@@ -15,7 +15,7 @@ export default function TeacherFollowAlongPage() {
 
   return (
     <main className="min-h-screen bg-stone-50 p-4 sm:p-6">
-      <div className="mx-auto max-w-4xl">
+      <div className="mx-auto max-w-[96rem]">
         <TeacherFollowAlongPanel
           teacherBookId={teacherBookId}
           presentation="standalone"

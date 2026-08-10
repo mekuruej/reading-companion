@@ -10,7 +10,9 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { getBookIdentity } from "@/lib/books/bookIdentity";
 import { bookTypeTitleLabel } from "@/lib/books/bookTypes";
+import { TeacherFollowAlongPanel } from "../../../../../library/[teacherBookId]/follow/components/TeacherFollowAlongPanel";
 
 type TeacherUseStatus =
   | "want_to_test"
@@ -30,12 +32,16 @@ type StudentProfile = {
 type BookMeta = {
   id: string;
   title: string | null;
+  title_reading?: string | null;
   author: string | null;
+  author_english_name?: string | null;
+  author_reading?: string | null;
   cover_url: string | null;
   isbn13: string | null;
   isbn: string | null;
   page_count: number | null;
   book_type: string | null;
+  language_code?: string | null;
 };
 
 type StudentUserBook = {
@@ -209,12 +215,16 @@ export default function StudentBookWorkspacePage() {
           books:book_id (
             id,
             title,
+            title_reading,
             author,
+            author_english_name,
+            author_reading,
             cover_url,
             isbn13,
             isbn,
             page_count,
-            book_type
+            book_type,
+            language_code
           )
         `
         )
@@ -282,18 +292,13 @@ export default function StudentBookWorkspacePage() {
   }
 
   const book = firstBook(studentBook?.books ?? null);
+  const bookIdentity = getBookIdentity(book);
   const studentName = student?.display_name || student?.username || "Student";
   const backHref = student?.username ? `/users/${student.username}/books` : "/teacher/students";
 
   const primaryActions = useMemo<ActionCard[]>(() => {
     const encodedUserBookId = encodeURIComponent(userBookId);
     return [
-      {
-        title: "Live Lesson Add Word",
-        description: "Capture words quickly during a live lesson.",
-        href: `/teacher/students/${encodeURIComponent(studentId)}/books/${encodedUserBookId}/lesson-add`,
-        tone: "amber",
-      },
       {
         title: "Student Book Hub",
         description: "Open the student's normal book hub and reading history.",
@@ -307,9 +312,11 @@ export default function StudentBookWorkspacePage() {
         tone: "purple",
       },
       {
-        title: "Supported Reading",
-        description: "Use saved-word support while reading this book.",
-        href: `/books/${encodedUserBookId}/readalong`,
+        title: "Follow-Along + Teacher Notebook",
+        description: "Read together with prepared support, teacher notes, and Quick Word capture.",
+        href: `/teacher/students/${encodeURIComponent(
+          studentId
+        )}/books/${encodedUserBookId}/workspace#student-lesson-follow-along`,
         tone: "green",
       },
     ];
@@ -398,10 +405,10 @@ export default function StudentBookWorkspacePage() {
                 Student Book Workspace
               </p>
               <h1 className="mt-2 text-3xl font-black text-stone-950 md:text-4xl">
-                {book?.title ?? "Untitled book"}
+                {bookIdentity.title}
               </h1>
-              {book?.author ? (
-                <p className="mt-2 text-sm font-semibold text-stone-600">{book.author}</p>
+              {bookIdentity.author ? (
+                <p className="mt-2 text-sm font-semibold text-stone-600">{bookIdentity.author}</p>
               ) : null}
 
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-black uppercase tracking-wide text-stone-500">
@@ -437,6 +444,35 @@ export default function StudentBookWorkspacePage() {
             </div>
           </div>
         </section>
+
+        {teacherBook ? (
+          <section id="student-lesson-follow-along" className="mt-7">
+            <div className="mb-3">
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-700">
+                  Student Lesson
+                </p>
+                <p className="text-lg font-black leading-none text-sky-900">{studentName}</p>
+              </div>
+              <h2 className="mt-1 text-2xl font-black text-stone-950">
+                Follow-Along | Teacher Notebook
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-stone-600">
+                {bookIdentity.title} · Quick Word drafts are saved to {studentName}&apos;s lesson list for this student book.
+              </p>
+            </div>
+            <TeacherFollowAlongPanel
+              teacherBookId={teacherBook.id}
+              contextLabel={`Student Lesson · ${studentName}`}
+              contextDetail={bookIdentity.title}
+              notebookStudentId={studentId}
+              notebookStudentName={studentName}
+              notebookUserBookId={userBookId}
+              enableNotebookWordCapture
+              hideHeader
+            />
+          </section>
+        ) : null}
 
         <section className="mt-6">
           <div className="mb-3">

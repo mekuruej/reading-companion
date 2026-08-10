@@ -3,7 +3,12 @@ import Link from "next/link";
 type BookStatsHeaderProps = {
   bookTitle: string | null;
   bookTitleReading?: string | null;
+  author?: string | null;
+  authorReading?: string | null;
   coverUrl?: string | null;
+  statusLabel?: string | null;
+  languageLabel?: string | null;
+  formatLabel?: string | null;
   canOpenVocabList?: boolean;
   bookHubHref: string;
   vocabListHref: string;
@@ -13,71 +18,112 @@ type BookStatsHeaderProps = {
 export default function BookStatsHeader({
   bookTitle,
   bookTitleReading,
+  author,
+  authorReading,
   coverUrl,
+  statusLabel,
+  languageLabel,
+  formatLabel,
   canOpenVocabList = false,
   bookHubHref,
   vocabListHref,
   description = "Reading history, time, pace, and difficulty.",
 }: BookStatsHeaderProps) {
   const displayTitle = bookTitle ?? "Untitled book";
+  const metadataPills = [statusLabel, languageLabel, formatLabel].filter(
+    (value): value is string => Boolean(value?.trim())
+  );
 
   return (
-    <section className="rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Link
-          href={bookHubHref}
-          className="flex min-w-0 items-center gap-4 rounded-xl text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
-          title={`Go to ${displayTitle} Book Hub`}
-        >
-          {coverUrl ? (
-            <img
-              src={coverUrl}
-              alt={`${displayTitle} cover`}
-              className="h-32 w-24 shrink-0 rounded-xl border border-stone-200 object-cover shadow-sm"
-            />
-          ) : (
-            <div className="flex h-32 w-24 shrink-0 items-center justify-center rounded-xl border border-stone-200 bg-stone-100 text-xs text-stone-400 shadow-sm">
-              No cover
-            </div>
-          )}
+    <section className="overflow-hidden rounded-[2rem] border border-white/70 bg-white shadow-sm">
+      <div className="relative bg-gradient-to-br from-sky-100 via-amber-50 to-emerald-100 p-7 md:p-10">
+        <div className="grid gap-8 md:grid-cols-[220px_minmax(0,1fr)] md:items-center">
+          <Link
+            href={bookHubHref}
+            className="w-40 rounded-[1.8rem] text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400 md:w-56"
+            title={`Go to ${displayTitle} Book Hub`}
+          >
+            {coverUrl ? (
+              <img
+                src={coverUrl}
+                alt={`${displayTitle} cover`}
+                className="aspect-[2/3] w-full rounded-[1.8rem] border-[6px] border-white object-cover shadow-xl"
+              />
+            ) : (
+              <div className="flex aspect-[2/3] w-full items-center justify-center rounded-[1.8rem] border-[6px] border-white bg-stone-950 text-4xl font-black text-white shadow-xl">
+                No cover
+              </div>
+            )}
+          </Link>
 
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-              Book Stats
-            </p>
+            <div className="mb-5 flex flex-wrap gap-2">
+              <span className="rounded-full bg-white/80 px-4 py-1.5 text-xs font-black uppercase tracking-[0.22em] text-stone-600 shadow-sm">
+                Book Stats
+              </span>
+              <span className="rounded-full bg-stone-950 px-4 py-1.5 text-xs font-black text-white shadow-sm">
+                Private View
+              </span>
+            </div>
 
-            <h1 className="mt-1 truncate text-xl font-black tracking-tight text-stone-900 sm:text-2xl">
+            <h1 className="text-5xl font-black leading-none text-stone-950 md:text-7xl">
               {displayTitle}
             </h1>
 
             {bookTitleReading ? (
-              <p className="mt-1 truncate text-sm text-stone-500">
+              <p className="mt-2 text-sm font-semibold text-stone-600 md:text-base">
                 {bookTitleReading}
               </p>
             ) : null}
 
-            <p className="mt-2 hidden text-sm text-stone-600 sm:block">
+            {author ? (
+              <div className="mt-4">
+                <p className="text-xl font-black text-stone-900 md:text-2xl">
+                  {author}
+                </p>
+                {authorReading ? (
+                  <p className="mt-1 text-sm font-semibold text-stone-600">
+                    {authorReading}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            <p className="mt-5 max-w-3xl text-base font-semibold leading-7 text-stone-700 md:text-lg md:leading-8">
               {description}
             </p>
+
+            {metadataPills.length > 0 ? (
+              <div className="mt-5 flex flex-wrap gap-2">
+                {metadataPills.map((pill) => (
+                  <span
+                    key={pill}
+                    className="rounded-full bg-white/75 px-4 py-2 text-sm font-black text-stone-700 shadow-sm"
+                  >
+                    {pill}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Link
+                href={bookHubHref}
+                className="rounded-full bg-stone-950 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-stone-800"
+              >
+                Back to Book Hub
+              </Link>
+
+              {canOpenVocabList ? (
+                <Link
+                  href={vocabListHref}
+                  className="rounded-full bg-white/80 px-4 py-2 text-sm font-black text-stone-700 shadow-sm transition hover:bg-white"
+                >
+                  Vocab List
+                </Link>
+              ) : null}
+            </div>
           </div>
-        </Link>
-
-        <div className="flex flex-wrap gap-2 sm:justify-end">
-          {canOpenVocabList ? (
-            <Link
-              href={vocabListHref}
-              className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
-            >
-              Vocab List
-            </Link>
-          ) : null}
-
-          <Link
-            href={bookHubHref}
-            className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
-          >
-            Book Hub
-          </Link>
         </div>
       </div>
     </section>

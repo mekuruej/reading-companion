@@ -7,11 +7,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { findMekuruReadingLevel } from "@/components/profile/MekuruReadingLevelGuide";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
-import {
-  emptyLibraryStudyColorTotals,
-  fetchLibraryStudyColorTotals,
-  type LibraryStudyColorTotals,
-} from "@/lib/libraryStudyTotals";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { bookTypeLabel } from "@/lib/books/bookTypes";
 import { supabase } from "@/lib/supabaseClient";
 
 type ProfileRow = {
@@ -29,37 +26,32 @@ type ProfileRow = {
 type PublicProfileRow = {
   jlpt_level_public: string | null;
   favorite_genres: string[] | null;
-  bio: string | null;
   public_name_choice: "display_name" | "username" | null;
 };
 
-type CurrentBookPreview = {
-  id: string;
-  title: string;
-  author: string | null;
-  cover_url: string | null;
+type SessionRow = {
+  user_book_id: string | null;
+  start_page: number | null;
+  end_page: number | null;
+  minutes_read: number | null;
+  session_mode: string | null;
+  is_filler?: boolean | null;
+  user_books?: {
+    books?: {
+      book_type: string | null;
+      language_code: string | null;
+    } | null;
+  } | null;
 };
 
-const colorHighlights = [
-  {
-    key: "green",
-    label: "Green",
-    description: "Reading Gate",
-    className: "bg-emerald-500",
-  },
-  {
-    key: "blue",
-    label: "Blue",
-    description: "Meaning Gate",
-    className: "bg-sky-500",
-  },
-  {
-    key: "purple",
-    label: "Purple",
-    description: "Mastered",
-    className: "bg-violet-500",
-  },
-] as const;
+type PaceByBookType = {
+  bookType: string;
+  label: string;
+  curiosityMinPerPage: number | null;
+  curiosityPages: number;
+  fluidMinPerPage: number | null;
+  fluidPages: number;
+};
 
 function firstInitial(name: string) {
   return (name.trim()[0] ?? "M").toUpperCase();
@@ -81,6 +73,94 @@ function displayValue(value: string | null | undefined, fallback = "Not set") {
 function formatCount(value: number | null | undefined) {
   if (value == null) return "—";
   return value.toLocaleString();
+}
+
+function formatMinutes(total: number | null | undefined) {
+  if (total == null) return "—";
+  if (total <= 0) return "0m";
+
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+
+  if (hours === 0) return `${minutes}m`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
+}
+
+function formatMinPerPage(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return `${value.toFixed(1)} min/page`;
+}
+
+function sessionPages(row: SessionRow) {
+  const start = Number(row.start_page);
+  const end = Number(row.end_page);
+
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return 0;
+  if (end <= start) return 0;
+
+  return end - start;
+}
+
+function isJapanesePaceBook(row: SessionRow) {
+  const languageCode = row.user_books?.books?.language_code?.trim().toLowerCase();
+  return !languageCode || languageCode === "ja";
+}
+
+function buildPaceByBookType(sessions: SessionRow[]) {
+  const buckets = new Map<
+    string,
+    {
+      curiosityMinutes: number;
+      curiosityPages: number;
+      fluidMinutes: number;
+      fluidPages: number;
+    }
+  >();
+
+  for (const row of sessions) {
+    if (row.session_mode !== "curiosity" && row.session_mode !== "fluid") continue;
+    if (!isJapanesePaceBook(row)) continue;
+
+    const pages = sessionPages(row);
+    const minutes = row.minutes_read ?? 0;
+    if (pages <= 0 || minutes <= 0) continue;
+
+    const bookType = row.user_books?.books?.book_type ?? "other";
+    const bucket =
+      buckets.get(bookType) ??
+      {
+        curiosityMinutes: 0,
+        curiosityPages: 0,
+        fluidMinutes: 0,
+        fluidPages: 0,
+      };
+
+    if (row.session_mode === "curiosity") {
+      bucket.curiosityMinutes += minutes;
+      bucket.curiosityPages += pages;
+    } else {
+      bucket.fluidMinutes += minutes;
+      bucket.fluidPages += pages;
+    }
+
+    buckets.set(bookType, bucket);
+  }
+
+  return Array.from(buckets.entries())
+    .map(([bookType, bucket]) => ({
+      bookType,
+      label: bookTypeLabel(bookType, "Other"),
+      curiosityMinPerPage:
+        bucket.curiosityPages > 0
+          ? bucket.curiosityMinutes / bucket.curiosityPages
+          : null,
+      curiosityPages: bucket.curiosityPages,
+      fluidMinPerPage:
+        bucket.fluidPages > 0 ? bucket.fluidMinutes / bucket.fluidPages : null,
+      fluidPages: bucket.fluidPages,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 }
 
 function AccessLabel({
@@ -179,6 +259,29 @@ function HighlightCard({
   );
 }
 
+function PaceAverageCard({
+  label,
+  value,
+  bookTypeLabel,
+  pages,
+  tone,
+}: {
+  label: string;
+  value: string;
+  bookTypeLabel: string;
+  pages: number;
+  tone: "amber" | "emerald" | "sky" | "violet";
+}) {
+  return (
+    <HighlightCard
+      label={label}
+      value={value}
+      detail={`Japanese books only · ${bookTypeLabel}${pages > 0 ? ` · ${formatCount(pages)} pages` : ""}`}
+      tone={tone}
+    />
+  );
+}
+
 function DetailCard({ label, value }: { label: string; value: string | number | null | undefined }) {
   return (
     <div className="rounded-3xl border border-white/70 bg-white/85 p-5 shadow-sm">
@@ -245,36 +348,6 @@ function ActionCard({
   );
 }
 
-function CurrentBookCard({ book }: { book: CurrentBookPreview }) {
-  return (
-    <Link
-      href={`/books/${book.id}`}
-      className="grid grid-cols-[72px_minmax(0,1fr)] gap-4 rounded-3xl border border-white/70 bg-white/85 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-    >
-      {book.cover_url ? (
-        <img
-          src={book.cover_url}
-          alt={`${book.title} cover`}
-          className="aspect-[2/3] w-full rounded-2xl object-cover shadow-sm ring-1 ring-black/10"
-        />
-      ) : (
-        <div className="flex aspect-[2/3] w-full items-center justify-center rounded-2xl bg-stone-200 text-xs font-black text-stone-500">
-          Book
-        </div>
-      )}
-      <div className="min-w-0 py-1">
-        <p className="text-xs font-black uppercase tracking-[0.16em] text-stone-400">Reading</p>
-        <h3 className="mt-2 line-clamp-2 text-lg font-black leading-tight text-stone-950">
-          {book.title}
-        </h3>
-        {book.author ? (
-          <p className="mt-2 truncate text-sm font-semibold text-stone-500">{book.author}</p>
-        ) : null}
-      </div>
-    </Link>
-  );
-}
-
 export default function ProfileHubPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
@@ -282,11 +355,12 @@ export default function ProfileHubPage() {
   const [publicProfile, setPublicProfile] = useState<PublicProfileRow | null>(null);
   const [bookCount, setBookCount] = useState<number | null>(null);
   const [finishedBookCount, setFinishedBookCount] = useState<number | null>(null);
-  const [libraryWordCount, setLibraryWordCount] = useState<number | null>(null);
-  const [currentBooks, setCurrentBooks] = useState<CurrentBookPreview[]>([]);
-  const [colorTotals, setColorTotals] = useState<LibraryStudyColorTotals>(
-    emptyLibraryStudyColorTotals()
-  );
+  const [listenedBookCount, setListenedBookCount] = useState<number | null>(null);
+  const [totalPagesRead, setTotalPagesRead] = useState<number | null>(null);
+  const [totalMinutesSpent, setTotalMinutesSpent] = useState<number | null>(null);
+  const [canShowPaceAverages, setCanShowPaceAverages] = useState(false);
+  const [paceByBookType, setPaceByBookType] = useState<PaceByBookType[]>([]);
+  const [paceIndex, setPaceIndex] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -306,97 +380,115 @@ export default function ProfileHubPage() {
           if (!cancelled) {
             setProfile(null);
             setPublicProfile(null);
+            setCanShowPaceAverages(false);
             setLoading(false);
           }
           return;
         }
 
-        const [
-          profileResult,
-          publicProfileResult,
-          bookCountResult,
-          finishedBookCountResult,
-          libraryWordCountResult,
-          currentBooksResult,
-          colorTotalsResult,
-        ] = await Promise.all([
-          supabase
-            .from("profiles")
+	        const [
+	          profileResult,
+	          publicProfileResult,
+	          bookCountResult,
+	          finishedBookCountResult,
+          sessionTotalsResult,
+	        ] = await Promise.all([
+	          supabase
+	            .from("profiles")
             .select(
               "display_name, username, native_language, target_language, level, role, is_super_teacher, app_access_type, app_access_expires_at"
-            )
-            .eq("id", user.id)
-            .maybeSingle<ProfileRow>(),
-          supabase
-            .from("user_public_profile")
-            .select("jlpt_level_public, favorite_genres, bio, public_name_choice")
-            .eq("user_id", user.id)
-            .maybeSingle<PublicProfileRow>(),
-          supabase
-            .from("user_books")
+	            )
+	            .eq("id", user.id)
+	            .maybeSingle<ProfileRow>(),
+	          supabase
+	            .from("user_public_profile")
+	            .select("jlpt_level_public, favorite_genres, public_name_choice")
+	            .eq("user_id", user.id)
+	            .maybeSingle<PublicProfileRow>(),
+	          supabase
+	            .from("user_books")
             .select("id", { count: "exact", head: true })
-            .eq("user_id", user.id)
-            .or("is_teacher_prep.is.null,is_teacher_prep.eq.false"),
+	            .eq("user_id", user.id)
+	            .or("is_teacher_prep.is.null,is_teacher_prep.eq.false"),
+	          supabase
+	            .from("user_books")
+	            .select("id", { count: "exact", head: true })
+	            .eq("user_id", user.id)
+	            .not("finished_at", "is", null)
+	            .or("is_teacher_prep.is.null,is_teacher_prep.eq.false"),
           supabase
-            .from("user_books")
-            .select("id", { count: "exact", head: true })
-            .eq("user_id", user.id)
-            .not("finished_at", "is", null)
-            .or("is_teacher_prep.is.null,is_teacher_prep.eq.false"),
-          supabase
-            .from("user_library_word_summaries")
-            .select("study_identity_key", { count: "exact", head: true })
-            .eq("user_id", user.id),
-          supabase
-            .from("user_books")
+            .from("user_book_reading_sessions")
             .select(
               `
-              id,
-              books:book_id (
-                title,
-                author,
-                cover_url
+              user_book_id,
+              start_page,
+              end_page,
+              minutes_read,
+              session_mode,
+              is_filler,
+              user_books!inner (
+                user_id,
+                is_teacher_prep,
+                books (
+                  book_type,
+                  language_code
+                )
               )
             `
             )
-            .eq("user_id", user.id)
-            .not("started_at", "is", null)
-            .is("finished_at", null)
-            .is("dnf_at", null)
-            .or("is_teacher_prep.is.null,is_teacher_prep.eq.false")
-            .order("started_at", { ascending: false })
-            .limit(4),
-          fetchLibraryStudyColorTotals(user.id).catch((error) => {
-            console.error("Error loading reading profile color totals:", error);
-            return emptyLibraryStudyColorTotals();
-          }),
-        ]);
+            .eq("user_books.user_id", user.id)
+            .or("is_teacher_prep.is.null,is_teacher_prep.eq.false", {
+              foreignTable: "user_books",
+            }),
+	        ]);
 
-        if (profileResult.error) throw profileResult.error;
-        if (publicProfileResult.error) throw publicProfileResult.error;
-        if (bookCountResult.error) throw bookCountResult.error;
-        if (finishedBookCountResult.error) throw finishedBookCountResult.error;
-        if (libraryWordCountResult.error) throw libraryWordCountResult.error;
-        if (currentBooksResult.error) throw currentBooksResult.error;
+	        if (profileResult.error) throw profileResult.error;
+	        if (publicProfileResult.error) throw publicProfileResult.error;
+	        if (bookCountResult.error) throw bookCountResult.error;
+	        if (finishedBookCountResult.error) throw finishedBookCountResult.error;
+        if (sessionTotalsResult.error) throw sessionTotalsResult.error;
 
         if (!cancelled) {
-          const normalizedCurrentBooks = ((currentBooksResult.data ?? []) as any[])
-            .map((row) => ({
-              id: String(row.id),
-              title: String(row.books?.title ?? "").trim(),
-              author: row.books?.author ? String(row.books.author) : null,
-              cover_url: row.books?.cover_url ? String(row.books.cover_url) : null,
-            }))
-            .filter((book) => book.title);
+          const appAccessStatus = getAppAccessStatus({
+            role: profileResult.data?.role ?? null,
+            is_super_teacher: profileResult.data?.is_super_teacher ?? null,
+            app_access_type: profileResult.data?.app_access_type ?? null,
+            app_access_expires_at: profileResult.data?.app_access_expires_at ?? null,
+          });
+          const featureAccess = getFeatureAccess({
+            role: profileResult.data?.role ?? null,
+            isSuperTeacher: profileResult.data?.is_super_teacher ?? null,
+            hasFullAccess: appAccessStatus.hasFullAccess,
+            isTrialActive: appAccessStatus.isTrialActive,
+          });
+          const sessions = ((sessionTotalsResult.data ?? []) as any[] as SessionRow[]).filter(
+            (row) => !row.is_filler
+          );
+          const pagesRead = sessions.reduce((total, row) => {
+            if (row.session_mode === "listening") return total;
+            return total + sessionPages(row);
+          }, 0);
+          const minutesSpent = sessions.reduce(
+            (total, row) => total + (row.minutes_read ?? 0),
+            0
+          );
+          const listenedBooks = new Set(
+            sessions
+              .filter((row) => row.session_mode === "listening" && row.user_book_id)
+              .map((row) => row.user_book_id)
+          );
 
           setProfile(profileResult.data ?? null);
-          setPublicProfile(publicProfileResult.data ?? null);
-          setBookCount(bookCountResult.count ?? 0);
-          setFinishedBookCount(finishedBookCountResult.count ?? 0);
-          setLibraryWordCount(libraryWordCountResult.count ?? 0);
-          setCurrentBooks(normalizedCurrentBooks);
-          setColorTotals(colorTotalsResult);
-        }
+	          setPublicProfile(publicProfileResult.data ?? null);
+	          setBookCount(bookCountResult.count ?? 0);
+	          setFinishedBookCount(finishedBookCountResult.count ?? 0);
+          setListenedBookCount(listenedBooks.size);
+          setTotalPagesRead(pagesRead);
+          setTotalMinutesSpent(minutesSpent);
+          setCanShowPaceAverages(featureAccess.hasPaidAccess);
+          setPaceByBookType(buildPaceByBookType(sessions));
+          setPaceIndex(0);
+	        }
       } catch (error: any) {
         if (!cancelled) {
           setErrorMsg(error?.message ?? "Could not load profile information.");
@@ -412,6 +504,16 @@ export default function ProfileHubPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!canShowPaceAverages || paceByBookType.length <= 1) return;
+
+    const intervalId = window.setInterval(() => {
+      setPaceIndex((current) => (current + 1) % paceByBookType.length);
+    }, 10000);
+
+    return () => window.clearInterval(intervalId);
+  }, [canShowPaceAverages, paceByBookType.length]);
 
   const displayName = profile?.display_name?.trim() || "";
   const username = profile?.username?.trim() || "";
@@ -433,6 +535,8 @@ export default function ProfileHubPage() {
     targetLanguage,
     readingLevel?.plain ?? profile?.level,
   ].filter(Boolean);
+  const selectedPace =
+    paceByBookType.length > 0 ? paceByBookType[paceIndex % paceByBookType.length] : null;
 
   if (loading) {
     return (
@@ -470,9 +574,6 @@ export default function ProfileHubPage() {
                   <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-stone-600 shadow-sm">
                     My Reading Profile
                   </span>
-                  <span className="rounded-full bg-stone-950 px-3 py-1 text-xs font-black text-white shadow-sm">
-                    Private View
-                  </span>
                 </div>
 
                 <h1 className="text-4xl font-black leading-tight text-stone-950 md:text-6xl">
@@ -480,7 +581,7 @@ export default function ProfileHubPage() {
                 </h1>
 
                 <p className="mt-5 max-w-3xl text-lg font-semibold leading-8 text-stone-700">
-                  A living profile of your library, saved words, reading level, and current books.
+                  Your long-term reading profile: books read, books listened to, logged time, and reading level.
                 </p>
 
                 {heroFacts.length > 0 ? (
@@ -502,30 +603,53 @@ export default function ProfileHubPage() {
 
         <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <HighlightCard
-            label="Books"
-            value={formatCount(bookCount)}
-            detail="Books in your library"
+            label="Books Read"
+            value={formatCount(finishedBookCount)}
+            detail="Total books read"
             tone="amber"
           />
           <HighlightCard
-            label="Finished"
-            value={formatCount(finishedBookCount)}
-            detail="Completed books"
+            label={(listenedBookCount ?? 0) > 0 ? "Books Listened To" : "Books in Library"}
+            value={formatCount((listenedBookCount ?? 0) > 0 ? listenedBookCount : bookCount)}
+            detail={
+              (listenedBookCount ?? 0) > 0
+                ? "Books with listening history"
+                : "Total books in your library"
+            }
             tone="emerald"
           />
+	          <HighlightCard
+	            label="Pages Read (not listened to)"
+	            value={formatCount(totalPagesRead)}
+	            detail="All page-tracked reading"
+	            tone="sky"
+	          />
           <HighlightCard
-            label="Library Words"
-            value={formatCount(libraryWordCount)}
-            detail="Saved vocabulary archive"
-            tone="sky"
-          />
-          <HighlightCard
-            label="Reading Level"
-            value={readingLevel?.value ?? displayValue(profile?.level)}
-            detail={readingLevel?.plain ?? "Mekuru reader level"}
+            label="Time Spent"
+            value={formatMinutes(totalMinutesSpent)}
+            detail="All logged reading/listening time"
             tone="violet"
           />
         </section>
+
+        {canShowPaceAverages && selectedPace ? (
+          <section className="mt-4 grid gap-4 md:grid-cols-2">
+            <PaceAverageCard
+              label="Average Curiosity Reading"
+              value={formatMinPerPage(selectedPace.curiosityMinPerPage)}
+              bookTypeLabel={selectedPace.label}
+              pages={selectedPace.curiosityPages}
+              tone="amber"
+            />
+            <PaceAverageCard
+              label="Average Fluid Reading"
+              value={formatMinPerPage(selectedPace.fluidMinPerPage)}
+              bookTypeLabel={selectedPace.label}
+              pages={selectedPace.fluidPages}
+              tone="emerald"
+            />
+          </section>
+        ) : null}
 
         <section className="mt-6 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
           <ProfileSection
@@ -562,73 +686,19 @@ export default function ProfileHubPage() {
           </section>
         </section>
 
-        <section className="mt-6 grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
-          <ProfileSection
-            eyebrow="Word Colors"
-            title="Vocabulary Progress"
-            description="A quick look at the colors currently forming across your saved book vocabulary."
-          >
-            <div className="grid gap-3 sm:grid-cols-3">
-              {colorHighlights.map((color) => (
-                <div
-                  key={color.key}
-                  className="rounded-3xl border border-white/70 bg-white/85 p-4 shadow-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={`h-3 w-3 rounded-full ${color.className}`} />
-                    <p className="text-sm font-black text-stone-950">{color.label}</p>
-                  </div>
-                  <p className="mt-3 text-3xl font-black text-stone-950">
-                    {formatCount(colorTotals[color.key])}
-                  </p>
-                  <p className="mt-1 text-xs font-semibold text-stone-500">{color.description}</p>
-                </div>
-              ))}
-            </div>
-          </ProfileSection>
-
-          <ProfileSection
-            eyebrow="Currently Reading"
-            title="Books in Progress"
-            description="The books you have started and have not finished yet."
-          >
-            {currentBooks.length > 0 ? (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {currentBooks.map((book) => (
-                  <CurrentBookCard key={book.id} book={book} />
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-3xl border border-white/70 bg-white/85 p-5 text-sm font-semibold leading-6 text-stone-600 shadow-sm">
-                No current books yet. Start a book from your library and it will appear here.
-              </div>
-            )}
-          </ProfileSection>
-        </section>
-
-        <section className="mt-6 grid gap-5 lg:grid-cols-2">
-          <ProfileSection
-            eyebrow="Reader Bio"
-            title="Profile Notes"
-            description="This is the reader-facing bio saved in your profile settings."
-          >
-            <p className="rounded-3xl border border-white/70 bg-white/85 p-5 text-sm leading-7 text-stone-700 shadow-sm">
-              {publicProfile?.bio?.trim() || "No profile bio yet. Add one when you want this page to feel more personal."}
-            </p>
-          </ProfileSection>
-
-          <ProfileSection
-            eyebrow="Profile Tools"
-            title="Edit Profile"
+	        <section className="mt-6">
+	          <ProfileSection
+	            eyebrow="Profile Tools"
+	            title="Edit Profile"
             description="Update the reader details that shape this profile page."
           >
             <div className="grid gap-3">
-              <ActionCard
-                href="/community/profile/settings"
-                title="Edit Profile"
-                description="Update your reader details, level, favorite genres, and bio."
-                tone="amber"
-              />
+	              <ActionCard
+	                href="/community/profile/settings"
+	                title="Edit Profile"
+	                description="Update your reader details, level, and favorite genres."
+	                tone="amber"
+	              />
             </div>
           </ProfileSection>
         </section>

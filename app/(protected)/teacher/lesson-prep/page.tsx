@@ -56,6 +56,8 @@ function learningTaskTypeLabel(taskType: string) {
   if (taskType === "reread_pages") return "Reread pages";
   if (taskType === "review_book_words") return "Book flashcards";
   if (taskType === "kanji_reading_practice") return "Kanji Reading";
+  if (taskType === "study_kana") return "Study Kana";
+  if (taskType === "foundations_vocabulary") return "Foundations Vocabulary";
   if (taskType === "listening") return "Listening";
   return "Learning task";
 }

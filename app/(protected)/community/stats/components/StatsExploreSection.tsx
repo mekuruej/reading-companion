@@ -15,8 +15,8 @@ export default function StatsExploreSection({
   cards,
 }: StatsExploreSectionProps) {
   return (
-    <section className="mt-8">
-      <div className="mb-4 flex items-end justify-between gap-4">
+    <section className="mt-5">
+      <div className="mb-3 flex items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black text-stone-900">
             Explore more stats

@@ -1310,8 +1310,8 @@ export default function BooksPage() {
 
 
   function renderBookCard(row: UserBookRow) {
-    const liveLessonHref = isViewingStudentLibrary
-      ? `/teacher/students/${encodeURIComponent(viewingUserId)}/books/${encodeURIComponent(row.id)}/lesson-add`
+    const workspaceHref = isViewingStudentLibrary
+      ? `/teacher/students/${encodeURIComponent(viewingUserId)}/books/${encodeURIComponent(row.id)}/workspace`
       : null;
 
     return (
@@ -1321,15 +1321,15 @@ export default function BooksPage() {
         stats={readingStatsByUserBookId[row.id]}
         href={`/books/${row.id}`}
         formatRelativeDate={formatRelativeDate}
-        secondaryActionHref={liveLessonHref}
-        secondaryActionLabel="Live Lesson Add Word"
+        secondaryActionHref={workspaceHref}
+        secondaryActionLabel="Open Workspace"
       />
     );
   }
 
   function renderBookRow(row: UserBookRow) {
-    const liveLessonHref = isViewingStudentLibrary
-      ? `/teacher/students/${encodeURIComponent(viewingUserId)}/books/${encodeURIComponent(row.id)}/lesson-add`
+    const workspaceHref = isViewingStudentLibrary
+      ? `/teacher/students/${encodeURIComponent(viewingUserId)}/books/${encodeURIComponent(row.id)}/workspace`
       : null;
 
     return (
@@ -1338,8 +1338,8 @@ export default function BooksPage() {
         row={row}
         status={getLibraryItemStatusLabel(row)}
         onOpen={() => router.push(`/books/${row.id}`)}
-        secondaryActionHref={liveLessonHref}
-        secondaryActionLabel="Live Lesson Add Word"
+        secondaryActionHref={workspaceHref}
+        secondaryActionLabel="Open Workspace"
       />
     );
   }
@@ -1365,6 +1365,8 @@ export default function BooksPage() {
     if (taskType === "review_book_words") return "Study book flashcards";
     if (taskType === "review_recent_words") return "Review recent words";
     if (taskType === "kanji_reading_practice") return "Kanji Reading";
+    if (taskType === "study_kana") return "Study Kana";
+    if (taskType === "foundations_vocabulary") return "Foundations Vocabulary";
     if (taskType === "listening") return "Listening";
     return "Learning task";
   }
@@ -1372,6 +1374,17 @@ export default function BooksPage() {
   function learningTaskAction(task: LearningTaskRow) {
     if (task.task_type === "kanji_reading_practice") {
       return { href: "/library-study/characters", label: "Open Character Study" };
+    }
+
+    if (task.task_type === "study_kana") {
+      return { href: "/library-study/kana", label: "Open Kana Study" };
+    }
+
+    if (task.task_type === "foundations_vocabulary") {
+      return {
+        href: "/library-study/foundation-vocabulary",
+        label: "Open Foundations Vocabulary",
+      };
     }
 
     if (!task.user_book_id) return null;

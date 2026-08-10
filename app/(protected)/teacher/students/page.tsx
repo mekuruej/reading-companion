@@ -103,6 +103,8 @@ type LearningTaskType =
     | "reread_pages"
     | "review_book_words"
     | "kanji_reading_practice"
+    | "study_kana"
+    | "foundations_vocabulary"
     | "listening";
 
 type RereadTaskMode =
@@ -125,6 +127,14 @@ const DEFAULT_TASK_COPY: Record<LearningTaskType, { title: string; instructions:
     kanji_reading_practice: {
         title: "Do Kanji Reading practice",
         instructions: "Practice a short set of global Kanji Reading cards.",
+    },
+    study_kana: {
+        title: "Study Kana",
+        instructions: "Practice hiragana and katakana.",
+    },
+    foundations_vocabulary: {
+        title: "Study Foundations Vocabulary",
+        instructions: "Review the Foundations Vocabulary cards.",
     },
     listening: {
         title: "Listen to today’s section",
@@ -230,6 +240,8 @@ function learningTaskTypeLabel(taskType: string) {
     if (taskType === "reread_pages") return "Reread pages";
     if (taskType === "review_book_words") return "Book flashcards";
     if (taskType === "kanji_reading_practice") return "Kanji Reading";
+    if (taskType === "study_kana") return "Study Kana";
+    if (taskType === "foundations_vocabulary") return "Foundations Vocabulary";
     if (taskType === "listening") return "Listening";
     return "Learning task";
 }
@@ -1132,6 +1144,14 @@ export default function TeacherStudentsPage() {
         if (taskType === "kanji_reading_practice") {
             taskPayload.mode = "kanji_reading_practice";
             taskPayload.card_count = kanjiCardCount ?? 10;
+        }
+
+        if (taskType === "study_kana") {
+            taskPayload.mode = "study_kana";
+        }
+
+        if (taskType === "foundations_vocabulary") {
+            taskPayload.mode = "foundations_vocabulary";
         }
 
         if (taskType === "listening") {

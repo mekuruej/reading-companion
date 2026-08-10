@@ -24,8 +24,16 @@ const LEARNING_TASK_TYPE_OPTIONS = [
   { value: "reread_pages", label: "Reread pages" },
   { value: "review_book_words", label: "Study book flashcards" },
   { value: "kanji_reading_practice", label: "Kanji Reading practice" },
+  { value: "study_kana", label: "Study Kana" },
+  { value: "foundations_vocabulary", label: "Foundations Vocabulary" },
   { value: "listening", label: "Listening" },
 ];
+
+const GLOBAL_TASK_TYPES = new Set([
+  "kanji_reading_practice",
+  "study_kana",
+  "foundations_vocabulary",
+]);
 
 const REREAD_TASK_MODE_OPTIONS = [
   { value: "fluid_reading_saved_words", label: "Fluid Reading with Saved Word Support" },
@@ -157,9 +165,9 @@ export default function TeacherLearningTaskModal({
             </select>
           </label>
 
-          {taskType === "kanji_reading_practice" ? (
+          {GLOBAL_TASK_TYPES.has(taskType) ? (
             <div className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm text-stone-600">
-              Kanji Reading tasks are global, so they do not need a linked book.
+              This task is global, so it does not need a linked book.
             </div>
           ) : (
             <label className="grid gap-1 text-sm font-semibold text-stone-700">
@@ -284,7 +292,7 @@ export default function TeacherLearningTaskModal({
             />
           </label>
 
-          {taskType !== "kanji_reading_practice" &&
+          {!GLOBAL_TASK_TYPES.has(taskType) &&
           (taskType !== "review_book_words" || taskFlashcardFilter === "page_range") ? (
             <>
               <label className="grid gap-1 text-sm font-semibold text-stone-700">

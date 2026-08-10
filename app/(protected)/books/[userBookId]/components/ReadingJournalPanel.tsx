@@ -182,7 +182,7 @@ export default function ReadingJournalPanel({
   const [characters, setCharacters] = useState<Character[]>([]);
   const [characterSearch, setCharacterSearch] = useState("");
   const [showCharacters, setShowCharacters] = useState(true);
-  const [charactersReverseOrder, setCharactersReverseOrder] = useState(false);
+  const [charactersReverseOrder, setCharactersReverseOrder] = useState(true);
   const [editingCharacterIds, setEditingCharacterIds] = useState<string[]>([]);
   const [savingCharacterIds, setSavingCharacterIds] = useState<string[]>([]);
   const [savedCharacterIds, setSavedCharacterIds] = useState<string[]>([]);
@@ -190,7 +190,7 @@ export default function ReadingJournalPanel({
   const [chapterSummaries, setChapterSummaries] = useState<ChapterSummary[]>([]);
   const [plotSearch, setPlotSearch] = useState("");
   const [showChapterSummaries, setShowChapterSummaries] = useState(true);
-  const [chapterReverseOrder, setChapterReverseOrder] = useState(false);
+  const [chapterReverseOrder, setChapterReverseOrder] = useState(true);
   const [expandedChapterIds, setExpandedChapterIds] = useState<string[]>([]);
   const [editingChapterIds, setEditingChapterIds] = useState<string[]>([]);
   const [savingChapterIds, setSavingChapterIds] = useState<string[]>([]);
@@ -200,7 +200,7 @@ export default function ReadingJournalPanel({
   const [settingItems, setSettingItems] = useState<SettingItem[]>([]);
   const [settingSearch, setSettingSearch] = useState("");
   const [showSettingItems, setShowSettingItems] = useState(true);
-  const [settingReverseOrder, setSettingReverseOrder] = useState(false);
+  const [settingReverseOrder, setSettingReverseOrder] = useState(true);
   const [editingSettingIds, setEditingSettingIds] = useState<string[]>([]);
   const [savingSettingIds, setSavingSettingIds] = useState<string[]>([]);
   const [savedSettingIds, setSavedSettingIds] = useState<string[]>([]);
@@ -208,7 +208,7 @@ export default function ReadingJournalPanel({
   const [culturalItems, setCulturalItems] = useState<CulturalItem[]>([]);
   const [culturalSearch, setCulturalSearch] = useState("");
   const [showCulturalItems, setShowCulturalItems] = useState(true);
-  const [culturalReverseOrder, setCulturalReverseOrder] = useState(false);
+  const [culturalReverseOrder, setCulturalReverseOrder] = useState(true);
   const [editingCulturalIds, setEditingCulturalIds] = useState<string[]>([]);
   const [savingCulturalIds, setSavingCulturalIds] = useState<string[]>([]);
   const [savedCulturalIds, setSavedCulturalIds] = useState<string[]>([]);
@@ -1013,10 +1013,11 @@ export default function ReadingJournalPanel({
 
   const panel = (
     <StoryTab
-      storyTab={storyTab}
-      setStoryTab={setStoryTab}
-      tabOrder={tabOrder}
-      detectiveEntries={detective.detectiveEntries}
+	      storyTab={storyTab}
+	      setStoryTab={setStoryTab}
+	      tabOrder={tabOrder}
+	      showCharacterReadingField={bookLanguageCode !== "en"}
+	      detectiveEntries={detective.detectiveEntries}
       detectiveSearch={detective.detectiveSearch}
       setDetectiveSearch={detective.setDetectiveSearch}
       collapsedDetectiveGroups={detective.collapsedDetectiveGroups}

@@ -145,11 +145,14 @@ export default function BookHubActionGrid({
         return (
             <div className="pb-2">
                 <div className="mt-6 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 [&>button]:h-[104px]">
-                    <ActionButton
-                        title="Read / Listen"
-                        description="Start a timed reading or listening session and update your progress."
-                        className="bg-emerald-50 hover:bg-emerald-100"
-                        onClick={onFluidReadingJustReading}
+	                    <ActionButton
+	                        title="Read / Listen"
+	                        description={[
+	                            "Time reading or listening and update progress.",
+	                            "You can open the Reading Journal beside it if you want to take notes.",
+	                        ]}
+	                        className="bg-emerald-50 hover:bg-emerald-100"
+	                        onClick={onFluidReadingJustReading}
                         size="secondary"
                     />
 

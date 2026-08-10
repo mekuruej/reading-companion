@@ -65,6 +65,7 @@ type StoryTabProps = {
   storyTab: StoryTabMode;
   setStoryTab: (value: StoryTabMode) => void;
   tabOrder: StoryTabMode[];
+  showCharacterReadingField?: boolean;
 
   detectiveEntries: DetectiveEntry[];
   detectiveSearch: string;
@@ -240,6 +241,7 @@ export default function StoryTab({
   storyTab,
   setStoryTab,
   tabOrder,
+  showCharacterReadingField = true,
 
   detectiveEntries,
   detectiveSearch,
@@ -364,8 +366,8 @@ export default function StoryTab({
   const filteredVisibleCharacters = cleanCharacterSearch
     ? visibleCharacters.filter((character) =>
         [
-          character.name,
-          character.reading,
+	          character.name,
+	          showCharacterReadingField ? character.reading : "",
           character.role,
           characterFirstAppearance(character),
           character.notes,
@@ -464,7 +466,7 @@ export default function StoryTab({
                 onClick={() => setCharactersReverseOrder(!charactersReverseOrder)}
                 className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
               >
-                {charactersReverseOrder ? "Oldest First" : "Newest First"}
+	                Flip Order
               </button>
 
               <button
@@ -501,10 +503,10 @@ export default function StoryTab({
                     <div key={character.id} className="rounded-xl border bg-white p-4">
                       {!isEditing ? (
                         <div className="space-y-2 text-sm">
-                          <div className="font-medium text-stone-900">
-                            {character.name || "—"}
-                            {character.reading ? ` · ${character.reading}` : ""}
-                          </div>
+	                          <div className="font-medium text-stone-900">
+	                            {character.name || "—"}
+	                            {showCharacterReadingField && character.reading ? ` · ${character.reading}` : ""}
+	                          </div>
                           {firstAppearance ? (
                             <div className="inline-flex rounded-full border border-violet-100 bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-800">
                               First appearance: {firstAppearance}
@@ -542,14 +544,16 @@ export default function StoryTab({
                             className="w-full rounded border px-3 py-2 text-sm"
                           />
 
-                          <input
-                            value={character.reading ?? ""}
-                            onChange={(e) =>
-                              updateCharacter(character.id, "reading", e.target.value)
-                            }
-                            placeholder="Reading"
-                            className="w-full rounded border px-3 py-2 text-sm"
-                          />
+	                          {showCharacterReadingField ? (
+	                            <input
+	                              value={character.reading ?? ""}
+	                              onChange={(e) =>
+	                                updateCharacter(character.id, "reading", e.target.value)
+	                              }
+	                              placeholder="Reading"
+	                              className="w-full rounded border px-3 py-2 text-sm"
+	                            />
+	                          ) : null}
 
                           <input
                             value={character.role ?? ""}
@@ -647,7 +651,7 @@ export default function StoryTab({
                 onClick={() => setChapterReverseOrder(!chapterReverseOrder)}
                 className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
               >
-                {chapterReverseOrder ? "Oldest First" : "Newest First"}
+	                Flip Order
               </button>
 
               <button
@@ -810,7 +814,7 @@ export default function StoryTab({
                 onClick={() => setSettingReverseOrder(!settingReverseOrder)}
                 className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
               >
-                {settingReverseOrder ? "Oldest First" : "Newest First"}
+	                Flip Order
               </button>
 
               <button
@@ -947,7 +951,7 @@ export default function StoryTab({
                 onClick={() => setCulturalReverseOrder(!culturalReverseOrder)}
                 className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
               >
-                {culturalReverseOrder ? "Oldest First" : "Newest First"}
+	                Flip Order
               </button>
 
               <button

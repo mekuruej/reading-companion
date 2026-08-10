@@ -100,6 +100,8 @@ type LearningTaskType =
   | "reread_pages"
   | "review_book_words"
   | "kanji_reading_practice"
+  | "study_kana"
+  | "foundations_vocabulary"
   | "listening";
 
 type RereadTaskMode =
@@ -132,6 +134,14 @@ const DEFAULT_TASK_COPY: Record<LearningTaskType, { title: string; instructions:
   kanji_reading_practice: {
     title: "Do Kanji Reading practice",
     instructions: "Practice a short set of global Kanji Reading cards.",
+  },
+  study_kana: {
+    title: "Study Kana",
+    instructions: "Practice hiragana and katakana.",
+  },
+  foundations_vocabulary: {
+    title: "Study Foundations Vocabulary",
+    instructions: "Review the Foundations Vocabulary cards.",
   },
   listening: {
     title: "Listen to today’s section",
@@ -171,6 +181,8 @@ function learningTaskTypeLabel(taskType: string) {
   if (taskType === "reread_pages") return "Reread pages";
   if (taskType === "review_book_words") return "Book flashcards";
   if (taskType === "kanji_reading_practice") return "Kanji Reading";
+  if (taskType === "study_kana") return "Study Kana";
+  if (taskType === "foundations_vocabulary") return "Foundations Vocabulary";
   if (taskType === "listening") return "Listening";
   return "Learning task";
 }
@@ -611,6 +623,14 @@ export default function StudentWorkspacePage() {
       taskPayload.card_count = kanjiCardCount ?? 10;
     }
 
+    if (taskType === "study_kana") {
+      taskPayload.mode = "study_kana";
+    }
+
+    if (taskType === "foundations_vocabulary") {
+      taskPayload.mode = "foundations_vocabulary";
+    }
+
     if (taskType === "listening") {
       taskPayload.mode = "listening";
     }
@@ -917,22 +937,18 @@ export default function StudentWorkspacePage() {
 
                   <div className="mt-4 grid gap-2 sm:grid-cols-2">
                     <Link
-                      href={`/teacher/students/${encodeURIComponent(studentId)}/books/${encodedUserBookId}/lesson-add?${context}`}
+                      href={`/teacher/students/${encodeURIComponent(
+                        studentId
+                      )}/books/${encodedUserBookId}/workspace`}
                       className="rounded-xl bg-stone-900 px-3 py-2 text-center text-sm font-bold text-white hover:bg-stone-800"
                     >
-                      Live Lesson Add
+                      Open Workspace
                     </Link>
                     <Link
                       href={`/books/${encodedUserBookId}/words?${context}`}
                       className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-center text-sm font-bold text-stone-700 hover:bg-stone-50"
                     >
                       Vocabulary List
-                    </Link>
-                    <Link
-                      href={`/books/${encodedUserBookId}/readalong?${context}`}
-                      className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-center text-sm font-bold text-stone-700 hover:bg-stone-50"
-                    >
-                      Follow-Along
                     </Link>
                     <Link
                       href={`/books/${encodedUserBookId}?${context}`}

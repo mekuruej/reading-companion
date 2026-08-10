@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
 import { getBookIdentity } from "@/lib/books/bookIdentity";
+import { bookTypeLabel } from "@/lib/books/bookTypes";
 import { isEnglishNativeTrackerBook as getIsEnglishNativeTrackerBook } from "@/lib/books/englishNativeTracker";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import BookStatsLoadingState from "./components/BookStatsLoadingState";
@@ -21,6 +22,9 @@ type Book = {
     id: string;
     title: string | null;
     title_reading: string | null;
+    author: string | null;
+    author_english_name: string | null;
+    author_reading: string | null;
     cover_url: string | null;
     book_type: string | null;
     language_code: string | null;
@@ -67,6 +71,13 @@ function statusLabel(row: UserBook | null) {
     if (row.finished_at) return "Finished";
     if (row.started_at) return "Reading";
     return "Not started";
+}
+
+function languageLabel(languageCode: string | null | undefined) {
+    if (!languageCode) return null;
+    if (languageCode.toLowerCase() === "en") return "English";
+    if (languageCode.toLowerCase() === "ja") return "Japanese";
+    return languageCode.toUpperCase();
 }
 
 function WordHistoryCard({
@@ -205,16 +216,19 @@ export default function BookStatsPage() {
           finished_at,
           dnf_at,
           current_location,
-          rating_difficulty,
-          books (
-            id,
-            title,
-            title_reading,
-            cover_url,
-            book_type,
-            language_code,
-            page_count
-          )
+	          rating_difficulty,
+	          books (
+	            id,
+	            title,
+	            title_reading,
+	            author,
+	            author_english_name,
+	            author_reading,
+	            cover_url,
+	            book_type,
+	            language_code,
+	            page_count
+	          )
         `)
                 .eq("id", userBookId)
                 .maybeSingle();
@@ -559,7 +573,12 @@ export default function BookStatsPage() {
                 <BookStatsHeader
                     bookTitle={bookIdentity.title}
                     bookTitleReading={bookIdentity.titleReading}
+                    author={bookIdentity.author}
+                    authorReading={bookIdentity.authorReading}
                     coverUrl={book?.cover_url ?? null}
+                    statusLabel={statusLabel(row)}
+                    languageLabel={languageLabel(book?.language_code)}
+                    formatLabel={bookTypeLabel(book?.book_type, "") || null}
                     canOpenVocabList={canSeeVocabularyStats}
                     bookHubHref={`/books/${encodeURIComponent(userBookId)}`}
                     vocabListHref={`/books/${encodeURIComponent(userBookId)}/words`}

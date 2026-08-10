@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import ReadAlongReaderShell from "../../../../../books/[userBookId]/_shared/readalong/ReadAlongReaderShell";
-import ReadAlongSupportModeTabs from "../../../../../books/[userBookId]/_shared/readalong/ReadAlongSupportModeTabs";
+import TeacherNotebookPanel from "../../../../components/TeacherNotebookPanel";
 import { TeacherFollowAlongHeader } from "./TeacherFollowAlongHeader";
 import { TeacherFollowAlongBookBar } from "./TeacherFollowAlongBookBar";
 import { TeacherFollowAlongEmptyPageState } from "./TeacherFollowAlongEmptyPageState";
@@ -211,12 +211,26 @@ type TeacherFollowAlongPanelProps = {
   teacherBookId: string;
   presentation?: "standalone" | "embedded";
   ownerTeacherId?: string;
+  contextLabel?: string;
+  contextDetail?: string;
+  notebookStudentId?: string | null;
+  notebookStudentName?: string | null;
+  notebookUserBookId?: string | null;
+  enableNotebookWordCapture?: boolean;
+  hideHeader?: boolean;
 };
 
 export function TeacherFollowAlongPanel({
   teacherBookId,
   presentation = "standalone",
   ownerTeacherId,
+  contextLabel = "Teacher Prep",
+  contextDetail = "No student selected",
+  notebookStudentId = null,
+  notebookStudentName = null,
+  notebookUserBookId = null,
+  enableNotebookWordCapture = false,
+  hideHeader = false,
 }: TeacherFollowAlongPanelProps) {
 
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
@@ -229,7 +243,6 @@ export function TeacherFollowAlongPanel({
   const [teacherBook, setTeacherBook] = useState<TeacherBookRow | null>(null);
   const [items, setItems] = useState<TeacherFollowAlongItem[]>([]);
   const [missingReaderLink, setMissingReaderLink] = useState(false);
-  const [supportMode, setSupportMode] = useState<SupportMode>("full");
   const [pageIndex, setPageIndex] = useState(0);
   const [jumpPageInput, setJumpPageInput] = useState("");
   const [fadedThroughIndex, setFadedThroughIndex] = useState(-1);
@@ -500,6 +513,7 @@ export function TeacherFollowAlongPanel({
 
   const book = firstBook(teacherBook?.books ?? null);
   const isEmbedded = presentation === "embedded";
+  const supportMode: SupportMode = "full";
 
   if (loading) {
     return (
@@ -531,20 +545,20 @@ export function TeacherFollowAlongPanel({
 
   return (
     <div className={isEmbedded ? "space-y-3" : "space-y-4"}>
-      {isEmbedded ? (
+      {hideHeader ? null : isEmbedded ? (
         <div>
           <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
-            My Follow-Along
+            {contextLabel}
           </p>
           <h2 className="mt-1 text-xl font-black text-stone-950">
             {book?.title ?? "Teacher Follow-Along"}
           </h2>
           <p className="mt-1 text-xs leading-5 text-stone-500">
-            Your prepared support for this book. Page navigation here stays separate from Live Lesson capture.
+            {contextDetail}
           </p>
         </div>
       ) : (
-        <TeacherFollowAlongHeader />
+        <TeacherFollowAlongHeader contextLabel={contextLabel} contextDetail={contextDetail} />
       )}
 
       {isEmbedded ? null : (
@@ -563,49 +577,68 @@ export function TeacherFollowAlongPanel({
         </div>
       ) : null}
 
-      <ReadAlongSupportModeTabs
-        supportMode={supportMode}
-        onSupportModeChange={setSupportMode}
-      />
-
-      <ReadAlongReaderShell
-        scrollAreaRef={scrollAreaRef}
-        header={
-          <TeacherFollowAlongReaderHeader
-            pageIndex={pageIndex}
-            pageCount={pages.length}
-            jumpPageInput={jumpPageInput}
-            currentPageLabel={currentPage?.label ?? "Teacher Follow-Along"}
-            currentPageItemCount={currentPage?.items.length ?? null}
-            onJumpPageInputChange={setJumpPageInput}
-            onJumpToPage={jumpToPage}
-            onPrevious={goPrev}
-            onNext={goNext}
-          />
+      <div
+        className={
+          isEmbedded
+            ? "space-y-3"
+            : "grid gap-4 lg:grid-cols-2 lg:items-start"
         }
       >
-        {!currentPage || currentPage.items.length === 0 ? (
-          <TeacherFollowAlongEmptyPageState />
-        ) : (
-          <div className="mx-auto max-w-2xl space-y-3 pb-[60vh]">
-            {currentPage.items.map((item, index) => (
-              <div
-                key={item.id}
-                ref={(element) => {
-                  itemRefs.current[item.id] = element;
-                }}
-              >
-                <TeacherFollowAlongPrepItemCard
-                  item={item}
-                  supportMode={supportMode}
-                  isFaded={index <= fadedThroughIndex}
-                  onSelect={() => handleProgressTap(index, item.id)}
-                />
+        <div className="min-w-0 space-y-3">
+          <ReadAlongReaderShell
+            scrollAreaRef={scrollAreaRef}
+            header={
+              <TeacherFollowAlongReaderHeader
+                pageIndex={pageIndex}
+                pageCount={pages.length}
+                jumpPageInput={jumpPageInput}
+                currentPageLabel={currentPage?.label ?? "Teacher Follow-Along"}
+                currentPageItemCount={currentPage?.items.length ?? null}
+                onJumpPageInputChange={setJumpPageInput}
+                onJumpToPage={jumpToPage}
+                onPrevious={goPrev}
+                onNext={goNext}
+              />
+            }
+          >
+            {!currentPage || currentPage.items.length === 0 ? (
+              <TeacherFollowAlongEmptyPageState />
+            ) : (
+              <div className="mx-auto max-w-2xl space-y-3 pb-[60vh]">
+                {currentPage.items.map((item, index) => (
+                  <div
+                    key={item.id}
+                    ref={(element) => {
+                      itemRefs.current[item.id] = element;
+                    }}
+                  >
+                    <TeacherFollowAlongPrepItemCard
+                      item={item}
+                      supportMode={supportMode}
+                      isFaded={index <= fadedThroughIndex}
+                      onSelect={() => handleProgressTap(index, item.id)}
+                    />
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+          </ReadAlongReaderShell>
+        </div>
+
+        {isEmbedded ? null : (
+          <div className="lg:sticky lg:top-4">
+            <TeacherNotebookPanel
+              teacherBookId={teacherBook.id}
+              bookId={teacherBook.book_id}
+              userBookId={enableNotebookWordCapture ? notebookUserBookId : null}
+              studentId={enableNotebookWordCapture ? notebookStudentId : null}
+              studentName={notebookStudentName}
+              enableWordCapture={enableNotebookWordCapture}
+              compact
+            />
           </div>
         )}
-      </ReadAlongReaderShell>
+      </div>
     </div>
   );
 }
