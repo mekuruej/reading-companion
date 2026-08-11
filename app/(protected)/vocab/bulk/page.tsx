@@ -123,6 +123,12 @@ type LastSavedWordContext = {
   page: string;
 };
 
+type TeacherStudentBulkContext = {
+  studentId: string;
+  studentName: string;
+  backHref: string;
+};
+
 // -------------------------------------------------------------
 // Main Component
 // -------------------------------------------------------------
@@ -131,7 +137,9 @@ export default function BulkVocabPage() {
 
   const [userBookId, setUserBookId] = useState("");
   const [bookTitle, setBookTitle] = useState("");
-  const [bookCover, setBookCover] = useState("");
+  const [bookCover, setBookCover] = useState<string | null>(null);
+  const [teacherStudentContext, setTeacherStudentContext] =
+    useState<TeacherStudentBulkContext | null>(null);
 
   // The route/local state can provide a userBookId, but private queries and writes
   // should only use it after confirming it belongs to the logged-in user.
@@ -189,6 +197,17 @@ export default function BulkVocabPage() {
     setUserBookId(id);
   }, []);
 
+  useEffect(() => {
+    if (!userBookId || typeof window === "undefined") return;
+
+    const storageKey = `teacherNotebookBulkWords:${userBookId}`;
+    const storedWords = sessionStorage.getItem(storageKey);
+    if (!storedWords) return;
+
+    setRawInput((current) => current || storedWords);
+    sessionStorage.removeItem(storageKey);
+  }, [userBookId]);
+
   // -------------------------------------------------------------
   // Load authorized book info
   // -------------------------------------------------------------
@@ -199,6 +218,7 @@ export default function BulkVocabPage() {
       setAuthorizedUserBookId("");
       setBookTitle("");
       setBookCover(null);
+      setTeacherStudentContext(null);
 
       if (!userBookId) return;
 
@@ -308,9 +328,33 @@ export default function BulkVocabPage() {
         if (cancelled) return;
 
         const b = (data as any)?.books;
+        const ownerUserId = (data as any).user_id as string;
         setAuthorizedUserBookId((data as any).id);
         setBookTitle(b?.title ?? "");
         setBookCover(b?.cover_url ?? null);
+
+        if (!isOwner && (isLinkedTeacher || isSuperTeacher)) {
+          const { data: studentProfile, error: studentProfileError } = await supabase
+            .from("profiles")
+            .select("display_name, username")
+            .eq("id", ownerUserId)
+            .maybeSingle();
+
+          if (studentProfileError) throw studentProfileError;
+
+          const studentName =
+            studentProfile?.display_name || studentProfile?.username || "Student";
+
+          setTeacherStudentContext({
+            studentId: ownerUserId,
+            studentName,
+            backHref: `/teacher/students/${encodeURIComponent(ownerUserId)}/books/${encodeURIComponent(
+              (data as any).id
+            )}/workspace#student-lesson-follow-along`,
+          });
+        } else {
+          setTeacherStudentContext(null);
+        }
 
         const saved = localStorage.getItem(`chapter_userBook_${(data as any).id}`);
         if (saved) {
@@ -917,7 +961,31 @@ export default function BulkVocabPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
       <div className="mx-auto max-w-5xl">
-        <h1 className="text-2xl font-semibold text-stone-900">🧺 Add Vocabulary in Bulk</h1>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-stone-900">Bulk Add Vocabulary</h1>
+            {teacherStudentContext && bookTitle ? (
+              <div className="mt-2">
+                <p className="text-lg font-black text-stone-950">
+                  {teacherStudentContext.studentName} · {bookTitle}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-stone-600">
+                  Adding vocabulary to this student's book.
+                </p>
+              </div>
+            ) : null}
+          </div>
+
+          {teacherStudentContext ? (
+            <button
+              type="button"
+              onClick={() => router.push(teacherStudentContext.backHref)}
+              className="self-start rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-black text-stone-700 shadow-sm transition hover:bg-stone-50"
+            >
+              ← Back to Workspace
+            </button>
+          ) : null}
+        </div>
 
         {bookTitle ? (
           <div className="mb-4 mt-4 flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:mb-8 sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:p-4">

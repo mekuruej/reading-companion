@@ -6,7 +6,7 @@
 "use client";
 
 import { Fragment, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import ChapterNameCombobox from "@/components/ChapterNameCombobox";
 import {
@@ -25,6 +25,7 @@ import TeacherPrepDoneState from "./components/TeacherPrepDoneState";
 import TeacherPrepPastePanel from "./components/TeacherPrepPastePanel";
 import TeacherPrepBulkFieldsPanel from "./components/TeacherPrepBulkFieldsPanel";
 import TeacherPrepPrimaryActionBar from "./components/TeacherPrepPrimaryActionBar";
+import TeacherNotebookPanel, { NotebookTab } from "../../components/TeacherNotebookPanel";
 
 type ItemType = "word" | "phrase" | "grammar" | "sentence" | "translation" | "note";
 type PrepStep = "paste" | "definitions" | "details" | "done";
@@ -100,6 +101,14 @@ type SavedItemEditDraft = {
 
 const allItemTypes: ItemType[] = ["word", "phrase", "grammar", "sentence", "translation", "note"];
 const newPrepItemTypes: ItemType[] = ["phrase", "grammar", "sentence", "translation", "note"];
+const teacherNotebookTabs: NotebookTab[] = [
+  "grammar",
+  "phrase",
+  "translation",
+  "special_vocab",
+  "note",
+];
+const showLegacyPreparedSupportEditor = false;
 let draftIdCounter = 0;
 
 function isTeacherRole(profile: any) {
@@ -330,7 +339,13 @@ function blankDraft(surfaceText: string, defaultType: ItemType): PrepItemDraft {
 
 export default function TeacherBookPrepPage() {
   const params = useParams<{ teacherBookId: string }>();
+  const searchParams = useSearchParams();
   const teacherBookId = params.teacherBookId;
+  const requestedNotebookTab = searchParams.get("notebookTab");
+  const initialNotebookTab = teacherNotebookTabs.includes(requestedNotebookTab as NotebookTab)
+    ? (requestedNotebookTab as NotebookTab)
+    : null;
+  const initialNotebookSearch = searchParams.get("notebookQuery") ?? null;
 
   const [loading, setLoading] = useState(true);
   const [canAccess, setCanAccess] = useState(false);
@@ -357,6 +372,7 @@ export default function TeacherBookPrepPage() {
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(() => new Set());
   const [savedSearch, setSavedSearch] = useState("");
   const [savedPageFilter, setSavedPageFilter] = useState("all");
+  const [legacyItemsOpen, setLegacyItemsOpen] = useState(false);
   const editPanelRef = useRef<HTMLElement | null>(null);
 
   const itemCount = useMemo(() => parseItems(rawInput).length, [rawInput]);
@@ -1099,6 +1115,95 @@ export default function TeacherBookPrepPage() {
 
             <TeacherLibraryBookMessageBanner message={message} />
 
+            <section className="mt-6">
+              <TeacherNotebookPanel
+                teacherBookId={teacherBookId}
+                bookId={teacherBook.book_id}
+                userBookId={teacherBook.user_book_id}
+                mode="prep"
+                initialTab={initialNotebookTab}
+                initialSearch={initialNotebookSearch}
+              />
+            </section>
+
+            {savedItems.length > 0 ? (
+              <section className="mt-8 rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
+                      Legacy prepared support
+                    </p>
+                    <h2 className="mt-1 text-lg font-black text-stone-950">
+                      {savedItems.length} older prep item{savedItems.length === 1 ? "" : "s"} still power Follow-Along.
+                    </h2>
+                    <p className="mt-1 text-sm leading-6 text-stone-600">
+                      These are preserved for existing lessons. New reusable teaching notes belong in Teacher Notebook above.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLegacyItemsOpen((previous) => !previous)}
+                    className="rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-black text-stone-700 hover:bg-stone-100"
+                  >
+                    {legacyItemsOpen ? "Hide legacy items" : "View legacy items"}
+                  </button>
+                </div>
+
+                {legacyItemsOpen ? (
+                  <div className="mt-4 space-y-3">
+                    {savedItems.map((item) => (
+                      <article
+                        key={item.id}
+                        className="rounded-2xl border border-stone-200 bg-stone-50 p-3"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-black uppercase tracking-[0.14em] text-stone-400">
+                              {itemTypeLabel(item.item_type)}
+                            </p>
+                            <h3 className="mt-1 text-base font-black text-stone-950">
+                              {compactText(item.surface_text || "Teaching note")}
+                            </h3>
+                            {[item.reading, item.meaning].filter(Boolean).length > 0 ? (
+                              <p className="mt-1 text-sm font-semibold leading-6 text-stone-600">
+                                {[item.reading, item.meaning].filter(Boolean).join(" · ")}
+                              </p>
+                            ) : null}
+                          </div>
+                          {[chapterDisplay(item), item.page_number == null ? "" : `p. ${item.page_number}`]
+                            .filter(Boolean)
+                            .join(" · ") ? (
+                            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-stone-500 shadow-sm">
+                              {[chapterDisplay(item), item.page_number == null ? "" : `p. ${item.page_number}`]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </span>
+                          ) : null}
+                        </div>
+                        {combinedTeacherNote(item) ? (
+                          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-stone-700">
+                            {combinedTeacherNote(item)}
+                          </p>
+                        ) : null}
+                        {item.support_url?.trim() ? (
+                          <a
+                            href={item.support_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-2 inline-flex text-sm font-black text-blue-700 underline"
+                          >
+                            Reference link
+                          </a>
+                        ) : null}
+                      </article>
+                    ))}
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
+
+            {showLegacyPreparedSupportEditor ? (
+              <>
             {step === "paste" ? (
               <TeacherPrepPastePanel
                 itemTypes={newPrepItemTypes}
@@ -1711,6 +1816,8 @@ export default function TeacherBookPrepPage() {
                   </button>
                 </div>
               </section>
+            ) : null}
+              </>
             ) : null}
           </>
         )}

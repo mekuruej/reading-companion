@@ -1,6 +1,8 @@
 import ReadAlongPageNavigator from "../../../../../books/[userBookId]/_shared/readalong/ReadAlongPageNavigator";
 
 type TeacherFollowAlongReaderHeaderProps = {
+  titleLabel?: string;
+  title?: string;
   pageIndex: number;
   pageCount: number;
   jumpPageInput: string;
@@ -13,6 +15,8 @@ type TeacherFollowAlongReaderHeaderProps = {
 };
 
 export function TeacherFollowAlongReaderHeader({
+  titleLabel = "Teacher Vocabulary",
+  title = "Private Lesson Support",
   pageIndex,
   pageCount,
   jumpPageInput,
@@ -25,6 +29,15 @@ export function TeacherFollowAlongReaderHeader({
 }: TeacherFollowAlongReaderHeaderProps) {
   return (
     <>
+      <div>
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+          {titleLabel}
+        </p>
+        <h3 className="mt-1 text-xl font-black text-stone-950">
+          {title}
+        </h3>
+      </div>
+
       <ReadAlongPageNavigator
         pageIndex={pageIndex}
         pageCount={pageCount}

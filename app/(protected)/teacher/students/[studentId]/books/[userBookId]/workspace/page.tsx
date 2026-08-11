@@ -68,6 +68,8 @@ type ActionCard = {
   description: string;
   href: string;
   tone: "blue" | "green" | "purple" | "amber" | "stone";
+  anchorId?: string;
+  titleLines?: string[];
 };
 
 const teacherUseStatusLabels: Record<TeacherUseStatus, string> = {
@@ -142,17 +144,82 @@ function ActionCardLink({ action }: { action: ActionCard }) {
   return (
     <Link
       href={action.href}
+      onClick={(event) => {
+        if (!action.anchorId) return;
+
+        event.preventDefault();
+        const target = document.getElementById(action.anchorId);
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
+          window.history.replaceState(null, "", `#${action.anchorId}`);
+        }
+      }}
       className={`block rounded-2xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${cardToneClass(action.tone)}`}
     >
       <div className="flex min-h-28 flex-col justify-between gap-4">
         <div>
-          <h3 className="text-lg font-black text-stone-950">{action.title}</h3>
+          <h3 className="text-lg font-black leading-tight text-stone-950">
+            {action.titleLines
+              ? action.titleLines.map((line) => (
+                  <span key={line} className="block">
+                    {line}
+                  </span>
+                ))
+              : action.title}
+          </h3>
           <p className="mt-3 text-sm leading-6 text-stone-600">{action.description}</p>
         </div>
         <p className="text-sm font-black text-stone-900">Open</p>
       </div>
     </Link>
   );
+}
+
+async function ensureTeacherBookSupport(teacherId: string, bookId: string) {
+  const { data: existingUserBook, error: existingUserBookError } = await supabase
+    .from("user_books")
+    .select("id")
+    .eq("user_id", teacherId)
+    .eq("book_id", bookId)
+    .limit(1)
+    .maybeSingle();
+
+  if (existingUserBookError) throw existingUserBookError;
+
+  let linkedUserBookId = existingUserBook?.id ?? null;
+
+  if (!linkedUserBookId) {
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: insertedUserBook, error: insertUserBookError } = await supabase
+      .from("user_books")
+      .insert({
+        user_id: teacherId,
+        book_id: bookId,
+        started_at: today,
+      })
+      .select("id")
+      .single();
+
+    if (insertUserBookError) throw insertUserBookError;
+    linkedUserBookId = insertedUserBook.id;
+  }
+
+  const { data: teacherBook, error: teacherBookError } = await supabase
+    .from("teacher_books")
+    .upsert(
+      {
+        teacher_id: teacherId,
+        book_id: bookId,
+        user_book_id: linkedUserBookId,
+        teacher_use_status: "want_to_test",
+      },
+      { onConflict: "teacher_id,book_id" }
+    )
+    .select("id, teacher_use_status, teacher_use_note, user_book_id")
+    .single();
+
+  if (teacherBookError) throw teacherBookError;
+  return teacherBook as TeacherBookSupport;
 }
 
 export default function StudentBookWorkspacePage() {
@@ -169,6 +236,17 @@ export default function StudentBookWorkspacePage() {
   useEffect(() => {
     void loadWorkspace();
   }, [studentId, userBookId]);
+
+  useEffect(() => {
+    if (loading || !studentBook) return;
+    if (window.location.hash !== "#student-lesson-follow-along") return;
+
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById("student-lesson-follow-along")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [loading, studentBook]);
 
   async function loadWorkspace() {
     setLoading(true);
@@ -282,7 +360,11 @@ export default function StudentBookWorkspacePage() {
 
       setStudent((studentProfile ?? null) as StudentProfile | null);
       setStudentBook(loadedStudentBook);
-      setTeacherBook((teacherBookRow ?? null) as TeacherBookSupport | null);
+      setTeacherBook(
+        teacherBookRow
+          ? ((teacherBookRow ?? null) as TeacherBookSupport | null)
+          : await ensureTeacherBookSupport(currentUser.id, loadedStudentBook.book_id)
+      );
     } catch (error: any) {
       console.error("Error loading Student Book Workspace:", error);
       setMessage(error?.message ?? "Could not load Student Book Workspace.");
@@ -314,13 +396,13 @@ export default function StudentBookWorkspacePage() {
       {
         title: "Follow-Along + Teacher Notebook",
         description: "Read together with prepared support, teacher notes, and Quick Word capture.",
-        href: `/teacher/students/${encodeURIComponent(
-          studentId
-        )}/books/${encodedUserBookId}/workspace#student-lesson-follow-along`,
+        href: "#student-lesson-follow-along",
+        anchorId: "student-lesson-follow-along",
+        titleLines: ["Follow-Along +", "Teacher Notebook"],
         tone: "green",
       },
     ];
-  }, [studentId, userBookId]);
+  }, [userBookId]);
 
   const teacherSupportActions = useMemo<ActionCard[]>(() => {
     if (!teacherBook) return [];
@@ -445,35 +527,6 @@ export default function StudentBookWorkspacePage() {
           </div>
         </section>
 
-        {teacherBook ? (
-          <section id="student-lesson-follow-along" className="mt-7">
-            <div className="mb-3">
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-700">
-                  Student Lesson
-                </p>
-                <p className="text-lg font-black leading-none text-sky-900">{studentName}</p>
-              </div>
-              <h2 className="mt-1 text-2xl font-black text-stone-950">
-                Follow-Along | Teacher Notebook
-              </h2>
-              <p className="mt-1 text-sm leading-6 text-stone-600">
-                {bookIdentity.title} · Quick Word drafts are saved to {studentName}&apos;s lesson list for this student book.
-              </p>
-            </div>
-            <TeacherFollowAlongPanel
-              teacherBookId={teacherBook.id}
-              contextLabel={`Student Lesson · ${studentName}`}
-              contextDetail={bookIdentity.title}
-              notebookStudentId={studentId}
-              notebookStudentName={studentName}
-              notebookUserBookId={userBookId}
-              enableNotebookWordCapture
-              hideHeader
-            />
-          </section>
-        ) : null}
-
         <section className="mt-6">
           <div className="mb-3">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
@@ -486,6 +539,49 @@ export default function StudentBookWorkspacePage() {
               <ActionCardLink key={action.href} action={action} />
             ))}
           </div>
+        </section>
+
+        <section id="student-lesson-follow-along" className="mt-7 scroll-mt-6">
+          <div className="mb-3">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-700">
+                Student Lesson
+              </p>
+              <p className="text-lg font-black leading-none text-sky-900">{studentName}</p>
+            </div>
+            <h2 className="mt-1 text-2xl font-black text-stone-950">
+              Follow-Along | Teacher Notebook
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-stone-600">
+              {bookIdentity.title} · Quick Word drafts are saved to {studentName}&apos;s lesson list for this student book.
+            </p>
+          </div>
+
+          {teacherBook ? (
+            <TeacherFollowAlongPanel
+              teacherBookId={teacherBook.id}
+              contextLabel={`Student Lesson · ${studentName}`}
+              contextDetail={bookIdentity.title}
+              notebookStudentId={studentId}
+              notebookStudentName={studentName}
+              notebookUserBookId={userBookId}
+              enableNotebookWordCapture
+              hideHeader
+            />
+          ) : (
+            <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
+              <h3 className="text-xl font-black text-stone-950">Teacher support is not prepared yet.</h3>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-stone-600">
+                Add this title to your Teacher Library to use Follow-Along + Teacher Notebook for this student book.
+              </p>
+              <Link
+                href="/teacher/library"
+                className="mt-4 inline-flex rounded-full bg-stone-950 px-4 py-2 text-sm font-black text-white transition hover:bg-stone-800"
+              >
+                Open Teacher Library
+              </Link>
+            </div>
+          )}
         </section>
 
         <section className="mt-7">

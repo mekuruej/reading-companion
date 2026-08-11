@@ -602,7 +602,13 @@ export function TeacherFollowAlongPanel({
             }
           >
             {!currentPage || currentPage.items.length === 0 ? (
-              <TeacherFollowAlongEmptyPageState />
+              <TeacherFollowAlongEmptyPageState
+                message={
+                  enableNotebookWordCapture
+                    ? "No Follow-Along-ready words or support items yet. Use Quick Word in Teacher Notebook to add a student's unknown word from this page."
+                    : undefined
+                }
+              />
             ) : (
               <div className="mx-auto max-w-2xl space-y-3 pb-[60vh]">
                 {currentPage.items.map((item, index) => (
@@ -634,6 +640,7 @@ export function TeacherFollowAlongPanel({
               studentId={enableNotebookWordCapture ? notebookStudentId : null}
               studentName={notebookStudentName}
               enableWordCapture={enableNotebookWordCapture}
+              mode="lesson"
               compact
             />
           </div>

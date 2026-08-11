@@ -31,6 +31,7 @@ import {
     makeLibraryStudyColorKey,
     type LibraryStudyWordColorInfo,
 } from "@/lib/libraryStudyColorLookup";
+import { computeLibraryStudyColorStatus } from "@/lib/libraryStudyColor";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
 import {
     clearPersistedTimedSession,
@@ -136,6 +137,23 @@ function chapterLabelForWord(word: Pick<ReadAlongWord, "chapter_number" | "chapt
     if (chapterName) return chapterName;
 
     return "Unchaptered";
+}
+
+function chapterContextFromKey(chapterKey: string) {
+    if (!chapterKey || chapterKey === "all") {
+        return { chapterNumber: null as number | null, chapterName: null as string | null };
+    }
+
+    const [chapterNumberPart, chapterNamePart = ""] = chapterKey.split("|||");
+    const chapterNumber =
+        chapterNumberPart && chapterNumberPart !== "no-number"
+            ? Number(chapterNumberPart)
+            : null;
+
+    return {
+        chapterNumber: Number.isFinite(chapterNumber) ? chapterNumber : null,
+        chapterName: chapterNamePart.trim() || null,
+    };
 }
 
 function hasUsefulSupportMeaning(word: Pick<ReadAlongWord, "meaning">) {
@@ -265,6 +283,28 @@ function makeBlankAddAfterDraft(word = ""): AddAfterDraft {
         lookupLoading: false,
         saving: false,
         message: "",
+    };
+}
+
+function fallbackReadAlongColorInfo(word: {
+    surface?: string | null;
+    reading?: string | null;
+}): LibraryStudyWordColorInfo | null {
+    const key = makeLibraryStudyColorKey(word.surface, word.reading);
+    if (!word.surface?.trim() || !word.reading?.trim()) return null;
+
+    return {
+        colorStatus: computeLibraryStudyColorStatus({
+            encounterCount: 1,
+            readingGate: "not_started",
+            meaningGate: "not_started",
+            heldBeforeReadingGate: false,
+            heldBeforeMeaningGate: false,
+            mastered: false,
+        }),
+        stageLabel: null,
+        studyIdentityKey: key,
+        encounterCount: 1,
     };
 }
 
@@ -765,6 +805,10 @@ export default function ReadAlongPage() {
     const currentPageChapterLabel = currentPage?.words[0]
         ? chapterLabelForWord(currentPage.words[0])
         : selectedChapterLabel;
+    const emptyPageAddWordKey =
+        currentPage && currentPage.words.length === 0
+            ? `empty-page-${currentPage.pageNumber ?? pageIndex}`
+            : null;
 
     useEffect(() => {
         if (!hasRestoredSavedPage || currentPageNumber == null) return;
@@ -1340,6 +1384,21 @@ export default function ReadAlongPage() {
         });
     }
 
+    function openEmptyPageAddWord() {
+        if (!emptyPageAddWordKey) return;
+
+        setActiveAddAfterWordId((current) => {
+            if (current === emptyPageAddWordKey) {
+                setAddAfterDraft(makeBlankAddAfterDraft());
+                return null;
+            }
+
+            setActiveAddPlacement("after");
+            setAddAfterDraft(makeBlankAddAfterDraft());
+            return emptyPageAddWordKey;
+        });
+    }
+
     function applyAddAfterCandidate(candidate: JishoCandidate) {
         setAddAfterDraft((current) => ({
             ...current,
@@ -1700,11 +1759,215 @@ export default function ReadAlongPage() {
         }
     }
 
+    async function saveWordToCurrentEmptyPage() {
+        if (!userBookId || !canAccessBook || !canUseSavedWordReading || !currentPage) return;
+
+        const cleanWord = addAfterDraft.word.trim();
+        const cleanReading = addAfterDraft.reading.trim();
+        const cleanMeaning = addAfterDraft.meaning.trim();
+
+        if (!cleanWord || !cleanReading || !cleanMeaning) {
+            setAddAfterDraft((current) => ({
+                ...current,
+                message: "Add the word, reading, and meaning before saving.",
+            }));
+            return;
+        }
+
+        setAddAfterDraft((current) => ({
+            ...current,
+            saving: true,
+            message: "",
+        }));
+
+        try {
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
+
+            if (!user) {
+                setAddAfterDraft((current) => ({
+                    ...current,
+                    message: "Please sign in.",
+                }));
+                return;
+            }
+
+            let vocabularyCacheId: number | null = null;
+            const hasVerifiedDictionaryMatch = addAfterDraft.candidates.some(
+                (candidate) =>
+                    candidate.surface === cleanWord &&
+                    candidate.reading === cleanReading &&
+                    candidate.meaningChoices.length > 0
+            );
+
+            if (hasKanji(cleanWord) && cleanReading) {
+                const { data: existingCache, error: cacheLookupError } = await supabase
+                    .from("vocabulary_cache")
+                    .select("id, jlpt, is_common")
+                    .eq("surface", cleanWord)
+                    .eq("reading", cleanReading)
+                    .maybeSingle();
+
+                if (cacheLookupError) throw cacheLookupError;
+
+                const normalizedJlpt = normalizeJlpt(addAfterDraft.jlpt);
+                const cacheMetadata = {
+                    jlpt: normalizedJlpt === "NON-JLPT" ? null : normalizedJlpt,
+                    is_common: !!addAfterDraft.isCommon,
+                };
+
+                if (existingCache?.id) {
+                    vocabularyCacheId = existingCache.id;
+
+                    if ((!existingCache.jlpt && cacheMetadata.jlpt) || existingCache.is_common == null) {
+                        const { error: cacheUpdateError } = await supabase
+                            .from("vocabulary_cache")
+                            .update(cacheMetadata)
+                            .eq("id", existingCache.id);
+
+                        if (cacheUpdateError) {
+                            console.error("Error updating vocabulary cache metadata:", cacheUpdateError);
+                        }
+                    }
+                } else if (hasVerifiedDictionaryMatch) {
+                    const { data: createdCache, error: cacheInsertError } = await supabase
+                        .from("vocabulary_cache")
+                        .insert({
+                            surface: cleanWord,
+                            reading: cleanReading,
+                            ...cacheMetadata,
+                        })
+                        .select("id")
+                        .single();
+
+                    if (cacheInsertError) throw cacheInsertError;
+                    vocabularyCacheId = createdCache.id;
+                }
+            }
+
+            const chapterContext = chapterContextFromKey(selectedChapterKey);
+            let orderQuery = supabase
+                .from("user_book_words")
+                .select("page_order, chapter_name")
+                .eq("user_book_id", userBookId);
+
+            if (chapterContext.chapterNumber == null) orderQuery = orderQuery.is("chapter_number", null);
+            else orderQuery = orderQuery.eq("chapter_number", chapterContext.chapterNumber);
+
+            if (currentPage.pageNumber == null) orderQuery = orderQuery.is("page_number", null);
+            else orderQuery = orderQuery.eq("page_number", currentPage.pageNumber);
+
+            const { data: orderRows, error: orderError } = await orderQuery;
+
+            if (orderError) throw orderError;
+
+            const matchingOrderRows = (orderRows ?? []).filter(
+                (row) => (row.chapter_name ?? "").trim() === (chapterContext.chapterName ?? "")
+            );
+            const nextPageOrder =
+                Math.max(0, ...matchingOrderRows.map((row) => Number(row.page_order) || 0)) + 1;
+
+            const payload = {
+                user_book_id: userBookId,
+                vocabulary_cache_id: vocabularyCacheId,
+                surface: cleanWord,
+                reading: cleanReading,
+                meaning: cleanMeaning,
+                other_definition: addAfterDraft.meaningChoiceIndex == null ? cleanMeaning : null,
+                meaning_choices: addAfterDraft.meaningChoices,
+                meaning_choice_index: addAfterDraft.meaningChoiceIndex,
+                jlpt: normalizeJlpt(addAfterDraft.jlpt),
+                is_common: !!addAfterDraft.isCommon,
+                page_number: currentPage.pageNumber ?? null,
+                page_order: nextPageOrder,
+                chapter_number: chapterContext.chapterNumber,
+                chapter_name: chapterContext.chapterName,
+                hide_kanji_in_reading_support: false,
+                seen_on: todayYmdAppTimeZone(),
+                excluded_from_flashcards: !isReadyForFlashcards({
+                    surface: cleanWord,
+                    reading: cleanReading,
+                    meaning: cleanMeaning,
+                }),
+            };
+
+            const { data: insertedRow, error: insertError } = await supabase
+                .from("user_book_words")
+                .insert(payload)
+                .select(
+                    "id, surface, reading, meaning, jlpt, meaning_choice_index, page_number, page_order, chapter_number, chapter_name, hide_kanji_in_reading_support"
+                )
+                .single();
+
+            if (insertError) throw insertError;
+
+            const insertedWord: ReadAlongWord = {
+                id: String(insertedRow.id),
+                surface: insertedRow.surface ?? cleanWord,
+                reading: insertedRow.reading ?? cleanReading,
+                meaning: insertedRow.meaning ?? cleanMeaning,
+                jlpt: insertedRow.jlpt ?? normalizeJlpt(addAfterDraft.jlpt),
+                meaning_choice_index:
+                    insertedRow.meaning_choice_index == null
+                        ? null
+                        : Number(insertedRow.meaning_choice_index),
+                page_number: insertedRow.page_number ?? currentPage.pageNumber ?? null,
+                page_order: insertedRow.page_order ?? nextPageOrder,
+                chapter_number: insertedRow.chapter_number ?? chapterContext.chapterNumber,
+                chapter_name: insertedRow.chapter_name ?? chapterContext.chapterName,
+                hide_kanji_in_reading_support: !!insertedRow.hide_kanji_in_reading_support,
+            };
+
+            setWords((currentWords) =>
+                [...currentWords.filter((word) => word.id !== insertedWord.id), insertedWord].sort(
+                    (a, b) => {
+                        const aChapter = a.chapter_number ?? Number.MAX_SAFE_INTEGER;
+                        const bChapter = b.chapter_number ?? Number.MAX_SAFE_INTEGER;
+                        if (aChapter !== bChapter) return aChapter - bChapter;
+
+                        const aPage = a.page_number ?? Number.MAX_SAFE_INTEGER;
+                        const bPage = b.page_number ?? Number.MAX_SAFE_INTEGER;
+                        if (aPage !== bPage) return aPage - bPage;
+
+                        const aOrder = a.page_order ?? Number.MAX_SAFE_INTEGER;
+                        const bOrder = b.page_order ?? Number.MAX_SAFE_INTEGER;
+                        if (aOrder !== bOrder) return aOrder - bOrder;
+
+                        return a.id.localeCompare(b.id);
+                    }
+                )
+            );
+
+            if (vocabularyCacheId && hasKanji(cleanWord)) {
+                await generateVocabularyKanjiMap(vocabularyCacheId);
+            }
+
+            setActiveAddAfterWordId(null);
+            setActiveAddPlacement("after");
+            setAddAfterDraft(makeBlankAddAfterDraft());
+        } catch (error: any) {
+            console.error("Follow-Along empty-page word save error:", error);
+            setAddAfterDraft((current) => ({
+                ...current,
+                message: error?.message ?? "Could not save this word.",
+            }));
+        } finally {
+            setAddAfterDraft((current) => ({
+                ...current,
+                saving: false,
+            }));
+        }
+    }
+
     const contextSuffix = studentWorkspaceBackContext
         ? `?from=student-workspace&studentId=${encodeURIComponent(studentWorkspaceBackContext.studentId)}`
         : "";
 
-    function renderAddAfterPanel(anchor: ReadAlongWord) {
+    function renderAddAfterPanel(
+        anchor: ReadAlongWord,
+        options: { heading?: string; onSave?: () => void } = {}
+    ) {
         const placementLabel = activeAddPlacement === "before" ? "before" : "after";
         const selectedCandidateId =
             addAfterDraft.candidates.find(
@@ -1717,7 +1980,7 @@ export default function ReadAlongPage() {
         return (
             <div className="mt-3 rounded-2xl border border-violet-100 bg-violet-50/70 p-3">
                 <p className="text-xs font-black uppercase tracking-[0.14em] text-violet-800">
-                    Add {placementLabel} {anchor.surface}
+                    {options.heading ?? `Add ${placementLabel} ${anchor.surface}`}
                 </p>
 
                 <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -1840,7 +2103,7 @@ export default function ReadAlongPage() {
                 <div className="mt-3 flex flex-wrap gap-2">
                     <button
                         type="button"
-                        onClick={() => void saveAddAfterWord(anchor)}
+                        onClick={() => void (options.onSave ? options.onSave() : saveAddAfterWord(anchor))}
                         disabled={addAfterDraft.saving || addAfterDraft.lookupLoading}
                         className="rounded-xl bg-violet-700 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-white transition hover:bg-violet-800 disabled:opacity-50"
                     >
@@ -1887,7 +2150,31 @@ export default function ReadAlongPage() {
             }
         >
             {!currentPage || currentPage.words.length === 0 ? (
-                <ReadAlongEmptyState />
+                <ReadAlongEmptyState
+                    canAddWord={Boolean(currentPage && canUseSavedWordReading)}
+                    isAddWordOpen={Boolean(emptyPageAddWordKey && activeAddAfterWordId === emptyPageAddWordKey)}
+                    onAddWord={openEmptyPageAddWord}
+                    addWordPanel={
+                        currentPage && emptyPageAddWordKey
+                            ? renderAddAfterPanel(
+                                {
+                                    id: emptyPageAddWordKey,
+                                    surface: currentPage.label,
+                                    reading: null,
+                                    meaning: null,
+                                    page_number: currentPage.pageNumber ?? null,
+                                    page_order: null,
+                                    chapter_number: null,
+                                    chapter_name: null,
+                                },
+                                {
+                                    heading: `Add to ${currentPage.label}`,
+                                    onSave: saveWordToCurrentEmptyPage,
+                                }
+                            )
+                            : null
+                    }
+                />
             ) : (
                 <ReadAlongWordList
                     words={currentPage.words}
@@ -1896,7 +2183,7 @@ export default function ReadAlongPage() {
                     getColorInfo={(word) =>
                         libraryColorByWordKey[
                         makeLibraryStudyColorKey(word.surface, word.reading)
-                        ] ?? null
+                        ] ?? fallbackReadAlongColorInfo(word)
                     }
                     setWordRef={(wordId, element) => {
                         wordRefs.current[wordId] = element;
@@ -2000,10 +2287,11 @@ export default function ReadAlongPage() {
                 <ReadAlongSupportModeTabs
                     supportMode={supportMode}
                     onSupportModeChange={setSupportMode}
+                    compact={showReadingWorkspace && Boolean(learnerUserId)}
                 />
 
                 {showReadingWorkspace && learnerUserId ? (
-                    <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)] lg:items-start lg:gap-4 lg:space-y-0 xl:grid-cols-[minmax(0,1fr)_minmax(390px,clamp(28rem,34vw,32rem))]">
+                    <div className="space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0">
                         <div className="min-w-0">{readerShell}</div>
                         <div className="hidden min-w-0 lg:block">
                             <ReadingJournalPanel

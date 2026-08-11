@@ -110,9 +110,9 @@ export default function AbilityCheckFeedbackPanel({
           `}</style>
         </div>
       ) : checked.ok ? (
-        <p className="text-green-700">Correct!</p>
+        <p className="text-3xl font-black text-green-700 sm:text-4xl">Correct!</p>
       ) : correctionComplete ? (
-        <p className="text-green-700">Correction accepted.</p>
+        <p className="text-2xl font-black text-green-700 sm:text-3xl">Correction accepted.</p>
       ) : (
         <>
           <p className="text-red-700">Not quite.</p>

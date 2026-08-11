@@ -115,7 +115,7 @@ function savedWordBadgeLabel(item: TeacherFollowAlongPrepItem) {
     Boolean
   );
 
-  return parts.length > 0 ? parts.join(" · ") : "Saved";
+  return parts.join(" · ");
 }
 
 function readerWordCardClass(isFaded: boolean) {
@@ -127,10 +127,13 @@ function readerWordCardClass(isFaded: boolean) {
 }
 
 function ReaderWordBadge({ item }: { item: TeacherFollowAlongPrepItem }) {
+  const label = savedWordBadgeLabel(item);
+  if (!label) return null;
+
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-red-100 bg-white px-2.5 py-1 text-[11px] font-semibold text-red-700 shadow-sm">
       <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
-      {savedWordBadgeLabel(item)}
+      {label}
     </span>
   );
 }
@@ -246,11 +249,6 @@ export function TeacherFollowAlongPrepItemCard({
       >
         <div className="mb-2 flex flex-wrap gap-2 sm:absolute sm:right-4 sm:top-3 sm:mb-0">
           <ReaderWordBadge item={item} />
-          {item.chapter_name ? (
-            <span className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-stone-600 shadow-sm">
-              {item.chapter_name}
-            </span>
-          ) : null}
         </div>
 
         <div className="min-w-0">
@@ -291,12 +289,6 @@ export function TeacherFollowAlongPrepItemCard({
         >
           {itemTypeLabel(item.item_type)}
         </span>
-
-        {item.chapter_name ? (
-          <span className="rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-semibold text-stone-600">
-            {item.chapter_name}
-          </span>
-        ) : null}
       </div>
 
       <div className="min-w-0">
