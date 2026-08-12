@@ -21,6 +21,7 @@ type ReadingJournalDetectiveTabProps = {
   toggleDetectiveGroup: (groupKey: string) => void;
   saveDetectiveEntry: (entry: DetectiveEntry) => Promise<void>;
   deleteDetectiveEntry: (id: string) => Promise<void>;
+  readOnly?: boolean;
 };
 
 type DetectiveGroup = {
@@ -120,6 +121,7 @@ export default function ReadingJournalDetectiveTab({
   toggleDetectiveGroup,
   saveDetectiveEntry,
   deleteDetectiveEntry,
+  readOnly = false,
 }: ReadingJournalDetectiveTabProps) {
   const cleanDetectiveSearch = detectiveSearch.trim().toLowerCase();
   const filteredDetectiveEntries = cleanDetectiveSearch
@@ -146,6 +148,11 @@ export default function ReadingJournalDetectiveTab({
 
   return (
     <div className="rounded-2xl border border-violet-200 bg-violet-50/60 p-4">
+      {readOnly ? (
+        <div className="mb-3 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-amber-800">
+          Learning archive · Read only
+        </div>
+      ) : null}
       <div className="mb-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
         <div>
           <div className="text-sm font-semibold text-stone-900">Detective Notes</div>
@@ -153,13 +160,15 @@ export default function ReadingJournalDetectiveTab({
             Track what you know, suspect, and still wonder while the story unfolds.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={addDetectiveEntry}
-          className="rounded-xl bg-violet-700 px-4 py-2 text-sm font-black text-white transition hover:bg-violet-800"
-        >
-          New Detective Entry
-        </button>
+        {!readOnly ? (
+          <button
+            type="button"
+            onClick={addDetectiveEntry}
+            className="rounded-xl bg-violet-700 px-4 py-2 text-sm font-black text-white transition hover:bg-violet-800"
+          >
+            New Detective Entry
+          </button>
+        ) : null}
       </div>
 
       <input
@@ -200,7 +209,7 @@ export default function ReadingJournalDetectiveTab({
                   <div className="mt-3 space-y-2">
                     {group.entries.map((entry) => {
                       const isExpanded = expandedDetectiveIds.includes(entry.id);
-                      const isEditing = editingDetectiveIds.includes(entry.id);
+                      const isEditing = !readOnly && editingDetectiveIds.includes(entry.id);
                       const isSaving = savingDetectiveIds.includes(entry.id);
                       const isSaved = savedDetectiveIds.includes(entry.id);
                       const populatedFields = detectiveFieldLabels.filter((field) =>
@@ -242,13 +251,15 @@ export default function ReadingJournalDetectiveTab({
                               >
                                 {isExpanded ? "Collapse" : "Expand"}
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => startEditingDetectiveEntry(entry.id)}
-                                className="rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-bold text-stone-700 hover:bg-stone-100"
-                              >
-                                Edit
-                              </button>
+                              {!readOnly ? (
+                                <button
+                                  type="button"
+                                  onClick={() => startEditingDetectiveEntry(entry.id)}
+                                  className="rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-bold text-stone-700 hover:bg-stone-100"
+                                >
+                                  Edit
+                                </button>
+                              ) : null}
                             </div>
                           </div>
 
@@ -338,13 +349,15 @@ export default function ReadingJournalDetectiveTab({
                                     >
                                       Cancel
                                     </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => void deleteDetectiveEntry(entry.id)}
-                                      className="rounded-xl bg-stone-200 px-3 py-2 text-sm font-bold text-stone-900 hover:bg-stone-300"
-                                    >
-                                      Delete
-                                    </button>
+                                    {!readOnly ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => void deleteDetectiveEntry(entry.id)}
+                                        className="rounded-xl bg-stone-200 px-3 py-2 text-sm font-bold text-stone-900 hover:bg-stone-300"
+                                      >
+                                        Delete
+                                      </button>
+                                    ) : null}
                                   </div>
                                 </div>
                               ) : (
@@ -359,13 +372,15 @@ export default function ReadingJournalDetectiveTab({
                                       </div>
                                     </div>
                                   ))}
-                                  <button
-                                    type="button"
-                                    onClick={() => void deleteDetectiveEntry(entry.id)}
-                                    className="rounded-xl bg-stone-200 px-3 py-2 text-sm font-bold text-stone-900 hover:bg-stone-300"
-                                  >
-                                    Delete
-                                  </button>
+                                  {!readOnly ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => void deleteDetectiveEntry(entry.id)}
+                                      className="rounded-xl bg-stone-200 px-3 py-2 text-sm font-bold text-stone-900 hover:bg-stone-300"
+                                    >
+                                      Delete
+                                    </button>
+                                  ) : null}
                                 </div>
                               )}
                             </div>

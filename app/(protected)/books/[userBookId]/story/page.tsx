@@ -8,9 +8,15 @@ import { useParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
-import { getFullAccessRequiredCopy } from "@/lib/access/requireFullAccess";
+import {
+  canUseActiveJapaneseLearningJournal,
+  canUseReadingCompanionJournal,
+  emptyJapaneseLearningJournalArchiveTabs,
+  isJapaneseLearningBook,
+  type JapaneseLearningJournalArchiveTabs,
+  type JapaneseLearningJournalTab,
+} from "@/lib/access/readingCompanion";
 import { getBookIdentity } from "@/lib/books/bookIdentity";
-import { isNativeLanguageBook } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
 import ReadingJournalPanel from "../components/ReadingJournalPanel";
 
@@ -33,8 +39,53 @@ type UserBookRow = {
   books: BookRow | null;
 };
 
+const japaneseLearningArchiveTables: Record<JapaneseLearningJournalTab, string> = {
+  detective: "user_book_detective_entries",
+  setting: "user_book_setting_items",
+  cultural: "user_book_cultural_items",
+};
+
 function isSuperTeacherFlag(value: unknown) {
   return value === true || value === "true";
+}
+
+async function hasJapaneseLearningArchiveRows({
+  userBookId,
+  table,
+}: {
+  userBookId: string;
+  table: string;
+}) {
+  const { count, error } = await supabase
+    .from(table as any)
+    .select("id", { count: "exact", head: true })
+    .eq("user_book_id", userBookId);
+
+  if (error) {
+    console.error("Error checking Reading Journal learning archive:", { table, error });
+    return false;
+  }
+
+  return (count ?? 0) > 0;
+}
+
+async function loadJapaneseLearningArchiveTabs(userBookId: string) {
+  const [detective, setting, cultural] = await Promise.all([
+    hasJapaneseLearningArchiveRows({
+      userBookId,
+      table: japaneseLearningArchiveTables.detective,
+    }),
+    hasJapaneseLearningArchiveRows({
+      userBookId,
+      table: japaneseLearningArchiveTables.setting,
+    }),
+    hasJapaneseLearningArchiveRows({
+      userBookId,
+      table: japaneseLearningArchiveTables.cultural,
+    }),
+  ]);
+
+  return { detective, setting, cultural };
 }
 
 export default function StoryNotesPage() {
@@ -44,6 +95,9 @@ export default function StoryNotesPage() {
   const [loading, setLoading] = useState(true);
   const [accessMessage, setAccessMessage] = useState("");
   const [row, setRow] = useState<UserBookRow | null>(null);
+  const [canUseJapaneseLearningJournal, setCanUseJapaneseLearningJournal] = useState(false);
+  const [japaneseLearningArchiveTabs, setJapaneseLearningArchiveTabs] =
+    useState<JapaneseLearningJournalArchiveTabs>(emptyJapaneseLearningJournalArchiveTabs);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,6 +106,8 @@ export default function StoryNotesPage() {
       setLoading(true);
       setAccessMessage("");
       setRow(null);
+      setCanUseJapaneseLearningJournal(false);
+      setJapaneseLearningArchiveTabs(emptyJapaneseLearningJournalArchiveTabs);
 
       const {
         data: { user },
@@ -167,28 +223,25 @@ export default function StoryNotesPage() {
         return;
       }
 
-      const { data: ownerProfile, error: ownerProfileError } = await supabase
-        .from("profiles")
-        .select("native_language")
-        .eq("id", loadedRow.user_id)
-        .maybeSingle();
-
-      if (ownerProfileError) {
-        console.error("Error loading Reading Journal owner profile:", ownerProfileError);
-      }
-
-      const nativeLanguageBook = isNativeLanguageBook({
-        bookLanguageCode: loadedRow.books?.language_code ?? null,
-        ownerNativeLanguage: ownerProfile?.native_language ?? null,
-      });
-
-      if (!nativeLanguageBook && !featureAccess.canUseStoryNotes) {
-        const copy = getFullAccessRequiredCopy("story_notes");
-        setAccessMessage(copy.message);
+      if (!canUseReadingCompanionJournal({ canAccessBook })) {
+        setAccessMessage("You do not have access to Reading Journal.");
         setLoading(false);
         return;
       }
 
+      const activeJapaneseLearningJournal = canUseActiveJapaneseLearningJournal({
+        bookLanguageCode: loadedRow.books?.language_code ?? null,
+        featureAccess,
+      });
+      const archiveTabs =
+        !activeJapaneseLearningJournal && isJapaneseLearningBook(loadedRow.books?.language_code ?? null)
+          ? await loadJapaneseLearningArchiveTabs(loadedRow.id)
+          : emptyJapaneseLearningJournalArchiveTabs;
+
+      if (cancelled) return;
+
+      setCanUseJapaneseLearningJournal(activeJapaneseLearningJournal);
+      setJapaneseLearningArchiveTabs(archiveTabs);
       setRow(loadedRow);
       setLoading(false);
     }
@@ -222,6 +275,8 @@ export default function StoryNotesPage() {
 
   const book = row.books;
   const bookIdentity = getBookIdentity(book);
+  const hasJapaneseLearningJournalTabs =
+    canUseJapaneseLearningJournal || Object.values(japaneseLearningArchiveTabs).some(Boolean);
 
   return (
     <main className="min-h-screen bg-stone-50 p-6">
@@ -261,9 +316,9 @@ export default function StoryNotesPage() {
                 </p>
               ) : null}
               <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
-                Use this as your personal notebook while you read: detective notes,
-                characters, plot points, settings, cultural details, and quotes you
-                want to remember.
+                {hasJapaneseLearningJournalTabs
+                  ? "Use this as your personal notebook while you read: characters, plot points, detective notes, settings, cultural details, quotes, and notes you want to remember."
+                  : "Use this as your personal notebook while you read: characters, plot points, quotes, notes, and anything else you want to remember."}
               </p>
             </div>
           </div>
@@ -274,6 +329,8 @@ export default function StoryNotesPage() {
           ownerUserId={row.user_id}
           favoriteQuotes={row.favorite_quotes}
           bookLanguageCode={book?.language_code ?? null}
+          canUseJapaneseLearningJournal={canUseJapaneseLearningJournal}
+          japaneseLearningArchiveTabs={japaneseLearningArchiveTabs}
           vocabListHref={book?.language_code === "en" ? undefined : `/books/${row.id}/words`}
           onFavoriteQuotesChange={(value) =>
             setRow((prev) => (prev ? { ...prev, favorite_quotes: value } : prev))

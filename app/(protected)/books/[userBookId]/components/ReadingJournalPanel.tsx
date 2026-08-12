@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import type {
+  JapaneseLearningJournalArchiveTabs,
+  JapaneseLearningJournalTab,
+} from "@/lib/access/readingCompanion";
 import { supabase } from "@/lib/supabaseClient";
 import StoryTab from "./tabs/StoryTab";
 import type { StoryTabMode } from "./tabs/readingJournalTypes";
@@ -67,6 +71,8 @@ type ReadingJournalPanelProps = {
   selectedChapterNumber?: number | null;
   compact?: boolean;
   vocabListHref?: string;
+  canUseJapaneseLearningJournal?: boolean;
+  japaneseLearningArchiveTabs?: JapaneseLearningJournalArchiveTabs;
   onFavoriteQuotesChange?: (value: string | null) => void;
 };
 
@@ -141,22 +147,13 @@ function chapterSummarySaveErrorMessage(chapterNumber: number | null) {
   return "Could not save chapter summary.";
 }
 
-const targetLanguageTabOrder: StoryTabMode[] = [
-  "characters",
-  "plot",
+const baseJournalStartTabs: StoryTabMode[] = ["characters", "plot"];
+const japaneseLearningJournalTabs: JapaneseLearningJournalTab[] = [
   "detective",
   "setting",
   "cultural",
-  "quotes",
 ];
-
-const nativeLanguageTabOrder: StoryTabMode[] = [
-  "characters",
-  "plot",
-  "quotes",
-  "notes",
-  "review",
-];
+const baseJournalEndTabs: StoryTabMode[] = ["quotes", "notes"];
 
 function clampRating5(value: number) {
   if (!Number.isFinite(value)) return null;
@@ -173,10 +170,50 @@ export default function ReadingJournalPanel({
   selectedChapterNumber,
   compact = false,
   vocabListHref,
+  canUseJapaneseLearningJournal = false,
+  japaneseLearningArchiveTabs = {
+    detective: false,
+    setting: false,
+    cultural: false,
+  },
   onFavoriteQuotesChange,
 }: ReadingJournalPanelProps) {
   const [storyTab, setStoryTab] = useState<StoryTabMode>("characters");
-  const tabOrder = bookLanguageCode === "en" ? nativeLanguageTabOrder : targetLanguageTabOrder;
+  const showReviewTab = bookLanguageCode === "en";
+  const learningTabs = useMemo(
+    () =>
+      canUseJapaneseLearningJournal
+        ? japaneseLearningJournalTabs
+        : japaneseLearningJournalTabs.filter((tab) => japaneseLearningArchiveTabs[tab]),
+    [
+      canUseJapaneseLearningJournal,
+      japaneseLearningArchiveTabs.cultural,
+      japaneseLearningArchiveTabs.detective,
+      japaneseLearningArchiveTabs.setting,
+    ]
+  );
+  const tabOrder = useMemo<StoryTabMode[]>(
+    () => [
+      ...baseJournalStartTabs,
+      ...learningTabs,
+      ...baseJournalEndTabs,
+      ...(showReviewTab ? (["review"] as StoryTabMode[]) : []),
+    ],
+    [learningTabs, showReviewTab]
+  );
+  const learningArchiveReadOnlyTabs = useMemo(
+    () => ({
+      detective: !canUseJapaneseLearningJournal && japaneseLearningArchiveTabs.detective,
+      setting: !canUseJapaneseLearningJournal && japaneseLearningArchiveTabs.setting,
+      cultural: !canUseJapaneseLearningJournal && japaneseLearningArchiveTabs.cultural,
+    }),
+    [
+      canUseJapaneseLearningJournal,
+      japaneseLearningArchiveTabs.cultural,
+      japaneseLearningArchiveTabs.detective,
+      japaneseLearningArchiveTabs.setting,
+    ]
+  );
   const detective = useDetectiveEntries();
 
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -279,9 +316,7 @@ export default function ReadingJournalPanel({
   useEffect(() => {
     let cancelled = false;
 
-    async function loadNativeReviewFields() {
-      if (bookLanguageCode !== "en") return;
-
+    async function loadReadingCompanionFields() {
       const { data, error } = await supabase
         .from("user_books")
         .select("notes, my_review, rating_overall")
@@ -292,7 +327,7 @@ export default function ReadingJournalPanel({
       if (cancelled) return;
 
       if (error) {
-        console.error("Error loading native Reading Journal review fields:", error);
+        console.error("Error loading Reading Journal companion fields:", error);
         return;
       }
 
@@ -306,12 +341,12 @@ export default function ReadingJournalPanel({
       setReviewSaveMessage("");
     }
 
-    void loadNativeReviewFields();
+    void loadReadingCompanionFields();
 
     return () => {
       cancelled = true;
     };
-  }, [bookLanguageCode, ownerUserId, userBookId]);
+  }, [ownerUserId, userBookId]);
 
   useEffect(() => {
     setFavoriteQuoteInputs(favoriteQuoteTextToInputs(favoriteQuotes));
@@ -743,6 +778,8 @@ export default function ReadingJournalPanel({
   }
 
   async function saveSettingItem(item: SettingItem) {
+    if (learningArchiveReadOnlyTabs.setting) return;
+
     const payload = {
       user_book_id: userBookId,
       title: item.title?.trim() || null,
@@ -803,6 +840,8 @@ export default function ReadingJournalPanel({
   }
 
   async function deleteSettingItem(id: string) {
+    if (learningArchiveReadOnlyTabs.setting) return;
+
     if (id.startsWith("new-setting-")) {
       setSettingItems((prev) => prev.filter((x) => x.id !== id));
       setEditingSettingIds((prev) => prev.filter((x) => x !== id));
@@ -851,6 +890,8 @@ export default function ReadingJournalPanel({
   }
 
   async function saveCulturalItem(item: CulturalItem) {
+    if (learningArchiveReadOnlyTabs.cultural) return;
+
     const payload = {
       user_book_id: userBookId,
       title: item.title?.trim() || null,
@@ -911,6 +952,8 @@ export default function ReadingJournalPanel({
   }
 
   async function deleteCulturalItem(id: string) {
+    if (learningArchiveReadOnlyTabs.cultural) return;
+
     if (id.startsWith("new-cultural-")) {
       setCulturalItems((prev) => prev.filter((x) => x.id !== id));
       setEditingCulturalIds((prev) => prev.filter((x) => x !== id));
@@ -970,7 +1013,7 @@ export default function ReadingJournalPanel({
     setSavingNotes(false);
 
     if (error) {
-      console.error("Error saving native Reading Journal notes:", error);
+      console.error("Error saving Reading Journal notes:", error);
       setNotesSaveMessage("Could not save notes.");
       return;
     }
@@ -1017,7 +1060,8 @@ export default function ReadingJournalPanel({
 	      setStoryTab={setStoryTab}
 	      tabOrder={tabOrder}
 	      showCharacterReadingField={bookLanguageCode !== "en"}
-	      detectiveEntries={detective.detectiveEntries}
+      learningArchiveReadOnlyTabs={learningArchiveReadOnlyTabs}
+      detectiveEntries={detective.detectiveEntries}
       detectiveSearch={detective.detectiveSearch}
       setDetectiveSearch={detective.setDetectiveSearch}
       collapsedDetectiveGroups={detective.collapsedDetectiveGroups}
@@ -1025,7 +1069,8 @@ export default function ReadingJournalPanel({
       editingDetectiveIds={detective.editingDetectiveIds}
       savingDetectiveIds={detective.savingDetectiveIds}
       savedDetectiveIds={detective.savedDetectiveIds}
-      addDetectiveEntry={() =>
+      addDetectiveEntry={() => {
+        if (learningArchiveReadOnlyTabs.detective) return;
         detective.addDetectiveEntry(
           { userBookId, ownerUserId },
           {
@@ -1036,19 +1081,27 @@ export default function ReadingJournalPanel({
                 : null,
             chapterNumber: selectedChapterNumber ?? null,
           }
-        )
-      }
-      updateDetectiveEntry={detective.updateDetectiveEntry}
-      startEditingDetectiveEntry={detective.startEditingDetectiveEntry}
+        );
+      }}
+      updateDetectiveEntry={(id, field, value) => {
+        if (learningArchiveReadOnlyTabs.detective) return;
+        detective.updateDetectiveEntry(id, field, value);
+      }}
+      startEditingDetectiveEntry={(id) => {
+        if (learningArchiveReadOnlyTabs.detective) return;
+        detective.startEditingDetectiveEntry(id);
+      }}
       stopEditingDetectiveEntry={detective.stopEditingDetectiveEntry}
       toggleDetectiveEntryExpanded={detective.toggleDetectiveEntryExpanded}
       toggleDetectiveGroup={detective.toggleDetectiveGroup}
-      saveDetectiveEntry={(entry) =>
-        detective.saveDetectiveEntry(entry, { userBookId, ownerUserId })
-      }
-      deleteDetectiveEntry={(id) =>
-        detective.deleteDetectiveEntry(id, { userBookId, ownerUserId })
-      }
+      saveDetectiveEntry={(entry) => {
+        if (learningArchiveReadOnlyTabs.detective) return Promise.resolve();
+        return detective.saveDetectiveEntry(entry, { userBookId, ownerUserId });
+      }}
+      deleteDetectiveEntry={(id) => {
+        if (learningArchiveReadOnlyTabs.detective) return Promise.resolve();
+        return detective.deleteDetectiveEntry(id, { userBookId, ownerUserId });
+      }}
       characters={characters}
       visibleCharacters={visibleCharacters}
       characterSearch={characterSearch}
@@ -1100,13 +1153,18 @@ export default function ReadingJournalPanel({
       editingSettingIds={editingSettingIds}
       savingSettingIds={savingSettingIds}
       savedSettingIds={savedSettingIds}
-      addSettingItem={addSettingItem}
+      addSettingItem={() => {
+        if (learningArchiveReadOnlyTabs.setting) return;
+        addSettingItem();
+      }}
       updateSettingItem={(id, field, value) =>
+        !learningArchiveReadOnlyTabs.setting &&
         setSettingItems((prev) =>
           prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
         )
       }
       startEditingSettingItem={(id) =>
+        !learningArchiveReadOnlyTabs.setting &&
         setEditingSettingIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
       }
       stopEditingSettingItem={(id) =>
@@ -1125,13 +1183,18 @@ export default function ReadingJournalPanel({
       editingCulturalIds={editingCulturalIds}
       savingCulturalIds={savingCulturalIds}
       savedCulturalIds={savedCulturalIds}
-      addCulturalItem={addCulturalItem}
+      addCulturalItem={() => {
+        if (learningArchiveReadOnlyTabs.cultural) return;
+        addCulturalItem();
+      }}
       updateCulturalItem={(id, field, value) =>
+        !learningArchiveReadOnlyTabs.cultural &&
         setCulturalItems((prev) =>
           prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
         )
       }
       startEditingCulturalItem={(id) =>
+        !learningArchiveReadOnlyTabs.cultural &&
         setEditingCulturalIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
       }
       stopEditingCulturalItem={(id) =>

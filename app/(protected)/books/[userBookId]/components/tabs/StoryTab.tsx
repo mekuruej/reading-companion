@@ -66,6 +66,7 @@ type StoryTabProps = {
   setStoryTab: (value: StoryTabMode) => void;
   tabOrder: StoryTabMode[];
   showCharacterReadingField?: boolean;
+  learningArchiveReadOnlyTabs?: Partial<Record<"detective" | "setting" | "cultural", boolean>>;
 
   detectiveEntries: DetectiveEntry[];
   detectiveSearch: string;
@@ -200,6 +201,14 @@ type StoryTabProps = {
   saveReviewRatings: () => Promise<void>;
 };
 
+function LearningArchiveNotice() {
+  return (
+    <div className="mb-3 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-amber-800">
+      Learning archive · Read only
+    </div>
+  );
+}
+
 function StorySubTab({
   active,
   onClick,
@@ -242,6 +251,7 @@ export default function StoryTab({
   setStoryTab,
   tabOrder,
   showCharacterReadingField = true,
+  learningArchiveReadOnlyTabs,
 
   detectiveEntries,
   detectiveSearch,
@@ -362,6 +372,9 @@ export default function StoryTab({
   reviewSaveMessage,
   saveReviewRatings,
 }: StoryTabProps) {
+  const detectiveReadOnly = Boolean(learningArchiveReadOnlyTabs?.detective);
+  const settingReadOnly = Boolean(learningArchiveReadOnlyTabs?.setting);
+  const culturalReadOnly = Boolean(learningArchiveReadOnlyTabs?.cultural);
   const cleanCharacterSearch = characterSearch.trim().toLowerCase();
   const filteredVisibleCharacters = cleanCharacterSearch
     ? visibleCharacters.filter((character) =>
@@ -444,6 +457,7 @@ export default function StoryTab({
           toggleDetectiveGroup={toggleDetectiveGroup}
           saveDetectiveEntry={saveDetectiveEntry}
           deleteDetectiveEntry={deleteDetectiveEntry}
+          readOnly={detectiveReadOnly}
         />
       )}
 
@@ -797,6 +811,7 @@ export default function StoryTab({
 
       {storyTab === "setting" && (
         <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+          {settingReadOnly ? <LearningArchiveNotice /> : null}
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="text-sm font-semibold text-stone-900">Setting</div>
 
@@ -817,13 +832,15 @@ export default function StoryTab({
 	                Flip Order
               </button>
 
-              <button
-                type="button"
-                onClick={addSettingItem}
-                className="rounded-xl bg-stone-900 px-3 py-2 text-sm font-medium text-white hover:bg-black"
-              >
-                Add Setting
-              </button>
+              {!settingReadOnly ? (
+                <button
+                  type="button"
+                  onClick={addSettingItem}
+                  className="rounded-xl bg-stone-900 px-3 py-2 text-sm font-medium text-white hover:bg-black"
+                >
+                  Add Setting
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -842,7 +859,7 @@ export default function StoryTab({
             ) : (
               <div className="space-y-3">
                 {filteredVisibleSettingItems.map((item) => {
-                  const isEditing = editingSettingIds.includes(item.id);
+                  const isEditing = !settingReadOnly && editingSettingIds.includes(item.id);
                   const isSaving = savingSettingIds.includes(item.id);
                   const isSaved = savedSettingIds.includes(item.id);
 
@@ -855,23 +872,25 @@ export default function StoryTab({
                             {item.details || "—"}
                           </div>
 
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => startEditingSettingItem(item.id)}
-                              className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
-                            >
-                              Edit
-                            </button>
+                          {!settingReadOnly ? (
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => startEditingSettingItem(item.id)}
+                                className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+                              >
+                                Edit
+                              </button>
 
-                            <button
-                              type="button"
-                              onClick={() => void deleteSettingItem(item.id)}
-                              className="rounded-xl bg-stone-200 px-3 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
-                            >
-                              Delete
-                            </button>
-                          </div>
+                              <button
+                                type="button"
+                                onClick={() => void deleteSettingItem(item.id)}
+                                className="rounded-xl bg-stone-200 px-3 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          ) : null}
                         </div>
                       ) : (
                         <div className="space-y-3">
@@ -934,6 +953,7 @@ export default function StoryTab({
 
       {storyTab === "cultural" && (
         <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+          {culturalReadOnly ? <LearningArchiveNotice /> : null}
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="text-sm font-semibold text-stone-900">Cultural</div>
 
@@ -954,13 +974,15 @@ export default function StoryTab({
 	                Flip Order
               </button>
 
-              <button
-                type="button"
-                onClick={addCulturalItem}
-                className="rounded-xl bg-stone-900 px-3 py-2 text-sm font-medium text-white hover:bg-black"
-              >
-                Add Cultural
-              </button>
+              {!culturalReadOnly ? (
+                <button
+                  type="button"
+                  onClick={addCulturalItem}
+                  className="rounded-xl bg-stone-900 px-3 py-2 text-sm font-medium text-white hover:bg-black"
+                >
+                  Add Cultural
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -979,7 +1001,7 @@ export default function StoryTab({
             ) : (
               <div className="space-y-3">
                 {filteredVisibleCulturalItems.map((item) => {
-                  const isEditing = editingCulturalIds.includes(item.id);
+                  const isEditing = !culturalReadOnly && editingCulturalIds.includes(item.id);
                   const isSaving = savingCulturalIds.includes(item.id);
                   const isSaved = savedCulturalIds.includes(item.id);
 
@@ -992,23 +1014,25 @@ export default function StoryTab({
                             {item.details || "—"}
                           </div>
 
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => startEditingCulturalItem(item.id)}
-                              className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
-                            >
-                              Edit
-                            </button>
+                          {!culturalReadOnly ? (
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => startEditingCulturalItem(item.id)}
+                                className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+                              >
+                                Edit
+                              </button>
 
-                            <button
-                              type="button"
-                              onClick={() => void deleteCulturalItem(item.id)}
-                              className="rounded-xl bg-stone-200 px-3 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
-                            >
-                              Delete
-                            </button>
-                          </div>
+                              <button
+                                type="button"
+                                onClick={() => void deleteCulturalItem(item.id)}
+                                className="rounded-xl bg-stone-200 px-3 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          ) : null}
                         </div>
                       ) : (
                         <div className="space-y-3">
