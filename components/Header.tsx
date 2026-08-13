@@ -7,15 +7,19 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
+import { shouldShowJapaneseStudyNavigation } from "@/lib/access/japaneseLearningIntent";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function Header() {
   const [username, setUsername] = useState<string | null>(null);
   const [profileRole, setProfileRole] = useState<string | null>(null);
   const [profileIsSuperTeacher, setProfileIsSuperTeacher] = useState(false);
+  const [showJapaneseStudyNavigation, setShowJapaneseStudyNavigation] = useState(false);
   const [hasFullAccess, setHasFullAccess] = useState(false);
   const [isTrialAccess, setIsTrialAccess] = useState(false);
   const [hasSavedVocabulary, setHasSavedVocabulary] = useState(false);
+  const [pendingJapaneseLearningRequestCount, setPendingJapaneseLearningRequestCount] = useState(0);
+  const [headerRefreshToken, setHeaderRefreshToken] = useState(0);
   const [hideJapaneseTaglineForEnglishBook, setHideJapaneseTaglineForEnglishBook] = useState(false);
   const [showLibraryMenu, setShowLibraryMenu] = useState(false);
   const [showDiscoveryMenu, setShowDiscoveryMenu] = useState(false);
@@ -54,15 +58,17 @@ export default function Header() {
           setUsername(null);
           setProfileRole(null);
           setProfileIsSuperTeacher(false);
+          setShowJapaneseStudyNavigation(false);
           setHasFullAccess(false);
           setIsTrialAccess(false);
           setHasSavedVocabulary(false);
+          setPendingJapaneseLearningRequestCount(0);
           return;
         }
 
         const profileResult = await supabase
           .from("profiles")
-          .select("username, role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at")
+          .select("username, role, is_super_teacher, target_language, japanese_learning_enabled, app_access_type, app_access_expires_at, trial_started_at")
           .eq("id", user.id)
           .maybeSingle();
         let profile: any = profileResult.data;
@@ -71,7 +77,7 @@ export default function Header() {
         if (isMissingAppAccessColumnError(profileError)) {
           const fallbackResult = await supabase
             .from("profiles")
-            .select("username, role, is_super_teacher")
+            .select("username, role, is_super_teacher, target_language, japanese_learning_enabled")
             .eq("id", user.id)
             .maybeSingle();
 
@@ -85,15 +91,18 @@ export default function Header() {
           setUsername(null);
           setProfileRole(null);
           setProfileIsSuperTeacher(false);
+          setShowJapaneseStudyNavigation(false);
           setHasFullAccess(false);
           setIsTrialAccess(false);
           setHasSavedVocabulary(false);
+          setPendingJapaneseLearningRequestCount(0);
           return;
         }
 
         setUsername(profile?.username ?? null);
         setProfileRole(profile?.role ?? null);
         setProfileIsSuperTeacher(!!profile?.is_super_teacher);
+        setShowJapaneseStudyNavigation(shouldShowJapaneseStudyNavigation(profile));
         const accessStatus = profile ? getAppAccessStatus(profile) : null;
         setHasFullAccess(accessStatus?.hasFullAccess ?? false);
         setIsTrialAccess(accessStatus?.reason === "trial");
@@ -108,14 +117,38 @@ export default function Header() {
           !savedWordsResult.error && (savedWordsResult.count ?? 0) > 0
         );
 
+        const canReviewJapaneseLearningRequests =
+          profile?.role === "teacher" ||
+          profile?.role === "super_teacher" ||
+          profile?.role === "admin" ||
+          profile?.is_super_teacher === true ||
+          profile?.is_super_teacher === "true";
+
+        if (canReviewJapaneseLearningRequests) {
+          const pendingRequestsResult = await supabase
+            .from("japanese_learning_access_requests")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "pending");
+
+          if (cancelled) return;
+
+          setPendingJapaneseLearningRequestCount(
+            !pendingRequestsResult.error ? pendingRequestsResult.count ?? 0 : 0
+          );
+        } else {
+          setPendingJapaneseLearningRequestCount(0);
+        }
+
       } catch (error) {
         if (!cancelled) {
           setUsername(null);
           setProfileRole(null);
           setProfileIsSuperTeacher(false);
+          setShowJapaneseStudyNavigation(false);
           setHasFullAccess(false);
           setIsTrialAccess(false);
           setHasSavedVocabulary(false);
+          setPendingJapaneseLearningRequestCount(0);
         }
       }
     }
@@ -124,6 +157,24 @@ export default function Header() {
 
     return () => {
       cancelled = true;
+    };
+  }, [headerRefreshToken]);
+
+  useEffect(() => {
+    function handleProfilePreferencesUpdated() {
+      setHeaderRefreshToken((current) => current + 1);
+    }
+
+    window.addEventListener(
+      "mekuru-profile-preferences-updated",
+      handleProfilePreferencesUpdated
+    );
+
+    return () => {
+      window.removeEventListener(
+        "mekuru-profile-preferences-updated",
+        handleProfilePreferencesUpdated
+      );
     };
   }, []);
 
@@ -351,7 +402,8 @@ export default function Header() {
               ) : null}
             </div>
 
-            <div className="relative" ref={studyMenuRef}>
+            {showJapaneseStudyNavigation ? (
+              <div className="relative" ref={studyMenuRef}>
               <Link
                 href="/library-study"
                 className={`rounded-full border px-3 py-1.5 transition md:hidden ${studySectionActive
@@ -454,7 +506,8 @@ export default function Header() {
                   )}
                 </div>
               ) : null}
-            </div>
+              </div>
+            ) : null}
 
             {showFullAccessNavigation ? (
               <div className="relative" ref={discoveryMenuRef}>
@@ -632,6 +685,19 @@ export default function Header() {
                     >
                       Site Upkeep
                     </Link>
+
+                    {pendingJapaneseLearningRequestCount > 0 ? (
+                      <Link
+                        href="/teacher/japanese-learning-requests"
+                        className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/teacher/japanese-learning-requests"
+                          ? "bg-violet-100 font-medium text-violet-950"
+                          : "bg-violet-50 font-semibold text-violet-900 hover:bg-violet-100"
+                          }`}
+                        onClick={() => setShowTeacherMenu(false)}
+                      >
+                        Japanese Learning Requests ({pendingJapaneseLearningRequestCount})
+                      </Link>
+                    ) : null}
                   </div>
                 ) : null}
               </div>

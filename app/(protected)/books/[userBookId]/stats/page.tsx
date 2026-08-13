@@ -304,14 +304,6 @@ export default function BookStatsPage() {
                 ownerNativeLanguage: ownerProfile?.native_language ?? null,
             });
 
-            if (featureAccess.isTrial && !trackerBook) {
-                setAccessMessage("Deep Book Stats are part of paid Reading Access. During your trial, use the Book Hub to track reading, listening, saved words, and word colors.");
-                setAccessChecked(true);
-                setCanAccessBook(false);
-                setLoading(false);
-                return;
-            }
-
             const canViewVocabularyStats = featureAccess.canUseBookStats && !trackerBook;
 
             setCanSeeVocabularyStats(canViewVocabularyStats);

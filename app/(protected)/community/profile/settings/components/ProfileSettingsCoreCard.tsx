@@ -5,14 +5,14 @@ type ProfileSettingsCoreCardProps = {
   username: string;
   nativeLanguageChoice: string;
   customNativeLanguage: string;
-  targetLanguage: string;
+  japaneseLearningEnabled: boolean;
   nativeLanguageOptions: readonly string[];
   nativeLanguageOther: string;
   onDisplayNameChange: (value: string) => void;
   onUsernameChange: (value: string) => void;
   onNativeLanguageChoiceChange: (value: string) => void;
   onCustomNativeLanguageChange: (value: string) => void;
-  onTargetLanguageChange: (value: string) => void;
+  onJapaneseLearningEnabledChange: (value: boolean) => void;
 };
 
 export default function ProfileSettingsCoreCard({
@@ -20,14 +20,14 @@ export default function ProfileSettingsCoreCard({
   username,
   nativeLanguageChoice,
   customNativeLanguage,
-  targetLanguage,
+  japaneseLearningEnabled,
   nativeLanguageOptions,
   nativeLanguageOther,
   onDisplayNameChange,
   onUsernameChange,
   onNativeLanguageChoiceChange,
   onCustomNativeLanguageChange,
-  onTargetLanguageChange,
+  onJapaneseLearningEnabledChange,
 }: ProfileSettingsCoreCardProps) {
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
@@ -99,17 +99,40 @@ export default function ProfileSettingsCoreCard({
 
         <div>
           <label className="block text-sm font-medium text-stone-800">
-            Target language
+            Japanese Study Tools
           </label>
-          <select
-            value={targetLanguage}
-            onChange={(e) => onTargetLanguageChange(e.target.value)}
-            className="mt-1 w-full rounded-xl border px-3 py-2"
-          >
-            <option value="Japanese">Japanese</option>
-          </select>
+          <div className="mt-1 grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => onJapaneseLearningEnabledChange(true)}
+              className={`rounded-xl border px-3 py-3 text-left transition ${
+                japaneseLearningEnabled
+                  ? "border-stone-900 bg-stone-900 text-white"
+                  : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"
+              }`}
+            >
+              <span className="block text-sm font-black">On</span>
+              <span className="mt-1 block text-xs opacity-80">
+                Show the Study area with the free, foundational flashcards.
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onJapaneseLearningEnabledChange(false)}
+              className={`rounded-xl border px-3 py-3 text-left transition ${
+                !japaneseLearningEnabled
+                  ? "border-stone-900 bg-stone-900 text-white"
+                  : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"
+              }`}
+            >
+              <span className="block text-sm font-black">Off</span>
+              <span className="mt-1 block text-xs opacity-80">
+                I don’t need Japanese study tools.
+              </span>
+            </button>
+          </div>
           <p className="mt-1 text-xs text-stone-500">
-            Japanese is currently the only supported language.
+            Paid Japanese Learning features are separate.
           </p>
         </div>
       </div>

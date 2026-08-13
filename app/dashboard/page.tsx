@@ -108,6 +108,7 @@ type ProfileBasics = {
   display_name: string | null;
   native_language: string | null;
   target_language: string | null;
+  japanese_learning_enabled?: boolean | null;
   level: string | null;
   role: string | null;
   is_super_teacher: boolean | null;
@@ -120,7 +121,7 @@ function isProfileReady(profile: ProfileBasics | null) {
     profile?.username &&
     profile?.display_name &&
     profile?.native_language &&
-    profile?.target_language &&
+    typeof profile?.japanese_learning_enabled === "boolean" &&
     profile?.level
   );
 }
@@ -151,7 +152,7 @@ export default function DashboardPage() {
     async function routeSignedInUser(userId: string, shouldOpenLibraryAfterLogin: boolean) {
       const profileResult = await supabase
         .from("profiles")
-        .select("username, display_name, native_language, target_language, level, role, is_super_teacher, app_access_type, app_access_expires_at")
+        .select("username, display_name, native_language, target_language, japanese_learning_enabled, level, role, is_super_teacher, app_access_type, app_access_expires_at")
         .eq("id", userId)
         .maybeSingle<ProfileBasics>();
       let profile: any = profileResult.data;
@@ -160,7 +161,7 @@ export default function DashboardPage() {
       if (isMissingAppAccessColumnError(error)) {
         const fallbackResult = await supabase
           .from("profiles")
-          .select("username, display_name, native_language, target_language, level, role, is_super_teacher")
+          .select("username, display_name, native_language, target_language, japanese_learning_enabled, level, role, is_super_teacher")
           .eq("id", userId)
           .maybeSingle();
 

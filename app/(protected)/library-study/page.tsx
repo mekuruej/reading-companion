@@ -5,13 +5,17 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import JapaneseLearningPromoCard from "@/components/japanese-learning/JapaneseLearningPromoCard";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { wantsJapaneseLearning } from "@/lib/access/japaneseLearningIntent";
 import { supabase } from "@/lib/supabaseClient";
 
 type ProfileAccessRow = {
   role: string | null;
   is_super_teacher: boolean | null;
+  target_language?: string | null;
+  japanese_learning_enabled?: boolean | null;
   app_access_type: string | null;
   app_access_expires_at: string | null;
 };
@@ -98,6 +102,7 @@ export default function StudyToolsPage() {
   const [isTrialAccess, setIsTrialAccess] = useState(false);
   const [canUseBookStudy, setCanUseBookStudy] = useState(false);
   const [canUseAdvancedStudyStep2, setCanUseAdvancedStudyStep2] = useState(false);
+  const [showJapaneseLearningPromo, setShowJapaneseLearningPromo] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -119,13 +124,14 @@ export default function StudyToolsPage() {
             setIsTrialAccess(false);
             setCanUseBookStudy(false);
             setCanUseAdvancedStudyStep2(false);
+            setShowJapaneseLearningPromo(false);
           }
           return;
         }
 
         const profileResult = await supabase
           .from("profiles")
-          .select("role, is_super_teacher, app_access_type, app_access_expires_at")
+          .select("role, is_super_teacher, target_language, japanese_learning_enabled, app_access_type, app_access_expires_at")
           .eq("id", user.id)
           .maybeSingle<ProfileAccessRow>();
         let profile: any = profileResult.data;
@@ -160,6 +166,9 @@ export default function StudyToolsPage() {
           setIsTrialAccess(featureAccess.isTrial);
           setCanUseBookStudy(featureAccess.canUseBookStudy);
           setCanUseAdvancedStudyStep2(featureAccess.canUseAdvancedStudyStep2);
+          setShowJapaneseLearningPromo(
+            wantsJapaneseLearning(profile) && !featureAccess.hasFullAccess
+          );
         }
       } catch (error) {
         console.error("Error loading Study Hub access:", error);
@@ -168,6 +177,7 @@ export default function StudyToolsPage() {
           setIsTrialAccess(false);
           setCanUseBookStudy(false);
           setCanUseAdvancedStudyStep2(false);
+          setShowJapaneseLearningPromo(false);
         }
       } finally {
         if (mounted) setLoadingAccess(false);
@@ -222,6 +232,12 @@ export default function StudyToolsPage() {
           ))}
         </div>
         )}
+
+        {!loadingAccess && showJapaneseLearningPromo ? (
+          <div className="mt-6">
+            <JapaneseLearningPromoCard source="study_hub" compact />
+          </div>
+        ) : null}
 
         {hasFullAccess && !isTrialAccess ? (
         <div className="mt-6 rounded-3xl border border-slate-200 bg-white/75 p-5 text-center shadow-sm">

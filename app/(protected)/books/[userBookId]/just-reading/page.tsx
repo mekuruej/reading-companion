@@ -7,7 +7,14 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
-import { isNativeLanguageBook } from "@/lib/books/englishNativeTracker";
+import {
+    canUseActiveJapaneseLearningJournal,
+    emptyJapaneseLearningJournalArchiveTabs,
+    isJapaneseLearningBook,
+    type JapaneseLearningJournalArchiveTabs,
+    type JapaneseLearningJournalTab,
+} from "@/lib/access/readingCompanion";
+import { wantsJapaneseLearning } from "@/lib/access/japaneseLearningIntent";
 import { supabase } from "@/lib/supabaseClient";
 import ReadingJournalPanel from "../components/ReadingJournalPanel";
 import SimpleTimedSessionPage from "../_shared/timed-session/SimpleTimedSessionPage";
@@ -20,6 +27,36 @@ function isSuperTeacherFlag(value: unknown) {
     return value === true || value === "true";
 }
 
+const japaneseLearningArchiveTables: Record<JapaneseLearningJournalTab, string> = {
+    detective: "user_book_detective_entries",
+    setting: "user_book_setting_items",
+    cultural: "user_book_cultural_items",
+};
+
+async function hasArchiveRows(userBookId: string, table: string) {
+    const { count, error } = await supabase
+        .from(table as any)
+        .select("id", { count: "exact", head: true })
+        .eq("user_book_id", userBookId);
+
+    if (error) {
+        console.error("Error checking Just Reading journal archive rows:", { table, error });
+        return false;
+    }
+
+    return (count ?? 0) > 0;
+}
+
+async function loadJapaneseLearningArchiveTabs(userBookId: string) {
+    const [detective, setting, cultural] = await Promise.all([
+        hasArchiveRows(userBookId, japaneseLearningArchiveTables.detective),
+        hasArchiveRows(userBookId, japaneseLearningArchiveTables.setting),
+        hasArchiveRows(userBookId, japaneseLearningArchiveTables.cultural),
+    ]);
+
+    return { detective, setting, cultural };
+}
+
 export default function JustReadingPage() {
     const params = useParams<{ userBookId: string }>();
     const userBookId = params.userBookId;
@@ -29,6 +66,9 @@ export default function JustReadingPage() {
     const [favoriteQuotes, setFavoriteQuotes] = useState<string | null>(null);
     const [bookLanguageCode, setBookLanguageCode] = useState<string | null>(null);
     const [isNativeBook, setIsNativeBook] = useState(false);
+    const [canUseJapaneseLearningJournal, setCanUseJapaneseLearningJournal] = useState(false);
+    const [japaneseLearningArchiveTabs, setJapaneseLearningArchiveTabs] =
+        useState<JapaneseLearningJournalArchiveTabs>(emptyJapaneseLearningJournalArchiveTabs);
     const [nativeSessionMode, setNativeSessionMode] = useState<NativeSessionMode>("fluid");
     const [viewMode, setViewMode] = useState<JustReadingViewMode>("just-reading");
 
@@ -66,6 +106,8 @@ export default function JustReadingPage() {
                 setFavoriteQuotes(null);
                 setBookLanguageCode(null);
                 setIsNativeBook(false);
+                setCanUseJapaneseLearningJournal(false);
+                setJapaneseLearningArchiveTabs(emptyJapaneseLearningJournalArchiveTabs);
                 setCheckingAccess(false);
                 return;
             }
@@ -77,7 +119,7 @@ export default function JustReadingPage() {
 
             const profileResult = await supabase
                 .from("profiles")
-                .select("role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at")
+                .select("role, is_super_teacher, target_language, japanese_learning_enabled, app_access_type, app_access_expires_at, trial_started_at")
                 .eq("id", user.id)
                 .maybeSingle();
             let profile: any = profileResult.data;
@@ -86,7 +128,7 @@ export default function JustReadingPage() {
             if (isMissingAppAccessColumnError(profileError)) {
                 const fallbackResult = await supabase
                     .from("profiles")
-                    .select("role, is_super_teacher")
+                    .select("role, is_super_teacher, target_language, japanese_learning_enabled")
                     .eq("id", user.id)
                     .maybeSingle();
 
@@ -117,23 +159,7 @@ export default function JustReadingPage() {
                 canAccessBook = !!teacherStudentLink;
             }
 
-            const { data: ownerProfile, error: ownerProfileError } = ownerUserId
-                ? await supabase
-                    .from("profiles")
-                    .select("native_language")
-                    .eq("id", ownerUserId)
-                    .maybeSingle()
-                : { data: null, error: null };
-
-            if (ownerProfileError) {
-                console.error("Error loading Just Reading owner profile:", ownerProfileError);
-            }
-
-            const nativeLanguageBook = isNativeLanguageBook({
-                bookLanguageCode: book?.language_code ?? null,
-                ownerNativeLanguage: ownerProfile?.native_language ?? null,
-            });
-            setIsNativeBook(nativeLanguageBook);
+            setIsNativeBook(canAccessBook);
 
             if (!profileError && profile) {
                 const appAccessStatus = getAppAccessStatus({
@@ -148,17 +174,35 @@ export default function JustReadingPage() {
                     isTrialActive: appAccessStatus.reason === "trial",
                 });
 
-                setCanUseReadingJournal(
-                    Boolean(canAccessBook && ownerUserId && (nativeLanguageBook || featureAccess.canUseStoryNotes))
-                );
+                const profileWantsJapaneseStudyTools = wantsJapaneseLearning(profile);
+                const activeJapaneseLearningJournal =
+                    profileWantsJapaneseStudyTools &&
+                    canUseActiveJapaneseLearningJournal({
+                        bookLanguageCode: book?.language_code ?? null,
+                        featureAccess,
+                    });
+                const archiveTabs =
+                    profileWantsJapaneseStudyTools &&
+                    !activeJapaneseLearningJournal &&
+                    isJapaneseLearningBook(book?.language_code ?? null)
+                        ? await loadJapaneseLearningArchiveTabs(userBookId)
+                        : emptyJapaneseLearningJournalArchiveTabs;
+
+                if (cancelled) return;
+
+                setCanUseReadingJournal(Boolean(canAccessBook && ownerUserId));
                 setJournalOwnerUserId(canAccessBook ? ownerUserId : null);
                 setFavoriteQuotes(canAccessBook ? ((userBook as any).favorite_quotes ?? null) : null);
+                setCanUseJapaneseLearningJournal(activeJapaneseLearningJournal);
+                setJapaneseLearningArchiveTabs(archiveTabs);
             } else {
                 setCanUseReadingJournal(false);
                 setJournalOwnerUserId(null);
                 setFavoriteQuotes(null);
                 setBookLanguageCode(null);
                 setIsNativeBook(false);
+                setCanUseJapaneseLearningJournal(false);
+                setJapaneseLearningArchiveTabs(emptyJapaneseLearningJournalArchiveTabs);
             }
 
             setCheckingAccess(false);
@@ -254,7 +298,7 @@ export default function JustReadingPage() {
                                         : "text-stone-600 hover:bg-violet-50"
                             }`}
                         >
-                            Reading Workspace
+                            Reading Journal
                         </button>
                     </div>
                 </div>
@@ -274,8 +318,15 @@ export default function JustReadingPage() {
                                 ownerUserId={journalOwnerUserId}
                                 favoriteQuotes={favoriteQuotes}
                                 bookLanguageCode={bookLanguageCode}
+                                canUseJapaneseLearningJournal={canUseJapaneseLearningJournal}
+                                japaneseLearningArchiveTabs={japaneseLearningArchiveTabs}
                                 compact
-                                vocabListHref={bookLanguageCode === "en" ? undefined : `/books/${encodeURIComponent(userBookId)}/words`}
+                                vocabListHref={
+                                    canUseJapaneseLearningJournal ||
+                                    Object.values(japaneseLearningArchiveTabs).some(Boolean)
+                                        ? `/books/${encodeURIComponent(userBookId)}/words`
+                                        : undefined
+                                }
                                 onFavoriteQuotesChange={setFavoriteQuotes}
                             />
                         </div>

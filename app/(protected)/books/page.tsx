@@ -27,7 +27,7 @@ export default function BooksRedirectPage() {
 
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("username, display_name, native_language, target_language")
+        .select("username, display_name, native_language, target_language, japanese_learning_enabled")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -43,7 +43,7 @@ export default function BooksRedirectPage() {
         !!profile?.username &&
         !!profile?.display_name &&
         !!profile?.native_language &&
-        !!profile?.target_language;
+        typeof profile?.japanese_learning_enabled === "boolean";
 
       if (!isComplete) {
         router.replace("/community/profile/setup");

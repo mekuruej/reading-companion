@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { findMekuruReadingLevel } from "@/components/profile/MekuruReadingLevelGuide";
 import ProfileShell from "@/components/profile/ProfileShell";
+import { wantsJapaneseLearning } from "@/lib/access/japaneseLearningIntent";
 import {
   emptyLibraryStudyColorTotals,
   fetchLibraryStudyColorTotals,
@@ -26,6 +27,7 @@ type ProfileRow = {
   username: string | null;
   level: string | null;
   target_language: string | null;
+  japanese_learning_enabled: boolean | null;
 };
 
 type PublicProfileRow = {
@@ -117,7 +119,7 @@ export default function PublicProfilePreviewPage() {
         ] = await Promise.all([
           supabase
             .from("profiles")
-            .select("display_name, username, level, target_language")
+            .select("display_name, username, level, target_language, japanese_learning_enabled")
             .eq("id", user.id)
             .maybeSingle<ProfileRow>(),
           supabase
@@ -214,9 +216,15 @@ export default function PublicProfilePreviewPage() {
       label: "Library Words",
       value: libraryWordCount == null ? "—" : libraryWordCount.toLocaleString(),
     },
-    { label: "Target Language", value: displayValue(profile?.target_language, "Japanese") },
+    {
+      label: "Reading Mode",
+      value: wantsJapaneseLearning(profile) ? "Japanese Study Tools" : "Reading Companion",
+    },
   ];
   const readingLevel = findMekuruReadingLevel(profile?.level);
+  const readingModeLabel = wantsJapaneseLearning(profile)
+    ? "Japanese Study Tools"
+    : "Reading Companion";
 
   return (
     <ProfileShell
@@ -232,7 +240,7 @@ export default function PublicProfilePreviewPage() {
             initial={firstInitial(publicName)}
             publicName={publicName}
             usernameLabel={username ? `@${username}` : "No username set"}
-            targetLanguageLabel={displayValue(profile?.target_language, "Japanese")}
+            readingModeLabel={readingModeLabel}
           />
 
           <div className="px-5 pb-6 sm:px-7">

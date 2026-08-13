@@ -7,6 +7,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ProfileShell from "@/components/profile/ProfileShell";
 import MekuruReadingLevelGuide from "@/components/profile/MekuruReadingLevelGuide";
+import {
+  legacyTargetLanguageForJapaneseLearning,
+  wantsJapaneseLearning,
+} from "@/lib/access/japaneseLearningIntent";
 import { supabase } from "@/lib/supabaseClient";
 
 const NATIVE_LANGUAGE_OPTIONS = [
@@ -40,9 +44,10 @@ export default function ProfileSetupPage() {
   const [username, setUsername] = useState("");
   const [nativeLanguageChoice, setNativeLanguageChoice] = useState("");
   const [customNativeLanguage, setCustomNativeLanguage] = useState("");
-  const [targetLanguage, setTargetLanguage] = useState("Japanese");
+  const [japaneseLearningEnabled, setJapaneseLearningEnabled] = useState<boolean | null>(null);
   const [level, setLevel] = useState("");
-  const [shouldInitializeTrial, setShouldInitializeTrial] = useState(false);
+  const [shouldInitializeMemberRole, setShouldInitializeMemberRole] = useState(false);
+  const [shouldInitializeFreeAccess, setShouldInitializeFreeAccess] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -66,7 +71,7 @@ export default function ProfileSetupPage() {
       const { data: profile, error } = await supabase
         .from("profiles")
         .select(
-          "display_name, username, native_language, target_language, level, app_access_type"
+          "display_name, username, native_language, target_language, japanese_learning_enabled, level, role, app_access_type"
         )
         .eq("id", user.id)
         .maybeSingle();
@@ -81,9 +86,10 @@ export default function ProfileSetupPage() {
 
       setDisplayName(profile?.display_name ?? "");
       setUsername(profile?.username ?? "");
-      setTargetLanguage(profile?.target_language ?? "Japanese");
+      setJapaneseLearningEnabled(profile ? wantsJapaneseLearning(profile) : null);
       setLevel(profile?.level ?? "");
-      setShouldInitializeTrial(!profile || !profile.app_access_type);
+      setShouldInitializeMemberRole(!profile || !profile.role);
+      setShouldInitializeFreeAccess(!profile || !profile.app_access_type);
 
       const loadedNativeLanguage = profile?.native_language?.trim() ?? "";
       if (
@@ -141,8 +147,8 @@ export default function ProfileSetupPage() {
       return;
     }
 
-    if (!targetLanguage.trim()) {
-      setMessage("Please choose a target language.");
+    if (japaneseLearningEnabled === null) {
+      setMessage("Please choose whether you want Japanese Study Tools.");
       return;
     }
 
@@ -164,23 +170,30 @@ export default function ProfileSetupPage() {
         return;
       }
 
-      const trialEndsAt = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000);
-      const trialFields = shouldInitializeTrial
+      const initialAccessFields = shouldInitializeFreeAccess
         ? {
-            app_access_type: "trial",
-            app_access_expires_at: trialEndsAt.toISOString(),
+            app_access_type: "free",
+            app_access_expires_at: null,
+            trial_started_at: null,
+          }
+        : {};
+      const initialRoleFields = shouldInitializeMemberRole
+        ? {
+            role: "member",
           }
         : {};
 
       const { error } = await supabase.from("profiles").upsert(
         {
           id: user.id,
+          ...initialRoleFields,
           display_name: displayName.trim(),
           username: cleanUsername,
           native_language: selectedNativeLanguage,
-          target_language: targetLanguage.trim(),
+          japanese_learning_enabled: japaneseLearningEnabled,
+          target_language: legacyTargetLanguageForJapaneseLearning(japaneseLearningEnabled),
           level: level.trim(),
-          ...trialFields,
+          ...initialAccessFields,
         },
         { onConflict: "id" }
       );
@@ -273,16 +286,41 @@ export default function ProfileSetupPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-stone-800">Target language</label>
-              <select
-                value={targetLanguage}
-                onChange={(e) => setTargetLanguage(e.target.value)}
-                className="mt-1 w-full rounded-xl border px-3 py-2"
-              >
-                <option value="Japanese">Japanese</option>
-              </select>
+              <label className="block text-sm font-medium text-stone-800">
+                Japanese Study Tools
+              </label>
+              <div className="mt-1 grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setJapaneseLearningEnabled(true)}
+                  className={`rounded-xl border px-3 py-3 text-left transition ${
+                    japaneseLearningEnabled === true
+                      ? "border-stone-900 bg-stone-900 text-white"
+                      : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"
+                  }`}
+                >
+                  <span className="block text-sm font-black">Yes</span>
+                  <span className="mt-1 block text-xs opacity-80">
+                    Show the Study area and free Japanese study tools.
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setJapaneseLearningEnabled(false)}
+                  className={`rounded-xl border px-3 py-3 text-left transition ${
+                    japaneseLearningEnabled === false
+                      ? "border-stone-900 bg-stone-900 text-white"
+                      : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"
+                  }`}
+                >
+                  <span className="block text-sm font-black">No</span>
+                  <span className="mt-1 block text-xs opacity-80">
+                    Keep MEKURU focused on your reading companion.
+                  </span>
+                </button>
+              </div>
               <p className="mt-1 text-xs text-stone-500">
-                Japanese is currently the only supported language.
+                Paid Japanese Learning features are separate.
               </p>
             </div>
           </div>

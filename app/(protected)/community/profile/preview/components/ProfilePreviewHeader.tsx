@@ -3,7 +3,7 @@ type ProfilePreviewHeaderProps = {
   initial: string;
   publicName: string;
   usernameLabel: string;
-  targetLanguageLabel: string;
+  readingModeLabel: string;
 };
 
 export default function ProfilePreviewHeader({
@@ -11,7 +11,7 @@ export default function ProfilePreviewHeader({
   initial,
   publicName,
   usernameLabel,
-  targetLanguageLabel,
+  readingModeLabel,
 }: ProfilePreviewHeaderProps) {
   return (
     <>
@@ -32,7 +32,7 @@ export default function ProfilePreviewHeader({
           </h1>
 
           <p className="mt-1 text-sm text-stone-500">
-            {usernameLabel} · {targetLanguageLabel} reader
+            {usernameLabel} · {readingModeLabel}
           </p>
         </div>
       </div>

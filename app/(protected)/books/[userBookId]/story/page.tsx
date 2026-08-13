@@ -16,6 +16,7 @@ import {
   type JapaneseLearningJournalArchiveTabs,
   type JapaneseLearningJournalTab,
 } from "@/lib/access/readingCompanion";
+import { wantsJapaneseLearning } from "@/lib/access/japaneseLearningIntent";
 import { getBookIdentity } from "@/lib/books/bookIdentity";
 import { supabase } from "@/lib/supabaseClient";
 import ReadingJournalPanel from "../components/ReadingJournalPanel";
@@ -124,7 +125,7 @@ export default function StoryNotesPage() {
 
       const profileResult = await supabase
         .from("profiles")
-        .select("role, is_super_teacher, app_access_type, app_access_expires_at")
+        .select("role, is_super_teacher, target_language, japanese_learning_enabled, app_access_type, app_access_expires_at")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -134,7 +135,7 @@ export default function StoryNotesPage() {
       if (isMissingAppAccessColumnError(profileError)) {
         const fallbackResult = await supabase
           .from("profiles")
-          .select("role, is_super_teacher")
+          .select("role, is_super_teacher, target_language, japanese_learning_enabled")
           .eq("id", user.id)
           .maybeSingle();
 
@@ -229,12 +230,17 @@ export default function StoryNotesPage() {
         return;
       }
 
-      const activeJapaneseLearningJournal = canUseActiveJapaneseLearningJournal({
-        bookLanguageCode: loadedRow.books?.language_code ?? null,
-        featureAccess,
-      });
+      const profileWantsJapaneseStudyTools = wantsJapaneseLearning(profile);
+      const activeJapaneseLearningJournal =
+        profileWantsJapaneseStudyTools &&
+        canUseActiveJapaneseLearningJournal({
+          bookLanguageCode: loadedRow.books?.language_code ?? null,
+          featureAccess,
+        });
       const archiveTabs =
-        !activeJapaneseLearningJournal && isJapaneseLearningBook(loadedRow.books?.language_code ?? null)
+        profileWantsJapaneseStudyTools &&
+        !activeJapaneseLearningJournal &&
+        isJapaneseLearningBook(loadedRow.books?.language_code ?? null)
           ? await loadJapaneseLearningArchiveTabs(loadedRow.id)
           : emptyJapaneseLearningJournalArchiveTabs;
 
@@ -324,6 +330,10 @@ export default function StoryNotesPage() {
           </div>
         </section>
 
+        <div className="hidden rounded-2xl border border-sky-100 bg-sky-50/70 px-4 py-3 text-sm font-semibold leading-6 text-sky-900 lg:block">
+          Reading as you go? Open Reading Journal from Read / Listen to use the timer and journal side by side.
+        </div>
+
         <ReadingJournalPanel
           userBookId={row.id}
           ownerUserId={row.user_id}
@@ -331,7 +341,9 @@ export default function StoryNotesPage() {
           bookLanguageCode={book?.language_code ?? null}
           canUseJapaneseLearningJournal={canUseJapaneseLearningJournal}
           japaneseLearningArchiveTabs={japaneseLearningArchiveTabs}
-          vocabListHref={book?.language_code === "en" ? undefined : `/books/${row.id}/words`}
+          vocabListHref={
+            hasJapaneseLearningJournalTabs ? `/books/${row.id}/words` : undefined
+          }
           onFavoriteQuotesChange={(value) =>
             setRow((prev) => (prev ? { ...prev, favorite_quotes: value } : prev))
           }

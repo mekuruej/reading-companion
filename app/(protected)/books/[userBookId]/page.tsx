@@ -9,6 +9,15 @@ import { supabase } from "@/lib/supabaseClient";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
 import {
+  canUseActiveJapaneseLearningActions,
+  emptyJapaneseLearningArchivePresence,
+  hasJapaneseLearningArchive,
+  isJapaneseLearningBook,
+  type JapaneseLearningArchivePresence,
+  type JapaneseLearningJournalTab,
+} from "@/lib/access/readingCompanion";
+import { wantsJapaneseLearning } from "@/lib/access/japaneseLearningIntent";
+import {
   canUseFullAccessFeature,
   getFullAccessRequiredCopy,
 } from "@/lib/access/requireFullAccess";
@@ -47,6 +56,12 @@ function isMissingSeriesTotalColumnError(error: any) {
     String(error?.message ?? "").includes("series_total")
   );
 }
+
+const japaneseLearningArchiveTables: Record<JapaneseLearningJournalTab, string> = {
+  detective: "user_book_detective_entries",
+  setting: "user_book_setting_items",
+  cultural: "user_book_cultural_items",
+};
 
 type Book = {
   id: string;
@@ -663,9 +678,13 @@ export default function BookHubPage() {
   const [canUseStudyFlashcards, setCanUseStudyFlashcards] = useState(false);
   const [canUseVocabularyList, setCanUseVocabularyList] = useState(false);
   const [canUseBulkAdd, setCanUseBulkAdd] = useState(false);
+  const [canUseJapaneseLearningActions, setCanUseJapaneseLearningActions] = useState(false);
+  const [japaneseLearningArchive, setJapaneseLearningArchive] =
+    useState<JapaneseLearningArchivePresence>(emptyJapaneseLearningArchivePresence);
   const [canSeeVocabularySummary, setCanSeeVocabularySummary] = useState(false);
   const [hasFullLearningAccess, setHasFullLearningAccess] = useState(false);
   const [isTrialLearningAccess, setIsTrialLearningAccess] = useState(false);
+  const [wantsJapaneseStudyTools, setWantsJapaneseStudyTools] = useState(false);
   const [highlightReadingReflection, setHighlightReadingReflection] = useState(false);
 
   const isTeacher = myRole === "teacher";
@@ -3493,6 +3512,31 @@ export default function BookHubPage() {
     setUniqueLookupCount(set.size);
   };
 
+  async function hasBookRows(table: string, id: string) {
+    const { count, error } = await supabase
+      .from(table as any)
+      .select("id", { count: "exact", head: true })
+      .eq("user_book_id", id);
+
+    if (error) {
+      console.error("Error checking Book Hub archive rows:", { table, error });
+      return false;
+    }
+
+    return (count ?? 0) > 0;
+  }
+
+  async function loadJapaneseLearningArchivePresence(id: string) {
+    const [vocabulary, detective, setting, cultural] = await Promise.all([
+      hasBookRows("user_book_words", id),
+      hasBookRows(japaneseLearningArchiveTables.detective, id),
+      hasBookRows(japaneseLearningArchiveTables.setting, id),
+      hasBookRows(japaneseLearningArchiveTables.cultural, id),
+    ]);
+
+    return { vocabulary, detective, setting, cultural };
+  }
+
   const load = async () => {
     if (!userBookId) return;
 
@@ -3504,6 +3548,8 @@ export default function BookHubPage() {
     setCanUseStudyFlashcards(false);
     setCanUseVocabularyList(false);
     setCanUseBulkAdd(false);
+    setCanUseJapaneseLearningActions(false);
+    setJapaneseLearningArchive(emptyJapaneseLearningArchivePresence);
     setCanSeeVocabularySummary(false);
     setHasFullLearningAccess(false);
     setStudentWorkspaceBackContext(null);
@@ -3526,7 +3572,7 @@ export default function BookHubPage() {
 
     const meProfileResult = await supabase
       .from("profiles")
-      .select("role, is_super_teacher, level, app_access_type, app_access_expires_at")
+      .select("role, is_super_teacher, target_language, japanese_learning_enabled, level, app_access_type, app_access_expires_at")
       .eq("id", user.id)
       .single();
     let meProfile: any = meProfileResult.data;
@@ -3535,7 +3581,7 @@ export default function BookHubPage() {
     if (isMissingAppAccessColumnError(meProfileErr)) {
       const fallbackResult = await supabase
         .from("profiles")
-        .select("role, is_super_teacher, level")
+        .select("role, is_super_teacher, target_language, japanese_learning_enabled, level")
         .eq("id", user.id)
         .single();
 
@@ -3589,6 +3635,8 @@ export default function BookHubPage() {
     setCanSeeVocabularySummary(featureAccess.canSeeVocabularyColors);
     setHasFullLearningAccess(featureAccess.hasFullAccess);
     setIsTrialLearningAccess(featureAccess.isTrial);
+    const profileWantsJapaneseStudyTools = wantsJapaneseLearning(meProfile);
+    setWantsJapaneseStudyTools(profileWantsJapaneseStudyTools);
 
     const bookHubSelect = `
         id,
@@ -3853,8 +3901,22 @@ export default function BookHubPage() {
       bookLanguageCode: b?.language_code ?? null,
       ownerNativeLanguage: loadedOwnerNativeLanguage,
     });
+    const loadedIsJapaneseLearningBook = isJapaneseLearningBook(b?.language_code ?? null);
+    const loadedCanUseJapaneseLearningActions =
+      profileWantsJapaneseStudyTools &&
+      canUseActiveJapaneseLearningActions({
+        bookLanguageCode: b?.language_code ?? null,
+        featureAccess,
+      });
+    const loadedJapaneseLearningArchive =
+      profileWantsJapaneseStudyTools && loadedIsJapaneseLearningBook
+        ? await loadJapaneseLearningArchivePresence(r.id)
+        : emptyJapaneseLearningArchivePresence;
 
-    if (featureAccess.canSeeVocabularyColors && !loadedIsEnglishNativeTrackerBook) {
+    setCanUseJapaneseLearningActions(loadedCanUseJapaneseLearningActions);
+    setJapaneseLearningArchive(loadedJapaneseLearningArchive);
+
+    if (profileWantsJapaneseStudyTools && !loadedIsEnglishNativeTrackerBook && loadedIsJapaneseLearningBook) {
       await loadUniqueLookupCount(r.id);
     } else {
       setUniqueLookupCount(null);
@@ -5399,24 +5461,6 @@ export default function BookHubPage() {
                 summaryStats={isEnglishNativeTrackerBook ? [] : undefined}
               />
 
-              {isEnglishNativeTrackerBook ? (
-                <section className="overflow-hidden rounded-3xl border border-violet-200 bg-gradient-to-br from-violet-100 via-fuchsia-50 to-amber-50 px-5 py-4 shadow-sm shadow-violet-100/70">
-                  <div>
-                    <p className="inline-flex rounded-full border border-violet-200 bg-white/85 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-violet-700 shadow-sm">
-                      Native-Language Tracker
-                    </p>
-                    <h2 className="mt-2 text-2xl font-black text-stone-950 sm:text-3xl">
-                      This book is in your native language.
-                    </h2>
-                    <p className="mt-2 max-w-none text-sm leading-6 text-stone-700 sm:text-base">
-                      MEKURU keeps this Book Hub focused on current progress, reading time,
-                      Reading History, pace stats, Reading Journal, notes, and your private
-                      Review & Ratings. Language-learning actions stay hidden here.
-                    </p>
-                  </div>
-                </section>
-              ) : null}
-
               <BookHubActionPrompt />
 
               <BookHubNotices
@@ -5428,14 +5472,32 @@ export default function BookHubPage() {
               <BookHubActionGrid
                 hasFullAccess={hasFullLearningAccess || isTeacher}
                 isTrialAccess={isTrialLearningAccess}
+                canUseJapaneseLearningActions={canUseJapaneseLearningActions}
                 canUseCuriosityReading={canUseCuriosityReading}
                 canUseSavedWordReading={canUseSavedWordReading}
                 canUseStudyFlashcards={canUseStudyFlashcards}
                 canUseVocabularyList={canUseVocabularyList}
                 canUseBulkAdd={!isEnglishBook && canUseBulkAdd}
-                canUseStoryNotes={isEnglishNativeTrackerBook || canUseStoryNotes}
-                hasSavedWords={(uniqueLookupCount ?? 0) > 0}
-                isEnglishNativeTrackerBook={isEnglishNativeTrackerBook}
+                canUseStoryNotes
+                hasSavedWords={
+                  wantsJapaneseStudyTools &&
+                  isJapaneseLearningBook(row.books?.language_code ?? null) &&
+                  (uniqueLookupCount ?? 0) > 0
+                }
+                hasLearningJournalArchive={
+                  wantsJapaneseStudyTools &&
+                  isJapaneseLearningBook(row.books?.language_code ?? null) &&
+                  hasJapaneseLearningArchive({
+                    ...japaneseLearningArchive,
+                    vocabulary: false,
+                  })
+                }
+                showJapaneseLearningPromo={
+                  wantsJapaneseStudyTools &&
+                  isJapaneseLearningBook(row.books?.language_code ?? null) &&
+                  !hasFullLearningAccess &&
+                  !isTeacherContext
+                }
                 onCuriosityReading={() => {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/curiosity-reading`);

@@ -4,10 +4,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { findMekuruReadingLevel } from "@/components/profile/MekuruReadingLevelGuide";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { wantsJapaneseLearning } from "@/lib/access/japaneseLearningIntent";
 import { bookTypeLabel } from "@/lib/books/bookTypes";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -16,6 +17,7 @@ type ProfileRow = {
   username: string | null;
   native_language: string | null;
   target_language: string | null;
+  japanese_learning_enabled: boolean | null;
   level: string | null;
   role: string | null;
   is_super_teacher: boolean | null;
@@ -64,10 +66,6 @@ function formatDate(value: string | null | undefined) {
     day: "numeric",
     year: "numeric",
   }).format(new Date(value));
-}
-
-function displayValue(value: string | null | undefined, fallback = "Not set") {
-  return value?.trim() || fallback;
 }
 
 function formatCount(value: number | null | undefined) {
@@ -170,6 +168,7 @@ function AccessLabel({
 }) {
   const appAccessStatus = profile ? getAppAccessStatus(profile) : null;
   const trialEndsAt = profile?.app_access_expires_at ?? null;
+  const wantsJapaneseStudyTools = wantsJapaneseLearning(profile);
 
   if (!appAccessStatus) {
     return (
@@ -179,44 +178,88 @@ function AccessLabel({
     );
   }
 
-  if (appAccessStatus.isTrialActive) {
-    return (
-      <>
-        <h2 className="mt-2 text-2xl font-black text-stone-950">
-          Reading Access trial active
-        </h2>
-        <p className="mt-2 text-sm leading-6 text-stone-600">
-          {appAccessStatus.daysRemaining === 1
-            ? "1 day remaining"
-            : `${appAccessStatus.daysRemaining ?? 0} days remaining`}
-          {trialEndsAt ? `, through ${formatDate(trialEndsAt)}.` : "."}
-        </p>
-      </>
-    );
-  }
-
-  if (appAccessStatus.hasFullAccess) {
-    return (
-      <>
-        <h2 className="mt-2 text-2xl font-black text-stone-950">
-          Reading Access active
-        </h2>
-        <p className="mt-2 text-sm leading-6 text-stone-600">
-          Your saved-word and reading study tools are available.
-        </p>
-      </>
-    );
-  }
+  const role = profile?.role ?? "";
+  const isTeacher =
+    role === "teacher" ||
+    role === "super_teacher" ||
+    role === "admin" ||
+    profile?.is_super_teacher === true;
+  const isStudent = role === "student";
+  const roleStatus = profile?.is_super_teacher
+    ? "Super Teacher"
+    : isTeacher
+    ? "Teacher"
+    : isStudent
+      ? "Student"
+      : "Reader";
+  const accessStatus = appAccessStatus.isTrialActive
+    ? trialEndsAt
+      ? `Trial · until ${formatDate(trialEndsAt)}`
+      : "Trial"
+    : appAccessStatus.reason === "free"
+      ? "Free"
+      : appAccessStatus.reason === "expired"
+        ? "Expired"
+        : appAccessStatus.reason === "none" || appAccessStatus.reason === "inactive"
+          ? "No Access"
+          : appAccessStatus.hasFullAccess
+            ? "Full Access"
+            : "Free";
+  const japaneseLearningStatus = appAccessStatus.isTrialActive
+    ? trialEndsAt
+      ? `Trial Active · until ${formatDate(trialEndsAt)}`
+      : "Trial Active"
+    : appAccessStatus.hasFullAccess
+      ? "Active"
+      : "Not Active";
+  const headline = isTeacher
+    ? "Teacher account"
+    : isStudent
+      ? "Student account"
+      : appAccessStatus.isTrialActive
+        ? "Reading Companion trial active"
+        : appAccessStatus.hasFullAccess
+          ? "Reading Companion active"
+          : "Free Reading Companion";
+  const description = appAccessStatus.isTrialActive
+    ? appAccessStatus.daysRemaining === 1
+      ? "1 day remaining."
+      : `${appAccessStatus.daysRemaining ?? 0} days remaining.`
+    : appAccessStatus.hasFullAccess
+      ? "Japanese Learning entitlement is active."
+      : "Your universal reading tools stay available for accessible books.";
 
   return (
     <>
       <h2 className="mt-2 text-2xl font-black text-stone-950">
-        Free reading profile
+        {headline}
       </h2>
       <p className="mt-2 text-sm leading-6 text-stone-600">
-        Your library, reading records, and saved vocabulary archive stay here.
+        {description}
       </p>
+      <div className="mt-4 space-y-2">
+        <AccessStatusRow label="Status" value={roleStatus} />
+        <AccessStatusRow label="Access" value={accessStatus} />
+        <AccessStatusRow
+          label="Japanese Study Tools"
+          value={wantsJapaneseStudyTools ? "On" : "Off"}
+        />
+        <AccessStatusRow label="Japanese Learning" value={japaneseLearningStatus} />
+      </div>
     </>
+  );
+}
+
+function AccessStatusRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl bg-white/80 px-3 py-2">
+      <span className="text-xs font-black uppercase tracking-[0.14em] text-stone-500">
+        {label}
+      </span>
+      <span className="rounded-full bg-stone-950 px-3 py-1 text-xs font-black text-white">
+        {value}
+      </span>
+    </div>
   );
 }
 
@@ -282,72 +325,6 @@ function PaceAverageCard({
   );
 }
 
-function DetailCard({ label, value }: { label: string; value: string | number | null | undefined }) {
-  return (
-    <div className="rounded-3xl border border-white/70 bg-white/85 p-5 shadow-sm">
-      <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">{label}</p>
-      <p className="mt-2 text-lg font-black text-stone-950">{value ?? "Not set"}</p>
-    </div>
-  );
-}
-
-function ProfileSection({
-  eyebrow,
-  title,
-  description,
-  children,
-  className = "",
-}: {
-  eyebrow: string;
-  title: string;
-  description?: string;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <section className={`rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-sm ${className}`}>
-      <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-500">{eyebrow}</p>
-      <h2 className="mt-2 text-2xl font-black text-stone-950">{title}</h2>
-      {description ? (
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-600">{description}</p>
-      ) : null}
-      <div className="mt-5">{children}</div>
-    </section>
-  );
-}
-
-function ActionCard({
-  href,
-  title,
-  description,
-  tone,
-}: {
-  href: string;
-  title: string;
-  description: string;
-  tone: "emerald" | "amber";
-}) {
-  const toneClass =
-    tone === "emerald"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-950 hover:bg-emerald-100/70"
-      : "border-amber-200 bg-amber-50 text-amber-950 hover:bg-amber-100/70";
-
-  return (
-    <Link
-      href={href}
-      className={`block rounded-3xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${toneClass}`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-lg font-black">{title}</div>
-          <p className="mt-2 text-sm font-semibold leading-6 opacity-75">{description}</p>
-        </div>
-        <span className="rounded-full bg-white/80 px-3 py-1 text-sm font-black">→</span>
-      </div>
-    </Link>
-  );
-}
-
 export default function ProfileHubPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
@@ -394,9 +371,9 @@ export default function ProfileHubPage() {
           sessionTotalsResult,
 	        ] = await Promise.all([
 	          supabase
-	            .from("profiles")
+            .from("profiles")
             .select(
-              "display_name, username, native_language, target_language, level, role, is_super_teacher, app_access_type, app_access_expires_at"
+              "display_name, username, native_language, target_language, japanese_learning_enabled, level, role, is_super_teacher, app_access_type, app_access_expires_at"
 	            )
 	            .eq("id", user.id)
 	            .maybeSingle<ProfileRow>(),
@@ -522,17 +499,13 @@ export default function ProfileHubPage() {
     publicNameChoice === "username"
       ? username || displayName || "My Reading Profile"
       : displayName || username || "My Reading Profile";
-  const favoriteGenres = useMemo(
-    () => (publicProfile?.favorite_genres ?? []).filter(Boolean),
-    [publicProfile?.favorite_genres]
-  );
   const readingLevel = findMekuruReadingLevel(profile?.level);
-  const targetLanguage = displayValue(profile?.target_language, "Japanese");
-  const nativeLanguage = displayValue(profile?.native_language);
-  const publicJlptLevel = displayValue(publicProfile?.jlpt_level_public, "Hidden");
+  const japaneseLearningLabel = wantsJapaneseLearning(profile)
+    ? "Japanese Study Tools"
+    : "Reading Companion";
   const heroFacts = [
     username ? `@${username}` : null,
-    targetLanguage,
+    japaneseLearningLabel,
     readingLevel?.plain ?? profile?.level,
   ].filter(Boolean);
   const selectedPace =
@@ -651,56 +624,19 @@ export default function ProfileHubPage() {
           </section>
         ) : null}
 
-        <section className="mt-6 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-          <ProfileSection
-            eyebrow="Reading Identity"
-            title="Reader Details"
-            description="These are your current reader profile fields. Public profile choices are still managed separately."
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <DetailCard label="Target Language" value={targetLanguage} />
-              <DetailCard label="Native Language" value={nativeLanguage} />
-              <DetailCard label="Public JLPT Level" value={publicJlptLevel} />
-              <DetailCard label="Public Name" value={publicNameChoice === "username" ? "Username" : "Display name"} />
-            </div>
-
-            {favoriteGenres.length > 0 ? (
-              <div className="mt-5 flex flex-wrap gap-2">
-                {favoriteGenres.map((genre) => (
-                  <span
-                    key={genre}
-                    className="rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-black text-stone-700"
-                  >
-                    {genre}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </ProfileSection>
-
-          <section className="rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-sm">
+        <section className="mt-6 rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-500">
               Access
             </p>
-            <AccessLabel profile={profile} />
-          </section>
-        </section>
-
-	        <section className="mt-6">
-	          <ProfileSection
-	            eyebrow="Profile Tools"
-	            title="Edit Profile"
-            description="Update the reader details that shape this profile page."
-          >
-            <div className="grid gap-3">
-	              <ActionCard
-	                href="/community/profile/settings"
-	                title="Edit Profile"
-	                description="Update your reader details, level, and favorite genres."
-	                tone="amber"
-	              />
-            </div>
-          </ProfileSection>
+            <Link
+              href="/community/profile/settings"
+              className="inline-flex w-fit items-center justify-center rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-black text-stone-700 shadow-sm transition hover:border-stone-300 hover:bg-stone-50 hover:text-stone-950"
+            >
+              Edit Profile →
+            </Link>
+          </div>
+          <AccessLabel profile={profile} />
         </section>
       </div>
     </main>

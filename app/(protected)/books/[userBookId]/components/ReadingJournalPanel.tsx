@@ -179,7 +179,6 @@ export default function ReadingJournalPanel({
   onFavoriteQuotesChange,
 }: ReadingJournalPanelProps) {
   const [storyTab, setStoryTab] = useState<StoryTabMode>("characters");
-  const showReviewTab = bookLanguageCode === "en";
   const learningTabs = useMemo(
     () =>
       canUseJapaneseLearningJournal
@@ -197,9 +196,9 @@ export default function ReadingJournalPanel({
       ...baseJournalStartTabs,
       ...learningTabs,
       ...baseJournalEndTabs,
-      ...(showReviewTab ? (["review"] as StoryTabMode[]) : []),
+      "review",
     ],
-    [learningTabs, showReviewTab]
+    [learningTabs]
   );
   const learningArchiveReadOnlyTabs = useMemo(
     () => ({
@@ -1273,7 +1272,7 @@ export default function ReadingJournalPanel({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-500">
-                Reading Workspace
+                Split view
               </p>
               <h2 className="mt-1 text-xl font-black text-stone-950">Reading Journal</h2>
               <p className="mt-1 text-xs leading-5 text-stone-500">

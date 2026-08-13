@@ -7,6 +7,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ProfileShell from "@/components/profile/ProfileShell";
 import { PROFILE_LEVEL_OPTIONS } from "@/lib/profileLevels";
+import {
+  legacyTargetLanguageForJapaneseLearning,
+  wantsJapaneseLearning,
+} from "@/lib/access/japaneseLearningIntent";
 import { supabase } from "@/lib/supabaseClient";
 import MekuruReadingLevelGuide from "@/components/profile/MekuruReadingLevelGuide";
 import ProfileSettingsLoadingState from "./components/ProfileSettingsLoadingState";
@@ -59,7 +63,7 @@ export default function ProfileSettingsPage() {
   const [username, setUsername] = useState("");
   const [nativeLanguageChoice, setNativeLanguageChoice] = useState("");
   const [customNativeLanguage, setCustomNativeLanguage] = useState("");
-  const [targetLanguage, setTargetLanguage] = useState("Japanese");
+  const [japaneseLearningEnabled, setJapaneseLearningEnabled] = useState(false);
   const [level, setLevel] = useState("");
 
   const [publicNameChoice, setPublicNameChoice] = useState<"display_name" | "username">(
@@ -93,7 +97,7 @@ export default function ProfileSettingsPage() {
       const [profileResult, publicResult] = await Promise.all([
         supabase
           .from("profiles")
-          .select("display_name, username, native_language, target_language, level")
+          .select("display_name, username, native_language, target_language, japanese_learning_enabled, level")
           .eq("id", user.id)
           .maybeSingle(),
         supabase
@@ -137,7 +141,7 @@ export default function ProfileSettingsPage() {
         setCustomNativeLanguage("");
       }
 
-      setTargetLanguage(profile?.target_language ?? "Japanese");
+      setJapaneseLearningEnabled(wantsJapaneseLearning(profile));
       setLevel(profile?.level ?? "");
 
       setPublicNameChoice(publicRow?.public_name_choice ?? "display_name");
@@ -231,12 +235,6 @@ export default function ProfileSettingsPage() {
       return;
     }
 
-    if (!targetLanguage.trim()) {
-      setSaving(false);
-      setErrorMsg("Please choose your target language.");
-      return;
-    }
-
     if (!level.trim()) {
       setSaving(false);
       setErrorMsg("Please choose the reading level that feels closest right now.");
@@ -263,7 +261,8 @@ export default function ProfileSettingsPage() {
           display_name: displayName.trim(),
           username: cleanUsername,
           native_language: selectedNativeLanguage,
-          target_language: targetLanguage.trim(),
+          japanese_learning_enabled: japaneseLearningEnabled,
+          target_language: legacyTargetLanguageForJapaneseLearning(japaneseLearningEnabled),
           level: level.trim(),
         },
         { onConflict: "id" }
@@ -293,6 +292,7 @@ export default function ProfileSettingsPage() {
     }
 
     setSuccessMsg("Profile saved.");
+    window.dispatchEvent(new Event("mekuru-profile-preferences-updated"));
     router.replace("/community/profile");
     router.refresh();
   }
@@ -323,14 +323,14 @@ export default function ProfileSettingsPage() {
           username={username}
           nativeLanguageChoice={nativeLanguageChoice}
           customNativeLanguage={customNativeLanguage}
-          targetLanguage={targetLanguage}
+          japaneseLearningEnabled={japaneseLearningEnabled}
           nativeLanguageOptions={NATIVE_LANGUAGE_OPTIONS}
           nativeLanguageOther={NATIVE_LANGUAGE_OTHER}
           onDisplayNameChange={setDisplayName}
           onUsernameChange={setUsername}
           onNativeLanguageChoiceChange={setNativeLanguageChoice}
           onCustomNativeLanguageChange={setCustomNativeLanguage}
-          onTargetLanguageChange={setTargetLanguage}
+          onJapaneseLearningEnabledChange={setJapaneseLearningEnabled}
         />
 
         <MekuruReadingLevelGuide selectedLevel={level} onSelect={setLevel} />

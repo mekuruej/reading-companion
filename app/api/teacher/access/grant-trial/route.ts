@@ -155,6 +155,7 @@ export async function POST(request: Request) {
     .from("profiles")
     .update({
       app_access_type: "trial",
+      trial_started_at: now.toISOString(),
       app_access_expires_at: trialEndsAt.toISOString(),
     })
     .eq("id", targetUserId)

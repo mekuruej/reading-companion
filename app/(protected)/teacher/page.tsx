@@ -363,6 +363,7 @@ export default function TeacherHubPage() {
         if (hasSuperTeacherAccess) {
           const [
             { data: pendingBookRequests },
+            { data: pendingJapaneseLearningRequests },
             { data: manualBookFlags },
             { data: globalBooks },
             { data: vocabularyFlags },
@@ -372,6 +373,10 @@ export default function TeacherHubPage() {
               .from("book_requests")
               .select("created_at")
               .or("status.eq.pending,status.is.null"),
+            supabase
+              .from("japanese_learning_access_requests")
+              .select("requested_at")
+              .eq("status", "pending"),
             supabase
               .from("user_alerts")
               .select("created_at")
@@ -397,6 +402,9 @@ export default function TeacherHubPage() {
             (book) => missingGlobalBookFields(book).length > 0
           );
           const pendingBookRequestRows = (pendingBookRequests ?? []) as CreatedAtRow[];
+          const pendingJapaneseLearningRequestRows = ((pendingJapaneseLearningRequests ?? []) as any[]).map(
+            (row) => ({ created_at: row.requested_at ?? null })
+          ) as CreatedAtRow[];
           const manualBookFlagRows = (manualBookFlags ?? []) as CreatedAtRow[];
           const vocabularyFlagRows = (vocabularyFlags ?? []) as CreatedAtRow[];
           const flaggedKanjiRows = (flaggedKanjiMapRows ?? []) as FlaggedKanjiMapCountRow[];
@@ -412,6 +420,14 @@ export default function TeacherHubPage() {
           ];
 
           nextTeacherAlerts.push(
+            {
+              title: "Japanese Learning Requests",
+              href: "/teacher/japanese-learning-requests",
+              count: pendingJapaneseLearningRequestRows.length,
+              description: "Invitation requests waiting for pilot review.",
+              hasToday: pendingJapaneseLearningRequestRows.some((row) => isTodayDate(row.created_at)),
+              sortDate: oldestDate(pendingJapaneseLearningRequestRows.map((row) => row.created_at)),
+            },
             {
               title: "Pending Book Requests",
               href: "/teacher/books",

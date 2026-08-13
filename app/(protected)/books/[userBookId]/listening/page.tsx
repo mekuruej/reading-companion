@@ -96,7 +96,7 @@ export default function ListeningPage() {
 
       const profileResult = await supabase
         .from("profiles")
-        .select("role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at, trial_ends_at")
+        .select("role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at")
         .eq("id", user.id)
         .maybeSingle();
       let profile: any = profileResult.data;
