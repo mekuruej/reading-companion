@@ -36,7 +36,6 @@ const cycleSteps = [
 export default function VocabularyGrowthCycleSection() {
     return (
         <details
-            open
             className="group mt-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
         >
             <summary className="cursor-pointer list-none">
