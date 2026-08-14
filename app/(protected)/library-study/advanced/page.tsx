@@ -211,38 +211,48 @@ export default function AdvancedStudyPage() {
                         setReadinessError(null);
                     }
 
-                    const { data: settingsRow, error: settingsError } = await supabase
-                        .from("user_learning_settings")
-                        .select("red_stages, orange_stages, yellow_stages")
-                        .eq("user_id", user.id)
-                        .maybeSingle<LearningSettingsRow>();
-
-                    if (settingsError) {
-                        console.warn("Advanced Study readiness is using default settings:", settingsError);
-                    }
-
-                    const { rows: summaryRows, limited } = await loadAdvancedStudySummaryRows(user.id);
-                    let progressRows: AdvancedStudyReadinessProgressRow[] = [];
-
                     try {
-                        progressRows = await loadAdvancedStudyProgressRows(user.id, summaryRows);
-                    } catch (progressError) {
-                        console.warn("Advanced Study readiness is using summary colors without progress:", progressError);
-                    }
+                        const { data: settingsRow, error: settingsError } = await supabase
+                            .from("user_learning_settings")
+                            .select("red_stages, orange_stages, yellow_stages")
+                            .eq("user_id", user.id)
+                            .maybeSingle<LearningSettingsRow>();
 
-                    const nextReadiness = calculateAdvancedStudyReadiness({
-                        summaries: summaryRows,
-                        progressRows,
-                        settings: {
-                            ...DEFAULT_LEARNING_SETTINGS,
-                            ...(settingsError ? {} : settingsRow ?? {}),
-                        },
-                    });
+                        if (settingsError) {
+                            console.warn("Advanced Study readiness is using default settings:", settingsError);
+                        }
 
-                    if (mounted) {
-                        setReadiness(nextReadiness);
-                        setReadinessSampleLimited(limited);
-                        setReadinessLoading(false);
+                        const { rows: summaryRows, limited } = await loadAdvancedStudySummaryRows(user.id);
+                        let progressRows: AdvancedStudyReadinessProgressRow[] = [];
+
+                        try {
+                            progressRows = await loadAdvancedStudyProgressRows(user.id, summaryRows);
+                        } catch (progressError) {
+                            console.warn("Advanced Study readiness is using summary colors without progress:", progressError);
+                        }
+
+                        const nextReadiness = calculateAdvancedStudyReadiness({
+                            summaries: summaryRows,
+                            progressRows,
+                            settings: {
+                                ...DEFAULT_LEARNING_SETTINGS,
+                                ...(settingsError ? {} : settingsRow ?? {}),
+                            },
+                        });
+
+                        if (mounted) {
+                            setReadiness(nextReadiness);
+                            setReadinessSampleLimited(limited);
+                        }
+                    } catch (readinessLoadError) {
+                        console.error("Could not load Advanced Study readiness:", readinessLoadError);
+                        if (mounted) {
+                            setReadiness(null);
+                            setReadinessSampleLimited(false);
+                            setReadinessError("Could not load Advanced Study readiness.");
+                        }
+                    } finally {
+                        if (mounted) setReadinessLoading(false);
                     }
                 }
 
@@ -349,7 +359,7 @@ export default function AdvancedStudyPage() {
                         ) : readiness ? (
                             <section className="rounded-3xl border border-violet-200 bg-white p-6 text-slate-900 shadow-sm">
                                 <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-600">
-                                    {showAdvancedTools ? "Advanced Study is available" : "Advanced Study is forming"}
+                                    {showAdvancedTools ? "Advanced Study is available" : "Building toward readiness"}
                                 </p>
                                 <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                                     <div>
@@ -363,9 +373,7 @@ export default function AdvancedStudyPage() {
                                                 ? readinessSampleLimited
                                                     ? `Showing your latest ${READINESS_SAMPLE_SIZE}-word sample. ${readiness.eligibleWordCount} tracked words in this sample are countable, and ${formatReadyScore(readiness.readyScore)} are strongly marked by color.`
                                                     : `You have ${readiness.eligibleWordCount} tracked words. ${formatReadyScore(readiness.readyScore)} words are strongly marked by color, which helps show the shape of your review pool.`
-                                                : isTrialAccess
-                                                    ? "During your trial, your word colors can begin while you build vocabulary from books. Ability Check and Library Review are part of paid Advanced Study."
-                                                : "Add more words from your books to make Ability Check and Library Review more useful. Your word colors can already begin before Advanced Study is fully useful."}
+                                                : "You’re building the vocabulary history Advanced Study uses. Keep reading, looking up words, and adding book vocabulary. Your advanced review tools will become more useful as your vocabulary history grows."}
                                         </p>
                                     </div>
 
@@ -386,9 +394,7 @@ export default function AdvancedStudyPage() {
                                 <p className="mt-4 text-sm font-semibold leading-6 text-slate-600">
                                     {libraryReviewAvailable
                                         ? `Library Review is available. ${readinessSampleLimited ? "In your latest tracked words" : `You have ${readiness.eligibleWordCount} tracked words`}, ${formatReadyScore(readiness.readyScore)} are strongly marked by color.`
-                                        : isTrialAccess
-                                            ? `Library Review is part of paid Advanced Study. Your color-marked review pool is ${formatReadyScore(readiness.readyScore)} strongly marked words.`
-                                            : `Library Review becomes more useful around ${readiness.libraryReviewTarget} tracked words. You have ${readiness.eligibleWordCount} / ${readiness.libraryReviewTarget}.`}
+                                        : `Library Review becomes more useful around ${readiness.libraryReviewTarget} tracked words. You have ${readiness.eligibleWordCount} / ${readiness.libraryReviewTarget}.`}
                                 </p>
 
                                 <div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3 text-sm font-semibold leading-6 text-violet-950">

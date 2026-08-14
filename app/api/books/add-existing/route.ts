@@ -134,23 +134,6 @@ async function canAddToTargetUser({
   return Boolean(data);
 }
 
-function missingGlobalBookFields(book: any) {
-  if (book?.missing_info_cleared_at) return [];
-
-  const missing: string[] = [];
-  if (!String(book?.title ?? "").trim()) missing.push("title");
-  if (!book?.allow_missing_isbn && !String(book?.isbn13 ?? "").trim() && !String(book?.asin ?? "").trim()) {
-    missing.push("ISBN-13 or ASIN");
-  }
-  if (!String(book?.cover_url ?? "").trim()) missing.push("cover");
-  if (!String(book?.book_type ?? "").trim()) missing.push("book type");
-  if (!String(book?.author ?? "").trim()) missing.push("author");
-  if (!book?.allow_missing_publisher && !String(book?.publisher ?? "").trim()) missing.push("publisher");
-  if (!String(book?.published_date ?? "").trim()) missing.push("published date");
-  if (book?.page_count == null) missing.push("page count");
-  return missing;
-}
-
 async function getBookForDirectAdd(bookId: string) {
   const fullResponse = await supabaseAdmin
     .from("books")
@@ -234,17 +217,6 @@ export async function POST(request: Request) {
 
   if (languageError) {
     return NextResponse.json({ error: languageError }, { status: 403 });
-  }
-
-  const missingFields = missingGlobalBookFields(book);
-  if (missingFields.length > 0) {
-    return NextResponse.json(
-      {
-        error: "This book needs review before it can be added directly.",
-        missingFields,
-      },
-      { status: 409 }
-    );
   }
 
   const { data: existingUserBook, error: existingUserBookError } =

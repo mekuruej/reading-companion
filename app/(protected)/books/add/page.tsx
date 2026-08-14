@@ -119,8 +119,8 @@ function missingGlobalBookFields(book: BookSearchResult) {
     return missing;
 }
 
-function isBookCompleteEnoughToAdd(book: BookSearchResult) {
-    return !book.needs_review && missingGlobalBookFields(book).length === 0;
+function isExistingCatalogBookAddable(book: BookSearchResult) {
+    return Boolean(book.id);
 }
 
 export default function AddBookPage() {
@@ -946,7 +946,7 @@ export default function AddBookPage() {
                     <div className="mt-5 space-y-3">
                         {bookSearchResults.map((result) => {
                             const missingFields = missingGlobalBookFields(result);
-                            const canAddExisting = isBookCompleteEnoughToAdd(result);
+                            const canAddExisting = isExistingCatalogBookAddable(result);
                             const languageMismatch = isMismatchedForLearner(result.language_code);
                             const addLabel = languageMismatch
                                 ? "Wrong language"

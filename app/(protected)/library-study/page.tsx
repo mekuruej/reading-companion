@@ -57,20 +57,20 @@ const studyPaths = [
 function StudyPathCard({
   path,
   locked,
-  trialForming = false,
+  lockedHref,
 }: {
   path: (typeof studyPaths)[number];
   locked: boolean;
-  trialForming?: boolean;
+  lockedHref: string;
 }) {
   return (
     <Link
-      href={locked ? "/trial-ended" : path.href}
+      href={locked ? lockedHref : path.href}
       className={`group relative rounded-3xl border p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${path.className}`}
     >
-      {locked || trialForming ? (
+      {locked ? (
         <div className="absolute right-4 top-4 rounded-full border border-white/70 bg-white/80 px-2.5 py-1 text-xs font-black shadow-sm">
-          {trialForming ? "Forming" : "Japanese Learning 🔒"}
+          Japanese Learning 🔒
         </div>
       ) : null}
 
@@ -82,9 +82,7 @@ function StudyPathCard({
         <div>
           <h2 className="text-2xl font-black">{path.title}</h2>
           <p className="mt-2 text-sm leading-6 opacity-80">
-            {trialForming
-              ? "During your trial, you can see your Advanced Study progress. Ability Check and Library Review open with Japanese Learning 🔒."
-              : locked ? path.lockedDescription : path.description}
+            {locked ? path.lockedDescription : path.description}
           </p>
         </div>
 
@@ -100,8 +98,9 @@ export default function StudyToolsPage() {
   const [loadingAccess, setLoadingAccess] = useState(true);
   const [hasFullAccess, setHasFullAccess] = useState(false);
   const [isTrialAccess, setIsTrialAccess] = useState(false);
+  const [isExpiredTrial, setIsExpiredTrial] = useState(false);
   const [canUseBookStudy, setCanUseBookStudy] = useState(false);
-  const [canUseAdvancedStudyStep2, setCanUseAdvancedStudyStep2] = useState(false);
+  const [canUseAdvancedStudy, setCanUseAdvancedStudy] = useState(false);
   const [showJapaneseLearningPromo, setShowJapaneseLearningPromo] = useState(false);
 
   useEffect(() => {
@@ -122,8 +121,9 @@ export default function StudyToolsPage() {
           if (mounted) {
             setHasFullAccess(false);
             setIsTrialAccess(false);
+            setIsExpiredTrial(false);
             setCanUseBookStudy(false);
-            setCanUseAdvancedStudyStep2(false);
+            setCanUseAdvancedStudy(false);
             setShowJapaneseLearningPromo(false);
           }
           return;
@@ -152,7 +152,7 @@ export default function StudyToolsPage() {
 
         const status = profile
           ? getAppAccessStatus(profile)
-          : { hasFullAccess: false, reason: "free", isTrialActive: false };
+          : { hasFullAccess: false, reason: "free", isTrialActive: false, isTrialExpired: false };
         const featureAccess = getFeatureAccess({
           role: profile?.role,
           isSuperTeacher: profile?.is_super_teacher,
@@ -164,8 +164,9 @@ export default function StudyToolsPage() {
         if (mounted) {
           setHasFullAccess(featureAccess.hasFullAccess);
           setIsTrialAccess(featureAccess.isTrial);
+          setIsExpiredTrial(status.isTrialExpired);
           setCanUseBookStudy(featureAccess.canUseBookStudy);
-          setCanUseAdvancedStudyStep2(featureAccess.canUseAdvancedStudyStep2);
+          setCanUseAdvancedStudy(featureAccess.canUseAdvancedStudy);
           setShowJapaneseLearningPromo(
             wantsJapaneseLearning(profile) && !featureAccess.hasFullAccess
           );
@@ -175,8 +176,9 @@ export default function StudyToolsPage() {
         if (mounted) {
           setHasFullAccess(false);
           setIsTrialAccess(false);
+          setIsExpiredTrial(false);
           setCanUseBookStudy(false);
-          setCanUseAdvancedStudyStep2(false);
+          setCanUseAdvancedStudy(false);
           setShowJapaneseLearningPromo(false);
         }
       } finally {
@@ -224,10 +226,10 @@ export default function StudyToolsPage() {
                 path.href === "/library-study/book-study"
                   ? !canUseBookStudy
                   : path.href === "/library-study/advanced"
-                    ? !canUseAdvancedStudyStep2
+                    ? !canUseAdvancedStudy
                     : path.requiresReadingAccess && !hasFullAccess
               }
-              trialForming={isTrialAccess && path.href === "/library-study/advanced"}
+              lockedHref={isExpiredTrial ? "/trial-ended" : "/reading-access"}
             />
           ))}
         </div>

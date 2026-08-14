@@ -43,6 +43,7 @@ export default function AddBookCatalogResult({
 }: AddBookCatalogResultProps) {
   const displayLanguage = languageLabel(result.language_code);
   const canAddThisExistingBook = canAddExisting && !languageMismatch;
+  const hasMissingDetails = missingFields.length > 0;
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-stone-50 p-3 sm:flex-row">
@@ -86,7 +87,11 @@ export default function AddBookCatalogResult({
               {displayLanguage}
             </span>
           ) : null}
-          {canAddExisting ? (
+          {hasMissingDetails && canAddExisting ? (
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-amber-800">
+              Some details missing
+            </span>
+          ) : canAddExisting ? (
             <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-800">
               Ready to add
             </span>
@@ -106,24 +111,35 @@ export default function AddBookCatalogResult({
             This book is not in your current learning language.
           </p>
         ) : null}
-        {!canAddExisting ? (
+        {hasMissingDetails && canAddExisting ? (
           <p className="mt-2 text-xs leading-5 text-amber-800">
-            Missing:{" "}
-            {missingFields.length > 0 ? missingFields.join(", ") : "review approval"}.
+            Some book details are missing ({missingFields.join(", ")}). You can still add this book.
           </p>
         ) : null}
       </div>
 
       <div className="flex shrink-0 flex-col gap-2 sm:w-40">
         {canAddExisting ? (
-          <button
-            type="button"
-            onClick={onAdd}
-            disabled={adding || !canAddThisExistingBook}
-            className="rounded-2xl bg-amber-500 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-amber-600 disabled:opacity-50"
-          >
-            {adding ? "Adding..." : addLabel}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={onAdd}
+              disabled={adding || !canAddThisExistingBook}
+              className="rounded-2xl bg-amber-500 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-amber-600 disabled:opacity-50"
+            >
+              {adding ? "Adding..." : addLabel}
+            </button>
+            {hasMissingDetails ? (
+              <button
+                type="button"
+                onClick={onRequestReview}
+                disabled={requestLoading}
+                className="rounded-2xl border border-amber-300 bg-white px-4 py-2 text-sm font-black text-amber-800 transition hover:bg-amber-50 disabled:opacity-50"
+              >
+                {requestLoading ? "Sending..." : "Request review"}
+              </button>
+            ) : null}
+          </>
         ) : (
           <button
             type="button"
