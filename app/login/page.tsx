@@ -69,7 +69,10 @@ export default function LoginPage() {
     <main className="min-h-screen bg-slate-100 p-6">
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-xl items-center justify-center">
         <div className="w-full rounded-2xl border bg-white p-6 shadow-sm">
-          <h1 className="mb-4 text-center text-2xl font-semibold">Sign in</h1>
+          <h1 className="text-center text-2xl font-semibold">Welcome back</h1>
+          <p className="mx-auto mt-3 mb-4 max-w-md text-center text-sm leading-6 text-slate-500">
+            Sign in to return to your library, reading history, journals, and study tools.
+          </p>
 
           <Auth
             supabaseClient={supabase}
@@ -87,6 +90,13 @@ export default function LoginPage() {
           <div className="mt-4 text-center text-sm text-slate-500">
             <Link href="/login/forgot-password" className="font-semibold underline">
               Forgot your password?
+            </Link>
+          </div>
+
+          <div className="mt-5 border-t border-slate-100 pt-5 text-center text-sm text-slate-500">
+            <p>Don’t have an account?</p>
+            <Link href="/login/beta-signup" className="mt-1 inline-flex font-semibold underline">
+              Create a free account →
             </Link>
           </div>
         </div>

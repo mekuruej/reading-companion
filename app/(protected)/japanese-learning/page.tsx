@@ -9,6 +9,8 @@ type RequestState = {
   id: string;
   status: "pending" | "approved" | "declined";
   note: string | null;
+  reading_experience: string | null;
+  jlpt_level: string | null;
   request_source: string | null;
   requested_at: string | null;
   reviewed_at: string | null;
@@ -25,9 +27,9 @@ type AccessState = {
 
 const features = [
   {
-    title: "Guided Japanese reading",
+    title: "Japanese reading support",
     description:
-      "Read with supportive book-specific tools built around the Japanese books in your library.",
+      "Use MEKURU alongside the Japanese books you choose. Look things up, capture vocabulary, and study as you read.",
   },
   {
     title: "Curiosity Reading",
@@ -44,6 +46,24 @@ const features = [
     description:
       "Review saved vocabulary from a single book or across your Japanese reading library.",
   },
+];
+
+const readingExperienceOptions = [
+  { value: "starting", label: "Just starting" },
+  { value: "lots_of_support", label: "I can read with a lot of support" },
+  { value: "independent_slow", label: "I can read independently but slowly" },
+  { value: "comfortable", label: "I’m a comfortable reader" },
+  { value: "not_sure", label: "Not sure" },
+];
+
+const jlptLevelOptions = [
+  { value: "n5", label: "N5" },
+  { value: "n4", label: "N4" },
+  { value: "n3", label: "N3" },
+  { value: "n2", label: "N2" },
+  { value: "n1", label: "N1" },
+  { value: "not_sure", label: "Not sure" },
+  { value: "not_taken", label: "I haven’t taken the JLPT" },
 ];
 
 function requestSourceFromParam(value: string | null) {
@@ -71,6 +91,8 @@ export default function JapaneseLearningPage() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [note, setNote] = useState("");
+  const [readingExperience, setReadingExperience] = useState("not_sure");
+  const [jlptLevel, setJlptLevel] = useState("");
   const [access, setAccess] = useState<AccessState | null>(null);
   const [request, setRequest] = useState<RequestState | null>(null);
 
@@ -122,7 +144,12 @@ export default function JapaneseLearningPage() {
     try {
       const response = await fetchWithSession("/api/japanese-learning/request", {
         method: "POST",
-        body: JSON.stringify({ note, source }),
+        body: JSON.stringify({
+          note,
+          readingExperience,
+          jlptLevel: jlptLevel || null,
+          source,
+        }),
       });
       const payload = await response.json().catch(() => null);
 
@@ -137,6 +164,8 @@ export default function JapaneseLearningPage() {
           : "Invitation requested. Access has not started yet."
       );
       setNote("");
+      setReadingExperience("not_sure");
+      setJlptLevel("");
     } catch (error: any) {
       setMessage(error?.message ?? "Could not request an invitation.");
     } finally {
@@ -173,7 +202,16 @@ export default function JapaneseLearningPage() {
             Learn Japanese through the books you are actually reading.
           </h1>
           <p className="mt-5 max-w-2xl text-base font-semibold leading-8 text-stone-700">
-            MEKURU connects Japanese reading support, vocabulary capture, flashcards, and study tools to your real reading life.
+            Use MEKURU alongside the Japanese books you choose. Look things up, capture vocabulary, and study as you read — at your own pace.
+          </p>
+        </section>
+
+        <section className="mt-6 rounded-3xl border border-amber-200 bg-white p-5 shadow-sm">
+          <p className="text-sm font-black text-stone-950">
+            You choose the book. You direct the reading. MEKURU provides the tools.
+          </p>
+          <p className="mt-2 text-sm leading-6 text-stone-600">
+            Bring your own books. MEKURU supports your reading and study, but does not provide the book text.
           </p>
         </section>
 
@@ -251,7 +289,39 @@ export default function JapaneseLearningPage() {
           ) : (
             <div className="mt-5 space-y-3">
               <label className="block text-sm font-black text-stone-800">
-                What are you hoping to read or work on?{" "}
+                How would you describe your current Japanese reading experience?
+              </label>
+              <select
+                value={readingExperience}
+                onChange={(event) => setReadingExperience(event.target.value)}
+                className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-violet-300 focus:ring-2 focus:ring-violet-100"
+              >
+                {readingExperienceOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+
+              <label className="block text-sm font-black text-stone-800">
+                JLPT level, if you know it{" "}
+                <span className="font-semibold text-stone-500">(optional)</span>
+              </label>
+              <select
+                value={jlptLevel}
+                onChange={(event) => setJlptLevel(event.target.value)}
+                className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-violet-300 focus:ring-2 focus:ring-violet-100"
+              >
+                <option value="">Select one, or leave blank</option>
+                {jlptLevelOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+
+              <label className="block text-sm font-black text-stone-800">
+                Anything you’d like me to know?{" "}
                 <span className="font-semibold text-stone-500">(optional)</span>
               </label>
               <textarea
@@ -259,7 +329,7 @@ export default function JapaneseLearningPage() {
                 onChange={(event) => setNote(event.target.value)}
                 maxLength={600}
                 className="min-h-[110px] w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-violet-300 focus:ring-2 focus:ring-violet-100"
-                placeholder="A book, manga, author, or study goal..."
+                placeholder="A book, manga, audiobook use, reading goal, learning background, or anything else helpful..."
               />
               <button
                 type="button"
@@ -278,6 +348,24 @@ export default function JapaneseLearningPage() {
           {message ? (
             <p className="mt-4 text-sm font-semibold text-violet-700">{message}</p>
           ) : null}
+        </section>
+
+        <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-500">
+            Want more support?
+          </p>
+          <h2 className="mt-2 text-2xl font-black text-stone-950">
+            Japanese reading lessons with Devon
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-stone-600">
+            Lessons are optional and separate from Japanese Learning. Devon offers focused support for working through real Japanese texts.
+          </p>
+          <Link
+            href="/japanese"
+            className="mt-4 inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-black text-stone-800 transition hover:bg-stone-50"
+          >
+            View lessons →
+          </Link>
         </section>
       </div>
     </main>

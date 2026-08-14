@@ -1,4 +1,4 @@
-// Beta Signup Page
+// Signup Page
 //
 
 "use client";
@@ -14,7 +14,7 @@ export default function BetaSignupPage() {
             <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-xl items-center justify-center">
                 <div className="w-full rounded-2xl border bg-white p-6 shadow-sm">
                     <p className="text-center text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">
-                        MEKURU Beta
+                        MEKURU
                     </p>
 
                     <h1 className="mt-2 text-center text-2xl font-semibold">
@@ -22,8 +22,8 @@ export default function BetaSignupPage() {
                     </h1>
 
                     <p className="mx-auto mt-3 max-w-md text-center text-sm leading-6 text-slate-500">
-                        This signup page is for invited beta readers and enrolled students.
-                        Use the email or Google account you’d like connected to your MEKURU library.
+                        Start a free Reader account to build your library, track your reading,
+                        and use Reading Journal and Reading Companion features.
                     </p>
 
                     <div className="mt-6">

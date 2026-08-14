@@ -3,13 +3,15 @@ import Link from "next/link";
 type JapaneseLearningPromoCardProps = {
   title?: string;
   description?: string;
+  cta?: string;
   source?: "study_hub" | "book_hub" | "japanese_learning_page";
   compact?: boolean;
 };
 
 export default function JapaneseLearningPromoCard({
   title = "Japanese Learning",
-  description = "Learn through Japanese books with guided reading, vocabulary, flashcards, and study tools.",
+  description = "Add reading support, vocabulary tools, flashcards, and more to the Japanese books you choose.",
+  cta = "See what Japanese Learning adds →",
   source = "study_hub",
   compact = false,
 }: JapaneseLearningPromoCardProps) {
@@ -36,7 +38,7 @@ export default function JapaneseLearningPromoCard({
         href={href}
         className="mt-3 inline-flex rounded-full border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-black text-violet-800 transition hover:bg-violet-100 sm:mt-0"
       >
-        Explore Japanese Learning →
+        {cta}
       </Link>
     </section>
   );

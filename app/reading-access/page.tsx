@@ -122,7 +122,7 @@ export default function ReadingAccessPage() {
             Separate lesson option
           </p>
           <h2 className="mt-3 text-2xl font-black text-stone-950">
-            Want guided reading support?
+            Want lesson support for Japanese reading?
           </h2>
           <p className="mt-3 text-sm leading-6 text-stone-700 sm:text-base">
             Reading Access gives you the tools to keep reading on your own. If

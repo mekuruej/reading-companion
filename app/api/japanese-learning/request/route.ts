@@ -32,6 +32,36 @@ function cleanSource(value: unknown) {
   return "japanese_learning_page";
 }
 
+function cleanReadingExperience(value: unknown) {
+  const readingExperience = cleanText(value);
+  if (
+    readingExperience === "starting" ||
+    readingExperience === "lots_of_support" ||
+    readingExperience === "independent_slow" ||
+    readingExperience === "comfortable" ||
+    readingExperience === "not_sure"
+  ) {
+    return readingExperience;
+  }
+  return "not_sure";
+}
+
+function cleanJlptLevel(value: unknown) {
+  const jlptLevel = cleanText(value);
+  if (
+    jlptLevel === "n5" ||
+    jlptLevel === "n4" ||
+    jlptLevel === "n3" ||
+    jlptLevel === "n2" ||
+    jlptLevel === "n1" ||
+    jlptLevel === "not_sure" ||
+    jlptLevel === "not_taken"
+  ) {
+    return jlptLevel;
+  }
+  return null;
+}
+
 async function getAuthenticatedUser(req: Request) {
   const authHeader = req.headers.get("authorization") ?? "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
@@ -64,7 +94,7 @@ async function loadProfile(userId: string) {
 async function loadLatestRequest(userId: string) {
   const { data, error } = await supabaseAdmin
     .from("japanese_learning_access_requests")
-    .select("id, status, note, request_source, requested_at, reviewed_at")
+    .select("id, status, note, reading_experience, jlpt_level, request_source, requested_at, reviewed_at")
     .eq("user_id", userId)
     .order("requested_at", { ascending: false })
     .limit(1)
@@ -136,11 +166,13 @@ export async function POST(request: Request) {
 
     const body = await request.json().catch(() => null);
     const note = cleanText(body?.note).slice(0, 600) || null;
+    const readingExperience = cleanReadingExperience(body?.readingExperience);
+    const jlptLevel = cleanJlptLevel(body?.jlptLevel);
     const requestSource = cleanSource(body?.source);
 
     const { data: pendingRequest, error: pendingError } = await supabaseAdmin
       .from("japanese_learning_access_requests")
-      .select("id, status, note, request_source, requested_at, reviewed_at")
+      .select("id, status, note, reading_experience, jlpt_level, request_source, requested_at, reviewed_at")
       .eq("user_id", auth.user.id)
       .eq("status", "pending")
       .maybeSingle();
@@ -161,9 +193,11 @@ export async function POST(request: Request) {
         user_id: auth.user.id,
         status: "pending",
         note,
+        reading_experience: readingExperience,
+        jlpt_level: jlptLevel,
         request_source: requestSource,
       })
-      .select("id, status, note, request_source, requested_at, reviewed_at")
+      .select("id, status, note, reading_experience, jlpt_level, request_source, requested_at, reviewed_at")
       .maybeSingle();
 
     if (error) throw error;

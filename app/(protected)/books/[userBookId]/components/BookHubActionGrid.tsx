@@ -211,8 +211,9 @@ export default function BookHubActionGrid({
 
       {showJapaneseLearningPromo ? (
         <JapaneseLearningPromoCard
-          title="Learn with this book"
+          title="Study Japanese with this book"
           description="Add Japanese reading support, vocabulary tools, flashcards, and more."
+          cta="See Japanese Learning tools →"
           source="book_hub"
           compact
         />

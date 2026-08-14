@@ -9,6 +9,8 @@ type JapaneseLearningRequest = {
   userId: string;
   status: string;
   note: string | null;
+  readingExperience: string | null;
+  jlptLevel: string | null;
   source: string | null;
   requestedAt: string | null;
   reviewedAt: string | null;
@@ -37,6 +39,44 @@ function displayRequester(request: JapaneseLearningRequest) {
     request.email ||
     "Unknown reader"
   );
+}
+
+function readingExperienceLabel(value: string | null | undefined) {
+  switch (value) {
+    case "starting":
+      return "Just starting";
+    case "lots_of_support":
+      return "Can read with a lot of support";
+    case "independent_slow":
+      return "Reads independently but slowly";
+    case "comfortable":
+      return "Comfortable reader";
+    case "not_sure":
+      return "Not sure";
+    default:
+      return "—";
+  }
+}
+
+function jlptLevelLabel(value: string | null | undefined) {
+  switch (value) {
+    case "n5":
+      return "N5";
+    case "n4":
+      return "N4";
+    case "n3":
+      return "N3";
+    case "n2":
+      return "N2";
+    case "n1":
+      return "N1";
+    case "not_sure":
+      return "Not sure";
+    case "not_taken":
+      return "Hasn’t taken the JLPT";
+    default:
+      return "—";
+  }
 }
 
 export default function JapaneseLearningRequestsPage() {
@@ -173,7 +213,10 @@ export default function JapaneseLearningRequestsPage() {
                   <p><span className="font-semibold text-stone-800">Username:</span> {request.username || "—"}</p>
                   <p><span className="font-semibold text-stone-800">Email:</span> {request.email || "—"}</p>
                   <p><span className="font-semibold text-stone-800">Requested:</span> {formatDate(request.requestedAt)}</p>
+                  <p><span className="font-semibold text-stone-800">Status:</span> {request.status || "—"}</p>
                   <p><span className="font-semibold text-stone-800">Source:</span> {request.source || "—"}</p>
+                  <p><span className="font-semibold text-stone-800">Reading experience:</span> {readingExperienceLabel(request.readingExperience)}</p>
+                  <p><span className="font-semibold text-stone-800">JLPT:</span> {jlptLevelLabel(request.jlptLevel)}</p>
                   <p><span className="font-semibold text-stone-800">Current access:</span> {request.appAccessType || "—"}</p>
                   <p><span className="font-semibold text-stone-800">Access expires:</span> {formatDate(request.appAccessExpiresAt)}</p>
                 </div>

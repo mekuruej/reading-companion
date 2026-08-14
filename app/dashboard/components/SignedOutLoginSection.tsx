@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 type SignedOutLoginSectionProps = {
   children: ReactNode;
@@ -16,39 +17,27 @@ export default function SignedOutLoginSection({
       />
 
       <div className="rounded-3xl border border-slate-200 bg-white/85 px-6 py-6 text-center shadow-sm">
-        <p className="text-xs font-bold uppercase tracking-[0.22em] text-slate-500">
-          Student Entrance
-        </p>
-
-        <h2 className="mt-2 text-3xl font-semibold">
-          Welcome to Mekuru
+        <h2 className="text-3xl font-semibold">
+          Welcome back
         </h2>
 
         <p className="mt-3 text-sm leading-6 text-gray-500">
-          Sign in to open your reading library, saved words, study tools, and teacher
-          assignments.
+          Sign in to return to your library, reading history, journals, and study tools.
         </p>
 
         <div className="mt-5 text-left">
           {children}
         </div>
 
-        <p className="mt-3 text-xs leading-5 text-slate-500">
-          App access is for enrolled students & beta readers only.
-        </p>
-
-        <p className="mt-1 text-xs leading-5 text-slate-500">
-          Would you like to try Mekuru? Join the beta waiting list{" "}
-          <a
-            href="https://forms.gle/5QLgohvkNvDBzTuH9"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-semibold underline underline-offset-4 hover:text-slate-900"
+        <div className="mt-5 border-t border-slate-100 pt-5 text-sm text-slate-500">
+          <p>Don’t have an account?</p>
+          <Link
+            href="/login/beta-signup"
+            className="mt-1 inline-flex font-semibold underline underline-offset-4 hover:text-slate-900"
           >
-            here
-          </a>
-          .
-        </p>
+            Create a free account →
+          </Link>
+        </div>
       </div>
     </section>
   );
