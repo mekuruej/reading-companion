@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+import { normalizeBookLanguageCode } from "@/lib/books/bookLanguage";
 import { lookupNormalizedExternalBookByIsbn13 } from "@/lib/books/bookLookup";
 import { normalizeIsbn13 } from "@/lib/books/isbn";
 import {
@@ -38,7 +39,7 @@ function isSuperTeacherFlag(value: unknown) {
 async function getProfile(userId: string) {
   const { data, error } = await supabaseAdmin
     .from("profiles")
-    .select("id, role, is_super_teacher, target_language")
+    .select("id, role, is_super_teacher")
     .eq("id", userId)
     .maybeSingle();
 
@@ -47,56 +48,7 @@ async function getProfile(userId: string) {
     id: string;
     role?: string | null;
     is_super_teacher?: boolean | string | null;
-    target_language?: string | null;
   } | null;
-}
-
-function isTeacherFacingProfile(
-  profile: { role?: string | null; is_super_teacher?: boolean | string | null } | null
-) {
-  return (
-    profile?.role === "teacher" ||
-    profile?.role === "super_teacher" ||
-    isSuperTeacherFlag(profile?.is_super_teacher)
-  );
-}
-
-function normalizeLanguageCode(value: string | null | undefined) {
-  const normalized = (value ?? "").trim().toLowerCase();
-  if (!normalized) return null;
-  if (normalized === "ja" || normalized === "japanese" || normalized === "日本語") {
-    return "ja";
-  }
-  if (normalized === "en" || normalized === "english" || normalized === "英語") {
-    return "en";
-  }
-  return null;
-}
-
-function learnerLanguageError({
-  actorProfile,
-  bookLanguageCode,
-}: {
-  actorProfile: {
-    role?: string | null;
-    is_super_teacher?: boolean | string | null;
-    target_language?: string | null;
-  } | null;
-  bookLanguageCode: string | null | undefined;
-}) {
-  if (isTeacherFacingProfile(actorProfile)) return null;
-
-  const targetLanguageCode = normalizeLanguageCode(actorProfile?.target_language);
-  if (!targetLanguageCode) {
-    return "Please set your learning language before adding books.";
-  }
-
-  const normalizedBookLanguageCode = normalizeLanguageCode(bookLanguageCode);
-  if (normalizedBookLanguageCode !== targetLanguageCode) {
-    return "This book is not in your current learning language.";
-  }
-
-  return null;
 }
 
 async function canAddToTargetUser({
@@ -142,6 +94,9 @@ export async function POST(request: Request) {
   const isbn13 = normalizeIsbn13(body?.isbn13 ?? body?.isbn ?? "");
   const mode = body?.mode === "global_only" ? "global_only" : "add_to_library";
   const allowPendingPlaceholder = body?.allowPendingPlaceholder === true;
+  const userConfirmedLanguageCode = normalizeBookLanguageCode(
+    body?.languageCode ?? body?.language_code
+  );
   const context = typeof body?.context === "string" ? body.context.trim() : "";
   const studentId = typeof body?.studentId === "string" ? body.studentId.trim() : "";
   const targetUserId =
@@ -177,8 +132,6 @@ export async function POST(request: Request) {
   const actorIsSuperTeacher =
     actorProfile?.role === "super_teacher" ||
     isSuperTeacherFlag(actorProfile?.is_super_teacher);
-  const actorIsTeacherFacing = isTeacherFacingProfile(actorProfile);
-  const learnerTargetLanguageCode = normalizeLanguageCode(actorProfile?.target_language);
 
   if (mode === "global_only" && !actorIsSuperTeacher) {
     return NextResponse.json(
@@ -204,7 +157,7 @@ export async function POST(request: Request) {
 
   const { data: existingBook, error: existingBookError } = await supabaseAdmin
     .from("books")
-    .select("id, language_code")
+    .select("id")
     .eq("isbn13", isbn13)
     .maybeSingle();
 
@@ -218,22 +171,6 @@ export async function POST(request: Request) {
   }
 
   let bookId = existingBook?.id ?? null;
-
-  if (bookId) {
-    const languageError = learnerLanguageError({
-      actorProfile,
-      bookLanguageCode: existingBook?.language_code,
-    });
-
-    if (languageError) {
-      return NextResponse.json({ error: languageError }, { status: 403 });
-    }
-  } else if (!actorIsTeacherFacing && !learnerTargetLanguageCode) {
-    return NextResponse.json(
-      { error: "Please set your learning language before adding books." },
-      { status: 403 }
-    );
-  }
 
   if (!bookId) {
     const lookupResult = await lookupNormalizedExternalBookByIsbn13(isbn13);
@@ -249,16 +186,21 @@ export async function POST(request: Request) {
         );
       }
 
+      if (!userConfirmedLanguageCode) {
+        return NextResponse.json(
+          { error: "Choose the language of this edition before adding it." },
+          { status: 400 }
+        );
+      }
+
       let { data: insertedPlaceholderBook, error: insertPlaceholderBookError } =
         await supabaseAdmin
           .from("books")
           .insert({
             isbn13,
             title: "Book details pending",
+            language_code: userConfirmedLanguageCode,
             needs_review: true,
-            ...(!actorIsTeacherFacing && learnerTargetLanguageCode
-              ? { language_code: learnerTargetLanguageCode }
-              : {}),
           })
           .select("id")
           .single();
@@ -269,9 +211,7 @@ export async function POST(request: Request) {
           .insert({
             isbn13,
             title: "Book details pending",
-            ...(!actorIsTeacherFacing && learnerTargetLanguageCode
-              ? { language_code: learnerTargetLanguageCode }
-              : {}),
+            language_code: userConfirmedLanguageCode,
           })
           .select("id")
           .single();
@@ -296,6 +236,16 @@ export async function POST(request: Request) {
       // The explicit pending-placeholder path created the minimal global book above.
     } else {
       const authorDisplay = lookupResult.author_display;
+      const editionLanguageCode =
+        normalizeBookLanguageCode(lookupResult.language_code) ??
+        userConfirmedLanguageCode;
+
+      if (!editionLanguageCode) {
+        return NextResponse.json(
+          { error: "Choose the language of this edition before adding it." },
+          { status: 400 }
+        );
+      }
 
       let { data: insertedBook, error: insertBookError } = await supabaseAdmin
         .from("books")
@@ -307,11 +257,9 @@ export async function POST(request: Request) {
           publisher: lookupResult.publisher,
           published_date: lookupResult.published_date,
           page_count: lookupResult.page_count,
+          language_code: editionLanguageCode,
           metadata_source: lookupResult.metadata_source,
           needs_review: true,
-          ...(!actorIsTeacherFacing && learnerTargetLanguageCode
-            ? { language_code: learnerTargetLanguageCode }
-            : {}),
         })
         .select("id")
         .single();
@@ -327,9 +275,7 @@ export async function POST(request: Request) {
             publisher: lookupResult.publisher,
             published_date: lookupResult.published_date,
             page_count: lookupResult.page_count,
-            ...(!actorIsTeacherFacing && learnerTargetLanguageCode
-              ? { language_code: learnerTargetLanguageCode }
-              : {}),
+            language_code: editionLanguageCode,
           })
           .select("id")
           .single();

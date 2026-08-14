@@ -1,4 +1,5 @@
 import { bookTypeLabel } from "@/lib/books/bookTypes";
+import { bookLanguageLabel } from "@/lib/books/bookLanguage";
 
 type CatalogBookResult = {
   id: string;
@@ -15,7 +16,6 @@ type AddBookCatalogResultProps = {
   result: CatalogBookResult;
   missingFields: string[];
   canAddExisting: boolean;
-  languageMismatch: boolean;
   adding: boolean;
   requestLoading: boolean;
   addLabel: string;
@@ -23,26 +23,18 @@ type AddBookCatalogResultProps = {
   onRequestReview: () => void;
 };
 
-function languageLabel(value: string | null | undefined) {
-  const code = (value ?? "").trim().toLowerCase();
-  if (code === "ja") return "Japanese";
-  if (code === "en") return "English";
-  return code ? code.toUpperCase() : null;
-}
-
 export default function AddBookCatalogResult({
   result,
   missingFields,
   canAddExisting,
-  languageMismatch,
   adding,
   requestLoading,
   addLabel,
   onAdd,
   onRequestReview,
 }: AddBookCatalogResultProps) {
-  const displayLanguage = languageLabel(result.language_code);
-  const canAddThisExistingBook = canAddExisting && !languageMismatch;
+  const displayLanguage = bookLanguageLabel(result.language_code);
+  const canAddThisExistingBook = canAddExisting;
   const hasMissingDetails = missingFields.length > 0;
 
   return (
@@ -100,17 +92,7 @@ export default function AddBookCatalogResult({
               Needs review
             </span>
           )}
-          {languageMismatch ? (
-            <span className="rounded-full border border-red-200 bg-red-50 px-2 py-1 text-red-700">
-              Different language
-            </span>
-          ) : null}
         </div>
-        {languageMismatch ? (
-          <p className="mt-2 text-xs leading-5 text-red-700">
-            This book is not in your current learning language.
-          </p>
-        ) : null}
         {hasMissingDetails && canAddExisting ? (
           <p className="mt-2 text-xs leading-5 text-amber-800">
             Some book details are missing ({missingFields.join(", ")}). You can still add this book.

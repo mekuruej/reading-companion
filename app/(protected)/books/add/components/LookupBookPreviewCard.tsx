@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { bookLanguageLabel } from "@/lib/books/bookLanguage";
 
 type LookupBookPreviewCardProps = {
   title: string;
@@ -15,13 +16,6 @@ type LookupBookPreviewCardProps = {
   children?: ReactNode;
 };
 
-function languageLabel(value: string | null | undefined) {
-  const code = (value ?? "").trim().toLowerCase();
-  if (code === "ja") return "Japanese";
-  if (code === "en") return "English";
-  return code ? code.toUpperCase() : null;
-}
-
 export default function LookupBookPreviewCard({
   title,
   subtitle,
@@ -36,7 +30,7 @@ export default function LookupBookPreviewCard({
   libraryLabel = "your library",
   children,
 }: LookupBookPreviewCardProps) {
-  const displayLanguage = languageLabel(languageCode);
+  const displayLanguage = bookLanguageLabel(languageCode);
 
   return (
     <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">

@@ -10,6 +10,8 @@
 // 4. User confirms "Add to my library."
 // 5. A separate server-controlled route creates/uses the global book row.
 
+import { normalizeBookLanguageCode } from "@/lib/books/bookLanguage";
+
 export type BookMetadataSource = "mekuru" | "openbd" | "google_books" | "open_library" | "none";
 
 export type BookLookupResult = {
@@ -24,6 +26,7 @@ export type BookLookupResult = {
   coverUrl: string | null;
   source: "openbd" | "google_books" | "open_library";
   sourceId: string | null;
+  languageCode: string | null;
 };
 
 export type NormalizedBookLookupResult = {
@@ -60,6 +63,7 @@ type GoogleBooksResponse = {
         smallThumbnail?: string;
         thumbnail?: string;
       };
+      language?: string;
     };
   }>;
 };
@@ -78,6 +82,7 @@ type OpenBdResponse = Array<{
     };
     DescriptiveDetail?: {
       Extent?: Array<{ ExtentType?: string; ExtentValue?: string | number }>;
+      Language?: Array<{ LanguageRole?: string; LanguageCode?: string }>;
     };
   };
 } | null>;
@@ -90,6 +95,9 @@ type OpenLibraryIsbnResponse = {
   number_of_pages?: number;
   description?: string | { value?: string };
   authors?: Array<{
+    key?: string;
+  }>;
+  languages?: Array<{
     key?: string;
   }>;
 };
@@ -176,7 +184,7 @@ function normalizedFromExternalLookup(
     found_existing_book: false,
     existing_book_id: null,
     needs_review: true,
-    language_code: null,
+    language_code: normalizeBookLanguageCode(result.languageCode),
   };
 }
 
@@ -221,7 +229,7 @@ export function normalizedLookupFromExistingBook({
     found_existing_book: true,
     existing_book_id: id ?? null,
     needs_review: false,
-    language_code: language_code?.trim() || null,
+    language_code: normalizeBookLanguageCode(language_code),
   };
 }
 
@@ -242,6 +250,11 @@ async function lookupOpenBdByIsbn13(isbn13: string): Promise<BookLookupResult | 
       (extent) => String(extent?.ExtentType ?? "") === "11"
     )?.ExtentValue
   );
+  const languageCode = normalizeBookLanguageCode(
+    item?.onix?.DescriptiveDetail?.Language?.find?.(
+      (language) => String(language?.LanguageRole ?? "") === "01"
+    )?.LanguageCode ?? item?.onix?.DescriptiveDetail?.Language?.[0]?.LanguageCode
+  );
 
   return {
     isbn13,
@@ -258,6 +271,7 @@ async function lookupOpenBdByIsbn13(isbn13: string): Promise<BookLookupResult | 
     coverUrl: cleanCoverUrl(summary.cover),
     source: "openbd",
     sourceId: isbn13,
+    languageCode,
   };
 }
 
@@ -298,6 +312,7 @@ async function lookupGoogleBooksByIsbn13(
     ),
     source: "google_books",
     sourceId: firstItem?.id ?? null,
+    languageCode: normalizeBookLanguageCode(volumeInfo.language),
   };
 }
 
@@ -363,6 +378,7 @@ async function lookupOpenLibraryByIsbn13(
     coverUrl,
     source: "open_library",
     sourceId: `/isbn/${isbn13}`,
+    languageCode: normalizeBookLanguageCode(data.languages?.[0]?.key),
   };
 }
 
