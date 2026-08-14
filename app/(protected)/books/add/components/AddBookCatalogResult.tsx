@@ -118,7 +118,7 @@ export default function AddBookCatalogResult({
                 disabled={requestLoading}
                 className="rounded-2xl border border-amber-300 bg-white px-4 py-2 text-sm font-black text-amber-800 transition hover:bg-amber-50 disabled:opacity-50"
               >
-                {requestLoading ? "Sending..." : "Request review"}
+                {requestLoading ? "Sending..." : "Check details"}
               </button>
             ) : null}
           </>
@@ -129,7 +129,7 @@ export default function AddBookCatalogResult({
             disabled={requestLoading}
             className="rounded-2xl border border-amber-300 bg-white px-4 py-2 text-sm font-black text-amber-800 transition hover:bg-amber-50 disabled:opacity-50"
           >
-            {requestLoading ? "Sending..." : "Request review"}
+            {requestLoading ? "Sending..." : "Ask for help"}
           </button>
         )}
       </div>

@@ -176,7 +176,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "We couldn’t find enough information for that ISBN yet. Please request this book for review.",
+            "We couldn’t retrieve this edition automatically. Add the details you know.",
         },
         { status: 404 }
       );

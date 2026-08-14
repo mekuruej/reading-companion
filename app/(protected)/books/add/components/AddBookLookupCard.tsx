@@ -56,7 +56,7 @@ export default function AddBookLookupCard({
 
             <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
                 If lookup does not find the exact edition, add the title here and
-                request review. The title below is only for ISBN/ASIN requests;
+                fill in the edition details manually. The title below is only for ISBN/ASIN fallback;
                 the fallback title search has its own box.
             </div>
 
@@ -122,12 +122,12 @@ export default function AddBookLookupCard({
 
             <label className="mt-4 block">
                 <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-stone-500">
-                    Title for ISBN/ASIN request
+                    Title for ISBN/ASIN fallback
                 </span>
                 <input
                     value={identifierRequestTitle}
                     onChange={(event) => onIdentifierRequestTitleChange(event.target.value)}
-                    placeholder="Optional title to send with this ISBN or ASIN"
+                    placeholder="Optional title to prefill if lookup misses"
                     className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
                 />
             </label>

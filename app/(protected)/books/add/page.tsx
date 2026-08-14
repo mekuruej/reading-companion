@@ -67,6 +67,19 @@ type BookSearchResult = {
     language_code?: string | null;
 };
 
+type ManualAddMode = "isbn" | "asin" | "manual";
+
+const EDITION_FORMAT_OPTIONS = [
+    { value: "bunko", label: "Bunkobon" },
+    { value: "tankobon_softcover", label: "Tankobon (softcover)" },
+    { value: "tankobon_hardcover", label: "Tankobon (hardcover)" },
+    { value: "paperback", label: "Paperback" },
+    { value: "hardcover", label: "Hardcover" },
+    { value: "ebook", label: "Ebook" },
+    { value: "audiobook", label: "Audiobook" },
+    { value: "other", label: "Other" },
+];
+
 function getDisplayAuthor(book: LookupBook) {
     return (
         book.authorDisplay ||
@@ -122,6 +135,15 @@ export default function AddBookPage() {
     const [identifierRequestTitle, setIdentifierRequestTitle] = useState("");
     const [fallbackRequestFormat, setFallbackRequestFormat] = useState("");
     const [confirmedEditionLanguageCode, setConfirmedEditionLanguageCode] = useState("");
+    const [manualAddMode, setManualAddMode] = useState<ManualAddMode | null>(null);
+    const [manualTitle, setManualTitle] = useState("");
+    const [manualAuthor, setManualAuthor] = useState("");
+    const [manualEditionFormat, setManualEditionFormat] = useState("");
+    const [manualLanguageCode, setManualLanguageCode] = useState("");
+    const [manualPageCount, setManualPageCount] = useState("");
+    const [manualAddError, setManualAddError] = useState("");
+    const [manualAddLoading, setManualAddLoading] = useState(false);
+    const [manualPossibleMatches, setManualPossibleMatches] = useState<BookSearchResult[]>([]);
     const [book, setBook] = useState<LookupBook | null>(null);
     const [currentUserId, setCurrentUserId] = useState("");
     const [currentUsername, setCurrentUsername] = useState<string | null>(null);
@@ -139,7 +161,6 @@ export default function AddBookPage() {
     const [addingExistingBookId, setAddingExistingBookId] = useState<string | null>(null);
     const [error, setError] = useState("");
     const [bookSearchError, setBookSearchError] = useState("");
-    const [canRequestBook, setCanRequestBook] = useState(false);
     const [libraryNotice, setLibraryNotice] = useState<{
         message: string;
         detail?: string;
@@ -260,6 +281,28 @@ export default function AddBookPage() {
         };
     }
 
+    function resetManualAdd() {
+        setManualAddMode(null);
+        setManualTitle("");
+        setManualAuthor("");
+        setManualEditionFormat("");
+        setManualLanguageCode("");
+        setManualPageCount("");
+        setManualAddError("");
+        setManualPossibleMatches([]);
+    }
+
+    function openManualAdd(mode: ManualAddMode, seed?: { title?: string; author?: string; format?: string }) {
+        setManualAddMode(mode);
+        setManualTitle(seed?.title ?? "");
+        setManualAuthor(seed?.author ?? "");
+        setManualEditionFormat(seed?.format ?? "");
+        setManualLanguageCode("");
+        setManualPageCount("");
+        setManualAddError("");
+        setManualPossibleMatches([]);
+    }
+
     function handleSuccessfulAdd(data: any) {
         if (isStudentLessonBookContext) {
             const notice = data?.alreadyInLibrary
@@ -286,7 +329,7 @@ export default function AddBookPage() {
         setBookSearchError("");
         setBook(null);
         setConfirmedEditionLanguageCode("");
-        setCanRequestBook(false);
+        resetManualAdd();
         setLibraryNotice(null);
         setLookupLoading(true);
 
@@ -320,10 +363,14 @@ export default function AddBookPage() {
 
             if (!response.ok) {
                 console.error("Lookup route returned an error:", data);
-                setCanRequestBook(true);
+                openManualAdd("isbn", {
+                    title: identifierRequestTitle || bookSearch,
+                    author: bookSearchAuthor,
+                    format: fallbackRequestFormat,
+                });
                 setError(
                     data.error ??
-                    "We couldn’t find enough information for that ISBN yet. You can request this book for review."
+                    "We couldn’t retrieve this edition automatically. Add the details you know."
                 );
                 return;
             }
@@ -332,17 +379,25 @@ export default function AddBookPage() {
 
             if (!lookedUpBook || typeof lookedUpBook !== "object") {
                 console.error("Lookup response had no usable book object:", data);
-                setCanRequestBook(true);
+                openManualAdd("isbn", {
+                    title: identifierRequestTitle || bookSearch,
+                    author: bookSearchAuthor,
+                    format: fallbackRequestFormat,
+                });
                 setError(
-                    "We couldn’t find enough information for that ISBN yet. You can request this book for review."
+                    "We couldn’t retrieve this edition automatically. Add the details you know."
                 );
                 return;
             }
 
             if (!lookedUpBook.title) {
-                setCanRequestBook(true);
+                openManualAdd("isbn", {
+                    title: identifierRequestTitle || bookSearch,
+                    author: bookSearchAuthor,
+                    format: fallbackRequestFormat,
+                });
                 setError(
-                    "We couldn’t find enough information for that ISBN yet. You can request this book for review."
+                    "We couldn’t retrieve this edition automatically. Add the details you know."
                 );
                 return;
             }
@@ -352,8 +407,7 @@ export default function AddBookPage() {
             setConfirmedEditionLanguageCode("");
         } catch (lookupError) {
             console.error("Book lookup failed:", lookupError);
-            setCanRequestBook(true);
-            setError("Something went wrong while looking up this book.");
+            setError("We couldn't complete the lookup. Please try again.");
         } finally {
             setLookupLoading(false);
         }
@@ -365,8 +419,8 @@ export default function AddBookPage() {
         setBookSearchError("");
         setBook(null);
         setConfirmedEditionLanguageCode("");
+        resetManualAdd();
         setBookSearchResults([]);
-        setCanRequestBook(false);
         setLibraryNotice(null);
 
         if (!normalizedAsin || !isValidAsin(normalizedAsin)) {
@@ -394,9 +448,13 @@ export default function AddBookPage() {
                 return;
             }
 
-            setCanRequestBook(true);
+            openManualAdd("asin", {
+                title: identifierRequestTitle || bookSearch,
+                author: bookSearchAuthor,
+                format: asinEditionFormat || fallbackRequestFormat,
+            });
             setError(
-                "MEKURU does not have that Amazon ASIN yet. Add the title in the ISBN/ASIN request title box, then request this Amazon edition for review."
+                "We do not have this Amazon edition yet. Add the details you know."
             );
         } catch (lookupError) {
             console.error("ASIN lookup failed:", lookupError);
@@ -411,6 +469,7 @@ export default function AddBookPage() {
         setLibraryNotice(null);
         setBookSearchResults([]);
         setConfirmedEditionLanguageCode("");
+        resetManualAdd();
         setBookSearchError("");
         setError("");
 
@@ -420,7 +479,6 @@ export default function AddBookPage() {
         }
 
         setBookSearchLoading(true);
-        setCanRequestBook(false);
 
         try {
             const {
@@ -448,8 +506,12 @@ export default function AddBookPage() {
             setBookSearchResults(results);
 
             if (results.length === 0) {
-                setCanRequestBook(true);
-                setBookSearchError("No matching book found. You can request this book for review.");
+                openManualAdd("manual", {
+                    title: query,
+                    author: bookSearchAuthor,
+                    format: fallbackRequestFormat,
+                });
+                setBookSearchError("No matching edition found. Add the details you know.");
             }
         } catch (searchError) {
             console.error("Book title/author search failed:", searchError);
@@ -578,38 +640,83 @@ export default function AddBookPage() {
         }
     }
 
-    async function handleRequestBook(bookToRequest?: BookSearchResult) {
-        const cleanIsbn = (bookToRequest?.isbn13 ?? isbn).replace(/[\s-]/g, "").trim();
-        const requestAsin = normalizeAsin(bookToRequest ? bookToRequest.asin : asin);
-        const requestEditionFormat = requestAsin
-            ? asinEditionFormat.trim()
-            : cleanIsbn
-            ? ""
-            : fallbackRequestFormat.trim();
-        const requestTitle = (bookToRequest?.title ?? (identifierRequestTitle || bookSearch)).trim();
-        const requestAuthor = (bookToRequest?.author ?? bookSearchAuthor).trim();
-        const isFallbackRequest = !!bookToRequest || (!!bookSearch.trim() && !cleanIsbn) || !!requestAsin;
-        const setRequestMessage = isFallbackRequest ? setBookSearchError : setError;
+    async function handleManualAdd(confirmDifferentEdition = false) {
+        if (!manualAddMode) return;
 
-        if (requestAsin && !isValidAsin(requestAsin)) {
-            setRequestMessage("Amazon ASIN must be exactly 10 letters or numbers.");
+        if (!targetLibraryUserId) {
+            setManualAddError(`Sign in again before adding this book to ${targetLibraryShortLabel}.`);
             return;
         }
+
+        setManualAddLoading(true);
+        setManualAddError("");
+        setLibraryNotice(null);
+
+        try {
+            const {
+                data: { session },
+            } = await supabase.auth.getSession();
+
+            const response = await fetch("/api/books/add-manual", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(session?.access_token
+                        ? { Authorization: `Bearer ${session.access_token}` }
+                        : {}),
+                },
+                body: JSON.stringify({
+                    isbn13: manualAddMode === "isbn" ? isbn.replace(/[\s-]/g, "").trim() : null,
+                    asin: manualAddMode === "asin" ? normalizeAsin(asin) : null,
+                    title: manualTitle,
+                    author: manualAuthor,
+                    editionFormat: manualEditionFormat || null,
+                    languageCode: manualLanguageCode,
+                    pageCount: manualPageCount || null,
+                    targetUserId: targetLibraryUserId,
+                    confirmDifferentEdition,
+                    ...studentLessonBookPayload(),
+                }),
+            });
+
+            const data = await response.json().catch(() => null);
+
+            if (response.status === 409 && data?.possibleMatches?.length) {
+                setManualPossibleMatches(data.possibleMatches as BookSearchResult[]);
+                setManualAddError(data.error ?? "We found a possible match.");
+                return;
+            }
+
+            if (!response.ok) {
+                setManualAddError(data?.error ?? `I couldn’t add this book to ${targetLibraryShortLabel}.`);
+                return;
+            }
+
+            resetManualAdd();
+            handleSuccessfulAdd(data);
+        } catch (manualError) {
+            console.error("Manual add failed:", manualError);
+            setManualAddError(`Something went wrong while adding this book to ${targetLibraryShortLabel}.`);
+        } finally {
+            setManualAddLoading(false);
+        }
+    }
+
+    async function handleRequestBookDetails(bookToRequest: BookSearchResult) {
+        const cleanIsbn = (bookToRequest.isbn13 ?? "").replace(/[\s-]/g, "").trim();
+        const requestAsin = normalizeAsin(bookToRequest.asin);
+        const requestTitle = (bookToRequest.title ?? "").trim();
+        const requestAuthor = (bookToRequest.author ?? "").trim();
 
         if (!cleanIsbn && !requestAsin && !requestTitle) {
-            setRequestMessage("Search for a title, enter an ISBN, or enter an Amazon ASIN before requesting review.");
+            setBookSearchError("There is not enough information to flag this edition yet.");
             return;
         }
 
-        if (!cleanIsbn && !requestAsin && requestTitle && !requestEditionFormat) {
-            setRequestMessage("Choose a format before requesting a title-only book for review.");
-            return;
-        }
-
-        setRequestingBookId(bookToRequest?.id ?? null);
+        setRequestingBookId(bookToRequest.id);
         setRequestLoading(true);
-        setError("");
         setBookSearchError("");
+        setLibraryNotice(null);
 
         try {
             const {
@@ -617,12 +724,12 @@ export default function AddBookPage() {
             } = await supabase.auth.getUser();
 
             if (!user) {
-                setRequestMessage("You need to be signed in to request a book.");
+                setBookSearchError("You need to be signed in to flag book details.");
                 return;
             }
 
             if (!targetLibraryUserId) {
-                setRequestMessage("Sign in again before requesting this book.");
+                setBookSearchError("Sign in again before flagging book details.");
                 return;
             }
 
@@ -643,11 +750,31 @@ export default function AddBookPage() {
 
                 if (existingPendingRequestError) throw existingPendingRequestError;
                 existingPendingRequest = data;
+            } else if (requestTitle) {
+                let duplicateQuery = supabase
+                    .from("book_requests")
+                    .select("id")
+                    .eq("user_id", user.id)
+                    .or("status.eq.pending,status.is.null")
+                    .eq("title", requestTitle);
+
+                if (requestAuthor) {
+                    duplicateQuery = duplicateQuery.eq("author", requestAuthor);
+                }
+
+                const { data, error: existingPendingRequestError } = await duplicateQuery
+                    .limit(1)
+                    .maybeSingle();
+
+                if (existingPendingRequestError) throw existingPendingRequestError;
+                existingPendingRequest = data;
             }
 
             if (existingPendingRequest) {
-                setCanRequestBook(false);
-                setRequestMessage("This book request is already waiting for review.");
+                setLibraryNotice({
+                    message: "You've already sent a request for this edition.",
+                    detail: "You can still add the book while the shared details are checked.",
+                });
                 return;
             }
 
@@ -657,21 +784,18 @@ export default function AddBookPage() {
                 author: requestAuthor || null,
                 isbn13: cleanIsbn || null,
                 asin: requestAsin,
-                edition_format: requestEditionFormat || null,
                 status: "pending",
             });
 
             if (requestError) throw requestError;
 
-            setCanRequestBook(false);
-            setRequestMessage(
-                isFallbackRequest
-                    ? "Book request sent. An admin can review the title and author details."
-                    : "Book request sent. An admin can review this ISBN and add the book details."
-            );
+            setLibraryNotice({
+                message: "Thanks — the book details were flagged for review.",
+                detail: "You can still add the book now.",
+            });
         } catch (requestError) {
-            console.error("Book request failed:", requestError);
-            setRequestMessage("Could not send this book request. Please ask an admin or teacher to add it.");
+            console.error("Book details request failed:", requestError);
+            setBookSearchError("Could not flag these book details. You can still add the book.");
         } finally {
             setRequestLoading(false);
             setRequestingBookId(null);
@@ -692,6 +816,26 @@ export default function AddBookPage() {
     )
         ? selectedEditionLanguageCode ?? ""
         : "";
+    const normalizedManualLanguageCode = normalizeBookLanguageCode(manualLanguageCode);
+    const manualLanguageLabel = bookLanguageLabel(normalizedManualLanguageCode);
+    const selectedCommonManualLanguageCode = COMMON_BOOK_LANGUAGE_OPTIONS.some(
+        (option) => option.code === normalizedManualLanguageCode
+    )
+        ? normalizedManualLanguageCode ?? ""
+        : "";
+    const manualAddTitle =
+        manualAddMode === "isbn"
+            ? "Add this ISBN edition"
+            : manualAddMode === "asin"
+            ? "Add this Amazon edition"
+            : "Add this edition";
+    const manualIdentifierLabel =
+        manualAddMode === "isbn"
+            ? `ISBN ${isbn.replace(/[\s-]/g, "").trim()}`
+            : manualAddMode === "asin"
+            ? `ASIN ${normalizeAsin(asin) ?? asin.trim()}`
+            : "No ISBN or ASIN";
+    const manualFormatRequired = manualAddMode === "manual";
     const isNewToMekuru =
         !!book &&
         book.found_existing_book !== true &&
@@ -740,9 +884,6 @@ export default function AddBookPage() {
             >
                 <AddBookMessagePanel
                     message={error}
-                    canRequestBook={canRequestBook}
-                    requestLoading={requestLoading}
-                    onRequestBook={handleRequestBook}
                 />
 
                 {libraryNotice ? (
@@ -760,6 +901,169 @@ export default function AddBookPage() {
                     />
                 ) : null}
             </AddBookLookupCard>
+
+            {manualAddMode ? (
+                <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+                        {manualIdentifierLabel}
+                    </p>
+                    <h2 className="mt-2 text-xl font-black text-stone-950">
+                        {manualAddTitle}
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-stone-600">
+                        Add the details you know. Page count is recommended for pacing
+                        and page-based stats, but it is optional.
+                    </p>
+
+                    <div className="mt-5 grid gap-3">
+                        <input
+                            value={manualTitle}
+                            onChange={(event) => {
+                                setManualTitle(event.target.value);
+                                setManualAddError("");
+                                setManualPossibleMatches([]);
+                            }}
+                            placeholder="Title"
+                            className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                        />
+
+                        <input
+                            value={manualAuthor}
+                            onChange={(event) => {
+                                setManualAuthor(event.target.value);
+                                setManualAddError("");
+                                setManualPossibleMatches([]);
+                            }}
+                            placeholder={manualAddMode === "manual" ? "Author" : "Author (optional)"}
+                            className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                        />
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <select
+                                value={manualEditionFormat}
+                                onChange={(event) => {
+                                    setManualEditionFormat(event.target.value);
+                                    setManualAddError("");
+                                    setManualPossibleMatches([]);
+                                }}
+                                className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                            >
+                                <option value="">
+                                    {manualFormatRequired ? "Format" : "Format (optional)"}
+                                </option>
+                                {EDITION_FORMAT_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+
+                            <input
+                                value={manualPageCount}
+                                onChange={(event) => {
+                                    setManualPageCount(event.target.value);
+                                    setManualAddError("");
+                                }}
+                                inputMode="numeric"
+                                placeholder="Page count (optional)"
+                                className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                            />
+                        </div>
+
+                        <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3">
+                            <label className="block text-sm font-black text-stone-900">
+                                What language is this edition?
+                            </label>
+                            <select
+                                value={selectedCommonManualLanguageCode}
+                                onChange={(event) => {
+                                    setManualLanguageCode(event.target.value);
+                                    setManualAddError("");
+                                    setManualPossibleMatches([]);
+                                }}
+                                className="mt-3 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                            >
+                                <option value="">Select edition language</option>
+                                {COMMON_BOOK_LANGUAGE_OPTIONS.map((option) => (
+                                    <option key={option.code} value={option.code}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                            <input
+                                value={manualLanguageCode}
+                                onChange={(event) => {
+                                    setManualLanguageCode(event.target.value);
+                                    setManualAddError("");
+                                    setManualPossibleMatches([]);
+                                }}
+                                placeholder="Edition language code"
+                                className="mt-3 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                            />
+                            <p className="mt-2 text-xs leading-5 text-stone-600">
+                                {manualLanguageLabel
+                                    ? `This will be saved as ${manualLanguageLabel}.`
+                                    : "Language is saved as book metadata for this edition."}
+                            </p>
+                        </div>
+                    </div>
+
+                    {manualAddError ? (
+                        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+                            {manualAddError}
+                        </div>
+                    ) : null}
+
+                    {manualPossibleMatches.length > 0 ? (
+                        <div className="mt-5 space-y-3">
+                            <p className="text-sm font-bold text-stone-800">
+                                Choose an existing edition, or confirm this is different.
+                            </p>
+                            {manualPossibleMatches.map((result) => (
+                                <AddBookCatalogResult
+                                    key={result.id}
+                                    result={result}
+                                    missingFields={missingGlobalBookFields(result)}
+                                    canAddExisting={true}
+                                    adding={addingExistingBookId === result.id}
+                                    requestLoading={false}
+                                    addLabel="Use This Edition"
+                                    onAdd={() => void handleAddExistingBook(result.id)}
+                                    onRequestReview={() => void handleRequestBookDetails(result)}
+                                />
+                            ))}
+                        </div>
+                    ) : null}
+
+                    <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                        <button
+                            type="button"
+                            onClick={() => void handleManualAdd(false)}
+                            disabled={manualAddLoading}
+                            className="rounded-2xl bg-amber-500 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {manualAddLoading ? "Adding..." : "Add to Library"}
+                        </button>
+                        {manualPossibleMatches.length > 0 ? (
+                            <button
+                                type="button"
+                                onClick={() => void handleManualAdd(true)}
+                                disabled={manualAddLoading}
+                                className="rounded-2xl border border-stone-200 bg-white px-5 py-3 text-sm font-bold text-stone-700 shadow-sm transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                This Is a Different Edition
+                            </button>
+                        ) : null}
+                        <button
+                            type="button"
+                            onClick={resetManualAdd}
+                            className="rounded-2xl border border-stone-200 bg-white px-5 py-3 text-sm font-bold text-stone-700 shadow-sm transition hover:bg-stone-50"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </section>
+            ) : null}
 
             <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
@@ -813,15 +1117,11 @@ export default function AddBookPage() {
                         className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
                     >
                         <option value="">Format if requested</option>
-                        <option value="bunko">文庫本</option>
-                        <option value="shinsho">新書</option>
-                        <option value="tankobon_softcover">単行本 (softcover)</option>
-                        <option value="tankobon_hardcover">単行本 (hardcover)</option>
-                        <option value="paperback">Paperback</option>
-                        <option value="hardcover">Hardcover</option>
-                        <option value="ebook">Ebook</option>
-                        <option value="audiobook">Audiobook</option>
-                        <option value="other">Other</option>
+                        {EDITION_FORMAT_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                                {option.label}
+                            </option>
+                        ))}
                     </select>
 
                     <button
@@ -842,14 +1142,19 @@ export default function AddBookPage() {
                     <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
                         <p>{bookSearchError}</p>
 
-                        {canRequestBook && (bookSearch.trim() || normalizeAsin(asin)) ? (
+                        {bookSearch.trim() || normalizeAsin(asin) ? (
                             <button
                                 type="button"
-                                onClick={() => void handleRequestBook()}
-                                disabled={requestLoading}
+                                onClick={() =>
+                                    openManualAdd(normalizeAsin(asin) ? "asin" : "manual", {
+                                        title: identifierRequestTitle || bookSearch,
+                                        author: bookSearchAuthor,
+                                        format: fallbackRequestFormat,
+                                    })
+                                }
                                 className="mt-3 rounded-xl bg-red-700 px-4 py-2 text-xs font-black text-white transition hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                {requestLoading ? "Sending..." : "Request this book for review"}
+                                Add the details manually
                             </button>
                         ) : null}
                     </div>
@@ -876,12 +1181,26 @@ export default function AddBookPage() {
                                     requestLoading={requestLoading && requestingBookId === result.id}
                                     addLabel={addLabel}
                                     onAdd={() => void handleAddExistingBook(result.id)}
-                                    onRequestReview={() => void handleRequestBook(result)}
+                                    onRequestReview={() => void handleRequestBookDetails(result)}
                                 />
                             );
                         })}
                     </div>
                 ) : null}
+
+                <button
+                    type="button"
+                    onClick={() =>
+                        openManualAdd("manual", {
+                            title: bookSearch,
+                            author: bookSearchAuthor,
+                            format: fallbackRequestFormat,
+                        })
+                    }
+                    className="mt-5 rounded-2xl border border-stone-200 bg-white px-5 py-3 text-sm font-bold text-stone-700 shadow-sm transition hover:bg-stone-50"
+                >
+                    Add a book without ISBN or ASIN
+                </button>
 
             </section>
 
