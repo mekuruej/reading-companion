@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { countNeededTeacherRatingBooks } from "@/lib/teacher/teacherReviewCompletion";
 import { TeacherHubCardGrid } from "./components/TeacherHubCardGrid";
 import { TeacherHubHeader } from "./components/TeacherHubHeader";
 import { TeacherHubTodaySection } from "./components/TeacherHubTodaySection";
@@ -77,28 +78,6 @@ type ReadingFitCountProfileRow = {
   id: string;
   level: string | null;
 };
-
-function countNeededTeacherRatingBooks(items: TeacherRatingCountUserBookRow[]) {
-  const bookIds = new Set<string>();
-
-  for (const item of items) {
-    const hasTeacherReview =
-      !!String(item.recommended_level ?? "").trim() ||
-      item.teacher_student_use_rating != null ||
-      !!String(item.notes ?? "").trim();
-
-    if (
-      item.finished_at &&
-      !item.dnf_at &&
-      !item.teacher_review_cleared_at &&
-      !hasTeacherReview
-    ) {
-      bookIds.add(item.book_id ?? `user-book:${item.id}`);
-    }
-  }
-
-  return bookIds.size;
-}
 
 const teacherHubCards: TeacherHubCard[] = [
   {
@@ -305,21 +284,7 @@ export default function TeacherHubPage() {
           }
         );
 
-        const teacherRatingItems = ((teacherRatingRows ?? []) as TeacherRatingCountUserBookRow[]).filter(
-          (item) => {
-            const hasTeacherReview =
-              !!String(item.recommended_level ?? "").trim() ||
-              item.teacher_student_use_rating != null ||
-              !!String(item.notes ?? "").trim();
-
-            return (
-              !!item.finished_at &&
-              !item.dnf_at &&
-              !item.teacher_review_cleared_at &&
-              !hasTeacherReview
-            );
-          }
-        );
+        const teacherRatingItems = (teacherRatingRows ?? []) as TeacherRatingCountUserBookRow[];
         const teacherRatingCount = countNeededTeacherRatingBooks(teacherRatingItems);
 
         const nextTeacherAlerts: TeacherAlertSummary[] = [

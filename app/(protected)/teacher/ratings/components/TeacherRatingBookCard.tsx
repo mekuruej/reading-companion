@@ -19,6 +19,7 @@ export type TeacherRatingBookCardItem = {
   wouldRetry: string | null;
   teacherReviewClearedAt: string | null;
   hasTeacherReview: boolean;
+  needsTeacherReview: boolean;
 };
 
 type TeacherRatingBookCardProps = {
@@ -106,14 +107,18 @@ export function TeacherRatingBookCard({
                 ? "bg-emerald-50 text-emerald-700"
                 : item.teacherReviewClearedAt
                   ? "bg-stone-100 text-stone-600"
-                : "bg-amber-50 text-amber-700"
+                  : item.needsTeacherReview
+                    ? "bg-amber-50 text-amber-700"
+                    : "bg-stone-100 text-stone-600"
                 }`}
             >
               {item.hasTeacherReview
                 ? "Rated"
                 : item.teacherReviewClearedAt
                   ? "Dismissed"
-                  : "Needs rating"}
+                  : item.needsTeacherReview
+                    ? "Needs rating"
+                    : "Unrated"}
             </span>
           </div>
 

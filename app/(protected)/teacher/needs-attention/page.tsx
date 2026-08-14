@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { countNeededTeacherRatingBooks } from "@/lib/teacher/teacherReviewCompletion";
 import {
   NeedsAttentionCardGrid,
   type AttentionCounts,
@@ -56,28 +57,6 @@ type TeacherRatingCountUserBookRow = {
   teacher_student_use_rating: number | null;
   teacher_review_cleared_at: string | null;
 };
-
-function countNeededTeacherRatingBooks(items: TeacherRatingCountUserBookRow[]) {
-  const bookIds = new Set<string>();
-
-  for (const item of items) {
-    const hasTeacherReview =
-      !!String(item.recommended_level ?? "").trim() ||
-      item.teacher_student_use_rating != null ||
-      !!String(item.notes ?? "").trim();
-
-    if (
-      item.finished_at &&
-      !item.dnf_at &&
-      !item.teacher_review_cleared_at &&
-      !hasTeacherReview
-    ) {
-      bookIds.add(item.book_id ?? `user-book:${item.id}`);
-    }
-  }
-
-  return bookIds.size;
-}
 
 const attentionCards: NeedsAttentionCard[] = [
   {

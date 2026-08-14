@@ -15,13 +15,13 @@ export function TeacherRatingsSummaryCards({
     {
       label: "Books reviewed",
       value: ratedCount,
-      note: "Have at least one teacher rating or note.",
+      note: "Have Level and Lesson Fit saved.",
       color: "border-emerald-200 bg-emerald-50 text-emerald-900",
     },
     {
       label: "Need ratings",
       value: needsRatingCount,
-      note: "Finished books without teacher-facing review notes yet. DNF and dismissed books are skipped.",
+      note: "Finished books missing Level or Lesson Fit. Notes are optional.",
       color: "border-amber-200 bg-amber-50 text-amber-900",
     },
     {

@@ -15,6 +15,11 @@ import { TeacherRatingsFilterPanel } from "./components/TeacherRatingsFilterPane
 import { TeacherRatingsHeader } from "./components/TeacherRatingsHeader";
 import { TeacherRatingsState } from "./components/TeacherRatingsState";
 import { TeacherRatingsSummaryCards } from "./components/TeacherRatingsSummaryCards";
+import {
+  countNeededTeacherRatingBooks,
+  isTeacherReviewComplete,
+  needsTeacherReviewRating,
+} from "@/lib/teacher/teacherReviewCompletion";
 
 type ProfileRow = {
   id: string;
@@ -49,6 +54,7 @@ type UserBookRow = {
 };
 
 type StatusFilter = "all" | "rated" | "needs-rating" | "strong-fit";
+type LessonFitFilter = "all" | "5" | "4" | "3" | "2" | "1";
 type SortMode = "student-use-desc" | "recent" | "title";
 
 function isSuperTeacherFlag(value: unknown) {
@@ -62,14 +68,6 @@ function getBook(bookRow: UserBookRow["books"]) {
 
 function displayName(profile: ProfileRow | null | undefined) {
   return profile?.display_name || profile?.username || "Unnamed learner";
-}
-
-function hasTeacherReview(row: UserBookRow) {
-  return (
-    !!String(row.recommended_level ?? "").trim() ||
-    row.teacher_student_use_rating != null ||
-    !!String(row.notes ?? "").trim()
-  );
 }
 
 function toItem(row: UserBookRow, learnerById: Map<string, ProfileRow>): TeacherRatingBookCardItem {
@@ -92,7 +90,8 @@ function toItem(row: UserBookRow, learnerById: Map<string, ProfileRow>): Teacher
     dnfNote: row.dnf_note,
     wouldRetry: row.would_retry,
     teacherReviewClearedAt: row.teacher_review_cleared_at,
-    hasTeacherReview: hasTeacherReview(row),
+    hasTeacherReview: isTeacherReviewComplete(row),
+    needsTeacherReview: needsTeacherReviewRating(row),
   };
 }
 
@@ -125,6 +124,7 @@ export default function TeacherRatingsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [levelFilter, setLevelFilter] = useState("all");
+  const [lessonFitFilter, setLessonFitFilter] = useState<LessonFitFilter>("all");
   const [sortMode, setSortMode] = useState<SortMode>("student-use-desc");
 
   useEffect(() => {
@@ -333,11 +333,15 @@ export default function TeacherRatingsPage() {
 
     return items
       .filter((item) => {
-        const isNeededRating =
-          !item.hasTeacherReview &&
-          !!item.finishedAt &&
-          !item.dnfAt &&
-          !item.teacherReviewClearedAt;
+        const isNeededRating = needsTeacherReviewRating({
+          id: item.id,
+          book_id: item.bookId,
+          finished_at: item.finishedAt,
+          dnf_at: item.dnfAt,
+          recommended_level: item.recommendedLevel,
+          teacher_student_use_rating: item.studentUseRating,
+          teacher_review_cleared_at: item.teacherReviewClearedAt,
+        });
 
         if (statusFilter === "rated" && !item.hasTeacherReview) return false;
         if (statusFilter === "needs-rating" && !isNeededRating) {
@@ -347,6 +351,12 @@ export default function TeacherRatingsPage() {
           return false;
         }
         if (levelFilter !== "all" && item.recommendedLevel !== levelFilter) return false;
+        if (
+          lessonFitFilter !== "all" &&
+          item.studentUseRating !== Number(lessonFitFilter)
+        ) {
+          return false;
+        }
 
         const matchesSearch =
           !query ||
@@ -372,20 +382,20 @@ export default function TeacherRatingsPage() {
         return true;
       })
       .sort((a, b) => compareItems(a, b, sortMode));
-  }, [items, levelFilter, search, sortMode, statusFilter]);
+  }, [items, lessonFitFilter, levelFilter, search, sortMode, statusFilter]);
 
   const ratedCount = items.filter((item) => item.hasTeacherReview).length;
-  const needsRatingCount = new Set(
-    items
-      .filter(
-        (item) =>
-          !item.hasTeacherReview &&
-          !!item.finishedAt &&
-          !item.dnfAt &&
-          !item.teacherReviewClearedAt
-      )
-      .map((item) => item.bookId ?? item.id)
-  ).size;
+  const needsRatingCount = countNeededTeacherRatingBooks(
+    items.map((item) => ({
+      id: item.id,
+      book_id: item.bookId,
+      finished_at: item.finishedAt,
+      dnf_at: item.dnfAt,
+      recommended_level: item.recommendedLevel,
+      teacher_student_use_rating: item.studentUseRating,
+      teacher_review_cleared_at: item.teacherReviewClearedAt,
+    }))
+  );
   const wouldTeachAgainCount = items.filter(
     (item) => ratingValue(item.studentUseRating) >= 4
   ).length;
@@ -426,11 +436,13 @@ export default function TeacherRatingsPage() {
           search={search}
           statusFilter={statusFilter}
           levelFilter={levelFilter}
+          lessonFitFilter={lessonFitFilter}
           sortMode={sortMode}
           levelOptions={levelOptions}
           onSearchChange={setSearch}
           onStatusFilterChange={(value) => setStatusFilter(value as StatusFilter)}
           onLevelFilterChange={setLevelFilter}
+          onLessonFitFilterChange={(value) => setLessonFitFilter(value as LessonFitFilter)}
           onSortModeChange={(value) => setSortMode(value as SortMode)}
         />
 
@@ -449,10 +461,15 @@ export default function TeacherRatingsPage() {
                 item={item}
                 dismissing={dismissingBookId === (item.bookId ?? item.id)}
                 onDismiss={
-                  !item.hasTeacherReview &&
-                  !!item.finishedAt &&
-                  !item.dnfAt &&
-                  !item.teacherReviewClearedAt
+                  needsTeacherReviewRating({
+                    id: item.id,
+                    book_id: item.bookId,
+                    finished_at: item.finishedAt,
+                    dnf_at: item.dnfAt,
+                    recommended_level: item.recommendedLevel,
+                    teacher_student_use_rating: item.studentUseRating,
+                    teacher_review_cleared_at: item.teacherReviewClearedAt,
+                  })
                     ? dismissTeacherRatingRequest
                     : undefined
                 }
