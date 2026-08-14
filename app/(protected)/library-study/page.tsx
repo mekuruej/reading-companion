@@ -38,7 +38,7 @@ const studyPaths = [
       "Choose one book and study the saved words from that book with focused flashcards.",
     className: "border-indigo-200 bg-indigo-50 text-indigo-950",
     lockedDescription:
-      "Reading Access opens one-book saved-word study and book flashcards.",
+      "Japanese Learning 🔒 opens one-book saved-word study and book flashcards.",
     requiresReadingAccess: true,
   },
   {
@@ -48,7 +48,7 @@ const studyPaths = [
     description:
       "Use cross-library smart review with Ability Check, Library Review, and Advanced Word Sky.",
     lockedDescription:
-      "Reading Access opens the smart vocabulary growth cycle when these tools are ready for your library.",
+      "Japanese Learning 🔒 opens the smart vocabulary growth cycle when these tools are ready for your library.",
     className: "border-violet-200 bg-violet-50 text-violet-950",
     requiresReadingAccess: true,
   },
@@ -70,7 +70,7 @@ function StudyPathCard({
     >
       {locked || trialForming ? (
         <div className="absolute right-4 top-4 rounded-full border border-white/70 bg-white/80 px-2.5 py-1 text-xs font-black shadow-sm">
-          {trialForming ? "Forming" : "Reading Access"}
+          {trialForming ? "Forming" : "Japanese Learning 🔒"}
         </div>
       ) : null}
 
@@ -83,7 +83,7 @@ function StudyPathCard({
           <h2 className="text-2xl font-black">{path.title}</h2>
           <p className="mt-2 text-sm leading-6 opacity-80">
             {trialForming
-              ? "During your trial, you can see your Advanced Study progress. Ability Check and Library Review open with paid Reading Access."
+              ? "During your trial, you can see your Advanced Study progress. Ability Check and Library Review open with Japanese Learning 🔒."
               : locked ? path.lockedDescription : path.description}
           </p>
         </div>
@@ -211,7 +211,7 @@ export default function StudyToolsPage() {
         {loadingAccess ? (
           <section className="rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm">
             <p className="text-sm font-semibold text-slate-600">
-              Loading reading access...
+              Loading Japanese Learning access...
             </p>
           </section>
         ) : (

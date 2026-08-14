@@ -152,7 +152,7 @@ export default function ProfileSetupPage() {
       return;
     }
 
-    if (!level.trim()) {
+    if (japaneseLearningEnabled && !level.trim()) {
       setMessage("Please choose the reading level that feels closest right now.");
       return;
     }
@@ -183,6 +183,12 @@ export default function ProfileSetupPage() {
           }
         : {};
 
+      const visibleJapaneseStudyFields = japaneseLearningEnabled
+        ? {
+            level: level.trim(),
+          }
+        : {};
+
       const { error } = await supabase.from("profiles").upsert(
         {
           id: user.id,
@@ -192,7 +198,7 @@ export default function ProfileSetupPage() {
           native_language: selectedNativeLanguage,
           japanese_learning_enabled: japaneseLearningEnabled,
           target_language: legacyTargetLanguageForJapaneseLearning(japaneseLearningEnabled),
-          level: level.trim(),
+          ...visibleJapaneseStudyFields,
           ...initialAccessFields,
         },
         { onConflict: "id" }
@@ -326,7 +332,9 @@ export default function ProfileSetupPage() {
           </div>
         </div>
 
-        <MekuruReadingLevelGuide selectedLevel={level} onSelect={setLevel} />
+        {japaneseLearningEnabled ? (
+          <MekuruReadingLevelGuide selectedLevel={level} onSelect={setLevel} />
+        ) : null}
 
         {message ? <p className="text-sm text-red-600">{message}</p> : null}
 

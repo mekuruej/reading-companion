@@ -11,7 +11,6 @@ export type TeacherRatingBookCardItem = {
   learnerName: string;
   recommendedLevel: string | null;
   studentUseRating: number | null;
-  languageLearningRating: number | null;
   notes: string | null;
   finishedAt: string | null;
   dnfAt: string | null;
@@ -125,7 +124,7 @@ export function TeacherRatingBookCard({
             {item.author || "Unknown author"} · {item.learnerName}
           </p>
 
-          <dl className="mt-4 grid gap-3 sm:grid-cols-4">
+          <dl className="mt-4 grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl bg-stone-50 p-3">
               <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">
                 Level
@@ -136,18 +135,10 @@ export function TeacherRatingBookCard({
             </div>
             <div className="rounded-2xl bg-stone-50 p-3">
               <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">
-                Lesson fit
+                Lesson Fit
               </dt>
               <dd className="mt-1 text-sm font-black text-stone-900">
                 {ratingText(item.studentUseRating)}
-              </dd>
-            </div>
-            <div className="rounded-2xl bg-stone-50 p-3">
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-400">
-                Language
-              </dt>
-              <dd className="mt-1 text-sm font-black text-stone-900">
-                {ratingText(item.languageLearningRating)}
               </dd>
             </div>
             <div className="rounded-2xl bg-stone-50 p-3">

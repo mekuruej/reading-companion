@@ -49,7 +49,7 @@ export default function ReadingAccessPage() {
                 MEKURU
               </p>
               <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                Reading Access
+                Japanese Learning
               </h1>
             </div>
           </Link>
@@ -64,15 +64,15 @@ export default function ReadingAccessPage() {
 
         <section className="rounded-[2rem] border border-stone-200 bg-white/90 p-6 shadow-lg shadow-slate-300/30 sm:p-8">
           <p className="text-sm font-bold uppercase tracking-[0.25em] text-violet-600">
-            Reading Access
+            Japanese Learning 🔒
           </p>
           <h2 className="mt-4 text-4xl font-black leading-tight text-stone-950 sm:text-5xl">
             Keep reading with MEKURU.
           </h2>
           <p className="mt-5 max-w-2xl text-base leading-7 text-stone-700 sm:text-lg">
-            Reading Access is the ¥500/month MEKURU app tools option for
-            independent readers who want to keep saving vocabulary, reviewing
-            words, and tracking their reading after a trial.
+            Japanese Learning is the ¥500/month MEKURU app tools option for
+            independent Japanese readers who want to keep saving vocabulary,
+            reviewing words, and using Japanese reading tools after a trial.
           </p>
 
           <div className="mt-7 flex flex-wrap items-center gap-3">
@@ -83,7 +83,7 @@ export default function ReadingAccessPage() {
                 rel="noopener noreferrer"
                 className="inline-flex rounded-2xl bg-stone-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-stone-700 hover:shadow-md"
               >
-                Join Reading Access on Ko-fi
+                Join Japanese Learning 🔒 on Ko-fi
               </a>
             ) : (
               <span className="inline-flex cursor-not-allowed rounded-2xl border border-stone-200 bg-stone-100 px-5 py-3 text-sm font-semibold text-stone-500">
@@ -125,10 +125,10 @@ export default function ReadingAccessPage() {
             Want lesson support for Japanese reading?
           </h2>
           <p className="mt-3 text-sm leading-6 text-stone-700 sm:text-base">
-            Reading Access gives you the tools to keep reading on your own. If
+            Japanese Learning gives you the tools to keep reading on your own. If
             you would like regular support, Devon also offers Japanese reading
             lessons 1-4 times per month, with term-based payments. Lessons are
-            separate from Reading Access.
+            separate from Japanese Learning.
           </p>
           <Link
             href="/japanese"

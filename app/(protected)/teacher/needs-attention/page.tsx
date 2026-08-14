@@ -54,7 +54,6 @@ type TeacherRatingCountUserBookRow = {
   notes: string | null;
   recommended_level: string | null;
   teacher_student_use_rating: number | null;
-  rating_recommend: number | null;
   teacher_review_cleared_at: string | null;
 };
 
@@ -65,7 +64,6 @@ function countNeededTeacherRatingBooks(items: TeacherRatingCountUserBookRow[]) {
     const hasTeacherReview =
       !!String(item.recommended_level ?? "").trim() ||
       item.teacher_student_use_rating != null ||
-      item.rating_recommend != null ||
       !!String(item.notes ?? "").trim();
 
     if (
@@ -282,7 +280,7 @@ export default function TeacherNeedsAttentionPage() {
             .is("teacher_review_cleared_at", null),
           supabase
             .from("user_books")
-            .select("id, book_id, finished_at, dnf_at, notes, recommended_level, teacher_student_use_rating, rating_recommend, teacher_review_cleared_at")
+            .select("id, book_id, finished_at, dnf_at, notes, recommended_level, teacher_student_use_rating, teacher_review_cleared_at")
             .in("user_id", studentIds),
           supabase
             .from("grammar_points")

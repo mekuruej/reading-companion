@@ -318,7 +318,7 @@ export default function BulkVocabPage() {
             setMessage(
               featureAccess.isTrial
                 ? "❌ Bulk Add is not part of trial access. During a trial, save words from Curiosity Reading or the regular Add Word page."
-                : "❌ Bulk vocabulary saving is available with paid Reading Access."
+                : "❌ Bulk vocabulary saving is available with Japanese Learning 🔒."
             );
             setAuthorizedUserBookId("");
           }

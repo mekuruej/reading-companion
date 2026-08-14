@@ -64,13 +64,13 @@ export default function LibraryGuidePanel({
         className="rounded-2xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-violet-100"
       >
         <div className="text-sm font-black text-slate-950">
-          Want More Reading Tools?
+          Want More Japanese Learning Tools?
         </div>
         <p className="mt-1 text-xs leading-5 text-slate-600">
-          Learn about <strong>Reading Access</strong> for saving vocabulary, practicing flashcards, and keeping your reading tools after trial.
+          Learn about <strong>Japanese Learning 🔒</strong> for saving vocabulary, practicing flashcards, and keeping your Japanese reading tools after trial.
         </p>
         <p className="mt-2 text-xs font-black text-violet-700">
-          See Reading Access →
+          See Japanese Learning 🔒 →
         </p>
       </button>
     </>

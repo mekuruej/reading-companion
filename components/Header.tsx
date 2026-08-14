@@ -477,7 +477,7 @@ export default function Header() {
                     <div className="block cursor-default rounded-xl px-3 py-2 text-sm leading-tight text-stone-400">
                       Book Study 🔒
                       <span className="block text-xs text-stone-500">
-                        Reading Access
+                        Japanese Learning 🔒
                       </span>
                     </div>
                   )}
@@ -500,7 +500,7 @@ export default function Header() {
                     <div className="block cursor-default rounded-xl px-3 py-2 text-sm leading-tight text-stone-400">
                       {isTrialAccess ? "Advanced Study forming" : "Advanced Study 🔒"}
                       <span className="block text-xs text-stone-500">
-                        {isTrialAccess ? "Paid Reading Access" : "Reading Access"}
+                        Japanese Learning 🔒
                       </span>
                     </div>
                   )}

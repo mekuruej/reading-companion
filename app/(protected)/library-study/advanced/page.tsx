@@ -124,7 +124,7 @@ export default function AdvancedStudyPage() {
     const [isStaffAccess, setIsStaffAccess] = useState(false);
     const [canUseAbilityCheck, setCanUseAbilityCheck] = useState(false);
     const [canUseLibraryReview, setCanUseLibraryReview] = useState(false);
-    const accessTitle = accessReason === "expired" ? "Reading Access ended" : "Free reading tracker";
+    const accessTitle = accessReason === "expired" ? "Japanese Learning ended" : "Free reading tracker";
     const abilityCheckAvailable = canUseAbilityCheck && !isTrialAccess && (isStaffAccess || (readiness?.abilityCheckReady ?? false));
     const libraryReviewAvailable = canUseLibraryReview && !isTrialAccess && (isStaffAccess || (readiness?.libraryReviewReady ?? false));
     const showAdvancedTools = canUseAdvancedStudy && !isTrialAccess && (
@@ -304,7 +304,7 @@ export default function AdvancedStudyPage() {
                 {loadingAccess ? (
                     <section className="rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm">
                         <p className="text-sm font-semibold text-slate-600">
-                            Loading reading access...
+                            Loading Japanese Learning access...
                         </p>
                     </section>
                 ) : !canUseAdvancedStudy ? (
@@ -316,7 +316,7 @@ export default function AdvancedStudyPage() {
                             Keep your reading archive simple
                         </h2>
                         <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-                            Advanced vocabulary study is part of Reading Access. You can still
+                            Advanced vocabulary study is included with Japanese Learning 🔒. You can still
                             track books, log reading time, and view basic stats{hasSavedWords ? ", plus open your saved vocabulary as a read-only archive with CSV export" : ""}.
                         </p>
                         <div className="mt-5 flex flex-wrap gap-3">

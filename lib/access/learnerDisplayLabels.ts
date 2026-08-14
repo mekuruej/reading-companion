@@ -8,7 +8,7 @@ export function getLearnerAccessLabel(profile: LearnerDisplayLabelInput) {
   if (profile.linkedToTeacher) return "Teacher-linked student";
   if (profile.app_access_type === "trial") return "Trial learner";
   if (profile.app_access_type === "free") return "Free learner";
-  if (profile.app_access_type === "student") return "Self-paid learner";
+  if (profile.app_access_type === "student") return "Japanese Learning learner";
   if (profile.role === "teacher") return "Teacher";
   return "Learner";
 }

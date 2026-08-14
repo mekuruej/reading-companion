@@ -15,6 +15,7 @@ type ProfileSettingsPublicCardProps = {
   favoriteGenres: string[];
   favoriteGenreInput: string;
   bio: string;
+  showJapaneseReadingLevel: boolean;
   profileLevelOptions: readonly ProfileLevelOption[];
   onPublicNameChoiceChange: (value: PublicNameChoice) => void;
   onPublicLevelChange: (value: string) => void;
@@ -33,6 +34,7 @@ export default function ProfileSettingsPublicCard({
   favoriteGenres,
   favoriteGenreInput,
   bio,
+  showJapaneseReadingLevel,
   profileLevelOptions,
   onPublicNameChoiceChange,
   onPublicLevelChange,
@@ -78,24 +80,26 @@ export default function ProfileSettingsPublicCard({
           </p>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-stone-800">
-            Japanese reading level shown publicly
-          </label>
+        {showJapaneseReadingLevel ? (
+          <div>
+            <label className="block text-sm font-medium text-stone-800">
+              Japanese reading level shown publicly
+            </label>
 
-          <select
-            className="mt-1 w-full rounded-xl border px-3 py-2"
-            value={publicLevel}
-            onChange={(e) => onPublicLevelChange(e.target.value)}
-          >
-            <option value="None">Prefer not to share</option>
-            {profileLevelOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.title} · {option.plain} ({option.cefr} · {option.jlpt})
-              </option>
-            ))}
-          </select>
-        </div>
+            <select
+              className="mt-1 w-full rounded-xl border px-3 py-2"
+              value={publicLevel}
+              onChange={(e) => onPublicLevelChange(e.target.value)}
+            >
+              <option value="None">Prefer not to share</option>
+              {profileLevelOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.title} · {option.plain} ({option.cefr} · {option.jlpt})
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
 
         <FavoriteGenreEditor
           favoriteGenres={favoriteGenres}

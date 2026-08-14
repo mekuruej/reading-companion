@@ -23,7 +23,7 @@ function BookFlashcardsFullAccessLockedState() {
     <main className="min-h-screen bg-slate-100 px-4 py-5 sm:px-5 sm:py-8">
       <div className="mx-auto max-w-3xl rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
         <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
-          Reading Access
+          Japanese Learning 🔒
         </p>
 
         <h1 className="mt-2 text-3xl font-black text-stone-950">
@@ -32,7 +32,7 @@ function BookFlashcardsFullAccessLockedState() {
 
         <p className="mt-3 text-sm leading-6 text-stone-600">
           Book Flashcards use saved vocabulary from your books, so they are part
-          of Reading Access. Your book tracking, reading reflections, and
+          of Japanese Learning. Your book tracking, reading reflections, and
           timer-only reading tools are still available.
         </p>
 

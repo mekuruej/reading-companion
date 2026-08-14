@@ -201,9 +201,6 @@ export default function JapaneseLearningPage() {
           <h1 className="mt-3 max-w-3xl text-4xl font-black leading-tight md:text-6xl">
             Learn Japanese through the books you are actually reading.
           </h1>
-          <p className="mt-5 max-w-2xl text-base font-semibold leading-8 text-stone-700">
-            Use MEKURU alongside the Japanese books you choose. Look things up, capture vocabulary, and study as you read — at your own pace.
-          </p>
         </section>
 
         <section className="mt-6 rounded-3xl border border-amber-200 bg-white p-5 shadow-sm">

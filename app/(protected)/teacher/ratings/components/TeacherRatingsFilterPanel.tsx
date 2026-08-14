@@ -80,7 +80,6 @@ export function TeacherRatingsFilterPanel({
             className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-stone-900 outline-none focus:border-stone-400"
           >
             <option value="student-use-desc">Best lesson fit</option>
-            <option value="language-desc">Best language value</option>
             <option value="recent">Recently added</option>
             <option value="title">Title</option>
           </select>

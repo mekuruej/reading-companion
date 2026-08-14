@@ -193,7 +193,7 @@ export default function ReviewNotesPage() {
 
       if (!nativeLanguageBook && !featureAccess.hasFullAccess) {
         setAccessMessage(
-          "My Review is part of Reading Access. Your Reading Reflection is still available after you finish a book."
+          "My Review is included with Japanese Learning 🔒. Your Reading Reflection is still available after you finish a book."
         );
         setLoading(false);
         return;

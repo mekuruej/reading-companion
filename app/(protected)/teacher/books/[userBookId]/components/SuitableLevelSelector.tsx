@@ -23,9 +23,9 @@ export function SuitableLevelSelector({
     return (
         <section className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
             <div className="mb-4">
-                <h2 className="text-lg font-black text-stone-900">Suitable Level</h2>
+                <h2 className="text-lg font-black text-stone-900">Level</h2>
                 <p className="mt-1 text-sm text-stone-500">
-                    Pick the level that feels suitable with guidance, not necessarily the level where the book becomes easy.
+                    What level of learner is this book best for?
                 </p>
             </div>
 

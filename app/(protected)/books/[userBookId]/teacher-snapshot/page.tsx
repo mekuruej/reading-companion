@@ -680,7 +680,7 @@ export default function TeacherReadingSnapshotPage() {
       </TeacherSnapshotSection>
 
       <TeacherSnapshotSection
-        title="Teaching Fit"
+        title="Lesson Fit"
         description="Teacher-side use status, note, and the existing recommended level for this reader copy."
       >
         <TeacherSnapshotTeachingFit

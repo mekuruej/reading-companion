@@ -342,7 +342,7 @@ export default function CommunityStatsHomePage() {
                 ? "..."
                 : canSeeLearningSnapshots
                   ? formatCount(snapshot.wordsSaved)
-                  : "Reading Access Feature"
+                  : "Japanese Learning 🔒"
             }
             detail={canSeeLearningSnapshots ? "Saved this calendar month" : "Upgrade to track saved words"}
             tone="sky"

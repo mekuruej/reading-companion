@@ -3,7 +3,7 @@ export default function TrialEndedPage() {
     <main className="mx-auto max-w-2xl px-6 py-16">
       <div className="rounded-3xl border border-stone-200 bg-stone-50 p-8 shadow-sm">
         <h1 className="text-2xl font-semibold text-stone-900">
-          Your Reading Access trial has ended
+          Your Japanese Learning trial has ended
         </h1>
 
         <p className="mt-4 text-base leading-7 text-stone-700">
@@ -14,7 +14,7 @@ export default function TrialEndedPage() {
         <p className="mt-4 text-base leading-7 text-stone-700">
           Free reading features are still available. To keep saving new words,
           seeing color progress, using Word Sky, and building toward Ability
-          Check, continue with Reading Access.
+          Check, continue with Japanese Learning 🔒.
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">

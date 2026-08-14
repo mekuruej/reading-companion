@@ -15,7 +15,7 @@ type ProfileAccessRow = {
 };
 
 function BookStudyFreeState({ hasSavedWords, accessReason }: { hasSavedWords: boolean; accessReason: string }) {
-  const accessTitle = accessReason === "expired" ? "Reading Access ended" : "Free reading tracker";
+  const accessTitle = accessReason === "expired" ? "Japanese Learning ended" : "Free reading tracker";
 
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">

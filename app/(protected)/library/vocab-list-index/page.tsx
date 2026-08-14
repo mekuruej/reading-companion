@@ -10,7 +10,7 @@ export default function VocabListIndexPage() {
     <LibraryBookActionIndex
       eyebrow="Vocabulary Lists"
       title="Open a Vocabulary List"
-      description="Choose a book to view its saved words and export CSV. Editing tools stay with Reading Access."
+      description="Choose a book to view its saved words and export CSV. Editing tools are included with Japanese Learning 🔒."
       actionLabel="Vocabulary List"
       emptyText="No saved words yet."
       accent="stone"

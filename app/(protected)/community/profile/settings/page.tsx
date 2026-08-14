@@ -235,7 +235,7 @@ export default function ProfileSettingsPage() {
       return;
     }
 
-    if (!level.trim()) {
+    if (japaneseLearningEnabled && !level.trim()) {
       setSaving(false);
       setErrorMsg("Please choose the reading level that feels closest right now.");
       return;
@@ -254,6 +254,17 @@ export default function ProfileSettingsPage() {
       }
     });
 
+    const visibleJapaneseStudyFields = japaneseLearningEnabled
+      ? {
+          level: level.trim(),
+        }
+      : {};
+    const visiblePublicJapaneseLevelFields = japaneseLearningEnabled
+      ? {
+          jlpt_level_public: publicLevel === "None" ? null : publicLevel,
+        }
+      : {};
+
     const [profileResult, publicResult] = await Promise.all([
       supabase.from("profiles").upsert(
         {
@@ -263,14 +274,14 @@ export default function ProfileSettingsPage() {
           native_language: selectedNativeLanguage,
           japanese_learning_enabled: japaneseLearningEnabled,
           target_language: legacyTargetLanguageForJapaneseLearning(japaneseLearningEnabled),
-          level: level.trim(),
+          ...visibleJapaneseStudyFields,
         },
         { onConflict: "id" }
       ),
       supabase.from("user_public_profile").upsert(
         {
           user_id: user.id,
-          jlpt_level_public: publicLevel === "None" ? null : publicLevel,
+          ...visiblePublicJapaneseLevelFields,
           favorite_genres: cleanedGenres,
           bio: bio.trim(),
           public_name_choice: publicNameChoice,
@@ -333,7 +344,9 @@ export default function ProfileSettingsPage() {
           onJapaneseLearningEnabledChange={setJapaneseLearningEnabled}
         />
 
-        <MekuruReadingLevelGuide selectedLevel={level} onSelect={setLevel} />
+        {japaneseLearningEnabled ? (
+          <MekuruReadingLevelGuide selectedLevel={level} onSelect={setLevel} />
+        ) : null}
 
         <ProfileSettingsPublicCard
           publicNameChoice={publicNameChoice}
@@ -344,6 +357,7 @@ export default function ProfileSettingsPage() {
           favoriteGenres={favoriteGenres}
           favoriteGenreInput={favoriteGenreInput}
           bio={bio}
+          showJapaneseReadingLevel={japaneseLearningEnabled}
           profileLevelOptions={PROFILE_LEVEL_OPTIONS}
           onPublicNameChoiceChange={setPublicNameChoice}
           onPublicLevelChange={setPublicLevel}

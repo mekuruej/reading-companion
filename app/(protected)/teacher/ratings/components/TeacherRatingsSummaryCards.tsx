@@ -27,7 +27,7 @@ export function TeacherRatingsSummaryCards({
     {
       label: "Strong lesson fit",
       value: wouldTeachAgainCount,
-      note: "Rated 4 or 5 for student use.",
+      note: "Rated 4 or 5 for Lesson Fit.",
       color: "border-sky-200 bg-sky-50 text-sky-900",
     },
     {

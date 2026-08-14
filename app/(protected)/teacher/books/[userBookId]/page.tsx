@@ -31,7 +31,7 @@ type UserBook = {
     notes: string | null;
     recommended_level: string | null;
     teacher_student_use_rating: number | null;
-    rating_recommend: number | null;
+    finished_at: string | null;
     books: Book | null;
 };
 
@@ -119,19 +119,11 @@ const suitableLevelOptions = [
 ] as const;
 
 const studentUseOptions = [
-    [5, "Strong yes. I'd happily use this with students."],
-    [4, "Yes, with minor caveats."],
-    [3, "Maybe. Depends on the student or context."],
-    [2, "Probably not."],
-    [1, "No. I would not use this with students."],
-] as const;
-
-const languageLearningOptions = [
-    [5, "This is a learner's dream come true."],
-    [4, "Has a lot of good material in there."],
-    [3, "You can learn some stuff, but nothing special."],
-    [2, "Not so much useful language material."],
-    [1, "I didn't get anything out of it."],
+    [5, "Excellent choice for lessons."],
+    [4, "A strong choice for many learners."],
+    [3, "Depends on the learner and lesson goals."],
+    [2, "Not a good fit for most learners."],
+    [1, "I would not recommend using this for lessons."],
 ] as const;
 
 function clampRating5(value: string) {
@@ -146,20 +138,11 @@ function stars5(n: number | null) {
 }
 
 function studentUseLabel(value: number | null) {
-    if (value === 5) return "Strong yes. I'd happily use this with students.";
-    if (value === 4) return "Yes, with minor caveats.";
-    if (value === 3) return "Maybe. Depends on the student or context.";
-    if (value === 2) return "Probably not.";
-    if (value === 1) return "No. I would not use this with students.";
-    return "Not rated yet.";
-}
-
-function languageLearningLabel(value: number | null) {
-    if (value === 5) return "This is a learner's dream come true.";
-    if (value === 4) return "Has a lot of good material in there.";
-    if (value === 3) return "You can learn some stuff, but nothing special.";
-    if (value === 2) return "Not so much useful language material.";
-    if (value === 1) return "I didn't get anything out of it.";
+    if (value === 5) return "Excellent choice for lessons.";
+    if (value === 4) return "A strong choice for many learners.";
+    if (value === 3) return "Depends on the learner and lesson goals.";
+    if (value === 2) return "Not a good fit for most learners.";
+    if (value === 1) return "I would not recommend using this for lessons.";
     return "Not rated yet.";
 }
 
@@ -182,7 +165,6 @@ export default function TeacherBookReviewPage() {
 
     const [recommendedLevel, setRecommendedLevel] = useState("");
     const [teacherStudentUseRating, setTeacherStudentUseRating] = useState("");
-    const [ratingRecommend, setRatingRecommend] = useState("");
     const [notes, setNotes] = useState("");
 
     useEffect(() => {
@@ -240,7 +222,7 @@ export default function TeacherBookReviewPage() {
           notes,
           recommended_level,
           teacher_student_use_rating,
-          rating_recommend,
+          finished_at,
           books (
             title,
             title_reading,
@@ -268,9 +250,6 @@ export default function TeacherBookReviewPage() {
             setRecommendedLevel(nextRow.recommended_level ?? "");
             setTeacherStudentUseRating(
                 nextRow.teacher_student_use_rating != null ? String(nextRow.teacher_student_use_rating) : ""
-            );
-            setRatingRecommend(
-                nextRow.rating_recommend != null ? String(nextRow.rating_recommend) : ""
             );
             setNotes(nextRow.notes ?? "");
 
@@ -307,7 +286,6 @@ export default function TeacherBookReviewPage() {
                 teacher_student_use_rating: teacherStudentUseRating
                     ? clampRating5(teacherStudentUseRating)
                     : null,
-                rating_recommend: ratingRecommend ? clampRating5(ratingRecommend) : null,
             })
             .eq("id", row.id);
 
@@ -328,7 +306,6 @@ export default function TeacherBookReviewPage() {
                     teacher_student_use_rating: teacherStudentUseRating
                         ? clampRating5(teacherStudentUseRating)
                         : null,
-                    rating_recommend: ratingRecommend ? clampRating5(ratingRecommend) : null,
                 }
                 : prev
         );
@@ -366,11 +343,10 @@ export default function TeacherBookReviewPage() {
                     savedLevelInfo={savedLevelInfo}
                     recommendedLevel={row?.recommended_level ?? null}
                     studentUseRating={row?.teacher_student_use_rating ?? null}
-                    languageLearningRating={row?.rating_recommend ?? null}
+                    finishedAt={row?.finished_at ?? null}
                     notes={row?.notes ?? null}
                     stars5={stars5}
                     studentUseLabel={studentUseLabel}
-                    languageLearningLabel={languageLearningLabel}
                 />
 
                 <SuitableLevelSelector
@@ -381,13 +357,13 @@ export default function TeacherBookReviewPage() {
                 />
 
                 <TeacherRatingSelector
-                    title="Language Learning Potential"
-                    description="How much useful language-learning value does this book have?"
-                    value={ratingRecommend}
-                    options={languageLearningOptions}
-                    label={languageLearningLabel(clampRating5(ratingRecommend))}
+                    title="Lesson Fit"
+                    description="How well would this book work in a lesson?"
+                    value={teacherStudentUseRating}
+                    options={studentUseOptions}
+                    label={studentUseLabel(clampRating5(teacherStudentUseRating))}
                     stars5={stars5}
-                    onChange={setRatingRecommend}
+                    onChange={setTeacherStudentUseRating}
                 />
 
                 <TeacherNotesCard

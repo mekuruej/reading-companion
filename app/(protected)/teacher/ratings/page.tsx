@@ -38,7 +38,6 @@ type UserBookRow = {
   notes: string | null;
   recommended_level: string | null;
   teacher_student_use_rating: number | null;
-  rating_recommend: number | null;
   finished_at: string | null;
   dnf_at: string | null;
   dnf_reason: string | null;
@@ -50,7 +49,7 @@ type UserBookRow = {
 };
 
 type StatusFilter = "all" | "rated" | "needs-rating" | "strong-fit";
-type SortMode = "student-use-desc" | "language-desc" | "recent" | "title";
+type SortMode = "student-use-desc" | "recent" | "title";
 
 function isSuperTeacherFlag(value: unknown) {
   return value === true || value === "true";
@@ -69,7 +68,6 @@ function hasTeacherReview(row: UserBookRow) {
   return (
     !!String(row.recommended_level ?? "").trim() ||
     row.teacher_student_use_rating != null ||
-    row.rating_recommend != null ||
     !!String(row.notes ?? "").trim()
   );
 }
@@ -87,7 +85,6 @@ function toItem(row: UserBookRow, learnerById: Map<string, ProfileRow>): Teacher
     learnerName: displayName(learnerById.get(row.user_id)),
     recommendedLevel: row.recommended_level,
     studentUseRating: row.teacher_student_use_rating,
-    languageLearningRating: row.rating_recommend,
     notes: row.notes,
     finishedAt: row.finished_at,
     dnfAt: row.dnf_at,
@@ -106,10 +103,6 @@ function ratingValue(value: number | null) {
 function compareItems(a: TeacherRatingBookCardItem, b: TeacherRatingBookCardItem, sortMode: SortMode) {
   if (sortMode === "title") {
     return a.title.localeCompare(b.title, "ja");
-  }
-
-  if (sortMode === "language-desc") {
-    return ratingValue(b.languageLearningRating) - ratingValue(a.languageLearningRating);
   }
 
   if (sortMode === "recent") {
@@ -208,7 +201,6 @@ export default function TeacherRatingsPage() {
                   notes,
                   recommended_level,
                   teacher_student_use_rating,
-                  rating_recommend,
                   finished_at,
                   dnf_at,
                   dnf_reason,
