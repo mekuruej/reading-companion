@@ -93,7 +93,6 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const isbn13 = normalizeIsbn13(body?.isbn13 ?? body?.isbn ?? "");
   const mode = body?.mode === "global_only" ? "global_only" : "add_to_library";
-  const allowPendingPlaceholder = body?.allowPendingPlaceholder === true;
   const userConfirmedLanguageCode = normalizeBookLanguageCode(
     body?.languageCode ?? body?.language_code
   );
@@ -104,8 +103,6 @@ export async function POST(request: Request) {
       ? body.targetUserId.trim()
       : auth.user.id;
   const isStudentLessonBookContext = context === "student-lesson-book";
-  const shouldLinkStudentLessonBook =
-    isStudentLessonBookContext && !allowPendingPlaceholder;
 
   if (!isbn13) {
     return NextResponse.json(
@@ -176,78 +173,46 @@ export async function POST(request: Request) {
     const lookupResult = await lookupNormalizedExternalBookByIsbn13(isbn13);
 
     if (!lookupResult?.title) {
-      if (!allowPendingPlaceholder || mode === "global_only") {
-        return NextResponse.json(
-          {
-            error:
-              "We couldn’t find enough information for that ISBN yet. Please request this book for review.",
-          },
-          { status: 404 }
-        );
-      }
-
-      if (!userConfirmedLanguageCode) {
-        return NextResponse.json(
-          { error: "Choose the language of this edition before adding it." },
-          { status: 400 }
-        );
-      }
-
-      let { data: insertedPlaceholderBook, error: insertPlaceholderBookError } =
-        await supabaseAdmin
-          .from("books")
-          .insert({
-            isbn13,
-            title: "Book details pending",
-            language_code: userConfirmedLanguageCode,
-            needs_review: true,
-          })
-          .select("id")
-          .single();
-
-      if (insertPlaceholderBookError?.code === "42703" || insertPlaceholderBookError?.code === "PGRST204") {
-        const retry = await supabaseAdmin
-          .from("books")
-          .insert({
-            isbn13,
-            title: "Book details pending",
-            language_code: userConfirmedLanguageCode,
-          })
-          .select("id")
-          .single();
-
-        insertedPlaceholderBook = retry.data;
-        insertPlaceholderBookError = retry.error;
-      }
-
-      if (insertPlaceholderBookError) {
-        console.error("Error creating pending ISBN book:", insertPlaceholderBookError);
-
-        return NextResponse.json(
-          { error: "The request was sent, but Mekuru could not add the pending book to the library." },
-          { status: 500 }
-        );
-      }
-
-      bookId = insertedPlaceholderBook.id;
+      return NextResponse.json(
+        {
+          error:
+            "We couldn’t find enough information for that ISBN yet. Please request this book for review.",
+        },
+        { status: 404 }
+      );
     }
 
-    if (bookId) {
-      // The explicit pending-placeholder path created the minimal global book above.
-    } else {
-      const authorDisplay = lookupResult.author_display;
-      const editionLanguageCode =
-        normalizeBookLanguageCode(lookupResult.language_code) ??
-        userConfirmedLanguageCode;
+    const authorDisplay = lookupResult.author_display;
+    const editionLanguageCode =
+      normalizeBookLanguageCode(lookupResult.language_code) ??
+      userConfirmedLanguageCode;
 
-      if (!editionLanguageCode) {
-        return NextResponse.json(
-          { error: "Choose the language of this edition before adding it." },
-          { status: 400 }
-        );
-      }
+    if (!editionLanguageCode) {
+      return NextResponse.json(
+        { error: "Choose the language of this edition before adding it." },
+        { status: 400 }
+      );
+    }
 
-      let { data: insertedBook, error: insertBookError } = await supabaseAdmin
+    let { data: insertedBook, error: insertBookError } = await supabaseAdmin
+      .from("books")
+      .insert({
+        isbn13: lookupResult.isbn13,
+        title: lookupResult.title,
+        author: authorDisplay,
+        cover_url: lookupResult.cover_url,
+        publisher: lookupResult.publisher,
+        published_date: lookupResult.published_date,
+        page_count: lookupResult.page_count,
+        language_code: editionLanguageCode,
+        metadata_source: lookupResult.metadata_source,
+        needs_review: true,
+      })
+      .select("id")
+      .single();
+
+    if (insertBookError?.code === "42703" || insertBookError?.code === "PGRST204") {
+      const retry = await supabaseAdmin
         .from("books")
         .insert({
           isbn13: lookupResult.isbn13,
@@ -258,41 +223,43 @@ export async function POST(request: Request) {
           published_date: lookupResult.published_date,
           page_count: lookupResult.page_count,
           language_code: editionLanguageCode,
-          metadata_source: lookupResult.metadata_source,
-          needs_review: true,
         })
         .select("id")
         .single();
 
-      if (insertBookError?.code === "42703" || insertBookError?.code === "PGRST204") {
-        const retry = await supabaseAdmin
+      insertedBook = retry.data;
+      insertBookError = retry.error;
+    }
+
+    if (insertBookError?.code === "23505") {
+      const { data: racedExistingBook, error: racedExistingBookError } =
+        await supabaseAdmin
           .from("books")
-          .insert({
-            isbn13: lookupResult.isbn13,
-            title: lookupResult.title,
-            author: authorDisplay,
-            cover_url: lookupResult.cover_url,
-            publisher: lookupResult.publisher,
-            published_date: lookupResult.published_date,
-            page_count: lookupResult.page_count,
-            language_code: editionLanguageCode,
-          })
           .select("id")
-          .single();
+          .eq("isbn13", isbn13)
+          .maybeSingle();
 
-        insertedBook = retry.data;
-        insertBookError = retry.error;
-      }
-
-      if (insertBookError) {
-        console.error("Error creating imported book:", insertBookError);
-
+      if (racedExistingBookError) {
+        console.error("Error checking ISBN after duplicate insert:", racedExistingBookError);
         return NextResponse.json(
-          { error: "Something went wrong while creating this book." },
+          { error: "Something went wrong while checking this book." },
           { status: 500 }
         );
       }
 
+      if (racedExistingBook?.id) {
+        bookId = racedExistingBook.id;
+      }
+    } else if (insertBookError) {
+      console.error("Error creating imported book:", insertBookError);
+
+      return NextResponse.json(
+        { error: "Something went wrong while creating this book." },
+        { status: 500 }
+      );
+    }
+
+    if (!bookId) {
       bookId = insertedBook.id;
     }
   }
@@ -326,7 +293,7 @@ export async function POST(request: Request) {
   if (existingUserBook) {
     let lessonBook = null;
 
-    if (shouldLinkStudentLessonBook) {
+    if (isStudentLessonBookContext) {
       try {
         lessonBook = await ensureStudentLessonBook({
           supabase: supabaseAdmin,
@@ -374,7 +341,7 @@ export async function POST(request: Request) {
 
   let lessonBook = null;
 
-  if (shouldLinkStudentLessonBook) {
+  if (isStudentLessonBookContext) {
     try {
       lessonBook = await ensureStudentLessonBook({
         supabase: supabaseAdmin,

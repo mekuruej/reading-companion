@@ -622,7 +622,7 @@ export default function AddBookPage() {
             }
 
             if (!targetLibraryUserId) {
-                setRequestMessage(`Sign in again before adding this pending book to ${targetLibraryShortLabel}.`);
+                setRequestMessage("Sign in again before requesting this book.");
                 return;
             }
 
@@ -653,7 +653,7 @@ export default function AddBookPage() {
 
             const { error: requestError } = await supabase.from("book_requests").insert({
                 user_id: user.id,
-                title: requestTitle || (requestAsin ? `Amazon ASIN ${requestAsin}` : cleanIsbn ? "Book details pending" : null),
+                title: requestTitle || (requestAsin ? `Amazon ASIN ${requestAsin}` : null),
                 author: requestAuthor || null,
                 isbn13: cleanIsbn || null,
                 asin: requestAsin,
@@ -663,55 +663,9 @@ export default function AddBookPage() {
 
             if (requestError) throw requestError;
 
-            let pendingUserBookId: string | null = null;
-
-            if (cleanIsbn) {
-                const {
-                    data: { session },
-                } = await supabase.auth.getSession();
-
-                const addResponse = await fetch("/api/books/add-by-isbn", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        ...(session?.access_token
-                            ? { Authorization: `Bearer ${session.access_token}` }
-                            : {}),
-                    },
-                    body: JSON.stringify({
-                        isbn13: cleanIsbn,
-                        mode: "add_to_library",
-                        targetUserId: targetLibraryUserId,
-                        allowPendingPlaceholder: true,
-                        languageCode: confirmedEditionLanguageCode || undefined,
-                    }),
-                });
-
-                const addData = await addResponse.json().catch(() => null);
-
-                if (addResponse.ok && addData?.userBookId) {
-                    pendingUserBookId = addData.userBookId;
-                } else {
-                    console.warn("Book request sent, but pending library copy was not added:", addData);
-                }
-            }
-
             setCanRequestBook(false);
-            if (pendingUserBookId) {
-                setLibraryNotice({
-                    message: `Book request sent and a pending copy was added to ${targetLibraryShortLabel}.`,
-                    detail: isStudentLessonBookContext
-                        ? "An admin can fill in the book details later. Active Lesson Books will be linked after a real catalog book is ready."
-                        : "You can start using it now. An admin can fill in the book details later.",
-                    userBookId: isStudentLessonBookContext ? undefined : pendingUserBookId,
-                    returnLabel: isStudentLessonBookContext ? "Back to Student Workspace" : undefined,
-                    returnHref: isStudentLessonBookContext ? studentWorkspaceHref : undefined,
-                });
-            }
             setRequestMessage(
-                pendingUserBookId
-                    ? `Book request sent. A pending copy was added to ${targetLibraryShortLabel}.`
-                    : isFallbackRequest
+                isFallbackRequest
                     ? "Book request sent. An admin can review the title and author details."
                     : "Book request sent. An admin can review this ISBN and add the book details."
             );
