@@ -12,6 +12,7 @@ import LookupBookPreviewCard from "./components/LookupBookPreviewCard";
 import AddBookActionRow from "./components/AddBookActionRow";
 import AddBookDestinationSummary from "./components/AddBookDestinationSummary";
 import AddBookCatalogResult from "./components/AddBookCatalogResult";
+import ManualEditionForm, { type ManualEditionMode } from "./components/ManualEditionForm";
 import { isValidAsin, normalizeAsin } from "@/lib/books/asin";
 import {
     COMMON_BOOK_LANGUAGE_OPTIONS,
@@ -67,8 +68,6 @@ type BookSearchResult = {
     language_code?: string | null;
 };
 
-type ManualAddMode = "isbn" | "asin" | "manual";
-
 const EDITION_FORMAT_OPTIONS = [
     { value: "bunko", label: "Bunkobon" },
     { value: "tankobon_softcover", label: "Tankobon (softcover)" },
@@ -85,7 +84,7 @@ function getDisplayAuthor(book: LookupBook) {
         book.authorDisplay ||
         book.author_display ||
         book.authors?.join("、") ||
-        "Author information needs review"
+        "Author not listed"
     );
 }
 
@@ -118,10 +117,6 @@ function missingGlobalBookFields(book: BookSearchResult) {
     return missing;
 }
 
-function isExistingCatalogBookAddable(book: BookSearchResult) {
-    return Boolean(book.id);
-}
-
 export default function AddBookPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -135,7 +130,7 @@ export default function AddBookPage() {
     const [identifierRequestTitle, setIdentifierRequestTitle] = useState("");
     const [fallbackRequestFormat, setFallbackRequestFormat] = useState("");
     const [confirmedEditionLanguageCode, setConfirmedEditionLanguageCode] = useState("");
-    const [manualAddMode, setManualAddMode] = useState<ManualAddMode | null>(null);
+    const [manualAddMode, setManualAddMode] = useState<ManualEditionMode | null>(null);
     const [manualTitle, setManualTitle] = useState("");
     const [manualAuthor, setManualAuthor] = useState("");
     const [manualEditionFormat, setManualEditionFormat] = useState("");
@@ -292,7 +287,7 @@ export default function AddBookPage() {
         setManualPossibleMatches([]);
     }
 
-    function openManualAdd(mode: ManualAddMode, seed?: { title?: string; author?: string; format?: string }) {
+    function openManualAdd(mode: ManualEditionMode, seed?: { title?: string; author?: string; format?: string }) {
         setManualAddMode(mode);
         setManualTitle(seed?.title ?? "");
         setManualAuthor(seed?.author ?? "");
@@ -537,7 +532,7 @@ export default function AddBookPage() {
         if (
             isNewToMekuru &&
             !window.confirm(
-                `This book is new to Mekuru. An admin may need to review it before all book details show up. Add it to ${targetLibraryLabel}?`
+                `This edition is new to Mekuru. Some shared details may be filled in later. Add it to ${targetLibraryLabel}?`
             )
         ) {
             return;
@@ -816,26 +811,12 @@ export default function AddBookPage() {
     )
         ? selectedEditionLanguageCode ?? ""
         : "";
-    const normalizedManualLanguageCode = normalizeBookLanguageCode(manualLanguageCode);
-    const manualLanguageLabel = bookLanguageLabel(normalizedManualLanguageCode);
-    const selectedCommonManualLanguageCode = COMMON_BOOK_LANGUAGE_OPTIONS.some(
-        (option) => option.code === normalizedManualLanguageCode
-    )
-        ? normalizedManualLanguageCode ?? ""
-        : "";
-    const manualAddTitle =
-        manualAddMode === "isbn"
-            ? "Add this ISBN edition"
-            : manualAddMode === "asin"
-            ? "Add this Amazon edition"
-            : "Add this edition";
     const manualIdentifierLabel =
         manualAddMode === "isbn"
             ? `ISBN ${isbn.replace(/[\s-]/g, "").trim()}`
             : manualAddMode === "asin"
             ? `ASIN ${normalizeAsin(asin) ?? asin.trim()}`
             : "No ISBN or ASIN";
-    const manualFormatRequired = manualAddMode === "manual";
     const isNewToMekuru =
         !!book &&
         book.found_existing_book !== true &&
@@ -850,6 +831,18 @@ export default function AddBookPage() {
 
     return (
         <main className="mx-auto max-w-3xl px-4 py-8">
+            <header className="mb-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
+                    MEKURU Library
+                </p>
+                <h1 className="mt-2 text-3xl font-black text-stone-950">
+                    Add a Book
+                </h1>
+                <p className="mt-2 text-sm leading-6 text-stone-600">
+                    Find an edition by ISBN, ASIN, or title.
+                </p>
+            </header>
+
             <AddBookDestinationSummary
                 destinationKind={destinationKind}
                 displayName={destinationDisplayName}
@@ -865,7 +858,6 @@ export default function AddBookPage() {
                 asinLookupLoading={asinLookupLoading}
                 lookupDisabled={!isbn.trim()}
                 asinLookupDisabled={!asin.trim()}
-                libraryLabel={targetLibraryLabel}
                 onIsbnChange={(value) => {
                     setIsbn(value);
                     setLibraryNotice(null);
@@ -903,171 +895,58 @@ export default function AddBookPage() {
             </AddBookLookupCard>
 
             {manualAddMode ? (
-                <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-                        {manualIdentifierLabel}
-                    </p>
-                    <h2 className="mt-2 text-xl font-black text-stone-950">
-                        {manualAddTitle}
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 text-stone-600">
-                        Add the details you know. Page count is recommended for pacing
-                        and page-based stats, but it is optional.
-                    </p>
-
-                    <div className="mt-5 grid gap-3">
-                        <input
-                            value={manualTitle}
-                            onChange={(event) => {
-                                setManualTitle(event.target.value);
-                                setManualAddError("");
-                                setManualPossibleMatches([]);
-                            }}
-                            placeholder="Title"
-                            className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
-                        />
-
-                        <input
-                            value={manualAuthor}
-                            onChange={(event) => {
-                                setManualAuthor(event.target.value);
-                                setManualAddError("");
-                                setManualPossibleMatches([]);
-                            }}
-                            placeholder={manualAddMode === "manual" ? "Author" : "Author (optional)"}
-                            className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
-                        />
-
-                        <div className="grid gap-3 sm:grid-cols-2">
-                            <select
-                                value={manualEditionFormat}
-                                onChange={(event) => {
-                                    setManualEditionFormat(event.target.value);
-                                    setManualAddError("");
-                                    setManualPossibleMatches([]);
-                                }}
-                                className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
-                            >
-                                <option value="">
-                                    {manualFormatRequired ? "Format" : "Format (optional)"}
-                                </option>
-                                {EDITION_FORMAT_OPTIONS.map((option) => (
-                                    <option key={option.value} value={option.value}>
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </select>
-
-                            <input
-                                value={manualPageCount}
-                                onChange={(event) => {
-                                    setManualPageCount(event.target.value);
-                                    setManualAddError("");
-                                }}
-                                inputMode="numeric"
-                                placeholder="Page count (optional)"
-                                className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
-                            />
-                        </div>
-
-                        <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3">
-                            <label className="block text-sm font-black text-stone-900">
-                                What language is this edition?
-                            </label>
-                            <select
-                                value={selectedCommonManualLanguageCode}
-                                onChange={(event) => {
-                                    setManualLanguageCode(event.target.value);
-                                    setManualAddError("");
-                                    setManualPossibleMatches([]);
-                                }}
-                                className="mt-3 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
-                            >
-                                <option value="">Select edition language</option>
-                                {COMMON_BOOK_LANGUAGE_OPTIONS.map((option) => (
-                                    <option key={option.code} value={option.code}>
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </select>
-                            <input
-                                value={manualLanguageCode}
-                                onChange={(event) => {
-                                    setManualLanguageCode(event.target.value);
-                                    setManualAddError("");
-                                    setManualPossibleMatches([]);
-                                }}
-                                placeholder="Edition language code"
-                                className="mt-3 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
-                            />
-                            <p className="mt-2 text-xs leading-5 text-stone-600">
-                                {manualLanguageLabel
-                                    ? `This will be saved as ${manualLanguageLabel}.`
-                                    : "Language is saved as book metadata for this edition."}
-                            </p>
-                        </div>
-                    </div>
-
-                    {manualAddError ? (
-                        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
-                            {manualAddError}
-                        </div>
-                    ) : null}
-
-                    {manualPossibleMatches.length > 0 ? (
-                        <div className="mt-5 space-y-3">
-                            <p className="text-sm font-bold text-stone-800">
-                                Choose an existing edition, or confirm this is different.
-                            </p>
-                            {manualPossibleMatches.map((result) => (
-                                <AddBookCatalogResult
-                                    key={result.id}
-                                    result={result}
-                                    missingFields={missingGlobalBookFields(result)}
-                                    canAddExisting={true}
-                                    adding={addingExistingBookId === result.id}
-                                    requestLoading={false}
-                                    addLabel="Use This Edition"
-                                    onAdd={() => void handleAddExistingBook(result.id)}
-                                    onRequestReview={() => void handleRequestBookDetails(result)}
-                                />
-                            ))}
-                        </div>
-                    ) : null}
-
-                    <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                        <button
-                            type="button"
-                            onClick={() => void handleManualAdd(false)}
-                            disabled={manualAddLoading}
-                            className="rounded-2xl bg-amber-500 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            {manualAddLoading ? "Adding..." : "Add to Library"}
-                        </button>
-                        {manualPossibleMatches.length > 0 ? (
-                            <button
-                                type="button"
-                                onClick={() => void handleManualAdd(true)}
-                                disabled={manualAddLoading}
-                                className="rounded-2xl border border-stone-200 bg-white px-5 py-3 text-sm font-bold text-stone-700 shadow-sm transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                This Is a Different Edition
-                            </button>
-                        ) : null}
-                        <button
-                            type="button"
-                            onClick={resetManualAdd}
-                            className="rounded-2xl border border-stone-200 bg-white px-5 py-3 text-sm font-bold text-stone-700 shadow-sm transition hover:bg-stone-50"
-                        >
-                            Cancel
-                        </button>
-                    </div>
-                </section>
+                <ManualEditionForm
+                    mode={manualAddMode}
+                    identifierLabel={manualIdentifierLabel}
+                    title={manualTitle}
+                    author={manualAuthor}
+                    editionFormat={manualEditionFormat}
+                    languageCode={manualLanguageCode}
+                    pageCount={manualPageCount}
+                    error={manualAddError}
+                    loading={manualAddLoading}
+                    candidates={manualPossibleMatches.map((result) => ({
+                        result,
+                        missingFields: missingGlobalBookFields(result),
+                        adding: addingExistingBookId === result.id,
+                        requestLoading: requestLoading && requestingBookId === result.id,
+                    }))}
+                    editionFormatOptions={EDITION_FORMAT_OPTIONS}
+                    onTitleChange={(value) => {
+                        setManualTitle(value);
+                        setManualAddError("");
+                        setManualPossibleMatches([]);
+                    }}
+                    onAuthorChange={(value) => {
+                        setManualAuthor(value);
+                        setManualAddError("");
+                        setManualPossibleMatches([]);
+                    }}
+                    onEditionFormatChange={(value) => {
+                        setManualEditionFormat(value);
+                        setManualAddError("");
+                        setManualPossibleMatches([]);
+                    }}
+                    onLanguageCodeChange={(value) => {
+                        setManualLanguageCode(value);
+                        setManualAddError("");
+                        setManualPossibleMatches([]);
+                    }}
+                    onPageCountChange={(value) => {
+                        setManualPageCount(value);
+                        setManualAddError("");
+                    }}
+                    onSubmit={() => void handleManualAdd(false)}
+                    onSubmitDifferentEdition={() => void handleManualAdd(true)}
+                    onCancel={resetManualAdd}
+                    onUseExistingEdition={(bookId) => void handleAddExistingBook(bookId)}
+                    onCheckDetails={(result) => void handleRequestBookDetails(result)}
+                />
             ) : null}
 
-            <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+            <section className="mt-5 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-                    Fallback search
+                    Title search
                 </p>
                 <h2 className="mt-2 text-xl font-black text-stone-950">
                     Search by title and author
@@ -1075,11 +954,11 @@ export default function AddBookPage() {
                 <p className="mt-2 text-sm leading-6 text-stone-600">
                     Use this when you do not have an ISBN or ASIN. If Mekuru already
                     has a complete record, you can add it to {targetLibraryLabel}. If
-                    details are missing, include the author and format so the book can
-                    be reviewed accurately.
+                    details are missing, include the author and format so the edition
+                    can be added accurately.
                 </p>
 
-                <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_1fr_220px_auto]">
+                <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_200px_auto]">
                     <input
                         value={bookSearch}
                         onChange={(event) => {
@@ -1116,7 +995,7 @@ export default function AddBookPage() {
                         }}
                         className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
                     >
-                        <option value="">Format if requested</option>
+                        <option value="">Format (optional)</option>
                         {EDITION_FORMAT_OPTIONS.map((option) => (
                             <option key={option.value} value={option.value}>
                                 {option.label}
@@ -1152,7 +1031,7 @@ export default function AddBookPage() {
                                         format: fallbackRequestFormat,
                                     })
                                 }
-                                className="mt-3 rounded-xl bg-red-700 px-4 py-2 text-xs font-black text-white transition hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="mt-3 rounded-xl border border-red-200 bg-white px-4 py-2 text-xs font-black text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 Add the details manually
                             </button>
@@ -1161,10 +1040,9 @@ export default function AddBookPage() {
                 ) : null}
 
                 {bookSearchResults.length > 0 ? (
-                    <div className="mt-5 space-y-3">
+                    <div className="mt-4 space-y-3">
                         {bookSearchResults.map((result) => {
                             const missingFields = missingGlobalBookFields(result);
-                            const canAddExisting = isExistingCatalogBookAddable(result);
                             const addLabel = isStudentDestination
                                 ? "Add to Student Library"
                                 : isOtherUserDestination
@@ -1176,7 +1054,6 @@ export default function AddBookPage() {
                                     key={result.id}
                                     result={result}
                                     missingFields={missingFields}
-                                    canAddExisting={canAddExisting}
                                     adding={addingExistingBookId === result.id}
                                     requestLoading={requestLoading && requestingBookId === result.id}
                                     addLabel={addLabel}
@@ -1197,7 +1074,7 @@ export default function AddBookPage() {
                             format: fallbackRequestFormat,
                         })
                     }
-                    className="mt-5 rounded-2xl border border-stone-200 bg-white px-5 py-3 text-sm font-bold text-stone-700 shadow-sm transition hover:bg-stone-50"
+                    className="mt-4 rounded-2xl border border-stone-200 bg-white px-5 py-3 text-sm font-bold text-stone-700 shadow-sm transition hover:bg-stone-50"
                 >
                     Add a book without ISBN or ASIN
                 </button>
@@ -1278,6 +1155,6 @@ export default function AddBookPage() {
                     />
                 </LookupBookPreviewCard>
             ) : null}
-        </main >
+        </main>
     );
 }

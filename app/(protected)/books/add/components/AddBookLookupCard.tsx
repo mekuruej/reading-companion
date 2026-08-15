@@ -9,8 +9,6 @@ type AddBookLookupCardProps = {
     asinLookupLoading?: boolean;
     lookupDisabled?: boolean;
     asinLookupDisabled?: boolean;
-    libraryLabel?: string;
-    languageLabel?: string;
     onIsbnChange: (value: string) => void;
     onAsinChange: (value: string) => void;
     onAsinEditionFormatChange: (value: string) => void;
@@ -29,8 +27,6 @@ export default function AddBookLookupCard({
     asinLookupLoading = false,
     lookupDisabled = false,
     asinLookupDisabled = false,
-    libraryLabel = "your library",
-    languageLabel,
     onIsbnChange,
     onAsinChange,
     onAsinEditionFormatChange,
@@ -40,27 +36,27 @@ export default function AddBookLookupCard({
     children,
 }: AddBookLookupCardProps) {
     return (
-        <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+        <section className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-                Add Book
+                Identifier lookup
             </p>
 
-            <h1 className="mt-2 text-2xl font-black text-stone-950">
-                Add {languageLabel ? `a ${languageLabel} book` : "a book"} by ISBN or Amazon ASIN
-            </h1>
+            <h2 className="mt-2 text-xl font-black text-stone-950">
+                Find by ISBN or Amazon ASIN
+            </h2>
 
-            <p className="mt-3 text-sm leading-6 text-stone-600">
+            <p className="mt-2 text-sm leading-6 text-stone-600">
                 Enter an ISBN-13 first when you have one. Use Amazon ASIN for
                 Kindle, Audible, or other Amazon-specific editions.
             </p>
 
-            <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+            <div className="mt-4 rounded-2xl border border-stone-100 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-700">
                 If lookup does not find the exact edition, add the title here and
                 fill in the edition details manually. The title below is only for ISBN/ASIN fallback;
                 the fallback title search has its own box.
             </div>
 
-            <div className="mt-5 rounded-3xl border border-stone-100 bg-stone-50 p-4">
+            <div className="mt-4 rounded-2xl border border-stone-100 bg-stone-50 p-4">
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-stone-500">
                     ISBN edition
                 </p>
@@ -84,7 +80,7 @@ export default function AddBookLookupCard({
                 </div>
             </div>
 
-            <div className="mt-4 rounded-3xl border border-stone-100 bg-stone-50 p-4">
+            <div className="mt-3 rounded-2xl border border-stone-100 bg-stone-50 p-4">
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-stone-500">
                     Amazon edition
                 </p>

@@ -105,9 +105,8 @@ export default function LookupBookPreviewCard({
 
           {isNewToMekuru ? (
             <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
-              This book is not in Mekuru’s database yet. You can still add it to{" "}
-              {libraryLabel} now, but an admin may need to review it before all book
-              details show up.
+              This edition is new to MEKURU. You can add it to {libraryLabel} now;
+              some shared details may be filled in later.
             </p>
           ) : null}
 

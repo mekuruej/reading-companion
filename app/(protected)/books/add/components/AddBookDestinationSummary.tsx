@@ -34,18 +34,18 @@ export default function AddBookDestinationSummary({
   contextDescription,
 }: AddBookDestinationSummaryProps) {
   return (
-    <section className="mb-6 rounded-3xl border border-sky-100 bg-sky-50 px-5 py-4 shadow-sm">
+    <section className="mb-5 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
         Destination
       </p>
-      <h2 className="mt-2 text-xl font-black text-stone-950">
+      <h2 className="mt-1 text-base font-black text-stone-950">
         {destinationTitle(destinationKind, displayName)}
       </h2>
-      <p className="mt-1 text-sm leading-6 text-sky-900">
+      <p className="mt-1 text-xs leading-5 text-sky-900">
         {destinationDescription(destinationKind)}
       </p>
       {contextDescription ? (
-        <p className="mt-2 text-sm font-semibold leading-6 text-sky-950">
+        <p className="mt-1 text-xs font-semibold leading-5 text-sky-950">
           {contextDescription}
         </p>
       ) : null}
