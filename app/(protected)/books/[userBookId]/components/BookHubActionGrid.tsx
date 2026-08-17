@@ -160,55 +160,6 @@ export default function BookHubActionGrid({
 
   return (
     <div className="space-y-6 pb-2">
-      <ActionSection
-        eyebrow="Reading Companion"
-        title="Read, track, and remember this book"
-        description="The universal reading workspace for this book."
-      >
-        <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 [&>button]:h-[104px]">
-          <ActionButton
-            title="Read / Listen"
-            description={[
-              "Time reading or listening and update progress.",
-              "You can open the Reading Journal beside it if you want to take notes.",
-            ]}
-            className="bg-emerald-50 hover:bg-emerald-100"
-            onClick={onFluidReadingJustReading}
-            size="secondary"
-          />
-
-          {onStoryNotes ? (
-            <ActionButton
-              title="Reading Journal"
-              description="Track characters, plot, quotes, notes, and reviews."
-              className="bg-sky-50 hover:bg-sky-100"
-              onClick={onStoryNotes}
-              size="secondary"
-            />
-          ) : null}
-
-          {onBookStats ? (
-            <ActionButton
-              title="Book Stats"
-              description="Open time, pages, sessions, and progress for this book."
-              className="bg-yellow-50 hover:bg-yellow-100"
-              onClick={onBookStats}
-              size="secondary"
-            />
-          ) : null}
-
-          {onReadingSessions ? (
-            <ActionButton
-              title="Reading History"
-              description="Edit session records, dates, and reading history for this book."
-              className="bg-purple-50 hover:bg-purple-100"
-              onClick={onReadingSessions}
-              size="secondary"
-            />
-          ) : null}
-        </div>
-      </ActionSection>
-
       {showJapaneseLearningPromo ? (
         <JapaneseLearningPromoCard
           title="Study Japanese with this book"
@@ -290,6 +241,55 @@ export default function BookHubActionGrid({
           </div>
         </ActionSection>
       ) : null}
+
+      <ActionSection
+        eyebrow="Reading Companion"
+        title="Read, track, and remember this book"
+        description="The universal reading workspace for this book."
+      >
+        <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 [&>button]:h-[104px]">
+          <ActionButton
+            title="Read / Listen"
+            description={[
+              "Time reading or listening and update progress.",
+              "You can open the Reading Journal beside it if you want to take notes.",
+            ]}
+            className="bg-emerald-50 hover:bg-emerald-100"
+            onClick={onFluidReadingJustReading}
+            size="secondary"
+          />
+
+          {onStoryNotes ? (
+            <ActionButton
+              title="Reading Journal"
+              description="Track characters, plot, quotes, notes, and reviews."
+              className="bg-sky-50 hover:bg-sky-100"
+              onClick={onStoryNotes}
+              size="secondary"
+            />
+          ) : null}
+
+          {onBookStats ? (
+            <ActionButton
+              title="Book Stats"
+              description="Open time, pages, sessions, and progress for this book."
+              className="bg-yellow-50 hover:bg-yellow-100"
+              onClick={onBookStats}
+              size="secondary"
+            />
+          ) : null}
+
+          {onReadingSessions ? (
+            <ActionButton
+              title="Reading History"
+              description="Edit session records, dates, and reading history for this book."
+              className="bg-purple-50 hover:bg-purple-100"
+              onClick={onReadingSessions}
+              size="secondary"
+            />
+          ) : null}
+        </div>
+      </ActionSection>
 
       {showJapaneseLearningArchive ? (
         <ActionSection

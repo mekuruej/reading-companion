@@ -196,11 +196,25 @@ export default function CuriosityReadingPage() {
   }
 
   const showReadingWorkspace = viewMode === "workspace";
+  const readingJournalPanel = (
+    <ReadingJournalPanel
+      userBookId={userBookId}
+      ownerUserId={journalOwnerUserId}
+      favoriteQuotes={favoriteQuotes}
+      bookLanguageCode={bookLanguageCode}
+      currentPageNumber={journalContext.currentPageNumber}
+      selectedChapterLabel={journalContext.selectedChapterLabel}
+      selectedChapterNumber={journalContext.selectedChapterNumber}
+      compact
+      onFavoriteQuotesChange={setFavoriteQuotes}
+    />
+  );
   const curiosityExperience = (
     <CuriosityReadingExperience
       experienceMode="curiosity"
       embedded
       workspaceCompact={showReadingWorkspace}
+      workspaceAside={showReadingWorkspace ? readingJournalPanel : undefined}
       onReadingJournalContextChange={setJournalContext}
     />
   );
@@ -240,28 +254,11 @@ export default function CuriosityReadingPage() {
           </div>
         </div>
 
-        <div
-          className={
-            showReadingWorkspace
-              ? "space-y-4 lg:grid lg:grid-cols-[minmax(24rem,30rem)_minmax(0,1fr)] lg:items-start lg:gap-4 lg:space-y-0 xl:grid-cols-[minmax(26rem,32rem)_minmax(0,1fr)]"
-              : "space-y-4"
-          }
-        >
+        <div className="space-y-4">
           <div className="min-w-0">{curiosityExperience}</div>
           {showReadingWorkspace ? (
-            <div className="hidden min-w-0 lg:block">
-              <ReadingJournalPanel
-                userBookId={userBookId}
-                ownerUserId={journalOwnerUserId}
-                favoriteQuotes={favoriteQuotes}
-                bookLanguageCode={bookLanguageCode}
-                currentPageNumber={journalContext.currentPageNumber}
-                selectedChapterLabel={journalContext.selectedChapterLabel}
-                selectedChapterNumber={journalContext.selectedChapterNumber}
-                compact
-                vocabListHref={bookLanguageCode === "en" ? undefined : `/books/${encodeURIComponent(userBookId)}/words`}
-                onFavoriteQuotesChange={setFavoriteQuotes}
-              />
+            <div className="min-w-0 md:hidden">
+              {readingJournalPanel}
             </div>
           ) : null}
         </div>

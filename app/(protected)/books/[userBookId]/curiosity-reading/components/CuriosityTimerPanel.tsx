@@ -50,13 +50,13 @@ export default function CuriosityTimerPanel({
   compact = false,
 }: CuriosityTimerPanelProps) {
   return (
-    <div className={compact ? "rounded-2xl border border-stone-300 bg-white p-3" : "mb-6 rounded-2xl border border-stone-300 bg-white p-4"}>
-      <div className="mb-2 text-sm font-medium text-stone-900">
+    <div className={compact ? "rounded-2xl" : "mb-6 rounded-2xl border border-stone-300 bg-white p-4"}>
+      <div className={compact ? "mb-1 text-center text-xs font-black uppercase tracking-[0.16em] text-stone-500" : "mb-2 text-sm font-medium text-stone-900"}>
         {title}
       </div>
 
-      <div className={compact ? "mt-3 rounded-xl border border-stone-200 bg-white px-3 py-3" : "mt-4 rounded-xl border border-stone-200 bg-white px-3 py-3"}>
-        <div className={compact ? "mb-2 text-center text-xs leading-5 text-stone-600" : "mb-2 text-center text-sm text-stone-600"}>
+      <div className={compact ? "rounded-xl border border-stone-200 bg-stone-50 px-3 py-2" : "mt-4 rounded-xl border border-stone-200 bg-white px-3 py-3"}>
+        <div className={compact ? "sr-only" : "mb-2 text-center text-sm text-stone-600"}>
           {description}
         </div>
 

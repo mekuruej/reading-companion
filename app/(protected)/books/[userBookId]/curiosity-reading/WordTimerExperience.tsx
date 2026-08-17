@@ -2,7 +2,7 @@
 //
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -359,11 +359,13 @@ export function CuriosityReadingExperience({
   experienceMode = "curiosity",
   embedded = false,
   workspaceCompact = false,
+  workspaceAside,
   onReadingJournalContextChange,
 }: {
   experienceMode?: WordTimerExperienceMode;
   embedded?: boolean;
   workspaceCompact?: boolean;
+  workspaceAside?: ReactNode;
   onReadingJournalContextChange?: (context: CuriosityReadingJournalContext) => void;
 }) {
   const router = useRouter();
@@ -1838,6 +1840,8 @@ export function CuriosityReadingExperience({
     window.requestAnimationFrame(() => quickWordInputRef.current?.focus());
   }
 
+  const useCompactSessionBar = !isListeningMode;
+
   const timerPanel = (
     <CuriosityTimerPanel
       title={timerTitle}
@@ -1854,7 +1858,7 @@ export function CuriosityReadingExperience({
       sessionEndPage={sessionEndPage}
       timerSaveMessage={timerSaveMessage}
       formatTimer={formatTimer}
-      compact={workspaceCompact}
+      compact={workspaceCompact || useCompactSessionBar}
       onStart={() => {
         setSessionDate(todayYmdAppTimeZone());
         setStartTime(Date.now());
@@ -1910,67 +1914,76 @@ export function CuriosityReadingExperience({
     />
   );
 
+  const sessionBar = (
+    <section className="rounded-2xl border border-stone-200 bg-white p-3 shadow-sm">
+      <div className="grid gap-3 lg:grid-cols-[minmax(13rem,1fr)_minmax(20rem,32rem)_auto] lg:items-center">
+        <div className="flex min-w-0 items-center gap-3">
+          {bookTitle ? (
+            <Link
+              href={`/books/${encodeURIComponent(userBookId)}`}
+              className="shrink-0 rounded-xl text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
+              title={`Go to ${bookTitle} Book Hub`}
+            >
+              {bookCover ? (
+                <img
+                  src={bookCover}
+                  alt={`Go to ${bookTitle} Book Hub`}
+                  className="h-20 w-14 rounded-xl object-cover shadow-sm"
+                />
+              ) : (
+                <div className="flex h-20 w-14 items-center justify-center rounded-xl bg-stone-100 px-1 text-center text-[10px] text-stone-400">
+                  No cover
+                </div>
+              )}
+            </Link>
+          ) : null}
+
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-stone-500">
+              {pageTitle}
+            </p>
+            {bookTitle ? (
+              <div className="mt-1 truncate text-base font-black text-stone-900">
+                {bookTitle}
+              </div>
+            ) : null}
+            {curiosityProgressLine ? (
+              <p className="mt-1 truncate text-xs font-medium text-stone-500">
+                {curiosityProgressLine}
+              </p>
+            ) : null}
+            <CuriosityStatusMessage message={message} />
+          </div>
+        </div>
+
+        <div className="min-w-0">
+          {timerPanel}
+        </div>
+
+        {bookTitle ? (
+          <div className="flex flex-wrap gap-2 lg:justify-end">
+            <Link
+              href={`/books/${encodeURIComponent(userBookId)}/words`}
+              className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
+            >
+              Vocab List
+            </Link>
+            <Link
+              href={`/books/${encodeURIComponent(userBookId)}`}
+              className="rounded-xl bg-stone-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
+            >
+              Book Hub
+            </Link>
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+
   const content = (
       <>
-        {workspaceCompact ? (
-          <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-            <div className="grid gap-4 xl:grid-cols-[9.5rem_minmax(0,1fr)]">
-              <div className="space-y-3">
-                {bookTitle ? (
-                  <Link
-                    href={`/books/${encodeURIComponent(userBookId)}`}
-                    className="block rounded-2xl text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
-                    title={`Go to ${bookTitle} Book Hub`}
-                  >
-                    {bookCover ? (
-                      <img
-                        src={bookCover}
-                        alt={`Go to ${bookTitle} Book Hub`}
-                        className="mx-auto h-56 w-36 rounded-2xl object-cover shadow-lg"
-                      />
-                    ) : (
-                      <div className="mx-auto flex h-56 w-36 items-center justify-center rounded-2xl bg-stone-100 text-sm text-stone-400">
-                        No cover
-                      </div>
-                    )}
-                  </Link>
-                ) : null}
-                {timerPanel}
-              </div>
-
-              <div className="min-w-0">
-                <CuriosityPageHeader title={pageTitle} description={pageDescription} />
-                {bookTitle ? (
-                  <div className="mt-3 min-w-0">
-                    <p className="text-xs uppercase tracking-wide text-stone-500">For book</p>
-                    <div className="truncate text-base font-semibold text-stone-900">
-                      {bookTitle}
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Link
-                        href={`/books/${encodeURIComponent(userBookId)}/words`}
-                        className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
-                      >
-                        Vocab List
-                      </Link>
-                      <Link
-                        href={`/books/${encodeURIComponent(userBookId)}`}
-                        className="rounded-xl bg-stone-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
-                      >
-                        Book Hub
-                      </Link>
-                    </div>
-                    {curiosityProgressLine ? (
-                      <p className="mt-3 text-sm font-medium text-stone-500">
-                        {curiosityProgressLine}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-                <CuriosityStatusMessage message={message} />
-              </div>
-            </div>
-          </section>
+        {useCompactSessionBar ? (
+          sessionBar
         ) : (
           <>
             <CuriosityPageHeader title={pageTitle} description={pageDescription} />
@@ -2145,7 +2158,14 @@ export function CuriosityReadingExperience({
           )}
         </div>
 
-        <div className="hidden md:block">
+        <div
+          className={
+            workspaceCompact && workspaceAside
+              ? "hidden md:grid md:grid-cols-[minmax(0,1fr)_minmax(24rem,30rem)] md:items-start md:gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(26rem,32rem)]"
+              : "hidden md:block"
+          }
+        >
+        <div className="min-w-0">
         <CuriosityAddEditWordCard
           title={isEnglishBook ? "Save English Word / Phrase" : addWordTitle}
           description={
@@ -2423,6 +2443,10 @@ export function CuriosityReadingExperience({
             ) : null}
           </CuriosityRecentSessionWords>
         </CuriosityAddEditWordCard>
+        </div>
+        {workspaceCompact && workspaceAside ? (
+          <div className="min-w-0">{workspaceAside}</div>
+        ) : null}
         </div>
       </>
   );
