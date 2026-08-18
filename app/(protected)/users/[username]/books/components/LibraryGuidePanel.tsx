@@ -25,7 +25,7 @@ export default function LibraryGuidePanel({
         <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-3 py-2.5">
           <div className="text-sm font-black text-slate-950">Open a book</div>
           <p className="mt-1 text-xs leading-5 text-slate-600">
-            Click a book cover below to open its Book Hub.
+            After adding a book or books, click a book cover below to open its Book Hub.
           </p>
         </div>
 

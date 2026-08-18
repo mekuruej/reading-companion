@@ -364,6 +364,12 @@ function definitionLabel(card: StudyCard | null | undefined) {
   return "";
 }
 
+function isNonPrimaryDefinition(card: StudyCard | null | undefined) {
+  const progressDefinition = card?.progress?.definition_key?.trim();
+  if (progressDefinition) return progressDefinition !== "1";
+  return card?.definitionNumber != null && card.definitionNumber !== 1;
+}
+
 function latestWordCreatedAt(words: UserBookWordRow[]) {
   return words.reduce<string | null>((latest, word) => {
     if (!word.created_at) return latest;
@@ -955,16 +961,17 @@ function gatePromptClass(card: StudyCard | undefined) {
 function definitionGateChipClass(card: StudyCard | null | undefined) {
   const base =
     "rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-wide shadow-sm sm:px-3 sm:py-1.5 sm:text-xs";
+  const pulseClass = isNonPrimaryDefinition(card) ? " animate-pulse" : "";
 
   if (card?.activeGate === "readiness") {
-    return `${base} border-yellow-300 bg-yellow-100 text-yellow-950`;
+    return `${base} border-yellow-300 bg-yellow-100 text-yellow-950${pulseClass}`;
   }
 
   if (card?.activeGate === "meaning") {
-    return `${base} border-sky-300 bg-sky-100 text-sky-950`;
+    return `${base} border-sky-300 bg-sky-100 text-sky-950${pulseClass}`;
   }
 
-  return `${base} border-emerald-300 bg-emerald-100 text-emerald-950`;
+  return `${base} border-emerald-300 bg-emerald-100 text-emerald-950${pulseClass}`;
 }
 
 function checkModeLabel(card: StudyCard | undefined) {
