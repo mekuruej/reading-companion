@@ -249,7 +249,7 @@ export default function CuriosityReadingPage() {
                   : "text-stone-600 hover:bg-violet-50"
               }`}
             >
-              Reading Workspace
+              Reading Journal
             </button>
           </div>
         </div>

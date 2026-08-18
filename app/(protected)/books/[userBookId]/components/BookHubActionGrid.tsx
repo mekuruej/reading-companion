@@ -214,7 +214,7 @@ export default function BookHubActionGrid({
             ) : null}
           </div>
 
-          <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 [&>button]:h-[104px]">
             {canUseVocabularyList ? (
               <ActionButton
                 title="Vocabulary List"

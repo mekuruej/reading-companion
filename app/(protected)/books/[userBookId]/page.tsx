@@ -692,6 +692,7 @@ export default function BookHubPage() {
   const isTeacherContext = isTeacher || isSuperTeacher;
   const canViewBookInfoTab = isTeacherContext || isAdmin;
   const canEditBookInfo = isSuperTeacher;
+  const canCreateSharedRecordsInBookHub = false;
 
   const [editingTab, setEditingTab] = useState<EditingPanel | null>(null);
   const [saving, setSaving] = useState(false);
@@ -4513,42 +4514,50 @@ export default function BookHubPage() {
       return;
     }
 
-    const strictPublisherResult = await ensureStrictPublisherRecord();
+    const strictPublisherResult = canCreateSharedRecordsInBookHub
+      ? await ensureStrictPublisherRecord()
+      : { data: null as { id: string; name_ja: string } | null, error: null as Error | null };
     if (strictPublisherResult.error) {
       setError(strictPublisherResult.error.message);
       setSaving(false);
       return;
     }
 
-    const strictContributorResults = await Promise.all([
-      ensureStrictPersonRecord({
-        selectedId: selectedAuthorId,
-        name: authorName,
-        englishName: authorEnglishName,
-        reading: authorReading,
-        imageUrl: authorImg,
-        requireSharedRecord: requireSharedAuthorRecord,
-        roleLabel: "author",
-      }),
-      ensureStrictPersonRecord({
-        selectedId: selectedTranslatorId,
-        name: translatorName,
-        englishName: translatorEnglishName,
-        reading: translatorReading,
-        imageUrl: translatorImg,
-        requireSharedRecord: requireSharedTranslatorRecord,
-        roleLabel: "translator",
-      }),
-      ensureStrictPersonRecord({
-        selectedId: selectedIllustratorId,
-        name: illustratorName,
-        englishName: illustratorEnglishName,
-        reading: illustratorReading,
-        imageUrl: illustratorImg,
-        requireSharedRecord: requireSharedIllustratorRecord,
-        roleLabel: "illustrator",
-      }),
-    ]);
+    const strictContributorResults = canCreateSharedRecordsInBookHub
+      ? await Promise.all([
+        ensureStrictPersonRecord({
+          selectedId: selectedAuthorId,
+          name: authorName,
+          englishName: authorEnglishName,
+          reading: authorReading,
+          imageUrl: authorImg,
+          requireSharedRecord: requireSharedAuthorRecord,
+          roleLabel: "author",
+        }),
+        ensureStrictPersonRecord({
+          selectedId: selectedTranslatorId,
+          name: translatorName,
+          englishName: translatorEnglishName,
+          reading: translatorReading,
+          imageUrl: translatorImg,
+          requireSharedRecord: requireSharedTranslatorRecord,
+          roleLabel: "translator",
+        }),
+        ensureStrictPersonRecord({
+          selectedId: selectedIllustratorId,
+          name: illustratorName,
+          englishName: illustratorEnglishName,
+          reading: illustratorReading,
+          imageUrl: illustratorImg,
+          requireSharedRecord: requireSharedIllustratorRecord,
+          roleLabel: "illustrator",
+        }),
+      ])
+      : [
+        { id: null as string | null, error: null as Error | null },
+        { id: null as string | null, error: null as Error | null },
+        { id: null as string | null, error: null as Error | null },
+      ];
 
     const strictContributorError = strictContributorResults.find((item) => item.error)?.error;
     if (strictContributorError) {
@@ -5650,6 +5659,7 @@ export default function BookHubPage() {
                     userBookId={row.id}
                     book={book}
                     canEditBookInfo={canEditBookInfo}
+                    canCreateSharedRecords={canCreateSharedRecordsInBookHub}
                     isEditingBookInfo={isEditingBookInfoDetails}
                     isEditingPeople={isEditingBookInfoPeople}
                     isEditingLinks={isEditingBookInfoLinks}

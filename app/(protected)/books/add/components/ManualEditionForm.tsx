@@ -45,6 +45,7 @@ type ManualEditionFormProps = {
   pageCount: string;
   error: string;
   loading: boolean;
+  addLabel?: string;
   candidates: ManualEditionCandidate[];
   editionFormatOptions: EditionFormatOption[];
   onTitleChange: (value: string) => void;
@@ -75,6 +76,7 @@ export default function ManualEditionForm({
   pageCount,
   error,
   loading,
+  addLabel = "Add to Library",
   candidates,
   editionFormatOptions,
   onTitleChange,
@@ -241,7 +243,7 @@ export default function ManualEditionForm({
           disabled={loading}
           className="rounded-2xl bg-amber-500 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {loading ? "Adding..." : "Add to Library"}
+          {loading ? "Adding..." : addLabel}
         </button>
         {candidates.length > 0 ? (
           <button

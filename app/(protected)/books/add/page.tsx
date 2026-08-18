@@ -2,10 +2,9 @@
 // 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import AddBookLookupCard from "./components/AddBookLookupCard";
 import AddBookMessagePanel from "./components/AddBookMessagePanel";
 import AddBookLibraryNotice from "./components/AddBookLibraryNotice";
 import LookupBookPreviewCard from "./components/LookupBookPreviewCard";
@@ -68,6 +67,22 @@ type BookSearchResult = {
     language_code?: string | null;
 };
 
+type AddBookSearchMode = "title" | "isbn" | "asin";
+type TeacherGlobalDestination = "catalog_only" | "student_only" | "teacher_and_student";
+
+type TeacherStudentOption = {
+    id: string;
+    display_name: string | null;
+    username: string | null;
+};
+
+type TeacherUserSearchResult = {
+    id: string;
+    displayName: string | null;
+    username: string | null;
+    email: string | null;
+};
+
 const EDITION_FORMAT_OPTIONS = [
     { value: "bunko", label: "Bunkobon" },
     { value: "tankobon_softcover", label: "Tankobon (softcover)" },
@@ -117,13 +132,47 @@ function missingGlobalBookFields(book: BookSearchResult) {
     return missing;
 }
 
+function ModeButton({
+    mode,
+    activeMode,
+    children,
+    onSelect,
+}: {
+    mode: AddBookSearchMode;
+    activeMode: AddBookSearchMode;
+    children: string;
+    onSelect: (mode: AddBookSearchMode) => void;
+}) {
+    const selected = mode === activeMode;
+
+    return (
+        <button
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            onClick={() => onSelect(mode)}
+            className={[
+                "flex-1 rounded-2xl px-4 py-3 text-sm font-black transition",
+                selected
+                    ? "bg-stone-900 text-white shadow-sm"
+                    : "bg-white text-stone-700 hover:bg-stone-50",
+            ].join(" ")}
+        >
+            {children}
+        </button>
+    );
+}
+
 export default function AddBookPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const destination = searchParams.get("destination") ?? "";
     const addBookContext = searchParams.get("context") ?? "";
     const targetUserIdParam = searchParams.get("targetUserId")?.trim() ?? "";
+    const isTeacherGlobalContext =
+        addBookContext === "teacher-global" || destination === "teacher-global";
 
+    const [activeMode, setActiveMode] = useState<AddBookSearchMode>("title");
     const [isbn, setIsbn] = useState("");
     const [asin, setAsin] = useState("");
     const [asinEditionFormat, setAsinEditionFormat] = useState("");
@@ -142,8 +191,26 @@ export default function AddBookPage() {
     const [book, setBook] = useState<LookupBook | null>(null);
     const [currentUserId, setCurrentUserId] = useState("");
     const [currentUsername, setCurrentUsername] = useState<string | null>(null);
+    const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+    const [currentUserIsSuperTeacher, setCurrentUserIsSuperTeacher] = useState(false);
     const [targetUsername, setTargetUsername] = useState<string | null>(null);
     const [targetDisplayName, setTargetDisplayName] = useState<string | null>(null);
+    const [teacherStudents, setTeacherStudents] = useState<TeacherStudentOption[]>([]);
+    const [teacherStudentLoading, setTeacherStudentLoading] = useState(false);
+    const [teacherStudentSearch, setTeacherStudentSearch] = useState("");
+    const [allUserSearch, setAllUserSearch] = useState("");
+    const [allUserSearchResults, setAllUserSearchResults] = useState<TeacherUserSearchResult[]>([]);
+    const [allUserSearchLoading, setAllUserSearchLoading] = useState(false);
+    const [allUserSearchError, setAllUserSearchError] = useState("");
+    const [selectedAllUser, setSelectedAllUser] = useState<TeacherUserSearchResult | null>(null);
+    const [teacherDestination, setTeacherDestination] =
+        useState<TeacherGlobalDestination>("catalog_only");
+    const [selectedTeacherStudentId, setSelectedTeacherStudentId] = useState(targetUserIdParam);
+    const canUseCatalogOnly =
+        currentUserRole === "super_teacher" || currentUserIsSuperTeacher;
+    const canSearchAllUsers =
+        isTeacherGlobalContext &&
+        (currentUserRole === "super_teacher" || currentUserIsSuperTeacher);
     const [lookupLoading, setLookupLoading] = useState(false);
     const [asinLookupLoading, setAsinLookupLoading] = useState(false);
     const [addLoading, setAddLoading] = useState(false);
@@ -179,13 +246,18 @@ export default function AddBookPage() {
 
             const { data: profile } = await supabase
                 .from("profiles")
-                .select("id, username")
+                .select("id, username, role, is_super_teacher")
                 .eq("id", user.id)
                 .maybeSingle();
 
             if (!alive) return;
 
             setCurrentUsername((profile as any)?.username ?? null);
+            setCurrentUserRole((profile as any)?.role ?? null);
+            setCurrentUserIsSuperTeacher(
+                (profile as any)?.is_super_teacher === true ||
+                (profile as any)?.is_super_teacher === "true"
+            );
         }
 
         void loadCurrentUser();
@@ -231,17 +303,178 @@ export default function AddBookPage() {
         };
     }, [targetUserIdParam]);
 
-    const targetLibraryUserId = targetUserIdParam || currentUserId;
+    useEffect(() => {
+        setSelectedTeacherStudentId(targetUserIdParam);
+    }, [targetUserIdParam]);
+
+    useEffect(() => {
+        if (!currentUserId) return;
+        if (isTeacherGlobalContext && !canUseCatalogOnly && teacherDestination === "catalog_only") {
+            setTeacherDestination("student_only");
+        }
+    }, [canUseCatalogOnly, currentUserId, isTeacherGlobalContext, teacherDestination]);
+
+    useEffect(() => {
+        let alive = true;
+
+        async function loadTeacherStudents() {
+            if (!isTeacherGlobalContext || !currentUserId) {
+                setTeacherStudents([]);
+                return;
+            }
+
+            setTeacherStudentLoading(true);
+
+            try {
+                if (
+                    currentUserRole !== "teacher" &&
+                    currentUserRole !== "super_teacher" &&
+                    !currentUserIsSuperTeacher
+                ) {
+                    if (alive) setTeacherStudents([]);
+                    return;
+                }
+
+                const { data: links, error: linkError } = await supabase
+                    .from("teacher_students")
+                    .select("student_id")
+                    .eq("teacher_id", currentUserId)
+                    .is("archived_at", null);
+
+                if (linkError) throw linkError;
+
+                const studentIds = (links ?? [])
+                    .map((link: any) => link.student_id)
+                    .filter(Boolean);
+
+                if (studentIds.length === 0) {
+                    if (alive) setTeacherStudents([]);
+                    return;
+                }
+
+                const { data: students, error: studentsError } = await supabase
+                    .from("profiles")
+                    .select("id, display_name, username")
+                    .in("id", studentIds)
+                    .order("display_name", { ascending: true });
+
+                if (studentsError) throw studentsError;
+                if (!alive) return;
+                setTeacherStudents((students ?? []) as TeacherStudentOption[]);
+            } catch (studentError) {
+                console.error("Could not load teacher students for Add Book:", studentError);
+                if (alive) setTeacherStudents([]);
+            } finally {
+                if (alive) setTeacherStudentLoading(false);
+            }
+        }
+
+        void loadTeacherStudents();
+
+        return () => {
+            alive = false;
+        };
+    }, [currentUserId, currentUserIsSuperTeacher, currentUserRole, isTeacherGlobalContext]);
+
+    const isTeacherGlobalStudentDestination =
+        isTeacherGlobalContext &&
+        (teacherDestination === "student_only" || teacherDestination === "teacher_and_student");
+
+    useEffect(() => {
+        let alive = true;
+        const query = allUserSearch.trim();
+
+        if (!canSearchAllUsers || !isTeacherGlobalStudentDestination || query.length < 2) {
+            setAllUserSearchResults([]);
+            setAllUserSearchLoading(false);
+            setAllUserSearchError("");
+            return;
+        }
+
+        setAllUserSearchLoading(true);
+        setAllUserSearchError("");
+
+        const timeout = window.setTimeout(async () => {
+            try {
+                const {
+                    data: { session },
+                } = await supabase.auth.getSession();
+
+                const response = await fetch(
+                    `/api/teacher/users/search?q=${encodeURIComponent(query)}&limit=12`,
+                    {
+                        headers: session?.access_token
+                            ? { Authorization: `Bearer ${session.access_token}` }
+                            : {},
+                    }
+                );
+
+                const data = await response.json().catch(() => null);
+
+                if (!alive) return;
+
+                if (!response.ok) {
+                    setAllUserSearchResults([]);
+                    setAllUserSearchError(data?.error ?? "Could not search users.");
+                    return;
+                }
+
+                setAllUserSearchResults((data?.users ?? []) as TeacherUserSearchResult[]);
+            } catch (searchError) {
+                console.error("All-user search failed:", searchError);
+                if (alive) {
+                    setAllUserSearchResults([]);
+                    setAllUserSearchError("Could not search users.");
+                }
+            } finally {
+                if (alive) setAllUserSearchLoading(false);
+            }
+        }, 300);
+
+        return () => {
+            alive = false;
+            window.clearTimeout(timeout);
+        };
+    }, [allUserSearch, canSearchAllUsers, isTeacherGlobalStudentDestination]);
+
+    const selectedTeacherStudent = teacherStudents.find(
+        (student) => student.id === selectedTeacherStudentId
+    );
+    const selectedSearchUser =
+        selectedAllUser?.id === selectedTeacherStudentId ? selectedAllUser : null;
+    const selectedTeacherStudentName =
+        selectedTeacherStudent?.display_name ||
+        selectedTeacherStudent?.username ||
+        selectedSearchUser?.displayName ||
+        selectedSearchUser?.username ||
+        selectedSearchUser?.email ||
+        targetDisplayName ||
+        "this student";
+    const targetLibraryUserId = isTeacherGlobalStudentDestination
+        ? selectedTeacherStudentId
+        : targetUserIdParam || currentUserId;
     const isStudentDestination =
         destination === "student" && !!targetUserIdParam && targetUserIdParam !== currentUserId;
     const isOtherUserDestination =
         !isStudentDestination && !!targetUserIdParam && targetUserIdParam !== currentUserId;
-    const targetLibraryLabel = isStudentDestination
+    const targetLibraryLabel = isTeacherGlobalContext
+        ? teacherDestination === "catalog_only"
+            ? "the MEKURU Catalog"
+            : teacherDestination === "teacher_and_student"
+            ? `your library and ${selectedTeacherStudentName}'s library`
+            : `${selectedTeacherStudentName}'s library`
+        : isStudentDestination
         ? `${targetDisplayName ?? "this student"}’s library`
         : isOtherUserDestination
         ? `${targetDisplayName ?? "this user"}’s library`
         : "your library";
-    const targetLibraryShortLabel = isStudentDestination
+    const targetLibraryShortLabel = isTeacherGlobalContext
+        ? teacherDestination === "catalog_only"
+            ? "the MEKURU Catalog"
+            : teacherDestination === "teacher_and_student"
+            ? "your library and the student's library"
+            : "student library"
+        : isStudentDestination
         ? "student library"
         : isOtherUserDestination
         ? "user library"
@@ -276,6 +509,56 @@ export default function AddBookPage() {
         };
     }
 
+    function addModePayload() {
+        if (!isTeacherGlobalContext) {
+            return {
+                mode: "add_to_library",
+                targetUserId: targetLibraryUserId,
+                ...studentLessonBookPayload(),
+            };
+        }
+
+        if (teacherDestination === "catalog_only") {
+            return {
+                mode: "global_only",
+            };
+        }
+
+        return {
+            mode: teacherDestination === "teacher_and_student" ? "teacher_and_student" : "add_to_library",
+            targetUserId: selectedTeacherStudentId,
+        };
+    }
+
+    function validateDestinationReady(setMessage: (message: string) => void) {
+        if (isTeacherGlobalStudentDestination && !selectedTeacherStudentId) {
+            setMessage("Choose a student before adding this book.");
+            return false;
+        }
+
+        if (!isTeacherGlobalContext && !targetLibraryUserId) {
+            setMessage(`Sign in again before adding this book to ${targetLibraryShortLabel}.`);
+            return false;
+        }
+
+        return true;
+    }
+
+    function finalAddLabel() {
+        if (isStudentLessonBookContext) return `Add Lesson Book for ${targetDisplayName ?? "Student"}`;
+        if (!isTeacherGlobalContext) {
+            return isStudentDestination
+                ? "Add to Student Library"
+                : isOtherUserDestination
+                ? "Add to User Library"
+                : "Add to My Library";
+        }
+
+        if (teacherDestination === "catalog_only") return "Add to MEKURU Catalog";
+        if (teacherDestination === "teacher_and_student") return "Add to My Library + Student's Library";
+        return "Add to Student's Library";
+    }
+
     function resetManualAdd() {
         setManualAddMode(null);
         setManualTitle("");
@@ -307,10 +590,43 @@ export default function AddBookPage() {
             return;
         }
 
+        if (isTeacherGlobalContext) {
+            if (data?.globalOnly) {
+                setLibraryNotice({
+                    message: "Added to the MEKURU Catalog",
+                    detail: "No personal Library copy was created.",
+                    bookId: data.bookId,
+                    returnLabel: "Back to Teacher Books",
+                    returnHref: "/teacher/books",
+                });
+                return;
+            }
+
+            if (data?.teacherAndStudent) {
+                setLibraryNotice({
+                    message: `Added to your Library and ${selectedTeacherStudentName}'s Library`,
+                    detail: "No Active Lesson Book relationship was created.",
+                    userBookId: data.studentUserBookId,
+                    returnLabel: "Back to Teacher Books",
+                    returnHref: "/teacher/books",
+                });
+                return;
+            }
+
+            setLibraryNotice({
+                message: `Added to ${selectedTeacherStudentName}'s Library`,
+                detail: "No Active Lesson Book relationship was created.",
+                userBookId: data.userBookId,
+                returnLabel: "Back to Teacher Books",
+                returnHref: "/teacher/books",
+            });
+            return;
+        }
+
         if (data?.alreadyInLibrary) {
             setLibraryNotice({
-                message: `This book is already in ${targetLibraryShortLabel}.`,
-                detail: "We found the existing copy.",
+                message: `In ${targetLibraryShortLabel}`,
+                detail: "Open the existing copy.",
                 userBookId: data.userBookId,
             });
             return;
@@ -519,10 +835,7 @@ export default function AddBookPage() {
     async function handleAddToLibrary() {
         if (!book?.isbn13) return;
 
-        if (!targetLibraryUserId) {
-            setError(`Sign in again before adding this book to ${targetLibraryShortLabel}.`);
-            return;
-        }
+        if (!validateDestinationReady(setError)) return;
 
         if (needsEditionLanguageConfirmation && !selectedEditionLanguageCode) {
             setError("Choose the language of this edition before adding it.");
@@ -557,12 +870,10 @@ export default function AddBookPage() {
                 },
                 body: JSON.stringify({
                     isbn13: book.isbn13,
-                    mode: "add_to_library",
-                    targetUserId: targetLibraryUserId,
+                    ...addModePayload(),
                     languageCode: needsEditionLanguageConfirmation
                         ? selectedEditionLanguageCode
                         : undefined,
-                    ...studentLessonBookPayload(),
                 }),
             });
 
@@ -574,7 +885,7 @@ export default function AddBookPage() {
                 return;
             }
 
-            if (!data.userBookId) {
+            if (!isTeacherGlobalContext && !data.userBookId) {
                 console.error("Add book response had no userBookId:", data);
                 setError("The book was added, but Mekuru could not open the Book Hub.");
                 return;
@@ -590,10 +901,7 @@ export default function AddBookPage() {
     }
 
     async function handleAddExistingBook(bookId: string) {
-        if (!targetLibraryUserId) {
-            setBookSearchError(`Sign in again before adding this book to ${targetLibraryShortLabel}.`);
-            return;
-        }
+        if (!validateDestinationReady(setBookSearchError)) return;
 
         setAddingExistingBookId(bookId);
         setBookSearchError("");
@@ -614,8 +922,7 @@ export default function AddBookPage() {
                 },
                 body: JSON.stringify({
                     bookId,
-                    targetUserId: targetLibraryUserId,
-                    ...studentLessonBookPayload(),
+                    ...addModePayload(),
                 }),
             });
 
@@ -638,10 +945,7 @@ export default function AddBookPage() {
     async function handleManualAdd(confirmDifferentEdition = false) {
         if (!manualAddMode) return;
 
-        if (!targetLibraryUserId) {
-            setManualAddError(`Sign in again before adding this book to ${targetLibraryShortLabel}.`);
-            return;
-        }
+        if (!validateDestinationReady(setManualAddError)) return;
 
         setManualAddLoading(true);
         setManualAddError("");
@@ -668,9 +972,8 @@ export default function AddBookPage() {
                     editionFormat: manualEditionFormat || null,
                     languageCode: manualLanguageCode,
                     pageCount: manualPageCount || null,
-                    targetUserId: targetLibraryUserId,
+                    ...addModePayload(),
                     confirmDifferentEdition,
-                    ...studentLessonBookPayload(),
                 }),
             });
 
@@ -828,55 +1131,246 @@ export default function AddBookPage() {
             book.source === "openbd" ||
             book.source === "google_books" ||
             book.source === "open_library");
+    const filteredTeacherStudents = useMemo(() => {
+        const query = teacherStudentSearch.trim().toLowerCase();
+        if (!query) return teacherStudents;
+
+        return teacherStudents.filter((student) => {
+            const displayName = student.display_name ?? "";
+            const username = student.username ?? "";
+            return `${displayName} ${username}`.toLowerCase().includes(query);
+        });
+    }, [teacherStudentSearch, teacherStudents]);
+    const pageEyebrow = isTeacherGlobalContext
+        ? "Teacher Global Add"
+        : isStudentLessonBookContext
+        ? "Student Lesson Book"
+        : "MEKURU Library";
+    const pageDescription = isTeacherGlobalContext
+        ? "Find the edition first, then choose where it should go."
+        : isStudentLessonBookContext
+        ? `Adding lesson book for ${targetDisplayName ?? "this student"}.`
+        : "Find an edition by title, ISBN, or ASIN.";
+    const showContextSummary = !isTeacherGlobalContext || isStudentLessonBookContext;
+    const hasEditionToActOn =
+        Boolean(book) || Boolean(manualAddMode) || bookSearchResults.length > 0;
 
     return (
-        <main className="mx-auto max-w-3xl px-4 py-8">
+        <main className="mx-auto max-w-4xl px-4 py-8">
             <header className="mb-5">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
-                    MEKURU Library
+                    {pageEyebrow}
                 </p>
                 <h1 className="mt-2 text-3xl font-black text-stone-950">
                     Add a Book
                 </h1>
                 <p className="mt-2 text-sm leading-6 text-stone-600">
-                    Find an edition by ISBN, ASIN, or title.
+                    {pageDescription}
                 </p>
             </header>
 
-            <AddBookDestinationSummary
-                destinationKind={destinationKind}
-                displayName={destinationDisplayName}
-                contextDescription={studentLessonContextDescription}
-            />
-
-            <AddBookLookupCard
-                isbn={isbn}
-                asin={asin}
-                asinEditionFormat={asinEditionFormat}
-                identifierRequestTitle={identifierRequestTitle}
-                lookupLoading={lookupLoading}
-                asinLookupLoading={asinLookupLoading}
-                lookupDisabled={!isbn.trim()}
-                asinLookupDisabled={!asin.trim()}
-                onIsbnChange={(value) => {
-                    setIsbn(value);
-                    setLibraryNotice(null);
-                }}
-                onAsinChange={(value) => {
-                    setAsin(value);
-                    setLibraryNotice(null);
-                }}
-                onAsinEditionFormatChange={setAsinEditionFormat}
-                onIdentifierRequestTitleChange={(value) => {
-                    setIdentifierRequestTitle(value);
-                    setLibraryNotice(null);
-                }}
-                onLookup={handleLookup}
-                onAsinLookup={handleAsinLookup}
-            >
-                <AddBookMessagePanel
-                    message={error}
+            {showContextSummary ? (
+                <AddBookDestinationSummary
+                    destinationKind={destinationKind}
+                    displayName={destinationDisplayName}
+                    contextDescription={studentLessonContextDescription}
                 />
+            ) : null}
+
+            <section className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+                            Find by
+                        </p>
+                        <h2 className="mt-2 text-xl font-black text-stone-950">
+                            Choose how to identify the edition
+                        </h2>
+                    </div>
+                    <div
+                        role="tablist"
+                        aria-label="Add book search mode"
+                        className="grid grid-cols-3 gap-1 rounded-[1.35rem] border border-stone-200 bg-stone-100 p-1 sm:min-w-[330px]"
+                    >
+                        <ModeButton mode="title" activeMode={activeMode} onSelect={setActiveMode}>
+                            Title
+                        </ModeButton>
+                        <ModeButton mode="isbn" activeMode={activeMode} onSelect={setActiveMode}>
+                            ISBN
+                        </ModeButton>
+                        <ModeButton mode="asin" activeMode={activeMode} onSelect={setActiveMode}>
+                            ASIN
+                        </ModeButton>
+                    </div>
+                </div>
+
+                <div className="mt-5 rounded-2xl border border-stone-100 bg-stone-50 p-4">
+                    {activeMode === "title" ? (
+                        <>
+                            <div className="grid gap-3 lg:grid-cols-[1fr_1fr_200px_auto]">
+                                <input
+                                    value={bookSearch}
+                                    onChange={(event) => {
+                                        setBookSearch(event.target.value);
+                                        setBookSearchError("");
+                                        setLibraryNotice(null);
+                                    }}
+                                    onKeyDown={(event) => {
+                                        if (event.key === "Enter") void handleBookSearch();
+                                    }}
+                                    placeholder="Title"
+                                    className="min-w-0 flex-1 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                                />
+
+                                <input
+                                    value={bookSearchAuthor}
+                                    onChange={(event) => {
+                                        setBookSearchAuthor(event.target.value);
+                                        setBookSearchError("");
+                                        setLibraryNotice(null);
+                                    }}
+                                    onKeyDown={(event) => {
+                                        if (event.key === "Enter") void handleBookSearch();
+                                    }}
+                                    placeholder="Author (helps manual fallback)"
+                                    className="min-w-0 flex-1 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                                />
+
+                                <select
+                                    value={fallbackRequestFormat}
+                                    onChange={(event) => {
+                                        setFallbackRequestFormat(event.target.value);
+                                        setBookSearchError("");
+                                    }}
+                                    className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                                >
+                                    <option value="">Format if known</option>
+                                    {EDITION_FORMAT_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+
+                                <button
+                                    type="button"
+                                    onClick={() => void handleBookSearch()}
+                                    disabled={bookSearchLoading || !bookSearch.trim()}
+                                    className="rounded-2xl bg-stone-900 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-stone-800 disabled:opacity-50"
+                                >
+                                    {bookSearchLoading ? "Searching..." : "Search"}
+                                </button>
+                            </div>
+                            <p className="mt-2 text-xs leading-5 text-stone-500">
+                                Title search checks the MEKURU catalog. Author and format help if you need to add the edition manually.
+                            </p>
+                        </>
+                    ) : null}
+
+                    {activeMode === "isbn" ? (
+                        <>
+                            <div className="flex flex-col gap-3 sm:flex-row">
+                                <input
+                                    value={isbn}
+                                    onChange={(event) => {
+                                        setIsbn(event.target.value);
+                                        setLibraryNotice(null);
+                                    }}
+                                    onKeyDown={(event) => {
+                                        if (event.key === "Enter" && isbn.trim()) void handleLookup();
+                                    }}
+                                    placeholder="ISBN-13, e.g. 978..."
+                                    inputMode="numeric"
+                                    className="min-w-0 flex-1 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                                />
+
+                                <button
+                                    type="button"
+                                    onClick={() => void handleLookup()}
+                                    disabled={lookupLoading || !isbn.trim()}
+                                    className="rounded-2xl bg-stone-900 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-stone-800 disabled:opacity-50"
+                                >
+                                    {lookupLoading ? "Looking..." : "Look Up"}
+                                </button>
+                            </div>
+
+                            <label className="mt-3 block">
+                                <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-stone-500">
+                                    Title if lookup misses
+                                </span>
+                                <input
+                                    value={identifierRequestTitle}
+                                    onChange={(event) => {
+                                        setIdentifierRequestTitle(event.target.value);
+                                        setLibraryNotice(null);
+                                    }}
+                                    placeholder="Optional title to prefill manual details"
+                                    className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                                />
+                            </label>
+                        </>
+                    ) : null}
+
+                    {activeMode === "asin" ? (
+                        <>
+                            <div className="grid gap-3 sm:grid-cols-[1fr_220px_auto]">
+                                <input
+                                    value={asin}
+                                    onChange={(event) => {
+                                        setAsin(event.target.value);
+                                        setLibraryNotice(null);
+                                    }}
+                                    onKeyDown={(event) => {
+                                        if (event.key === "Enter" && asin.trim()) void handleAsinLookup();
+                                    }}
+                                    placeholder="Amazon ASIN, e.g. B0D4V5K3M8"
+                                    className="min-w-0 flex-1 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                                />
+
+                                <select
+                                    value={asinEditionFormat}
+                                    onChange={(event) => setAsinEditionFormat(event.target.value)}
+                                    className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                                >
+                                    <option value="">Format if known</option>
+                                    <option value="ebook">Kindle eBook</option>
+                                    <option value="audiobook">Audiobook</option>
+                                    <option value="paperback">Paperback</option>
+                                    <option value="hardcover">Hardcover</option>
+                                    <option value="other">Other</option>
+                                </select>
+
+                                <button
+                                    type="button"
+                                    onClick={() => void handleAsinLookup()}
+                                    disabled={asinLookupLoading || !asin.trim()}
+                                    className="rounded-2xl bg-stone-900 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-stone-800 disabled:opacity-50"
+                                >
+                                    {asinLookupLoading ? "Checking..." : "Check MEKURU"}
+                                </button>
+                            </div>
+                            <label className="mt-3 block">
+                                <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-stone-500">
+                                    Title if this ASIN is new
+                                </span>
+                                <input
+                                    value={identifierRequestTitle}
+                                    onChange={(event) => {
+                                        setIdentifierRequestTitle(event.target.value);
+                                        setLibraryNotice(null);
+                                    }}
+                                    placeholder="Optional title to prefill manual details"
+                                    className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                                />
+                            </label>
+                            <p className="mt-2 text-xs leading-5 text-stone-500">
+                                ASIN checks MEKURU for an existing edition. It does not search Amazon metadata.
+                            </p>
+                        </>
+                    ) : null}
+                </div>
+
+                <AddBookMessagePanel message={error} />
 
                 {libraryNotice ? (
                     <AddBookLibraryNotice
@@ -892,150 +1386,316 @@ export default function AddBookPage() {
                         }
                     />
                 ) : null}
-            </AddBookLookupCard>
-
-            {manualAddMode ? (
-                <ManualEditionForm
-                    mode={manualAddMode}
-                    identifierLabel={manualIdentifierLabel}
-                    title={manualTitle}
-                    author={manualAuthor}
-                    editionFormat={manualEditionFormat}
-                    languageCode={manualLanguageCode}
-                    pageCount={manualPageCount}
-                    error={manualAddError}
-                    loading={manualAddLoading}
-                    candidates={manualPossibleMatches.map((result) => ({
-                        result,
-                        missingFields: missingGlobalBookFields(result),
-                        adding: addingExistingBookId === result.id,
-                        requestLoading: requestLoading && requestingBookId === result.id,
-                    }))}
-                    editionFormatOptions={EDITION_FORMAT_OPTIONS}
-                    onTitleChange={(value) => {
-                        setManualTitle(value);
-                        setManualAddError("");
-                        setManualPossibleMatches([]);
-                    }}
-                    onAuthorChange={(value) => {
-                        setManualAuthor(value);
-                        setManualAddError("");
-                        setManualPossibleMatches([]);
-                    }}
-                    onEditionFormatChange={(value) => {
-                        setManualEditionFormat(value);
-                        setManualAddError("");
-                        setManualPossibleMatches([]);
-                    }}
-                    onLanguageCodeChange={(value) => {
-                        setManualLanguageCode(value);
-                        setManualAddError("");
-                        setManualPossibleMatches([]);
-                    }}
-                    onPageCountChange={(value) => {
-                        setManualPageCount(value);
-                        setManualAddError("");
-                    }}
-                    onSubmit={() => void handleManualAdd(false)}
-                    onSubmitDifferentEdition={() => void handleManualAdd(true)}
-                    onCancel={resetManualAdd}
-                    onUseExistingEdition={(bookId) => void handleAddExistingBook(bookId)}
-                    onCheckDetails={(result) => void handleRequestBookDetails(result)}
-                />
-            ) : null}
+            </section>
 
             <section className="mt-5 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-                    Title search
-                </p>
-                <h2 className="mt-2 text-xl font-black text-stone-950">
-                    Search by title and author
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-stone-600">
-                    Use this when you do not have an ISBN or ASIN. If Mekuru already
-                    has a complete record, you can add it to {targetLibraryLabel}. If
-                    details are missing, include the author and format so the edition
-                    can be added accurately.
-                </p>
-
-                <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_200px_auto]">
-                    <input
-                        value={bookSearch}
-                        onChange={(event) => {
-                            setBookSearch(event.target.value);
-                            setBookSearchError("");
-                            setLibraryNotice(null);
-                        }}
-                        onKeyDown={(event) => {
-                            if (event.key === "Enter") void handleBookSearch();
-                        }}
-                        placeholder="Title"
-                        className="min-w-0 flex-1 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
-                    />
-
-                    <input
-                        value={bookSearchAuthor}
-                        onChange={(event) => {
-                            setBookSearchAuthor(event.target.value);
-                            setBookSearchError("");
-                            setLibraryNotice(null);
-                        }}
-                        onKeyDown={(event) => {
-                            if (event.key === "Enter") void handleBookSearch();
-                        }}
-                        placeholder="Author (optional)"
-                        className="min-w-0 flex-1 rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
-                    />
-
-                    <select
-                        value={fallbackRequestFormat}
-                        onChange={(event) => {
-                            setFallbackRequestFormat(event.target.value);
-                            setBookSearchError("");
-                        }}
-                        className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
-                    >
-                        <option value="">Format (optional)</option>
-                        {EDITION_FORMAT_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                                {option.label}
-                            </option>
-                        ))}
-                    </select>
-
-                    <button
-                        type="button"
-                        onClick={() => void handleBookSearch()}
-                        disabled={bookSearchLoading || !bookSearch.trim()}
-                        className="rounded-2xl bg-stone-900 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-stone-800 disabled:opacity-50"
-                    >
-                        {bookSearchLoading ? "Searching..." : "Search"}
-                    </button>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
+                            Results / Edition
+                        </p>
+                        <h2 className="mt-2 text-xl font-black text-stone-950">
+                            Confirm the edition
+                        </h2>
+                    </div>
+                    {activeMode === "title" ? (
+                        <button
+                            type="button"
+                            onClick={() =>
+                                openManualAdd("manual", {
+                                    title: bookSearch,
+                                    author: bookSearchAuthor,
+                                    format: fallbackRequestFormat,
+                                })
+                            }
+                            className="rounded-2xl border border-stone-200 bg-white px-5 py-3 text-sm font-bold text-stone-700 shadow-sm transition hover:bg-stone-50"
+                        >
+                            Can't find it?
+                        </button>
+                    ) : null}
                 </div>
 
-                <p className="mt-2 text-xs leading-5 text-stone-500">
-                    Title and author are both hugely helpful for keeping book records accurate.
-                </p>
+                {isTeacherGlobalContext && hasEditionToActOn ? (
+                    <div className="mt-4 rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                        <p className="text-xs font-black uppercase tracking-[0.16em] text-stone-500">
+                            Add this edition to
+                        </p>
+                        <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                            {[
+                                {
+                                    value: "catalog_only" as const,
+                                    title: "MEKURU Catalog",
+                                    helper: "Create this edition without adding it to a personal Library.",
+                                },
+                                {
+                                    value: "student_only" as const,
+                                    title: "Student's Library",
+                                    helper: "Add this edition to one student's Library.",
+                                },
+                                {
+                                    value: "teacher_and_student" as const,
+                                    title: "My Library + Student's Library",
+                                    helper: "Add this edition to your Library and the student's Library.",
+                                },
+                            ].map((option) => {
+                                const selected = teacherDestination === option.value;
+                                const disabled = option.value === "catalog_only" && !canUseCatalogOnly;
+                                return (
+                                    <button
+                                        key={option.value}
+                                        type="button"
+                                        disabled={disabled}
+                                        onClick={() => setTeacherDestination(option.value)}
+                                        className={[
+                                            "rounded-2xl border p-4 text-left transition",
+                                            disabled ? "cursor-not-allowed opacity-50" : "",
+                                            selected
+                                                ? "border-stone-900 bg-white shadow-sm"
+                                                : "border-stone-200 bg-white/70 hover:bg-white",
+                                        ].join(" ")}
+                                    >
+                                        <span className="block text-sm font-black text-stone-950">
+                                            {option.title}
+                                        </span>
+                                        <span className="mt-1 block text-xs leading-5 text-stone-600">
+                                            {option.helper}
+                                            {disabled ? " Super teacher access is required." : ""}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {isTeacherGlobalStudentDestination ? (
+                            <div className="mt-4">
+                                <label className="block text-sm font-black text-stone-900">
+                                    Student
+                                </label>
+                                <input
+                                    value={teacherStudentSearch}
+                                    onChange={(event) => setTeacherStudentSearch(event.target.value)}
+                                    placeholder="Search linked students"
+                                    className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                                />
+                                <select
+                                    value={selectedTeacherStudentId}
+                                    onChange={(event) => {
+                                        setSelectedTeacherStudentId(event.target.value);
+                                        setSelectedAllUser(null);
+                                    }}
+                                    className="mt-3 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                                >
+                                    <option value="">
+                                        {teacherStudentLoading ? "Loading linked students..." : "Choose a linked student"}
+                                    </option>
+                                    {selectedTeacherStudentId &&
+                                    !filteredTeacherStudents.some((student) => student.id === selectedTeacherStudentId) ? (
+                                        <option value={selectedTeacherStudentId}>
+                                            {selectedTeacherStudentName}
+                                        </option>
+                                    ) : null}
+                                    {filteredTeacherStudents.map((student) => (
+                                        <option key={student.id} value={student.id}>
+                                            {student.display_name || student.username || "Unnamed student"}
+                                            {student.username ? ` (@${student.username})` : ""}
+                                        </option>
+                                    ))}
+                                </select>
+                                {selectedTeacherStudentId ? (
+                                    <p className="mt-2 text-xs leading-5 text-stone-600">
+                                        Selected: <span className="font-bold text-stone-900">{selectedTeacherStudentName}</span>
+                                    </p>
+                                ) : null}
+
+                                {canSearchAllUsers ? (
+                                    <div className="mt-4 rounded-2xl border border-stone-200 bg-white p-4">
+                                        <label className="block text-sm font-black text-stone-900">
+                                            Search all users
+                                        </label>
+                                        <input
+                                            value={allUserSearch}
+                                            onChange={(event) => setAllUserSearch(event.target.value)}
+                                            placeholder="Type at least 2 characters"
+                                            className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                                        />
+                                        {allUserSearch.trim().length > 0 && allUserSearch.trim().length < 2 ? (
+                                            <p className="mt-2 text-xs leading-5 text-stone-500">
+                                                Enter at least 2 characters to search.
+                                            </p>
+                                        ) : null}
+                                        {allUserSearchLoading ? (
+                                            <p className="mt-2 text-xs font-bold text-stone-500">Searching users...</p>
+                                        ) : null}
+                                        {allUserSearchError ? (
+                                            <p className="mt-2 text-xs font-bold text-red-700">{allUserSearchError}</p>
+                                        ) : null}
+                                        {!allUserSearchLoading &&
+                                        !allUserSearchError &&
+                                        allUserSearch.trim().length >= 2 &&
+                                        allUserSearchResults.length === 0 ? (
+                                            <p className="mt-2 text-xs leading-5 text-stone-500">No matching users found.</p>
+                                        ) : null}
+                                        {allUserSearchResults.length > 0 ? (
+                                            <div className="mt-3 grid gap-2">
+                                                {allUserSearchResults.map((user) => {
+                                                    const resultName =
+                                                        user.displayName || user.username || user.email || "Unnamed user";
+                                                    const resultDetail = [
+                                                        user.email,
+                                                        user.username ? `@${user.username}` : null,
+                                                    ].filter(Boolean).join(" · ");
+                                                    const selected = selectedTeacherStudentId === user.id;
+
+                                                    return (
+                                                        <button
+                                                            key={user.id}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setSelectedTeacherStudentId(user.id);
+                                                                setSelectedAllUser(user);
+                                                            }}
+                                                            className={[
+                                                                "rounded-2xl border px-4 py-3 text-left transition",
+                                                                selected
+                                                                    ? "border-stone-900 bg-stone-50"
+                                                                    : "border-stone-200 bg-white hover:bg-stone-50",
+                                                            ].join(" ")}
+                                                        >
+                                                            <span className="block text-sm font-black text-stone-950">
+                                                                {resultName}
+                                                            </span>
+                                                            {resultDetail ? (
+                                                                <span className="mt-1 block text-xs leading-5 text-stone-600">
+                                                                    {resultDetail}
+                                                                </span>
+                                                            ) : null}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                ) : null}
+                            </div>
+                        ) : null}
+                    </div>
+                ) : null}
+
+                {book ? (
+                    <LookupBookPreviewCard
+                        title={book.title ?? "Untitled book"}
+                        subtitle={book.subtitle}
+                        coverUrl={coverUrl}
+                        displayAuthor={displayAuthor}
+                        publisher={book.publisher}
+                        publishedDate={publishedDate}
+                        pageCount={pageCount}
+                        isbn13={book.isbn13}
+                        languageCode={book.language_code}
+                        isNewToMekuru={isNewToMekuru}
+                        libraryLabel={targetLibraryLabel}
+                    >
+                        {needsEditionLanguageConfirmation ? (
+                            <div className="mt-4 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3">
+                                <label className="block text-sm font-black text-stone-900">
+                                    What language is this edition?
+                                </label>
+                                <select
+                                    value={selectedCommonEditionLanguageCode}
+                                    onChange={(event) => {
+                                        setConfirmedEditionLanguageCode(event.target.value);
+                                        setError("");
+                                    }}
+                                    className="mt-3 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                                >
+                                    <option value="">Select edition language</option>
+                                    {COMMON_BOOK_LANGUAGE_OPTIONS.map((option) => (
+                                        <option key={option.code} value={option.code}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <input
+                                    value={confirmedEditionLanguageCode}
+                                    onChange={(event) => {
+                                        setConfirmedEditionLanguageCode(event.target.value);
+                                        setError("");
+                                    }}
+                                    placeholder="Edition language code"
+                                    className="mt-3 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                                />
+                                <p className="mt-2 text-xs leading-5 text-stone-600">
+                                    {selectedEditionLanguageLabel
+                                        ? `This will be saved as ${selectedEditionLanguageLabel}.`
+                                        : "Language is saved as book metadata for this ISBN edition."}
+                                </p>
+                            </div>
+                        ) : null}
+
+                        <AddBookActionRow
+                            addLoading={addLoading}
+                            disabled={needsEditionLanguageConfirmation && !selectedEditionLanguageCode}
+                            addLabel={finalAddLabel()}
+                            onAdd={handleAddToLibrary}
+                            onCancel={() => router.push(targetLibraryHref)}
+                        />
+                    </LookupBookPreviewCard>
+                ) : null}
+
+                {manualAddMode ? (
+                    <ManualEditionForm
+                        mode={manualAddMode}
+                        identifierLabel={manualIdentifierLabel}
+                        title={manualTitle}
+                        author={manualAuthor}
+                        editionFormat={manualEditionFormat}
+                        languageCode={manualLanguageCode}
+                        pageCount={manualPageCount}
+                        error={manualAddError}
+                        loading={manualAddLoading}
+                        addLabel={finalAddLabel()}
+                        candidates={manualPossibleMatches.map((result) => ({
+                            result,
+                            missingFields: missingGlobalBookFields(result),
+                            adding: addingExistingBookId === result.id,
+                            requestLoading: requestLoading && requestingBookId === result.id,
+                        }))}
+                        editionFormatOptions={EDITION_FORMAT_OPTIONS}
+                        onTitleChange={(value) => {
+                            setManualTitle(value);
+                            setManualAddError("");
+                            setManualPossibleMatches([]);
+                        }}
+                        onAuthorChange={(value) => {
+                            setManualAuthor(value);
+                            setManualAddError("");
+                            setManualPossibleMatches([]);
+                        }}
+                        onEditionFormatChange={(value) => {
+                            setManualEditionFormat(value);
+                            setManualAddError("");
+                            setManualPossibleMatches([]);
+                        }}
+                        onLanguageCodeChange={(value) => {
+                            setManualLanguageCode(value);
+                            setManualAddError("");
+                            setManualPossibleMatches([]);
+                        }}
+                        onPageCountChange={(value) => {
+                            setManualPageCount(value);
+                            setManualAddError("");
+                        }}
+                        onSubmit={() => void handleManualAdd(false)}
+                        onSubmitDifferentEdition={() => void handleManualAdd(true)}
+                        onCancel={resetManualAdd}
+                        onUseExistingEdition={(bookId) => void handleAddExistingBook(bookId)}
+                        onCheckDetails={(result) => void handleRequestBookDetails(result)}
+                    />
+                ) : null}
 
                 {bookSearchError ? (
-                    <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                    <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
                         <p>{bookSearchError}</p>
-
-                        {bookSearch.trim() || normalizeAsin(asin) ? (
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    openManualAdd(normalizeAsin(asin) ? "asin" : "manual", {
-                                        title: identifierRequestTitle || bookSearch,
-                                        author: bookSearchAuthor,
-                                        format: fallbackRequestFormat,
-                                    })
-                                }
-                                className="mt-3 rounded-xl border border-red-200 bg-white px-4 py-2 text-xs font-black text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                Add the details manually
-                            </button>
-                        ) : null}
                     </div>
                 ) : null}
 
@@ -1043,11 +1703,6 @@ export default function AddBookPage() {
                     <div className="mt-4 space-y-3">
                         {bookSearchResults.map((result) => {
                             const missingFields = missingGlobalBookFields(result);
-                            const addLabel = isStudentDestination
-                                ? "Add to Student Library"
-                                : isOtherUserDestination
-                                ? "Add to User Library"
-                                : "Add to My Library";
 
                             return (
                                 <AddBookCatalogResult
@@ -1056,7 +1711,7 @@ export default function AddBookPage() {
                                     missingFields={missingFields}
                                     adding={addingExistingBookId === result.id}
                                     requestLoading={requestLoading && requestingBookId === result.id}
-                                    addLabel={addLabel}
+                                    addLabel={finalAddLabel()}
                                     onAdd={() => void handleAddExistingBook(result.id)}
                                     onRequestReview={() => void handleRequestBookDetails(result)}
                                 />
@@ -1065,96 +1720,14 @@ export default function AddBookPage() {
                     </div>
                 ) : null}
 
-                <button
-                    type="button"
-                    onClick={() =>
-                        openManualAdd("manual", {
-                            title: bookSearch,
-                            author: bookSearchAuthor,
-                            format: fallbackRequestFormat,
-                        })
-                    }
-                    className="mt-4 rounded-2xl border border-stone-200 bg-white px-5 py-3 text-sm font-bold text-stone-700 shadow-sm transition hover:bg-stone-50"
-                >
-                    Add a book without ISBN or ASIN
-                </button>
-
+                {!book && !manualAddMode && bookSearchResults.length === 0 && !bookSearchError ? (
+                    <div className="mt-4 rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-8 text-center">
+                        <p className="text-sm font-bold text-stone-700">
+                            Search first, then confirm the exact edition here.
+                        </p>
+                    </div>
+                ) : null}
             </section>
-
-            {book ? (
-                <LookupBookPreviewCard
-                    title={book.title ?? "Untitled book"}
-                    subtitle={book.subtitle}
-                    coverUrl={coverUrl}
-                    displayAuthor={displayAuthor}
-                    publisher={book.publisher}
-                    publishedDate={publishedDate}
-                    pageCount={pageCount}
-                    isbn13={book.isbn13}
-                    languageCode={book.language_code}
-                    isNewToMekuru={isNewToMekuru}
-                    libraryLabel={targetLibraryLabel}
-                >
-                    {needsEditionLanguageConfirmation ? (
-                        <div className="mt-4 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3">
-                            <label className="block text-sm font-black text-stone-900">
-                                What language is this edition?
-                            </label>
-                            <select
-                                value={selectedCommonEditionLanguageCode}
-                                onChange={(event) => {
-                                    setConfirmedEditionLanguageCode(event.target.value);
-                                    setError("");
-                                }}
-                                className="mt-3 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
-                            >
-                                <option value="">Select edition language</option>
-                                {COMMON_BOOK_LANGUAGE_OPTIONS.map((option) => (
-                                    <option key={option.code} value={option.code}>
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </select>
-                            <input
-                                value={confirmedEditionLanguageCode}
-                                onChange={(event) => {
-                                    setConfirmedEditionLanguageCode(event.target.value);
-                                    setError("");
-                                }}
-                                placeholder="Edition language code"
-                                className="mt-3 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
-                            />
-                            {selectedEditionLanguageLabel ? (
-                                <p className="mt-2 text-xs leading-5 text-stone-600">
-                                    This will be saved as the book edition language:{" "}
-                                    <span className="font-bold text-stone-800">
-                                        {selectedEditionLanguageLabel}
-                                    </span>
-                                    .
-                                </p>
-                            ) : (
-                                <p className="mt-2 text-xs leading-5 text-stone-600">
-                                    Language is saved as book metadata for this ISBN edition.
-                                </p>
-                            )}
-                        </div>
-                    ) : null}
-
-                    <AddBookActionRow
-                        addLoading={addLoading}
-                        disabled={needsEditionLanguageConfirmation && !selectedEditionLanguageCode}
-                        addLabel={
-                            isStudentDestination
-                                ? "Add to Student Library"
-                                : isOtherUserDestination
-                                ? "Add to User Library"
-                                : "Add to My Library"
-                        }
-                        onAdd={handleAddToLibrary}
-                        onCancel={() => router.push(targetLibraryHref)}
-                    />
-                </LookupBookPreviewCard>
-            ) : null}
         </main>
     );
 }

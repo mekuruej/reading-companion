@@ -40,6 +40,13 @@ function isSuperTeacherFlag(value: unknown) {
   return value === true || value === "true";
 }
 
+function isElevatedCatalogUser(profile: { role?: string | null; is_super_teacher?: boolean | string | null } | null) {
+  return (
+    profile?.role === "super_teacher" ||
+    isSuperTeacherFlag(profile?.is_super_teacher)
+  );
+}
+
 async function getProfile(userId: string) {
   const { data, error } = await supabaseAdmin
     .from("profiles")
@@ -70,7 +77,16 @@ async function canAddToTargetUser({
     actorProfile?.role === "super_teacher" ||
     isSuperTeacherFlag(actorProfile?.is_super_teacher);
 
-  if (isSuperTeacher) return true;
+  if (isSuperTeacher) {
+    const { data, error } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("id", targetUserId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return Boolean(data);
+  }
   if (actorProfile?.role !== "teacher") return false;
 
   const { data, error } = await supabaseAdmin
@@ -103,17 +119,136 @@ async function getBookForDirectAdd(bookId: string) {
     .maybeSingle();
 }
 
-export async function POST(request: Request) {
-  const auth = await getAuthenticatedUser(request);
-  if ("error" in auth) {
-    return NextResponse.json(
-      { error: "You need to be logged in to add a book." },
-      { status: auth.status }
-    );
+async function addBookToLibrary({
+  authUserId,
+  targetUserId,
+  bookId,
+  actorProfile,
+  isStudentLessonBookContext,
+  studentId,
+}: {
+  authUserId: string;
+  targetUserId: string;
+  bookId: string;
+  actorProfile: { role?: string | null; is_super_teacher?: boolean | string | null } | null;
+  isStudentLessonBookContext: boolean;
+  studentId: string;
+}) {
+  const { data: existingUserBook, error: existingUserBookError } =
+    await supabaseAdmin
+      .from("user_books")
+      .select("id")
+      .eq("user_id", targetUserId)
+      .eq("book_id", bookId)
+      .maybeSingle();
+
+  if (existingUserBookError) throw existingUserBookError;
+
+  let userBookId = existingUserBook?.id ?? null;
+  let alreadyInLibrary = Boolean(existingUserBook);
+
+  if (!userBookId) {
+    const { data: insertedUserBook, error: insertUserBookError } = await supabaseAdmin
+      .from("user_books")
+      .insert({
+        user_id: targetUserId,
+        book_id: bookId,
+      })
+      .select("id")
+      .single();
+
+    if (insertUserBookError) throw insertUserBookError;
+    userBookId = insertedUserBook.id;
+    alreadyInLibrary = false;
   }
+
+  let lessonBook = null;
+
+  if (isStudentLessonBookContext) {
+    lessonBook = await ensureStudentLessonBook({
+      supabase: supabaseAdmin,
+      teacherId: authUserId,
+      studentId,
+      userBookId,
+      teacherProfile: actorProfile,
+    });
+  }
+
+  return {
+    userBookId,
+    alreadyInLibrary,
+    lessonBook,
+  };
+}
+
+async function addBookToTeacherAndStudentLibraries({
+  authUserId,
+  studentUserId,
+  bookId,
+  actorProfile,
+}: {
+  authUserId: string;
+  studentUserId: string;
+  bookId: string;
+  actorProfile: { role?: string | null; is_super_teacher?: boolean | string | null } | null;
+}) {
+  const canAddToStudent = await canAddToTargetUser({
+    actorId: authUserId,
+    targetUserId: studentUserId,
+    actorProfile,
+  });
+
+  if (!canAddToStudent) {
+    const error = new Error("You do not have permission to add books to that student.");
+    (error as any).status = 403;
+    throw error;
+  }
+
+  const teacherResult = await addBookToLibrary({
+    authUserId,
+    targetUserId: authUserId,
+    bookId,
+    actorProfile,
+    isStudentLessonBookContext: false,
+    studentId: "",
+  });
+  const studentResult = await addBookToLibrary({
+    authUserId,
+    targetUserId: studentUserId,
+    bookId,
+    actorProfile,
+    isStudentLessonBookContext: false,
+    studentId: "",
+  });
+
+  return {
+    teacherUserBookId: teacherResult.userBookId,
+    studentUserBookId: studentResult.userBookId,
+    userBookId: studentResult.userBookId,
+    alreadyInTeacherLibrary: teacherResult.alreadyInLibrary,
+    alreadyInStudentLibrary: studentResult.alreadyInLibrary,
+    alreadyInLibrary: studentResult.alreadyInLibrary,
+  };
+}
+
+export async function POST(request: Request) {
+  try {
+    const auth = await getAuthenticatedUser(request);
+    if ("error" in auth) {
+      return NextResponse.json(
+        { error: "You need to be logged in to add a book." },
+        { status: auth.status }
+      );
+    }
 
   const body = await request.json().catch(() => null);
   const bookId = typeof body?.bookId === "string" ? body.bookId.trim() : "";
+  const mode =
+    body?.mode === "global_only"
+      ? "global_only"
+      : body?.mode === "teacher_and_student"
+      ? "teacher_and_student"
+      : "add_to_library";
   const context = typeof body?.context === "string" ? body.context.trim() : "";
   const studentId = typeof body?.studentId === "string" ? body.studentId.trim() : "";
   const targetUserId =
@@ -133,18 +268,42 @@ export async function POST(request: Request) {
     );
   }
 
-  const actorProfile = await getProfile(auth.user.id);
-  const canAdd = await canAddToTargetUser({
-    actorId: auth.user.id,
-    targetUserId,
-    actorProfile,
-  });
-
-  if (!canAdd) {
+  if (isStudentLessonBookContext && mode !== "add_to_library") {
     return NextResponse.json(
-      { error: "You do not have permission to add books to that user." },
+      { error: "Student lesson book context cannot use this add mode." },
+      { status: 400 }
+    );
+  }
+
+  const actorProfile = await getProfile(auth.user.id);
+
+  if (mode === "global_only" && !isElevatedCatalogUser(actorProfile)) {
+    return NextResponse.json(
+      { error: "Only super teachers can create global catalog books without adding them to a library." },
       { status: 403 }
     );
+  }
+
+  if (mode === "teacher_and_student" && targetUserId === auth.user.id) {
+    return NextResponse.json(
+      { error: "Choose a student before adding this book." },
+      { status: 400 }
+    );
+  }
+
+  if (mode === "add_to_library") {
+    const canAdd = await canAddToTargetUser({
+      actorId: auth.user.id,
+      targetUserId,
+      actorProfile,
+    });
+
+    if (!canAdd) {
+      return NextResponse.json(
+        { error: "You do not have permission to add books to that user." },
+        { status: 403 }
+      );
+    }
   }
 
   const { data: book, error: bookError } = await getBookForDirectAdd(bookId);
@@ -161,96 +320,62 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Book not found." }, { status: 404 });
   }
 
-  const { data: existingUserBook, error: existingUserBookError } =
-    await supabaseAdmin
-      .from("user_books")
-      .select("id")
-      .eq("user_id", targetUserId)
-      .eq("book_id", bookId)
-      .maybeSingle();
-
-  if (existingUserBookError) {
-    console.error("Error checking user library:", existingUserBookError);
-    return NextResponse.json(
-      { error: "Something went wrong while checking the library." },
-      { status: 500 }
-    );
-  }
-
-  if (existingUserBook) {
-    let lessonBook = null;
-
-    if (isStudentLessonBookContext) {
-      try {
-        lessonBook = await ensureStudentLessonBook({
-          supabase: supabaseAdmin,
-          teacherId: auth.user.id,
-          studentId,
-          userBookId: existingUserBook.id,
-          teacherProfile: actorProfile,
-        });
-      } catch (error) {
-        if (error instanceof StudentLessonBookError) {
-          return NextResponse.json(
-            { error: error.message },
-            { status: error.status }
-          );
-        }
-        throw error;
-      }
-    }
-
+  if (mode === "global_only") {
     return NextResponse.json({
-      userBookId: existingUserBook.id,
+      userBookId: null,
       bookId,
-      alreadyInLibrary: true,
-      lessonBook,
+      alreadyInLibrary: false,
+      globalOnly: true,
     });
   }
 
-  const { data: insertedUserBook, error: insertUserBookError } = await supabaseAdmin
-    .from("user_books")
-    .insert({
-      user_id: targetUserId,
-      book_id: bookId,
-    })
-    .select("id")
-    .single();
+  if (mode === "teacher_and_student") {
+    const libraryResult = await addBookToTeacherAndStudentLibraries({
+      authUserId: auth.user.id,
+      studentUserId: targetUserId,
+      bookId,
+      actorProfile,
+    });
 
-  if (insertUserBookError) {
-    console.error("Error adding existing book to user library:", insertUserBookError);
+    return NextResponse.json({
+      ...libraryResult,
+      bookId,
+      teacherAndStudent: true,
+    });
+  }
+
+  const libraryResult = await addBookToLibrary({
+    authUserId: auth.user.id,
+    targetUserId,
+    bookId,
+    actorProfile,
+    isStudentLessonBookContext,
+    studentId,
+  });
+
+  return NextResponse.json({
+    ...libraryResult,
+    bookId,
+  });
+  } catch (error) {
+    if (error instanceof StudentLessonBookError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status }
+      );
+    }
+
+    if ((error as any)?.status) {
+      return NextResponse.json(
+        { error: (error as Error).message },
+        { status: (error as any).status }
+      );
+    }
+
+    console.error("Add existing book failed:", error);
     return NextResponse.json(
-      { error: "Something went wrong while adding this book to the library." },
+      { error: "Something went wrong while adding this book." },
       { status: 500 }
     );
   }
-
-  let lessonBook = null;
-
-  if (isStudentLessonBookContext) {
-    try {
-      lessonBook = await ensureStudentLessonBook({
-        supabase: supabaseAdmin,
-        teacherId: auth.user.id,
-        studentId,
-        userBookId: insertedUserBook.id,
-        teacherProfile: actorProfile,
-      });
-    } catch (error) {
-      if (error instanceof StudentLessonBookError) {
-        return NextResponse.json(
-          { error: error.message },
-          { status: error.status }
-        );
-      }
-      throw error;
-    }
-  }
-
-  return NextResponse.json({
-    userBookId: insertedUserBook.id,
-    bookId,
-    alreadyInLibrary: false,
-    lessonBook,
-  });
 }

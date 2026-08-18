@@ -88,7 +88,7 @@ export default function AddBookCatalogResult({
         </div>
         {hasMissingDetails ? (
           <p className="mt-2 text-xs leading-5 text-stone-600">
-            Some book details are missing ({missingFields.join(", ")}). You can still add this book.
+            Some details are missing. You can still add this book.
           </p>
         ) : null}
       </div>

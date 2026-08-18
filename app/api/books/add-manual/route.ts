@@ -67,6 +67,13 @@ function isSuperTeacherFlag(value: unknown) {
   return value === true || value === "true";
 }
 
+function isElevatedCatalogUser(profile: { role?: string | null; is_super_teacher?: boolean | string | null } | null) {
+  return (
+    profile?.role === "super_teacher" ||
+    isSuperTeacherFlag(profile?.is_super_teacher)
+  );
+}
+
 async function getProfile(userId: string) {
   const { data, error } = await supabaseAdmin
     .from("profiles")
@@ -97,7 +104,16 @@ async function canAddToTargetUser({
     actorProfile?.role === "super_teacher" ||
     isSuperTeacherFlag(actorProfile?.is_super_teacher);
 
-  if (isSuperTeacher) return true;
+  if (isSuperTeacher) {
+    const { data, error } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("id", targetUserId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return Boolean(data);
+  }
   if (actorProfile?.role !== "teacher") return false;
 
   const { data, error } = await supabaseAdmin
@@ -171,6 +187,56 @@ async function addBookToLibrary({
     userBookId,
     alreadyInLibrary,
     lessonBook,
+  };
+}
+
+async function addBookToTeacherAndStudentLibraries({
+  authUserId,
+  studentUserId,
+  bookId,
+  actorProfile,
+}: {
+  authUserId: string;
+  studentUserId: string;
+  bookId: string;
+  actorProfile: { role?: string | null; is_super_teacher?: boolean | string | null } | null;
+}) {
+  const canAddToStudent = await canAddToTargetUser({
+    actorId: authUserId,
+    targetUserId: studentUserId,
+    actorProfile,
+  });
+
+  if (!canAddToStudent) {
+    const error = new Error("You do not have permission to add books to that student.");
+    (error as any).status = 403;
+    throw error;
+  }
+
+  const teacherResult = await addBookToLibrary({
+    authUserId,
+    targetUserId: authUserId,
+    bookId,
+    actorProfile,
+    isStudentLessonBookContext: false,
+    studentId: "",
+  });
+  const studentResult = await addBookToLibrary({
+    authUserId,
+    targetUserId: studentUserId,
+    bookId,
+    actorProfile,
+    isStudentLessonBookContext: false,
+    studentId: "",
+  });
+
+  return {
+    teacherUserBookId: teacherResult.userBookId,
+    studentUserBookId: studentResult.userBookId,
+    userBookId: studentResult.userBookId,
+    alreadyInTeacherLibrary: teacherResult.alreadyInLibrary,
+    alreadyInStudentLibrary: studentResult.alreadyInLibrary,
+    alreadyInLibrary: studentResult.alreadyInLibrary,
   };
 }
 
@@ -253,6 +319,12 @@ export async function POST(request: Request) {
     const editionFormat = cleanOptionalText(body?.editionFormat ?? body?.edition_format);
     const pageCountResult = cleanPageCount(body?.pageCount ?? body?.page_count);
     const confirmDifferentEdition = body?.confirmDifferentEdition === true;
+    const mode =
+      body?.mode === "global_only"
+        ? "global_only"
+        : body?.mode === "teacher_and_student"
+        ? "teacher_and_student"
+        : "add_to_library";
     const context = cleanText(body?.context);
     const studentId = cleanText(body?.studentId);
     const targetUserId =
@@ -278,21 +350,68 @@ export async function POST(request: Request) {
     }
 
     const actorProfile = await getProfile(auth.user.id);
-    const canAdd = await canAddToTargetUser({
-      actorId: auth.user.id,
-      targetUserId,
-      actorProfile,
-    });
-
-    if (!canAdd) {
+    if (isStudentLessonBookContext && mode !== "add_to_library") {
       return NextResponse.json(
-        { error: "You do not have permission to add books to that user." },
+        { error: "Student lesson book context cannot use this add mode." },
+        { status: 400 }
+      );
+    }
+
+    if (mode === "global_only" && !isElevatedCatalogUser(actorProfile)) {
+      return NextResponse.json(
+        { error: "Only super teachers can create global catalog books without adding them to a library." },
         { status: 403 }
       );
     }
 
+    if (mode === "teacher_and_student" && targetUserId === auth.user.id) {
+      return NextResponse.json(
+        { error: "Choose a student before adding this book." },
+        { status: 400 }
+      );
+    }
+
+    if (mode === "add_to_library") {
+      const canAdd = await canAddToTargetUser({
+        actorId: auth.user.id,
+        targetUserId,
+        actorProfile,
+      });
+
+      if (!canAdd) {
+        return NextResponse.json(
+          { error: "You do not have permission to add books to that user." },
+          { status: 403 }
+        );
+      }
+    }
+
     const existingIdentifierBookId = await findIdentifierBook({ isbn13, asin });
     if (existingIdentifierBookId) {
+      if (mode === "global_only") {
+        return NextResponse.json({
+          userBookId: null,
+          bookId: existingIdentifierBookId,
+          alreadyInLibrary: false,
+          globalOnly: true,
+        });
+      }
+
+      if (mode === "teacher_and_student") {
+        const libraryResult = await addBookToTeacherAndStudentLibraries({
+          authUserId: auth.user.id,
+          studentUserId: targetUserId,
+          bookId: existingIdentifierBookId,
+          actorProfile,
+        });
+
+        return NextResponse.json({
+          ...libraryResult,
+          bookId: existingIdentifierBookId,
+          teacherAndStudent: true,
+        });
+      }
+
       const libraryResult = await addBookToLibrary({
         authUserId: auth.user.id,
         targetUserId,
@@ -406,6 +525,30 @@ export async function POST(request: Request) {
       );
     }
 
+    if (mode === "global_only") {
+      return NextResponse.json({
+        userBookId: null,
+        bookId,
+        alreadyInLibrary: false,
+        globalOnly: true,
+      });
+    }
+
+    if (mode === "teacher_and_student") {
+      const libraryResult = await addBookToTeacherAndStudentLibraries({
+        authUserId: auth.user.id,
+        studentUserId: targetUserId,
+        bookId,
+        actorProfile,
+      });
+
+      return NextResponse.json({
+        ...libraryResult,
+        bookId,
+        teacherAndStudent: true,
+      });
+    }
+
     const libraryResult = await addBookToLibrary({
       authUserId: auth.user.id,
       targetUserId,
@@ -424,6 +567,13 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: error.message },
         { status: error.status }
+      );
+    }
+
+    if ((error as any)?.status) {
+      return NextResponse.json(
+        { error: (error as Error).message },
+        { status: (error as any).status }
       );
     }
 

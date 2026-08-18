@@ -27,6 +27,13 @@ const BOOK_TYPE_OPTIONS = [
     { value: "", label: "Choose a book type" },
     ...SHARED_BOOK_TYPE_OPTIONS,
 ];
+const VALID_BOOK_TYPE_VALUES = new Set(SHARED_BOOK_TYPE_OPTIONS.map((option) => option.value));
+
+function normalizeBookTypeForSave(value: string) {
+    const cleaned = cleanText(value);
+    if (!cleaned) return null;
+    return VALID_BOOK_TYPE_VALUES.has(cleaned as any) ? cleaned : "__invalid__";
+}
 
 type BookRow = {
     id: string;
@@ -374,6 +381,9 @@ export default function TeacherAddBookPage() {
                 await loadBook(bookId);
             } else if (requestId) {
                 await loadBookRequest(requestId);
+            } else {
+                router.replace(`/books/add?context=teacher-global${sourceParam ? `&from=${encodeURIComponent(sourceParam)}` : ""}`);
+                return;
             }
 
             setLoading(false);
@@ -929,6 +939,12 @@ export default function TeacherAddBookPage() {
             return;
         }
 
+        const cleanBookType = normalizeBookTypeForSave(bookType);
+        if (cleanBookType === "__invalid__") {
+            setMessage("Choose a valid book type before saving.");
+            return;
+        }
+
         const cleanPageCount = pageCount.trim()
             ? Number(pageCount.replace(/[^0-9]/g, ""))
             : null;
@@ -954,7 +970,7 @@ export default function TeacherAddBookPage() {
                     isbn13: cleanIsbn13 || null,
                     asin: normalizedAsin,
                     cover_url: cleanText(coverUrl),
-                    book_type: cleanText(bookType),
+                    book_type: cleanBookType,
 
                     author: cleanText(author),
                     author_english_name: cleanText(authorEnglishName),

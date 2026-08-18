@@ -326,6 +326,11 @@ export default function StoryNotesPage() {
                   ? "Use this as your personal notebook while you read: characters, plot points, detective notes, settings, cultural details, quotes, and notes you want to remember."
                   : "Use this as your personal notebook while you read: characters, plot points, quotes, notes, and anything else you want to remember."}
               </p>
+              {hasJapaneseLearningJournalTabs ? (
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">
+                  Reading Journal is available in split screen with Follow-Along, Save Words, and Read/Listen.
+                </p>
+              ) : null}
             </div>
           </div>
         </section>

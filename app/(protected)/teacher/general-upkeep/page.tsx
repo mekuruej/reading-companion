@@ -18,9 +18,9 @@ type UpkeepCard = {
 const baseUpkeepCards: UpkeepCard[] = [
   {
     title: "Global Book Entry",
-    href: "/teacher/books/add?from=site-upkeep",
+    href: "/books/add?context=teacher-global&from=site-upkeep",
     eyebrow: "Books",
-    description: "Add or edit global book records, including books that do not come from ISBN lookup.",
+    description: "Create shared book editions without adding them to a personal Library.",
   },
   {
     title: "Global Vocabulary Entry",
