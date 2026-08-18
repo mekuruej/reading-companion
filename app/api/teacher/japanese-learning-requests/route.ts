@@ -22,6 +22,14 @@ function isSuperTeacherFlag(value: unknown) {
 
 function canReviewRequests(profile: ProfileRow | null) {
   return Boolean(
+    profile?.role === "super_teacher" ||
+      profile?.role === "admin" ||
+      isSuperTeacherFlag(profile?.is_super_teacher)
+  );
+}
+
+function isTeacherOrElevatedProfile(profile: ProfileRow | null) {
+  return Boolean(
     profile?.role === "teacher" ||
       profile?.role === "super_teacher" ||
       profile?.role === "admin" ||
@@ -87,7 +95,7 @@ async function requireReviewer(req: Request) {
 
   const profile = await getProfile(auth.user.id);
   if (!canReviewRequests(profile)) {
-    return { error: "Teacher access is required.", status: 403 as const };
+    return { error: "Super teacher access is required.", status: 403 as const };
   }
 
   return { user: auth.user, profile };
@@ -247,7 +255,7 @@ export async function PATCH(request: Request) {
         );
       }
 
-      if (!canReviewRequests(targetProfile) && !isActiveNonTrialFullAccess(targetProfile)) {
+      if (!isTeacherOrElevatedProfile(targetProfile) && !isActiveNonTrialFullAccess(targetProfile)) {
         const endsAt = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000);
         trialStartedAt = now.toISOString();
         trialEndsAt = endsAt.toISOString();

@@ -118,7 +118,6 @@ export default function Header() {
         );
 
         const canReviewJapaneseLearningRequests =
-          profile?.role === "teacher" ||
           profile?.role === "super_teacher" ||
           profile?.role === "admin" ||
           profile?.is_super_teacher === true ||
@@ -274,7 +273,10 @@ export default function Header() {
     pathname === "/teacher/global-words" ||
     pathname.startsWith("/teacher/testing");
   const showTeacherLink =
-    profileRole === "teacher" || profileRole === "super_teacher" || profileIsSuperTeacher;
+    profileRole === "teacher" ||
+    profileRole === "super_teacher" ||
+    profileRole === "admin" ||
+    profileIsSuperTeacher;
 
   const showFullAccessNavigation = (hasFullAccess && !isTrialAccess) || showTeacherLink;
   const canUseLearningStudy = hasFullAccess || showTeacherLink;

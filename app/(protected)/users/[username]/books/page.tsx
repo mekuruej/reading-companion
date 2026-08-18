@@ -244,6 +244,8 @@ export default function BooksPage() {
 
   const isViewingOwnLibrary =
     !!viewingUserId && !!meId && viewingUserId === meId;
+  const showEmptyLibraryJapaneseLearningDiscovery =
+    isViewingOwnLibrary && !hasFullLearningAccess && !trialBanner && !isTeacher;
   const libraryOwnerLabel = isViewingStudentLibrary ? `${viewingLabel}’s` : "My";
 
   const libraryContextLabel = isViewingStudentLibrary
@@ -1652,7 +1654,13 @@ export default function BooksPage() {
           </>
         )}
 
-        {allValidRows.length === 0 ? <LibraryEmptyState /> : null}
+        {allValidRows.length === 0 ? (
+          <LibraryEmptyState
+            onAddBook={() => router.push(addBookHref)}
+            showJapaneseLearningDiscovery={showEmptyLibraryJapaneseLearningDiscovery}
+            onLearnJapaneseLearning={() => router.push("/japanese-learning")}
+          />
+        ) : null}
 
         {isTeacher ? (
           <>
