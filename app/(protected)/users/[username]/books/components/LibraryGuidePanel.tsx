@@ -2,16 +2,14 @@ type LibraryGuidePanelProps = {
   // Route decisions stay in page.tsx; this panel only displays guide buttons.
   onNavigate: (path: string) => void;
   hasFullAccess: boolean;
-  hasSavedWords: boolean;
 };
 
 export default function LibraryGuidePanel({
   onNavigate,
   hasFullAccess,
-  hasSavedWords,
 }: LibraryGuidePanelProps) {
-  const freeActions = (
-    <>
+  const freeGuide = (
+    <div className="mt-4 space-y-4">
       <button
         type="button"
         onClick={() => onNavigate("/books/add")}
@@ -19,61 +17,44 @@ export default function LibraryGuidePanel({
       >
         <div className="text-sm font-black text-slate-950">Add Book</div>
         <p className="mt-1 text-xs leading-5 text-slate-600">
-          Add a new book to your library.
+          Add books you are reading or want to track.
         </p>
       </button>
 
-      <button
-        type="button"
-        onClick={() => onNavigate("/library/just-reading-index")}
-        className="rounded-2xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-violet-100"
-      >
-        <div className="text-sm font-black text-slate-950">Reading Timer</div>
-        <p className="mt-1 text-xs leading-5 text-slate-600">
-          Track a simple reading session.
-        </p>
-      </button>
-
-      <button
-        type="button"
-        onClick={() => onNavigate("/library/just-listening-index")}
-        className="rounded-2xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-violet-100"
-      >
-        <div className="text-sm font-black text-slate-950">Listening Timer</div>
-        <p className="mt-1 text-xs leading-5 text-slate-600">
-          Track listening time for a book or audiobook.
-        </p>
-      </button>
-
-      {hasSavedWords ? (
-        <button
-          type="button"
-          onClick={() => onNavigate("/library/vocab-list-index")}
-          className="rounded-2xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-violet-100"
-        >
-          <div className="text-sm font-black text-slate-950">Vocabulary Archive</div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-3 py-2.5">
+          <div className="text-sm font-black text-slate-950">Open a book</div>
           <p className="mt-1 text-xs leading-5 text-slate-600">
-            View saved words and export CSV.
+            Click a book cover below to open its Book Hub.
           </p>
-        </button>
-      ) : null}
-
-      <button
-        type="button"
-        onClick={() => onNavigate("/reading-access")}
-        className="rounded-2xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-violet-100"
-      >
-        <div className="text-sm font-black text-slate-950">
-          Want More Japanese Learning Tools?
         </div>
-        <p className="mt-1 text-xs leading-5 text-slate-600">
-          Learn about <strong>Japanese Learning 🔒</strong> for saving vocabulary, practicing flashcards, and keeping your Japanese reading tools after trial.
-        </p>
-        <p className="mt-2 text-xs font-black text-violet-700">
-          See Japanese Learning 🔒 →
-        </p>
-      </button>
-    </>
+
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3 py-2.5">
+          <div className="text-sm font-black text-slate-950">Read / Listen</div>
+          <p className="mt-1 text-xs leading-5 text-slate-600">
+            In the Book Hub, record reading or listening time and progress.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-sky-100 bg-sky-50/70 px-3 py-2.5">
+          <div className="text-sm font-black text-slate-950">Reading Journal</div>
+          <p className="mt-1 text-xs leading-5 text-slate-600">
+            Keep characters, plot, quotes, notes, and reviews with the book.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-amber-100 bg-amber-50/70 px-3 py-2.5">
+          <div className="text-sm font-black text-slate-950">Look back</div>
+          <p className="mt-1 text-xs leading-5 text-slate-600">
+            Reading History shows sessions. Book Stats shows progress, time, and pace.
+          </p>
+        </div>
+      </div>
+
+      <p className="text-xs leading-5 text-slate-500">
+        From the Book Hub, you can also mark a book Finished or DNF.
+      </p>
+    </div>
   );
 
   return (
@@ -152,7 +133,7 @@ export default function LibraryGuidePanel({
           </button>
           </div>
         ) : (
-          <div className="mt-4 grid gap-3">{freeActions}</div>
+          freeGuide
         )}
       </details>
 
@@ -257,13 +238,11 @@ export default function LibraryGuidePanel({
         ) : (
           <>
             <p className="mt-3 max-w-3xl text-xs leading-5 text-slate-600 sm:text-sm">
-              Use your library as a simple reading tracker. Add books, time your
-              reading or listening, and keep your reading records in one place.
+              Use your Library as a simple reading tracker. Add books, open a
+              Book Hub, then track reading, notes, history, and progress there.
             </p>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {freeActions}
-            </div>
+            {freeGuide}
           </>
         )}
       </details>

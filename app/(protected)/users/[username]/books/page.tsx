@@ -244,14 +244,6 @@ export default function BooksPage() {
 
   const isViewingOwnLibrary =
     !!viewingUserId && !!meId && viewingUserId === meId;
-  const hasSavedWordsInLibrary = useMemo(
-    () =>
-      Object.values(readingStatsByUserBookId).some(
-        (stats) => (stats.wordsLookedUp ?? 0) > 0
-      ),
-    [readingStatsByUserBookId]
-  );
-
   const libraryOwnerLabel = isViewingStudentLibrary ? `${viewingLabel}’s` : "My";
 
   const libraryContextLabel = isViewingStudentLibrary
@@ -1535,7 +1527,6 @@ export default function BooksPage() {
 
         <LibraryGuidePanel
           hasFullAccess={hasFullLearningAccess || isTeacher}
-          hasSavedWords={hasSavedWordsInLibrary}
           onNavigate={(path) => router.push(path === "/books/add" ? addBookHref : path)}
         />
 
