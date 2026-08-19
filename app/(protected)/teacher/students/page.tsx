@@ -336,14 +336,14 @@ function LinkedStudentCard({
                             disabled
                             className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-base font-semibold text-stone-400"
                         >
-                            Workspace
+                            Student Space
                         </button>
                     ) : (
                         <Link
                             href={`/teacher/students/${encodeURIComponent(student.id)}/workspace`}
                             className="block w-full rounded-2xl border border-stone-900 bg-stone-900 px-4 py-3 text-center text-base font-semibold text-white hover:bg-black"
                         >
-                            Open Workspace
+                            Open Student Space
                         </Link>
                     )}
 
@@ -1273,7 +1273,16 @@ export default function TeacherStudentsPage() {
 
     return (
         <main className="mx-auto max-w-6xl px-4 py-8">
-            <TeacherStudentsHeader backHref={backLink.href} backLabel={backLink.label} />
+            <nav className="mb-3">
+                <Link
+                    href={backLink.href}
+                    className="inline-flex text-sm font-semibold text-stone-500 hover:text-stone-900"
+                >
+                    {backLink.label}
+                </Link>
+            </nav>
+
+            <TeacherStudentsHeader />
 
             {loading ? (
                 <TeacherStudentsLoadingState />

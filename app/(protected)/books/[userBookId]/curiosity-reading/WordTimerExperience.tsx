@@ -360,12 +360,14 @@ export function CuriosityReadingExperience({
   embedded = false,
   workspaceCompact = false,
   workspaceAside,
+  modeSwitchSlot,
   onReadingJournalContextChange,
 }: {
   experienceMode?: WordTimerExperienceMode;
   embedded?: boolean;
   workspaceCompact?: boolean;
   workspaceAside?: ReactNode;
+  modeSwitchSlot?: ReactNode;
   onReadingJournalContextChange?: (context: CuriosityReadingJournalContext) => void;
 }) {
   const router = useRouter();
@@ -376,7 +378,7 @@ export function CuriosityReadingExperience({
   const pageTitle = isListeningMode ? "Listening" : "Curiosity Reading";
   const pageDescription = isListeningMode
     ? "Listen to this book or audiobook, track your time, and save words you catch by ear without leaving the session."
-    : "Use this for a slower, exploratory reading experience. This is where you stop, investigate, save new words, and let lookup time count as part of the reading session.";
+    : "Look up and save words from this book while you read. Add words when you want to check or remember them, then keep reading.";
   const timerTitle = isListeningMode ? "Log your listening session" : "Log your reading session";
   const timerDescription = isListeningMode
     ? "Use the timer to track listening while you add words you heard in this book."
@@ -1915,75 +1917,84 @@ export function CuriosityReadingExperience({
   );
 
   const sessionBar = (
-    <section className="rounded-2xl border border-stone-200 bg-white p-3 shadow-sm">
-      <div className="grid gap-3 lg:grid-cols-[minmax(13rem,1fr)_minmax(20rem,32rem)_auto] lg:items-center">
-        <div className="flex min-w-0 items-center gap-3">
-          {bookTitle ? (
-            <Link
-              href={`/books/${encodeURIComponent(userBookId)}`}
-              className="shrink-0 rounded-xl text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
-              title={`Go to ${bookTitle} Book Hub`}
-            >
-              {bookCover ? (
-                <img
-                  src={bookCover}
-                  alt={`Go to ${bookTitle} Book Hub`}
-                  className="h-20 w-14 rounded-xl object-cover shadow-sm"
-                />
-              ) : (
-                <div className="flex h-20 w-14 items-center justify-center rounded-xl bg-stone-100 px-1 text-center text-[10px] text-stone-400">
-                  No cover
-                </div>
-              )}
-            </Link>
-          ) : null}
+    <>
+      {bookTitle ? (
+        <Link
+          href={`/books/${encodeURIComponent(userBookId)}`}
+          className="mb-2 inline-flex text-sm font-medium text-stone-500 underline-offset-4 transition hover:text-stone-800 hover:underline"
+        >
+          ← Back to Book Hub
+        </Link>
+      ) : null}
 
-          <div className="min-w-0">
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-stone-500">
-              {pageTitle}
-            </p>
+      <section className="rounded-xl border border-stone-200 bg-white p-2.5 shadow-sm">
+        <div className="grid gap-2 lg:grid-cols-[minmax(16rem,1fr)_auto_minmax(8rem,1fr)] lg:items-center">
+          <div className="flex min-w-0 items-center gap-3">
             {bookTitle ? (
-              <div className="mt-1 truncate text-base font-black text-stone-900">
-                {bookTitle}
-              </div>
+              <Link
+                href={`/books/${encodeURIComponent(userBookId)}`}
+                className="shrink-0 rounded-lg text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
+                title={`Go to ${bookTitle} Book Hub`}
+              >
+                {bookCover ? (
+                  <img
+                    src={bookCover}
+                    alt={`Go to ${bookTitle} Book Hub`}
+                    className="h-14 w-10 rounded-md object-cover shadow-sm"
+                  />
+                ) : (
+                  <div className="flex h-14 w-10 items-center justify-center rounded-md bg-stone-100 px-1 text-center text-[10px] text-stone-400">
+                    No cover
+                  </div>
+                )}
+              </Link>
             ) : null}
-            {curiosityProgressLine ? (
-              <p className="mt-1 truncate text-xs font-medium text-stone-500">
-                {curiosityProgressLine}
+
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-stone-500">
+                Current book
               </p>
-            ) : null}
-            <CuriosityStatusMessage message={message} />
+              {bookTitle ? (
+                <div className="mt-0.5 truncate text-sm font-black text-stone-900">
+                  {bookTitle}
+                </div>
+              ) : null}
+              {curiosityProgressLine ? (
+                <p className="mt-0.5 truncate text-xs font-medium text-stone-500">
+                  {curiosityProgressLine}
+                </p>
+              ) : null}
+              <CuriosityStatusMessage message={message} />
+            </div>
           </div>
-        </div>
 
-        <div className="min-w-0">
-          {timerPanel}
-        </div>
-
-        {bookTitle ? (
-          <div className="flex flex-wrap gap-2 lg:justify-end">
-            <Link
-              href={`/books/${encodeURIComponent(userBookId)}/words`}
-              className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-100"
-            >
-              Vocab List
-            </Link>
-            <Link
-              href={`/books/${encodeURIComponent(userBookId)}`}
-              className="rounded-xl bg-stone-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
-            >
-              Book Hub
-            </Link>
+          <div className="min-w-0 lg:justify-self-center">
+            {timerPanel}
           </div>
-        ) : null}
-      </div>
-    </section>
+
+          {bookTitle ? (
+            <div className="flex flex-wrap gap-2 lg:justify-end">
+              <Link
+                href={`/books/${encodeURIComponent(userBookId)}/words`}
+                className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-semibold text-stone-700 transition hover:bg-stone-100"
+              >
+                Vocab List
+              </Link>
+            </div>
+          ) : null}
+        </div>
+      </section>
+    </>
   );
 
   const content = (
       <>
         {useCompactSessionBar ? (
-          sessionBar
+          <>
+            <CuriosityPageHeader title={pageTitle} description={pageDescription} />
+            {modeSwitchSlot}
+            {sessionBar}
+          </>
         ) : (
           <>
             <CuriosityPageHeader title={pageTitle} description={pageDescription} />

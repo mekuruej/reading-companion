@@ -51,7 +51,7 @@ export default function StudyFullAccessLockedState({
               onClick={onBackToBookHub}
               className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
             >
-              Back to Book Hub
+              ← Back to Book Hub
             </button>
 
             <button

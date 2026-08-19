@@ -293,7 +293,7 @@ export default function ReviewNotesPage() {
   const reviewDestinationLabel = isEnglishNativeTrackerBook ? "Review & Ratings" : "My Review";
   const reviewDescription = isEnglishNativeTrackerBook
     ? "Keep your rating and private review."
-    : "Keep your personal reviews in English and Japanese.";
+    : "Keep your personal reviews in English and Japanese. Currently reviews are all private.";
 
   return (
     <main className="min-h-screen bg-stone-50 p-6">

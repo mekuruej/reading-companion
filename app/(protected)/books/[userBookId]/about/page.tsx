@@ -666,7 +666,7 @@ export default function AboutBookPage() {
           href={`/books/${row.id}`}
           className="inline-flex text-sm font-black text-stone-600 transition hover:text-stone-950"
         >
-          &larr; Back to {usesEnglishReadingTerminology ? "Book Hub" : "Reader Book Hub"}
+          &larr; Back to Book Hub
         </Link>
 
         <section className="mt-5 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">

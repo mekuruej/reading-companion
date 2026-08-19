@@ -639,7 +639,7 @@ export default function TeacherReadingSnapshotPage() {
         href={`/books/${userBookId}`}
         className="inline-flex w-fit text-sm font-bold text-stone-600 transition hover:text-stone-950"
       >
-        ← Back to Reader Book Hub
+        ← Back to Book Hub
       </Link>
 
       <TeacherSnapshotHeader

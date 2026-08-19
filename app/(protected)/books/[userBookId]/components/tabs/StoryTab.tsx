@@ -61,6 +61,16 @@ type CulturalItem = {
   updated_at: string;
 };
 
+type UserBookReview = {
+  id: string;
+  user_book_id: string;
+  review_language: string;
+  review_text: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
 type StoryTabProps = {
   storyTab: StoryTabMode;
   setStoryTab: (value: StoryTabMode) => void;
@@ -196,12 +206,23 @@ type StoryTabProps = {
   ratingOverall: string;
   savedRatingOverall: number | null;
   setRatingOverall: (value: string) => void;
-  myReview: string;
-  savedMyReview: string | null;
-  setMyReview: (value: string) => void;
+  reviews: UserBookReview[];
+  reviewDraftLanguage: string;
+  reviewDraftText: string;
+  savingReviewIds: string[];
+  setReviewDraftLanguage: (value: string) => void;
+  setReviewDraftText: (value: string) => void;
+  updateBookReview: (
+    id: string,
+    field: keyof Pick<UserBookReview, "review_language" | "review_text">,
+    value: string
+  ) => void;
   savingReview: boolean;
   reviewSaveMessage: string;
   saveReviewRatings: () => Promise<void>;
+  addBookReview: () => Promise<void>;
+  saveBookReview: (review: UserBookReview) => Promise<void>;
+  deleteBookReview: (id: string) => Promise<void>;
 };
 
 function LearningArchiveNotice() {
@@ -369,12 +390,19 @@ export default function StoryTab({
   ratingOverall,
   savedRatingOverall,
   setRatingOverall,
-  myReview,
-  savedMyReview,
-  setMyReview,
+  reviews,
+  reviewDraftLanguage,
+  reviewDraftText,
+  savingReviewIds,
+  setReviewDraftLanguage,
+  setReviewDraftText,
+  updateBookReview,
   savingReview,
   reviewSaveMessage,
   saveReviewRatings,
+  addBookReview,
+  saveBookReview,
+  deleteBookReview,
 }: StoryTabProps) {
   const detectiveReadOnly = Boolean(learningArchiveReadOnlyTabs?.detective);
   const settingReadOnly = Boolean(learningArchiveReadOnlyTabs?.setting);
@@ -1180,7 +1208,7 @@ export default function StoryTab({
             <div>
               <div className="text-sm font-semibold text-stone-900">Review & Ratings</div>
               <p className="mt-1 text-xs leading-5 text-stone-500">
-                Your private response to this book.
+                Your private rating and written reviews for this book.
               </p>
             </div>
             <button
@@ -1189,14 +1217,14 @@ export default function StoryTab({
               disabled={savingReview}
               className="rounded-xl bg-purple-700 px-3 py-2 text-sm font-medium text-white hover:bg-purple-800 disabled:opacity-50"
             >
-              {savingReview ? "Saving..." : "Save Review"}
+              {savingReview ? "Saving..." : "Save Rating"}
             </button>
           </div>
 
-	          <div>
-	            <p className="text-sm font-semibold text-stone-900">Overall Enjoyment</p>
-	            <p className="mt-1 text-xs text-stone-500">1 = hated it · 5 = loved it</p>
-	            <div className="mt-2 flex flex-wrap gap-2">
+          <div>
+            <p className="text-sm font-semibold text-stone-900">Overall Enjoyment</p>
+            <p className="mt-1 text-xs text-stone-500">1 = hated it · 5 = loved it</p>
+            <div className="mt-2 flex flex-wrap gap-2">
               {SIMPLE_RATING_VALUES.map((value) => (
                 <button
                   key={value}
@@ -1225,19 +1253,122 @@ export default function StoryTab({
             ) : null}
           </div>
 
-          <label className="mt-5 block">
-            <span className="text-sm font-semibold text-stone-900">My Review</span>
-            <span className="mt-1 block text-xs text-stone-500">What did you think of the book?</span>
-            <textarea
-              value={myReview}
-              onChange={(event) => setMyReview(event.target.value)}
-              className="mt-2 min-h-[180px] w-full rounded-xl border border-stone-200 bg-white p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-stone-300"
-              placeholder="Write your private review here..."
-            />
-          </label>
+          <div className="mt-6 border-t border-stone-200 pt-4">
+            <div className="mb-3">
+              <p className="text-sm font-semibold text-stone-900">Reviews</p>
+              <p className="mt-1 text-xs text-stone-500">
+                Add written reviews in any language.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-stone-200 bg-white p-3">
+              <div className="grid gap-3 sm:grid-cols-[minmax(10rem,14rem)_1fr]">
+                <label className="block">
+                  <span className="text-xs font-semibold text-stone-600">Language of review</span>
+                  <input
+                    value={reviewDraftLanguage}
+                    onChange={(event) => setReviewDraftLanguage(event.target.value)}
+                    list="review-language-options"
+                    className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                    placeholder="Choose or type a language"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold text-stone-600">Review</span>
+                  <textarea
+                    value={reviewDraftText}
+                    onChange={(event) => setReviewDraftText(event.target.value)}
+                    className="mt-1 min-h-[120px] w-full rounded-xl border border-stone-200 bg-white p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-stone-300"
+                    placeholder="Write your private review here..."
+                  />
+                </label>
+              </div>
+              <datalist id="review-language-options">
+                <option value="English" />
+                <option value="Japanese" />
+                <option value="Portuguese" />
+                <option value="Spanish" />
+                <option value="French" />
+                <option value="Korean" />
+                <option value="Chinese" />
+              </datalist>
+              <button
+                type="button"
+                onClick={() => void addBookReview()}
+                disabled={savingReview}
+                className="mt-3 rounded-xl bg-purple-700 px-3 py-2 text-sm font-medium text-white hover:bg-purple-800 disabled:opacity-50"
+              >
+                {savingReview ? "Adding..." : "Add Review"}
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {reviews.length > 0 ? (
+                reviews.map((review) => {
+                  const isSavingThisReview = savingReviewIds.includes(review.id);
+                  return (
+                    <div
+                      key={review.id}
+                      className="rounded-2xl border border-stone-200 bg-white p-3"
+                    >
+                      <div className="grid gap-3 sm:grid-cols-[minmax(10rem,14rem)_1fr]">
+                        <label className="block">
+                          <span className="text-xs font-semibold text-stone-600">
+                            Language
+                          </span>
+                          <input
+                            value={review.review_language}
+                            onChange={(event) =>
+                              updateBookReview(review.id, "review_language", event.target.value)
+                            }
+                            list="review-language-options"
+                            className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-stone-300"
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="text-xs font-semibold text-stone-600">
+                            Review
+                          </span>
+                          <textarea
+                            value={review.review_text}
+                            onChange={(event) =>
+                              updateBookReview(review.id, "review_text", event.target.value)
+                            }
+                            className="mt-1 min-h-[140px] w-full rounded-xl border border-stone-200 bg-white p-3 text-sm leading-6 outline-none focus:ring-2 focus:ring-stone-300"
+                          />
+                        </label>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void saveBookReview(review)}
+                          disabled={isSavingThisReview}
+                          className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                        >
+                          {isSavingThisReview ? "Saving..." : "Save"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void deleteBookReview(review.id)}
+                          disabled={isSavingThisReview}
+                          className="rounded-xl bg-stone-200 px-3 py-2 text-sm font-semibold text-stone-900 hover:bg-stone-300 disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="rounded-2xl border border-dashed border-stone-200 bg-white p-3 text-xs text-stone-500">
+                  No written reviews saved yet.
+                </p>
+              )}
+            </div>
+          </div>
 
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-stone-500">
-            <span>{savedMyReview?.trim() ? "Saved review is private." : "No review saved yet."}</span>
+            <span>Written reviews are private.</span>
             {reviewSaveMessage ? <span className="font-semibold">{reviewSaveMessage}</span> : null}
           </div>
         </div>

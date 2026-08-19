@@ -14,7 +14,15 @@ export default function StudyBookHeader({
   vocabListHref,
 }: StudyBookHeaderProps) {
   return (
-    <div className="mb-4 mt-4 flex w-full max-w-3xl flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:mb-8 sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+    <div className="w-full max-w-3xl">
+      <Link
+        href={bookHubHref}
+        className="mb-2 inline-flex text-sm font-medium text-stone-500 underline-offset-4 transition hover:text-stone-800 hover:underline"
+      >
+        ← Back to Book Hub
+      </Link>
+
+    <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm sm:mb-8 sm:flex-row sm:items-center sm:justify-between sm:p-4">
       <Link
         href={bookHubHref}
         className="flex min-w-0 items-center gap-4 rounded-xl text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
@@ -50,13 +58,8 @@ export default function StudyBookHeader({
         >
           Vocab List
         </Link>
-        <Link
-          href={bookHubHref}
-          className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
-        >
-          Book Hub
-        </Link>
       </div>
+    </div>
     </div>
   );
 }

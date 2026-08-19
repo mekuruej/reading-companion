@@ -209,12 +209,41 @@ export default function CuriosityReadingPage() {
       onFavoriteQuotesChange={setFavoriteQuotes}
     />
   );
+  const modeSwitch = (
+    <div className="hidden justify-end lg:flex">
+      <div className="inline-flex rounded-2xl border border-stone-200 bg-white p-1 shadow-sm">
+        <button
+          type="button"
+          onClick={() => setViewMode("curiosity")}
+          className={`rounded-xl px-4 py-2 text-sm font-black transition ${
+            viewMode === "curiosity"
+              ? "bg-stone-900 text-white"
+              : "text-stone-600 hover:bg-stone-50"
+          }`}
+        >
+          Curiosity Reading
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewMode("workspace")}
+          className={`rounded-xl px-4 py-2 text-sm font-black transition ${
+            viewMode === "workspace"
+              ? "bg-violet-700 text-white"
+              : "text-stone-600 hover:bg-violet-50"
+          }`}
+        >
+          Reading Journal
+        </button>
+      </div>
+    </div>
+  );
   const curiosityExperience = (
     <CuriosityReadingExperience
       experienceMode="curiosity"
       embedded
       workspaceCompact={showReadingWorkspace}
       workspaceAside={showReadingWorkspace ? readingJournalPanel : undefined}
+      modeSwitchSlot={modeSwitch}
       onReadingJournalContextChange={setJournalContext}
     />
   );
@@ -227,33 +256,6 @@ export default function CuriosityReadingPage() {
           showReadingWorkspace ? "max-w-[96rem]" : "max-w-5xl",
         ].join(" ")}
       >
-        <div className="hidden justify-end lg:flex">
-          <div className="inline-flex rounded-2xl border border-stone-200 bg-white p-1 shadow-sm">
-            <button
-              type="button"
-              onClick={() => setViewMode("curiosity")}
-              className={`rounded-xl px-4 py-2 text-sm font-black transition ${
-                viewMode === "curiosity"
-                  ? "bg-stone-900 text-white"
-                  : "text-stone-600 hover:bg-stone-50"
-              }`}
-            >
-              Curiosity Reading
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("workspace")}
-              className={`rounded-xl px-4 py-2 text-sm font-black transition ${
-                viewMode === "workspace"
-                  ? "bg-violet-700 text-white"
-                  : "text-stone-600 hover:bg-violet-50"
-              }`}
-            >
-              Reading Journal
-            </button>
-          </div>
-        </div>
-
         <div className="space-y-4">
           <div className="min-w-0">{curiosityExperience}</div>
           {showReadingWorkspace ? (

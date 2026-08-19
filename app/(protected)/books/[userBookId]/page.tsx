@@ -668,6 +668,7 @@ export default function BookHubPage() {
   const [isLinkedStudentToAnyTeacher, setIsLinkedStudentToAnyTeacher] = useState(false);
   const [profileLevel, setProfileLevel] = useState<string>("");
   const [bookHubOwnerName, setBookHubOwnerName] = useState<string>("");
+  const [bookHubOwnerUsername, setBookHubOwnerUsername] = useState<string>("");
   const [bookHubOwnerNativeLanguage, setBookHubOwnerNativeLanguage] = useState<string | null>(null);
   const [studentWorkspaceBackContext, setStudentWorkspaceBackContext] =
     useState<StudentWorkspaceBackContext | null>(null);
@@ -3573,7 +3574,7 @@ export default function BookHubPage() {
 
     const meProfileResult = await supabase
       .from("profiles")
-      .select("role, is_super_teacher, target_language, japanese_learning_enabled, level, app_access_type, app_access_expires_at")
+      .select("role, is_super_teacher, target_language, japanese_learning_enabled, level, username, app_access_type, app_access_expires_at")
       .eq("id", user.id)
       .single();
     let meProfile: any = meProfileResult.data;
@@ -3582,7 +3583,7 @@ export default function BookHubPage() {
     if (isMissingAppAccessColumnError(meProfileErr)) {
       const fallbackResult = await supabase
         .from("profiles")
-        .select("role, is_super_teacher, target_language, japanese_learning_enabled, level")
+        .select("role, is_super_teacher, target_language, japanese_learning_enabled, level, username")
         .eq("id", user.id)
         .single();
 
@@ -3771,6 +3772,7 @@ export default function BookHubPage() {
     setRow(r);
 
     setBookHubOwnerName("");
+    setBookHubOwnerUsername(meProfile?.username || "");
     let loadedOwnerNativeLanguage: string | null = null;
 
     if (r.user_id) {
@@ -3786,6 +3788,7 @@ export default function BookHubPage() {
 
       loadedOwnerNativeLanguage = ownerProfile?.native_language ?? null;
       setBookHubOwnerNativeLanguage(loadedOwnerNativeLanguage);
+      setBookHubOwnerUsername(ownerProfile?.username || meProfile?.username || "");
 
       if (r.user_id !== user.id) {
         setBookHubOwnerName(
@@ -5345,6 +5348,9 @@ export default function BookHubPage() {
   const bookHubContextLabel = isViewingStudentBookHub
     ? `Student Book Hub · ${bookHubOwnerName || "Student"}`
     : "My Book Hub";
+  const backToLibraryHref = bookHubOwnerUsername
+    ? `/users/${encodeURIComponent(bookHubOwnerUsername)}/books`
+    : "/dashboard";
 
   const bookHubStatusLabel = dnfAt
     ? "DNF"
@@ -5388,16 +5394,24 @@ export default function BookHubPage() {
       ) : null}
 
       <div className="mx-auto max-w-6xl">
-        {studentWorkspaceBackContext ? (
-          <nav className="mb-3 flex flex-wrap items-center gap-3">
+        <nav className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          {studentWorkspaceBackContext ? (
             <Link
               href={studentWorkspaceBackContext.href}
               className="inline-flex text-sm font-semibold text-stone-500 hover:text-stone-900"
             >
               {studentWorkspaceBackContext.label}
             </Link>
-          </nav>
-        ) : null}
+          ) : (
+            <span aria-hidden="true" />
+          )}
+          <Link
+            href={backToLibraryHref}
+            className="ml-auto inline-flex text-sm font-semibold text-stone-500 hover:text-stone-900"
+          >
+            ← Back to Library
+          </Link>
+        </nav>
 
         <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
           <div className="p-5 md:p-8">
@@ -5427,8 +5441,8 @@ export default function BookHubPage() {
                   showStartButton={showBookHubStartButton}
                   showFinishDnfButtons={showBookHubFinishDnfButtons}
                   showReflectionLink={shouldShowReadingReflectionNudge}
-                  showReviewLink={!isEnglishNativeTrackerBook && canUseMyReviewNotes}
-                  reviewLinkLabel={isEnglishNativeTrackerBook ? "Review & Ratings" : "My Review"}
+                  showReviewLink={false}
+                  reviewLinkLabel="Review & Ratings"
                   shouldNudgeStartBook={shouldNudgeStartBook}
                   shouldNudgeFinishBook={shouldNudgeFinishBook}
                   canFillBeginningPages={canFillBeginningPages}

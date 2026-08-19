@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import type {
   JapaneseLearningJournalArchiveTabs,
   JapaneseLearningJournalTab,
@@ -61,6 +60,16 @@ type CulturalItem = {
   updated_at: string;
 };
 
+type UserBookReview = {
+  id: string;
+  user_book_id: string;
+  review_language: string;
+  review_text: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
 type ReadingJournalPanelProps = {
   userBookId: string;
   ownerUserId: string;
@@ -101,6 +110,21 @@ function isMissingFirstSeenLocationError(error: any) {
     .toLowerCase();
 
   return text.includes("first_seen_location") || text.includes("pgrst204") || text.includes("42703");
+}
+
+function isMissingReviewsTableError(error: any) {
+  const text = [
+    error?.message,
+    error?.details,
+    error?.hint,
+    error?.code,
+    typeof error === "string" ? error : "",
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return text.includes("user_book_reviews") || text.includes("pgrst205") || text.includes("42p01");
 }
 
 function omitFlexibleCharacterLocation<T extends { first_seen_location?: unknown }>(payload: T) {
@@ -157,7 +181,7 @@ const baseJournalEndTabs: StoryTabMode[] = ["quotes", "notes"];
 
 function clampRating5(value: number) {
   if (!Number.isFinite(value)) return null;
-  return Math.min(5, Math.max(1, Math.round(value)));
+  return Math.min(5, Math.max(1, Math.round(value * 2) / 2));
 }
 
 export default function ReadingJournalPanel({
@@ -169,7 +193,6 @@ export default function ReadingJournalPanel({
   selectedChapterLabel,
   selectedChapterNumber,
   compact = false,
-  vocabListHref,
   canUseJapaneseLearningJournal = false,
   japaneseLearningArchiveTabs = {
     detective: false,
@@ -259,12 +282,14 @@ export default function ReadingJournalPanel({
   const [savedNotes, setSavedNotes] = useState<string | null>(null);
   const [savingNotes, setSavingNotes] = useState(false);
   const [notesSaveMessage, setNotesSaveMessage] = useState("");
-  const [myReview, setMyReview] = useState("");
-  const [savedMyReview, setSavedMyReview] = useState<string | null>(null);
   const [ratingOverall, setRatingOverall] = useState("");
   const [savedRatingOverall, setSavedRatingOverall] = useState<number | null>(null);
   const [savingReview, setSavingReview] = useState(false);
   const [reviewSaveMessage, setReviewSaveMessage] = useState("");
+  const [reviews, setReviews] = useState<UserBookReview[]>([]);
+  const [reviewDraftLanguage, setReviewDraftLanguage] = useState("");
+  const [reviewDraftText, setReviewDraftText] = useState("");
+  const [savingReviewIds, setSavingReviewIds] = useState<string[]>([]);
 
   const visibleCharacters = useMemo(() => {
     const copy = [...characters];
@@ -286,6 +311,15 @@ export default function ReadingJournalPanel({
     return culturalReverseOrder ? copy.reverse() : copy;
   }, [culturalItems, culturalReverseOrder]);
 
+  const visibleReviews = useMemo(
+    () =>
+      [...reviews].sort((a, b) => {
+        if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+        return Date.parse(a.created_at || "") - Date.parse(b.created_at || "");
+      }),
+    [reviews]
+  );
+
   useEffect(() => {
     let cancelled = false;
 
@@ -296,6 +330,7 @@ export default function ReadingJournalPanel({
         loadChapterSummaries(userBookId, cancelled),
         loadSettingItems(userBookId, cancelled),
         loadCulturalItems(userBookId, cancelled),
+        loadReviews(userBookId, cancelled),
       ]);
     }
 
@@ -318,7 +353,7 @@ export default function ReadingJournalPanel({
     async function loadReadingCompanionFields() {
       const { data, error } = await supabase
         .from("user_books")
-        .select("notes, my_review, rating_overall")
+        .select("notes, rating_overall")
         .eq("id", userBookId)
         .eq("user_id", ownerUserId)
         .maybeSingle();
@@ -332,8 +367,6 @@ export default function ReadingJournalPanel({
 
       setNotes(data?.notes ?? "");
       setSavedNotes(data?.notes ?? null);
-      setMyReview(data?.my_review ?? "");
-      setSavedMyReview(data?.my_review ?? null);
       setRatingOverall(data?.rating_overall == null ? "" : String(data.rating_overall));
       setSavedRatingOverall(data?.rating_overall ?? null);
       setNotesSaveMessage("");
@@ -480,6 +513,29 @@ export default function ReadingJournalPanel({
     }
 
     setCulturalItems((data as CulturalItem[]) ?? []);
+  }
+
+  async function loadReviews(id: string, cancelled: boolean) {
+    const { data, error } = await supabase
+      .from("user_book_reviews")
+      .select("id, user_book_id, review_language, review_text, sort_order, created_at, updated_at")
+      .eq("user_book_id", id)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true });
+
+    if (cancelled) return;
+    if (error) {
+      if (isMissingReviewsTableError(error)) {
+        setReviewSaveMessage("Multiple reviews need the user_book_reviews migration.");
+        return;
+      }
+
+      console.error("Error loading Reading Journal reviews:", error);
+      setReviewSaveMessage("Could not load reviews.");
+      return;
+    }
+
+    setReviews((data as UserBookReview[]) ?? []);
   }
 
   function startEditingCharacter(id: string) {
@@ -1028,13 +1084,11 @@ export default function ReadingJournalPanel({
     const nextRating = ratingOverall.trim()
       ? clampRating5(Number(ratingOverall.trim()))
       : null;
-    const nextReview = myReview.trim() || null;
 
     const { error } = await supabase
       .from("user_books")
       .update({
         rating_overall: nextRating,
-        my_review: nextReview,
       })
       .eq("id", userBookId)
       .eq("user_id", ownerUserId);
@@ -1048,9 +1102,111 @@ export default function ReadingJournalPanel({
     }
 
     setSavedRatingOverall(nextRating);
-    setSavedMyReview(nextReview);
     setRatingOverall(nextRating == null ? "" : String(nextRating));
-    setReviewSaveMessage("Saved.");
+    setReviewSaveMessage("Rating saved.");
+  }
+
+  async function addBookReview() {
+    const nextLanguage = reviewDraftLanguage.trim();
+    const nextText = reviewDraftText.trim();
+    if (!nextLanguage || !nextText) {
+      setReviewSaveMessage("Choose a language and write a review first.");
+      return;
+    }
+
+    setSavingReview(true);
+    setReviewSaveMessage("");
+
+    const nextSortOrder =
+      reviews.length > 0 ? Math.max(...reviews.map((review) => review.sort_order)) + 10 : 10;
+    const { data, error } = await supabase
+      .from("user_book_reviews")
+      .insert({
+        user_book_id: userBookId,
+        review_language: nextLanguage,
+        review_text: nextText,
+        sort_order: nextSortOrder,
+      })
+      .select("id, user_book_id, review_language, review_text, sort_order, created_at, updated_at")
+      .single();
+
+    setSavingReview(false);
+
+    if (error) {
+      console.error("Error adding Reading Journal review:", error);
+      setReviewSaveMessage("Could not add review.");
+      return;
+    }
+
+    setReviews((prev) => [...prev, data as UserBookReview]);
+    setReviewDraftText("");
+    setReviewSaveMessage("Review added.");
+  }
+
+  function updateBookReview(
+    id: string,
+    field: keyof Pick<UserBookReview, "review_language" | "review_text">,
+    value: string
+  ) {
+    setReviews((prev) =>
+      prev.map((review) => (review.id === id ? { ...review, [field]: value } : review))
+    );
+    setReviewSaveMessage("");
+  }
+
+  async function saveBookReview(review: UserBookReview) {
+    const nextLanguage = review.review_language.trim();
+    const nextText = review.review_text.trim();
+    if (!nextLanguage || !nextText) {
+      setReviewSaveMessage("Language and review text are required.");
+      return;
+    }
+
+    setSavingReviewIds((prev) => [...prev, review.id]);
+    setReviewSaveMessage("");
+
+    const { data, error } = await supabase
+      .from("user_book_reviews")
+      .update({
+        review_language: nextLanguage,
+        review_text: nextText,
+      })
+      .eq("id", review.id)
+      .select("id, user_book_id, review_language, review_text, sort_order, created_at, updated_at")
+      .single();
+
+    setSavingReviewIds((prev) => prev.filter((x) => x !== review.id));
+
+    if (error) {
+      console.error("Error saving Reading Journal review:", error);
+      setReviewSaveMessage("Could not save review.");
+      return;
+    }
+
+    setReviews((prev) =>
+      prev.map((item) => (item.id === review.id ? (data as UserBookReview) : item))
+    );
+    setReviewSaveMessage("Review saved.");
+  }
+
+  async function deleteBookReview(id: string) {
+    if (!window.confirm("Delete this review?")) return;
+
+    setSavingReviewIds((prev) => [...prev, id]);
+    setReviewSaveMessage("");
+
+    const { error } = await supabase.from("user_book_reviews").delete().eq("id", id);
+
+    setSavingReviewIds((prev) => prev.filter((x) => x !== id));
+
+    if (error) {
+      console.error("Error deleting Reading Journal review:", error);
+      setReviewSaveMessage("Could not delete review.");
+      return;
+    }
+
+    setReviews((prev) => prev.filter((review) => review.id !== id));
+    setReviewSaveMessage("Review deleted.");
   }
 
   const panel = (
@@ -1243,28 +1399,27 @@ export default function ReadingJournalPanel({
         setRatingOverall(value);
         setReviewSaveMessage("");
       }}
-      myReview={myReview}
-      savedMyReview={savedMyReview}
-      setMyReview={(value) => {
-        setMyReview(value);
+      reviews={visibleReviews}
+      reviewDraftLanguage={reviewDraftLanguage}
+      reviewDraftText={reviewDraftText}
+      savingReviewIds={savingReviewIds}
+      setReviewDraftLanguage={(value) => {
+        setReviewDraftLanguage(value);
         setReviewSaveMessage("");
       }}
+      setReviewDraftText={(value) => {
+        setReviewDraftText(value);
+        setReviewSaveMessage("");
+      }}
+      updateBookReview={updateBookReview}
       savingReview={savingReview}
       reviewSaveMessage={reviewSaveMessage}
       saveReviewRatings={saveNativeReviewRatings}
+      addBookReview={addBookReview}
+      saveBookReview={saveBookReview}
+      deleteBookReview={deleteBookReview}
     />
   );
-
-  const actionLinks = vocabListHref ? (
-    <div className="flex flex-wrap gap-2">
-      <Link
-        href={vocabListHref}
-        className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-black text-stone-700 transition hover:bg-stone-100"
-      >
-        Vocab List
-      </Link>
-    </div>
-  ) : null;
 
   if (compact) {
     return (
@@ -1289,11 +1444,6 @@ export default function ReadingJournalPanel({
 
   return (
     <div className="space-y-4">
-      {actionLinks ? (
-        <div className="flex justify-end">
-          {actionLinks}
-        </div>
-      ) : null}
       {panel}
     </div>
   );

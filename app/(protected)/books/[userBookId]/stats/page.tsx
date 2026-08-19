@@ -571,9 +571,7 @@ export default function BookStatsPage() {
                     statusLabel={statusLabel(row)}
                     languageLabel={languageLabel(book?.language_code)}
                     formatLabel={bookTypeLabel(book?.book_type, "") || null}
-                    canOpenVocabList={canSeeVocabularyStats}
                     bookHubHref={`/books/${encodeURIComponent(userBookId)}`}
-                    vocabListHref={`/books/${encodeURIComponent(userBookId)}/words`}
                     description={
                         isEnglishNativeTrackerBook
                             ? "Progress, timed reading, listening, and pace."

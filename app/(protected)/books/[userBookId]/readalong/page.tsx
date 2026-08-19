@@ -1289,7 +1289,7 @@ export default function ReadAlongPage() {
                                 onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
                                 className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
                             >
-                                Back to Book Hub
+                                ← Back to Book Hub
                             </button>
 
                             <button
@@ -2253,6 +2253,27 @@ export default function ReadAlongPage() {
                         bookCover={bookCover}
                         bookHubHref={`/books/${encodeURIComponent(userBookId)}${contextSuffix}`}
                         vocabListHref={`/books/${encodeURIComponent(userBookId)}/words${contextSuffix}`}
+                        timerSlot={
+                            <ReadAlongTimerPanel
+                                isRunning={isRunning}
+                                isPaused={isPaused}
+                                elapsedLabel={formatTimer(elapsed)}
+                                showTimedSessionForm={showTimedSessionForm}
+                                sessionStartPage={sessionStartPage}
+                                sessionEndPage={sessionEndPage}
+                                timerSaveMessage={timerSaveMessage}
+                                compact
+                                onStartTimer={handleStartTimer}
+                                onPauseTimer={handlePauseTimer}
+                                onFinishRunningTimer={handleFinishRunningTimer}
+                                onResumeTimer={handleResumeTimer}
+                                onFinishPausedTimer={handleFinishPausedTimer}
+                                onSessionStartPageChange={setSessionStartPage}
+                                onSessionEndPageChange={setSessionEndPage}
+                                onSaveTimedSession={handleSaveTimedSessionFromTimer}
+                                onCancelTimedSession={handleCancelTimedSession}
+                            />
+                        }
                     />
                 ) : null}
 
@@ -2264,25 +2285,6 @@ export default function ReadAlongPage() {
                         onSelectedChapterKeyChange={setSelectedChapterKey}
                     />
                 ) : null}
-
-                <ReadAlongTimerPanel
-                    isRunning={isRunning}
-                    isPaused={isPaused}
-                    elapsedLabel={formatTimer(elapsed)}
-                    showTimedSessionForm={showTimedSessionForm}
-                    sessionStartPage={sessionStartPage}
-                    sessionEndPage={sessionEndPage}
-                    timerSaveMessage={timerSaveMessage}
-                    onStartTimer={handleStartTimer}
-                    onPauseTimer={handlePauseTimer}
-                    onFinishRunningTimer={handleFinishRunningTimer}
-                    onResumeTimer={handleResumeTimer}
-                    onFinishPausedTimer={handleFinishPausedTimer}
-                    onSessionStartPageChange={setSessionStartPage}
-                    onSessionEndPageChange={setSessionEndPage}
-                    onSaveTimedSession={handleSaveTimedSessionFromTimer}
-                    onCancelTimedSession={handleCancelTimedSession}
-                />
 
                 <ReadAlongSupportModeTabs
                     supportMode={supportMode}

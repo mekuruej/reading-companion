@@ -3,7 +3,7 @@
 // saved-word support once, without repeating the same reading-momentum message.
 export default function ReadAlongPageHeader() {
   return (
-    <header>
+    <header className="pt-3 sm:pt-4">
       <h1 className="text-2xl font-semibold text-stone-900">
         Fluid Reading with Saved Word Support
       </h1>

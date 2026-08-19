@@ -22,6 +22,14 @@ export default function BookVocabContextCard({
   const titleText = `Go to ${bookTitle || "this book"} Book Hub`;
 
   return (
+    <>
+      <Link
+        href={bookHubHref}
+        className="mb-2 inline-flex text-sm font-medium text-stone-500 underline-offset-4 transition hover:text-stone-800 hover:underline"
+      >
+        ← Back to Book Hub
+      </Link>
+
     <Link
       href={bookHubHref}
       className="flex w-full flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-3 text-left shadow-sm transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400 sm:flex-row sm:items-center sm:justify-between sm:p-4"
@@ -49,9 +57,7 @@ export default function BookVocabContextCard({
         </div>
       </div>
 
-      <span className="inline-flex w-fit rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800">
-        Book Hub
-      </span>
     </Link>
+    </>
   );
 }

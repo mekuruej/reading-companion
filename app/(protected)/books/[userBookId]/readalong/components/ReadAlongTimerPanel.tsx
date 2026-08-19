@@ -6,6 +6,7 @@ type ReadAlongTimerPanelProps = {
   sessionStartPage: string;
   sessionEndPage: string;
   timerSaveMessage: string;
+  compact?: boolean;
 
   onStartTimer: () => void;
   onPauseTimer: () => void;
@@ -29,6 +30,7 @@ export default function ReadAlongTimerPanel({
   sessionStartPage,
   sessionEndPage,
   timerSaveMessage,
+  compact = false,
   onStartTimer,
   onPauseTimer,
   onFinishRunningTimer,
@@ -40,10 +42,12 @@ export default function ReadAlongTimerPanel({
   onCancelTimedSession,
 }: ReadAlongTimerPanelProps) {
   return (
-    <div className="rounded-xl border border-stone-200 bg-white px-3 py-3">
-      <div className="mb-2 text-center text-sm text-stone-600">
-        Use the timer to track your fluid reading session with saved word support.
-      </div>
+    <div className={compact ? "rounded-xl border border-stone-200 bg-stone-50 px-3 py-2" : "rounded-xl border border-stone-200 bg-white px-3 py-3"}>
+      {!compact ? (
+        <div className="mb-2 text-center text-sm text-stone-600">
+          Use the timer to track your fluid reading session with saved word support.
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-center justify-center gap-2">
         {!isRunning && !isPaused ? (
