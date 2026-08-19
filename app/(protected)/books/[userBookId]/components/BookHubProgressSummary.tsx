@@ -14,6 +14,8 @@ type BookHubProgressSummaryProps = {
   savedWordsPerPageLabel: string;
   averageMinutesPerPageLabel: string;
   showVocabularyStats?: boolean;
+  showSummaryCard?: boolean;
+  showProgressSection?: boolean;
   summaryStats?: {
     label: string;
     value: string;
@@ -34,6 +36,8 @@ export default function BookHubProgressSummary({
   savedWordsPerPageLabel,
   averageMinutesPerPageLabel,
   showVocabularyStats = true,
+  showSummaryCard = true,
+  showProgressSection = true,
   summaryStats,
 }: BookHubProgressSummaryProps) {
   const showLastDetailLine = lastSavedWordLabel || lastChapterLabel || lastPageLabel;
@@ -49,7 +53,7 @@ export default function BookHubProgressSummary({
 
   return (
     <>
-      <div>
+      {showSummaryCard ? (
         <div className="mb-3 rounded-3xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-700 shadow-sm sm:px-5">
           <div className="font-semibold text-stone-900">Your Progress</div>
           {progressSummaryLabel ? (
@@ -88,58 +92,64 @@ export default function BookHubProgressSummary({
             </div>
           ) : null}
         </div>
+      ) : null}
 
-        <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-stone-500">
-          <span>Current Page Progress</span>
-          <span>
-            {progressPercentLabel ? `${progressPercentLabel} · ` : ""}{progressLabel}
-          </span>
-        </div>
+      {showProgressSection ? (
+        <>
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-stone-500">
+              <span>Current Page Progress</span>
+              <span>
+                {progressPercentLabel ? `${progressPercentLabel} · ` : ""}{progressLabel}
+              </span>
+            </div>
 
-        <div className="h-3 w-full overflow-hidden rounded-full bg-stone-200">
-          <div
-            className="h-full rounded-full bg-stone-700 transition-all"
-            style={{ width: progressBarWidth }}
-          />
-        </div>
-      </div>
-
-      {summaryStats && summaryStats.length === 0 ? null : (
-        <div className={`grid grid-cols-1 gap-3 ${statGridClass}`}>
-          {summaryStats ? (
-            summaryStats.map((stat) => (
-              <BookHubStatCard
-                key={stat.label}
-                label={stat.label}
-                value={stat.value}
-                caption={stat.caption}
+            <div className="h-3 w-full overflow-hidden rounded-full bg-stone-200">
+              <div
+                className="h-full rounded-full bg-stone-700 transition-all"
+                style={{ width: progressBarWidth }}
               />
-            ))
-          ) : (
-            <>
-              <BookHubStatCard
-                label="Days Engaged"
-                value={daysEngagedLabel}
-                caption={daysEngagedCaption}
-              />
+            </div>
+          </div>
 
-              {showVocabularyStats ? (
-                <BookHubStatCard
-                  label="Saved Words/Page"
-                  value={savedWordsPerPageLabel}
-                  caption="Saved-word load"
-                />
-              ) : null}
+          {summaryStats && summaryStats.length === 0 ? null : (
+            <div className={`grid grid-cols-1 gap-3 ${statGridClass}`}>
+              {summaryStats ? (
+                summaryStats.map((stat) => (
+                  <BookHubStatCard
+                    key={stat.label}
+                    label={stat.label}
+                    value={stat.value}
+                    caption={stat.caption}
+                  />
+                ))
+              ) : (
+                <>
+                  <BookHubStatCard
+                    label="Days Engaged"
+                    value={daysEngagedLabel}
+                    caption={daysEngagedCaption}
+                  />
 
-              <BookHubStatCard
-                label="Avg Min/Page"
-                value={averageMinutesPerPageLabel}
-                caption="Timed page-tracked reading"
-              />
-            </>
+                  {showVocabularyStats ? (
+                    <BookHubStatCard
+                      label="Saved Words/Page"
+                      value={savedWordsPerPageLabel}
+                      caption="Saved-word load"
+                    />
+                  ) : null}
+
+                  <BookHubStatCard
+                    label="Avg Min/Page"
+                    value={averageMinutesPerPageLabel}
+                    caption="Timed page-tracked reading"
+                  />
+                </>
+              )}
+            </div>
           )}
-        </div>
-      )}
+        </>
+      ) : null}
     </>
   );
 }

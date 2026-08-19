@@ -768,7 +768,7 @@ export default function SimpleTimedSessionPage({
     }
 
     const nativeModeToggle = allowNativeReadListenToggle ? (
-        <div className="mt-4 inline-flex rounded-2xl border border-stone-200 bg-white p-1 shadow-sm">
+        <div className="mx-auto flex w-fit rounded-2xl border border-stone-200 bg-white p-1 shadow-sm">
             {(["fluid", "listening"] as SessionMode[]).map((mode) => {
                 const active = activeSessionMode === mode;
                 const activeClass =
@@ -1127,29 +1127,12 @@ export default function SimpleTimedSessionPage({
             ) : null}
 
             <section className="overflow-hidden rounded-[2rem] border border-stone-200 bg-white p-4 shadow-sm">
-                <div className="grid gap-4 xl:grid-cols-[9.5rem_minmax(0,1fr)]">
-                    <div className="space-y-3">
-                        <div className="flex justify-center">
-                            {bookCover ? (
-                                <img
-                                    src={bookCover}
-                                    alt={`${bookTitle} cover`}
-                                    className="h-56 w-36 rounded-2xl object-cover shadow-lg"
-                                />
-                            ) : (
-                                <div className="flex h-56 w-36 items-center justify-center rounded-2xl bg-stone-100 text-sm text-stone-400">
-                                    No cover
-                                </div>
-                            )}
-                        </div>
-                        {timerPanel}
-                        {saveSessionForm}
-                        {progressUpdatePanel}
-                    </div>
+                <div className="space-y-4">
+                    <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                        {nativeModeToggle}
 
-                    <div className="min-w-0">
                         {!allowNativeReadListenToggle ? (
-                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
+                            <p className="mt-3 text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
                                 {activeEyebrow}
                             </p>
                         ) : null}
@@ -1167,7 +1150,28 @@ export default function SimpleTimedSessionPage({
                         <p className="mt-3 text-sm leading-7 text-stone-600">
                             {activeDescription}
                         </p>
-                        {nativeModeToggle}
+                    </div>
+
+                    <div className="grid items-start gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
+                        <div className="flex justify-center">
+                            {bookCover ? (
+                                <img
+                                    src={bookCover}
+                                    alt={`${bookTitle} cover`}
+                                    className="h-56 w-36 rounded-2xl object-cover shadow-lg"
+                                />
+                            ) : (
+                                <div className="flex h-56 w-36 items-center justify-center rounded-2xl bg-stone-100 text-sm text-stone-400">
+                                    No cover
+                                </div>
+                            )}
+                        </div>
+                        {timerPanel}
+                    </div>
+
+                    <div className="space-y-3">
+                        {saveSessionForm}
+                        {progressUpdatePanel}
                     </div>
                 </div>
             </section>
@@ -1244,18 +1248,21 @@ export default function SimpleTimedSessionPage({
 
                 <section className="overflow-hidden rounded-[2rem] border border-stone-200 bg-white shadow-sm">
                     <div className="grid gap-6 p-6 md:grid-cols-[280px_minmax(0,1fr)] md:p-8">
-                        <div className="flex justify-center">
-                            {bookCover ? (
-                                <img
-                                    src={bookCover}
-                                    alt={`${bookTitle} cover`}
-                                    className="h-[28rem] w-72 rounded-2xl object-cover shadow-xl"
-                                />
-                            ) : (
-                                <div className="flex h-[28rem] w-72 items-center justify-center rounded-2xl bg-stone-100 text-stone-400">
-                                    No cover
-                                </div>
-                            )}
+                        <div className="space-y-4">
+                            {nativeModeToggle}
+                            <div className="flex justify-center">
+                                {bookCover ? (
+                                    <img
+                                        src={bookCover}
+                                        alt={`${bookTitle} cover`}
+                                        className="h-[28rem] w-72 rounded-2xl object-cover shadow-xl"
+                                    />
+                                ) : (
+                                    <div className="flex h-[28rem] w-72 items-center justify-center rounded-2xl bg-stone-100 text-stone-400">
+                                        No cover
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         <div className="flex flex-col justify-center">
@@ -1278,7 +1285,6 @@ export default function SimpleTimedSessionPage({
                             <p className="mt-4 text-sm leading-7 text-stone-600">
                                 {activeDescription}
                             </p>
-                            {nativeModeToggle}
 
                             {timerPanel}
 

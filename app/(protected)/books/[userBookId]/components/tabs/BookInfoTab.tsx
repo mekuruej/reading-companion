@@ -5,6 +5,7 @@
 
 import { useEffect, useState, type ComponentType } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { normalizeBookLanguageCode } from "@/lib/books/bookLanguage";
 import BookInfoDetailsSection from "./BookInfoDetailsSection";
 import BookInfoLinksSection from "./BookInfoLinksSection";
 import BookInfoRecordSearchPanel from "./BookInfoRecordSearchPanel";
@@ -341,7 +342,9 @@ export default function BookInfoTab({
   Detail,
   PersonRow,
 }: BookInfoTabProps) {
-  const usesEnglishBookTerminology = book.language_code === "en";
+  const normalizedLanguageCode = normalizeBookLanguageCode(book.language_code);
+  const usesEnglishBookTerminology = normalizedLanguageCode === "en";
+  const usesJapaneseReadingMetadata = normalizedLanguageCode === "ja";
   const personSearchPlaceholder = usesEnglishBookTerminology
     ? "Stephen King"
     : "宮沢 賢治 / Kenji Miyazawa / みやざわ けんじ";
@@ -354,8 +357,11 @@ export default function BookInfoTab({
   const publisherSearchPlaceholder = usesEnglishBookTerminology
     ? "Penguin Random House"
     : "講談社 / Kodansha / こうだんしゃ";
-  const personNameInputLabel = usesEnglishBookTerminology ? "Name" : undefined;
-  const publisherNameInputLabel = usesEnglishBookTerminology ? "Publisher" : undefined;
+  const personNameInputLabel = usesJapaneseReadingMetadata
+    ? undefined
+    : "Author Name";
+  const contributorNameInputLabel = usesJapaneseReadingMetadata ? undefined : "Name";
+  const publisherNameInputLabel = usesJapaneseReadingMetadata ? undefined : "Publisher";
   const [authorSearch, setAuthorSearch] = useState("");
   const [authorResults, setAuthorResults] = useState<PersonRecord[]>([]);
   const [authorContributorMatches, setAuthorContributorMatches] = useState<PersonRecord[]>([]);
@@ -1234,8 +1240,8 @@ export default function BookInfoTab({
               readingValue={authorReading}
               setReadingValue={setAuthorReading}
               nameInputLabel={personNameInputLabel}
-              showEnglishName={!usesEnglishBookTerminology}
-              showReading={!usesEnglishBookTerminology}
+              showEnglishName={usesJapaneseReadingMetadata}
+              showReading={usesJapaneseReadingMetadata}
             />
           </div>
 
@@ -1294,9 +1300,9 @@ export default function BookInfoTab({
                 setImgValue={setTranslatorImg}
                 readingValue={translatorReading}
                 setReadingValue={setTranslatorReading}
-                nameInputLabel={personNameInputLabel}
-                showEnglishName={!usesEnglishBookTerminology}
-                showReading={!usesEnglishBookTerminology}
+                nameInputLabel={contributorNameInputLabel}
+                showEnglishName={usesJapaneseReadingMetadata}
+                showReading={usesJapaneseReadingMetadata}
               />
             </div>
           )}
@@ -1356,9 +1362,9 @@ export default function BookInfoTab({
                 setImgValue={setIllustratorImg}
                 readingValue={illustratorReading}
                 setReadingValue={setIllustratorReading}
-                nameInputLabel={personNameInputLabel}
-                showEnglishName={!usesEnglishBookTerminology}
-                showReading={!usesEnglishBookTerminology}
+                nameInputLabel={contributorNameInputLabel}
+                showEnglishName={usesJapaneseReadingMetadata}
+                showReading={usesJapaneseReadingMetadata}
               />
             </div>
           )}
@@ -1390,7 +1396,7 @@ export default function BookInfoTab({
                   createNewButtonLabel="Create New Publisher"
                   onCreateFromSearch={startNewPublisherFromSearch}
                   footerContent={
-                    usesEnglishBookTerminology ? null :
+                    !usesJapaneseReadingMetadata ? null :
                     <div className="mt-3">
                       <label className="mb-1 block text-sm font-medium text-stone-700">
                         Publisher name (English)
@@ -1430,8 +1436,8 @@ export default function BookInfoTab({
                 readingValue={publisherReading}
                 setReadingValue={setPublisherReading}
                 nameInputLabel={publisherNameInputLabel}
-                showEnglishName={!usesEnglishBookTerminology}
-                showReading={!usesEnglishBookTerminology}
+                showEnglishName={usesJapaneseReadingMetadata}
+                showReading={usesJapaneseReadingMetadata}
               />
             </div>
           )}

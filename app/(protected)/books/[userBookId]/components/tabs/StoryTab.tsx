@@ -118,6 +118,9 @@ type StoryTabProps = {
   chapterReverseOrder: boolean;
   setChapterReverseOrder: (value: boolean) => void;
   expandedChapterIds: string[];
+  setExpandedChapterIds: (
+    value: string[] | ((previousIds: string[]) => string[])
+  ) => void;
   toggleChapterExpanded: (id: string) => void;
   editingChapterIds: string[];
   savingChapterIds: string[];
@@ -297,6 +300,7 @@ export default function StoryTab({
   chapterReverseOrder,
   setChapterReverseOrder,
   expandedChapterIds,
+  setExpandedChapterIds,
   toggleChapterExpanded,
   editingChapterIds,
   savingChapterIds,
@@ -404,6 +408,15 @@ export default function StoryTab({
           .includes(cleanPlotSearch)
       )
     : visibleChapterSummaries;
+  const filteredVisibleChapterSummaryIds = filteredVisibleChapterSummaries.map(
+    (chapter) => chapter.id
+  );
+  const hasFilteredVisibleChapterSummaries = filteredVisibleChapterSummaryIds.length > 0;
+  const allFilteredChapterSummariesExpanded =
+    hasFilteredVisibleChapterSummaries &&
+    filteredVisibleChapterSummaryIds.every(
+      (id) => expandedChapterIds.includes(id) || editingChapterIds.includes(id)
+    );
 
   const cleanSettingSearch = settingSearch.trim().toLowerCase();
   const filteredVisibleSettingItems = cleanSettingSearch
@@ -658,6 +671,26 @@ export default function StoryTab({
                 className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
               >
                 {showChapterSummaries ? "Hide" : "Show"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (allFilteredChapterSummariesExpanded) {
+                    setExpandedChapterIds((previousIds) =>
+                      previousIds.filter((id) => !filteredVisibleChapterSummaryIds.includes(id))
+                    );
+                    return;
+                  }
+
+                  setExpandedChapterIds((previousIds) =>
+                    Array.from(new Set([...previousIds, ...filteredVisibleChapterSummaryIds]))
+                  );
+                }}
+                disabled={!hasFilteredVisibleChapterSummaries}
+                className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {allFilteredChapterSummariesExpanded ? "Collapse All" : "Expand All"}
               </button>
 
               <button

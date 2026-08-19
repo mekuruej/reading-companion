@@ -1127,6 +1127,7 @@ export default function ReadingJournalPanel({
       chapterReverseOrder={chapterReverseOrder}
       setChapterReverseOrder={setChapterReverseOrder}
       expandedChapterIds={expandedChapterIds}
+      setExpandedChapterIds={setExpandedChapterIds}
       toggleChapterExpanded={(id) =>
         setExpandedChapterIds((prev) =>
           prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -1279,7 +1280,6 @@ export default function ReadingJournalPanel({
                 Keep notes beside your book.
               </p>
             </div>
-            {actionLinks}
           </div>
         </div>
         <div className="max-h-[78vh] overflow-y-auto pr-1">{panel}</div>

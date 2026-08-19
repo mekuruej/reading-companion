@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -39,21 +40,8 @@ function isTeacherOrElevatedProfile(profile: ProfileRow | null) {
 
 function isActiveNonTrialFullAccess(profile: ProfileRow | null) {
   if (!profile) return false;
-
-  const accessType = (profile.app_access_type ?? "").trim().toLowerCase();
-  const trialCompatible =
-    !accessType ||
-    accessType === "trial" ||
-    accessType === "free" ||
-    accessType === "expired" ||
-    accessType === "none" ||
-    accessType === "inactive";
-
-  if (trialCompatible) return false;
-  if (!profile.app_access_expires_at) return true;
-
-  const expiry = new Date(profile.app_access_expires_at).getTime();
-  return !Number.isNaN(expiry) && expiry >= Date.now();
+  const access = getAppAccessStatus(profile);
+  return access.hasFullAccess && access.reason !== "trial" && access.reason !== "staff";
 }
 
 function cleanText(value: unknown) {

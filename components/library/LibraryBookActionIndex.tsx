@@ -5,11 +5,13 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { isJapaneseLearningBook } from "@/lib/access/readingCompanion";
 import { supabase } from "@/lib/supabaseClient";
 
 type BookInfo = {
     title: string | null;
     cover_url: string | null;
+    language_code?: string | null;
 };
 
 type LibraryBookRow = {
@@ -38,6 +40,7 @@ type LibraryBookActionIndexProps = {
     emptyText?: string;
     accent?: "stone" | "rose" | "emerald" | "sky" | "violet" | "amber" | "indigo";
     requireSavedWords?: boolean;
+    filterJapaneseBooks?: boolean;
     hrefForBook: (userBookId: string) => string;
 };
 
@@ -250,6 +253,7 @@ export default function LibraryBookActionIndex({
     emptyText = "No books in this section yet.",
     accent = "stone",
     requireSavedWords = false,
+    filterJapaneseBooks = false,
     hrefForBook,
 }: LibraryBookActionIndexProps) {
     const [loading, setLoading] = useState(true);
@@ -293,7 +297,8 @@ export default function LibraryBookActionIndex({
               created_at,
               books:book_id (
                 title,
-                cover_url
+                cover_url,
+                language_code
               )
             `
                     )
@@ -305,6 +310,12 @@ export default function LibraryBookActionIndex({
                 if (!isMounted) return;
 
                 let nextRows = (data ?? []) as LibraryBookRow[];
+
+                if (filterJapaneseBooks) {
+                    nextRows = nextRows.filter((row) =>
+                        isJapaneseLearningBook(getBook(row)?.language_code ?? null)
+                    );
+                }
 
                 if (requireSavedWords && nextRows.length > 0) {
                     const userBookIds = nextRows.map((row) => row.id);
@@ -340,7 +351,7 @@ export default function LibraryBookActionIndex({
         return () => {
             isMounted = false;
         };
-    }, [requireSavedWords]);
+    }, [requireSavedWords, filterJapaneseBooks]);
 
     const filteredRows = useMemo(() => {
         const cleanSearch = search.trim().toLowerCase();

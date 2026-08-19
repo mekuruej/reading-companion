@@ -55,6 +55,7 @@ const DAY_MS = 1000 * 60 * 60 * 24;
 type Book = {
   id: string;
   title: string;
+  language_code?: string | null;
   author: string | null;
   translator: string | null;
   illustrator: string | null;
@@ -146,6 +147,14 @@ type LibrarySortMode =
 
 const ABILITY_CHECK_REMINDER_MIN_DUE_CARDS = 10;
 
+function LibraryBooksLoadingState() {
+  return (
+    <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-5 text-sm font-semibold text-slate-500 shadow-sm">
+      Loading your Library books...
+    </div>
+  );
+}
+
 function formatTrialEndDate(date: Date) {
   return new Intl.DateTimeFormat(undefined, {
     year: "numeric",
@@ -181,6 +190,8 @@ export default function BooksPage() {
   const [readingStatsByUserBookId, setReadingStatsByUserBookId] = useState<
     Record<string, ReadingSessionStats>
   >({});
+  const [libraryBooksLoading, setLibraryBooksLoading] = useState(true);
+  const [libraryBooksError, setLibraryBooksError] = useState<string | null>(null);
 
   const [kanjiEnrichmentAlerts, setKanjiEnrichmentAlerts] = useState<KanjiEnrichmentAlertItem[]>([]);
   const [learningTasks, setLearningTasks] = useState<LearningTaskRow[]>([]);
@@ -495,9 +506,12 @@ export default function BooksPage() {
     } = await supabase.auth.getUser();
 
     if (userError || !user) {
+      setLibraryBooksError("Please sign in to view your Library.");
       setRows([]);
       return;
     }
+
+    setLibraryBooksError(null);
 
     const targetUserId = isTeacher ? userIdToView : user.id;
 
@@ -534,11 +548,13 @@ export default function BooksPage() {
 
     if (error) {
       logSbError("Error fetching user_books:", error);
+      setLibraryBooksError(error.message ?? "Could not load Library books.");
       setRows([]);
       return;
     }
 
     const loadedRows = (data as any) || [];
+    setLibraryBooksError(null);
     setRows(loadedRows);
 
     const userBookIds = loadedRows.map((r: any) => r.id);
@@ -1031,6 +1047,8 @@ export default function BooksPage() {
         if (!cancelled) {
           setRows([]);
           setTrialBanner(null);
+          setLibraryBooksLoading(false);
+          setLibraryBooksError("Please sign in to view your Library.");
         }
         return;
       }
@@ -1202,11 +1220,27 @@ export default function BooksPage() {
   }, [routeUsername]);
 
   useEffect(() => {
-    if (!viewingUserId || !meId) return;
+    if (!viewingUserId || !meId) {
+      setLibraryBooksLoading(true);
+      return;
+    }
+
+    let cancelled = false;
 
     setRows([]);
-    fetchBooks(viewingUserId);
-  }, [viewingUserId, meId, myRole]);
+    setLibraryBooksError(null);
+    setLibraryBooksLoading(true);
+
+    fetchBooks(viewingUserId).finally(() => {
+      if (!cancelled) {
+        setLibraryBooksLoading(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [viewingUserId, meId, myRole, isSuperTeacher]);
 
   useEffect(() => {
     const canViewLearningTasks =
@@ -1353,6 +1387,11 @@ export default function BooksPage() {
     (viewingUserId === meId || isViewingStudentLibrary) &&
     !learningTasksLoading &&
     !!learningTasksError;
+  const showLibraryBooksLoading = libraryBooksLoading;
+  const showLibraryBooksError = !libraryBooksLoading && !!libraryBooksError;
+  const showLibraryBookSections = !libraryBooksLoading && !libraryBooksError;
+  const showLibraryEmptyState =
+    showLibraryBookSections && allValidRows.length === 0;
 
   function learningTaskTypeLabel(taskType: string) {
     if (taskType === "reread_pages") return "Reread pages";
@@ -1529,7 +1568,14 @@ export default function BooksPage() {
 
         <LibraryGuidePanel
           hasFullAccess={hasFullLearningAccess || isTeacher}
-          onNavigate={(path) => router.push(path === "/books/add" ? addBookHref : path)}
+          onNavigate={(path) => {
+            if (path === "/books/add") {
+              router.push(addBookHref);
+              return;
+            }
+
+            router.push(path);
+          }}
         />
 
         {false && isTeacher && viewingUserId === meId && kanjiEnrichmentAlerts.length > 0 ? (
@@ -1599,69 +1645,78 @@ export default function BooksPage() {
           All reading/study tools live inside each book. Click a cover to open its Book Hub.
         </p>
 
-        {viewMode === "cover" ? (
-          sortMode === "status" ? (
+        {showLibraryBooksLoading ? <LibraryBooksLoadingState /> : null}
+
+        {showLibraryBooksError ? (
+          <div className="mt-8 rounded-3xl border border-red-200 bg-red-50 p-5 text-sm font-semibold text-red-700 shadow-sm">
+            {libraryBooksError}
+          </div>
+        ) : null}
+
+        {showLibraryBookSections ? (
+          viewMode === "cover" ? (
+            sortMode === "status" ? (
+              <>
+                {null}
+                <LibrarySection
+                  title="Currently Reading"
+                  subtitle="Started but not finished yet"
+                  count={currentlyReading.length}
+                  gridClassName={gridClass}
+                >
+                  {currentlyReading.map((row) => renderBookCard(row))}
+                </LibrarySection>
+
+                <LibrarySection
+                  title="Want to Read"
+                  subtitle="Not started yet"
+                  count={notStarted.length}
+                  gridClassName={gridClass}
+                >
+                  {notStarted.map((row) => renderBookCard(row))}
+                </LibrarySection>
+
+                <LibrarySection
+                  title="Finished"
+                  subtitle="Completed books"
+                  count={finished.length}
+                  gridClassName={gridClass}
+                >
+                  {finished.map((row) => renderBookCard(row))}
+                </LibrarySection>
+
+                <LibrarySection
+                  title="DNF"
+                  subtitle="Did not finish"
+                  count={dnf.length}
+                  gridClassName={gridClass}
+                >
+                  {dnf.map((row) => renderBookCard(row))}
+                </LibrarySection>
+              </>
+            ) : (
+              <ul className={gridClass}>
+                {sortedValidRows.map((row) => renderBookCard(row))}
+              </ul>
+            )
+          ) : (
             <>
               {null}
-              <LibrarySection
-                title="Currently Reading"
-                subtitle="Started but not finished yet"
-                count={currentlyReading.length}
-                gridClassName={gridClass}
-              >
-                {currentlyReading.map((row) => renderBookCard(row))}
-              </LibrarySection>
 
-              <LibrarySection
-                title="Want to Read"
-                subtitle="Not started yet"
-                count={notStarted.length}
-                gridClassName={gridClass}
-              >
-                {notStarted.map((row) => renderBookCard(row))}
-              </LibrarySection>
-
-              <LibrarySection
-                title="Finished"
-                subtitle="Completed books"
-                count={finished.length}
-                gridClassName={gridClass}
-              >
-                {finished.map((row) => renderBookCard(row))}
-              </LibrarySection>
-
-              <LibrarySection
-                title="DNF"
-                subtitle="Did not finish"
-                count={dnf.length}
-                gridClassName={gridClass}
-              >
-                {dnf.map((row) => renderBookCard(row))}
-              </LibrarySection>
+              <ul className="overflow-hidden rounded-xl border bg-white">
+                {sortedValidRows.map((row) => renderBookRow(row))}
+              </ul>
             </>
-          ) : (
-            <ul className={gridClass}>
-              {sortedValidRows.map((row) => renderBookCard(row))}
-            </ul>
           )
-        ) : (
-          <>
-            {null}
+        ) : null}
 
-            <ul className="overflow-hidden rounded-xl border bg-white">
-              {sortedValidRows.map((row) => renderBookRow(row))}
-            </ul>
-          </>
-        )}
-
-        {allValidRows.length === 0 ? (
+        {showLibraryEmptyState ? (
           <LibraryEmptyState
             onAddBook={() => router.push(addBookHref)}
             showJapaneseLearningDiscovery={showEmptyLibraryJapaneseLearningDiscovery}
             onLearnJapaneseLearning={() => router.push("/japanese-learning")}
           />
         ) : null}
-
         {isTeacher ? (
           <>
             <FloatingAddBookButton onClick={() => router.push(addBookHref)} />

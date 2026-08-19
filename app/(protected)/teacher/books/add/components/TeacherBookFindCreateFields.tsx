@@ -5,6 +5,7 @@ type TeacherBookFindCreateFieldsProps = {
     asin: string;
     isBookRequest: boolean;
     titleNeedsManualResearch: boolean;
+    showTitleReading?: boolean;
     onTitleChange: (value: string) => void;
     onTitleReadingChange: (value: string) => void;
     onIsbn13Change: (value: string) => void;
@@ -18,6 +19,7 @@ export function TeacherBookFindCreateFields({
     asin,
     isBookRequest,
     titleNeedsManualResearch,
+    showTitleReading = false,
     onTitleChange,
     onTitleReadingChange,
     onIsbn13Change,
@@ -44,18 +46,20 @@ export function TeacherBookFindCreateFields({
                 ) : null}
             </div>
 
-            <div>
-                <label className="mb-1 block text-sm font-semibold">
-                    Title reading
-                    <span className="font-normal text-stone-500"> (optional)</span>
-                </label>
-                <input
-                    value={titleReading}
-                    onChange={(event) => onTitleReadingChange(event.target.value)}
-                    placeholder="かな reading for the title"
-                    className="w-full rounded-xl border border-slate-500 px-4 py-3"
-                />
-            </div>
+            {showTitleReading ? (
+                <div>
+                    <label className="mb-1 block text-sm font-semibold">
+                        Title reading
+                        <span className="font-normal text-stone-500"> (optional)</span>
+                    </label>
+                    <input
+                        value={titleReading}
+                        onChange={(event) => onTitleReadingChange(event.target.value)}
+                        placeholder="かな reading for the title"
+                        className="w-full rounded-xl border border-slate-500 px-4 py-3"
+                    />
+                </div>
+            ) : null}
 
             <div>
                 <label className="mb-1 block text-sm font-semibold">

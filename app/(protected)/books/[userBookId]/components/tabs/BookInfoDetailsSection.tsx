@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import { normalizeBookLanguageCode } from "@/lib/books/bookLanguage";
 
 type BookDetails = {
   title_reading?: string | null;
@@ -103,6 +104,8 @@ export default function BookInfoDetailsSection({
   BOOK_TYPE_OPTIONS,
   Detail,
 }: BookInfoDetailsSectionProps) {
+  const normalizedLanguageCode = normalizeBookLanguageCode(book.language_code);
+  const isJapaneseEdition = normalizedLanguageCode === "ja";
   const genericEditionFormatOptions = [
     { value: "paperback", label: "Paperback" },
     { value: "hardcover", label: "Hardcover" },
@@ -119,12 +122,11 @@ export default function BookInfoDetailsSection({
     { value: "other", label: "Other" },
   ];
   const editionFormatOptions =
-    book.language_code === "ja" ? japaneseEditionFormatOptions : genericEditionFormatOptions;
+    isJapaneseEdition ? japaneseEditionFormatOptions : genericEditionFormatOptions;
   const editionFormatLabel =
     [...japaneseEditionFormatOptions, ...genericEditionFormatOptions].find(
       (option) => option.value === book.edition_format
     )?.label ?? "—";
-  const usesEnglishReadingTerminology = book.language_code === "en";
 
   return (
     <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
@@ -169,18 +171,16 @@ export default function BookInfoDetailsSection({
       </div>
 
       <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-        <Detail
-          label={usesEnglishReadingTerminology ? "Title Pronunciation" : "Title Reading"}
-          value={book.title_reading}
-          editing={isEditingBookInfo}
-          inputValue={titleReading}
-          setInputValue={setTitleReading}
-          placeholder={
-            usesEnglishReadingTerminology
-              ? "Optional pronunciation note"
-              : "かな reading for the title"
-          }
-        />
+        {isJapaneseEdition ? (
+          <Detail
+            label="Title Reading"
+            value={book.title_reading}
+            editing={isEditingBookInfo}
+            inputValue={titleReading}
+            setInputValue={setTitleReading}
+            placeholder="かな reading for the title"
+          />
+        ) : null}
 
         <div className="rounded border bg-white p-3 text-sm">
           <div className="text-stone-600">Book Type</div>

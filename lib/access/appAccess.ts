@@ -8,6 +8,21 @@ type AppAccessProfile = {
   app_access_expires_at?: string | null;
 };
 
+export type CanonicalAppAccessType =
+  | "free"
+  | "trial"
+  | "reading_access"
+  | "lesson_access"
+  | "inactive";
+
+export type LegacyAppAccessAlias =
+  | "student"
+  | "paid"
+  | "full_access"
+  | "book_club"
+  | "expired"
+  | "none";
+
 type AppAccessStatus = {
   // Can the user enter the app at all?
   hasAccess: boolean;
@@ -28,14 +43,20 @@ type AppAccessStatus = {
   | "expired"
   | "no_expiration"
   | "invalid_expiration"
+  | "unknown"
   | "active"
   | "trial";
 };
 
-const FULL_ACCESS_TYPES = new Set([
-  "student",
+const CANONICAL_FULL_ACCESS_TYPES = new Set<CanonicalAppAccessType>([
   "reading_access",
   "lesson_access",
+]);
+
+// Temporary read aliases for rows that predate the canonical entitlement
+// vocabulary. New database writes should use CanonicalAppAccessType only.
+const LEGACY_FULL_ACCESS_ALIASES = new Set<LegacyAppAccessAlias>([
+  "student",
   "paid",
   "book_club",
   "full_access",
@@ -49,6 +70,10 @@ export function getAppAccessStatus(profile: AppAccessProfile): AppAccessStatus {
   const role = profile.role ?? "";
   const accessType = (profile.app_access_type ?? "").trim().toLowerCase();
   const expiresAt = profile.app_access_expires_at ?? null;
+  const expiry = expiresAt ? new Date(expiresAt).getTime() : null;
+  const hasExpiry = Boolean(expiresAt);
+  const hasValidExpiry = expiry != null && !Number.isNaN(expiry);
+  const expiryIsActive = hasValidExpiry && expiry >= Date.now();
 
   function status(
     values: Omit<
@@ -56,9 +81,8 @@ export function getAppAccessStatus(profile: AppAccessProfile): AppAccessStatus {
       "accessType" | "daysRemaining" | "isTrialActive" | "isTrialExpired"
     >
   ): AppAccessStatus {
-    const expiry = expiresAt ? new Date(expiresAt).getTime() : null;
     const daysRemaining =
-      expiry && !Number.isNaN(expiry)
+      hasValidExpiry
         ? Math.max(0, Math.ceil((expiry - Date.now()) / (1000 * 60 * 60 * 24)))
         : null;
     const isTrial = accessType === "trial";
@@ -68,8 +92,29 @@ export function getAppAccessStatus(profile: AppAccessProfile): AppAccessStatus {
       accessType,
       daysRemaining,
       isTrialActive: isTrial && values.hasFullAccess,
-      isTrialExpired: isTrial && !values.hasFullAccess && values.reason === "expired",
+      isTrialExpired:
+        isTrial && !values.hasFullAccess && hasValidExpiry && !expiryIsActive,
     };
+  }
+
+  function expiringFullAccessStatus() {
+    if (!hasExpiry) {
+      return status({ hasAccess: true, hasFullAccess: true, reason: "active" });
+    }
+
+    if (!hasValidExpiry) {
+      return status({
+        hasAccess: true,
+        hasFullAccess: false,
+        reason: "invalid_expiration",
+      });
+    }
+
+    return status({
+      hasAccess: true,
+      hasFullAccess: expiryIsActive,
+      reason: expiryIsActive ? "active" : "expired",
+    });
   }
 
   if (
@@ -86,6 +131,30 @@ export function getAppAccessStatus(profile: AppAccessProfile): AppAccessStatus {
     return status({ hasAccess: true, hasFullAccess: false, reason: "free" });
   }
 
+  if (accessType === "trial") {
+    if (!hasExpiry) {
+      return status({
+        hasAccess: true,
+        hasFullAccess: false,
+        reason: "no_expiration",
+      });
+    }
+
+    if (!hasValidExpiry) {
+      return status({
+        hasAccess: true,
+        hasFullAccess: false,
+        reason: "invalid_expiration",
+      });
+    }
+
+    return status({
+      hasAccess: true,
+      hasFullAccess: expiryIsActive,
+      reason: expiryIsActive ? "trial" : "expired",
+    });
+  }
+
   if (accessType === "expired") {
     return status({ hasAccess: true, hasFullAccess: false, reason: "expired" });
   }
@@ -94,25 +163,24 @@ export function getAppAccessStatus(profile: AppAccessProfile): AppAccessStatus {
     return status({ hasAccess: false, hasFullAccess: false, reason: accessType });
   }
 
-  if (FULL_ACCESS_TYPES.has(accessType)) {
-    return status({ hasAccess: true, hasFullAccess: true, reason: "active" });
+  if (
+    CANONICAL_FULL_ACCESS_TYPES.has(accessType as CanonicalAppAccessType) ||
+    LEGACY_FULL_ACCESS_ALIASES.has(accessType as LegacyAppAccessAlias)
+  ) {
+    return expiringFullAccessStatus();
   }
 
   if (!expiresAt) {
     return status({ hasAccess: true, hasFullAccess: false, reason: "no_expiration" });
   }
 
-  const expiry = new Date(expiresAt).getTime();
-
-  if (Number.isNaN(expiry)) {
+  if (!hasValidExpiry) {
     return status({ hasAccess: true, hasFullAccess: false, reason: "invalid_expiration" });
   }
 
-  const isActive = expiry >= Date.now();
-
   return status({
     hasAccess: true,
-    hasFullAccess: isActive,
-    reason: isActive && accessType === "trial" ? "trial" : isActive ? "active" : "expired",
+    hasFullAccess: false,
+    reason: "unknown",
   });
 }

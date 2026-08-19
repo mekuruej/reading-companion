@@ -6,8 +6,6 @@
 import JapaneseLearningPromoCard from "@/components/japanese-learning/JapaneseLearningPromoCard";
 
 type BookHubActionGridProps = {
-  hasFullAccess: boolean;
-  isTrialAccess?: boolean;
   canUseJapaneseLearningActions?: boolean;
   canUseCuriosityReading: boolean;
   canUseSavedWordReading: boolean;
@@ -103,7 +101,7 @@ function ActionSection({
   description,
   children,
 }: {
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
   description?: string;
   children: React.ReactNode;
@@ -111,10 +109,14 @@ function ActionSection({
   return (
     <section className="space-y-3">
       <div>
-        <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-500">
-          {eyebrow}
-        </p>
-        <h2 className="mt-1 text-xl font-black text-stone-950">{title}</h2>
+        {eyebrow ? (
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-500">
+            {eyebrow}
+          </p>
+        ) : null}
+        <h2 className={eyebrow ? "mt-1 text-xl font-black text-stone-950" : "text-xl font-black text-stone-950"}>
+          {title}
+        </h2>
         {description ? (
           <p className="mt-1 text-sm leading-6 text-stone-600">{description}</p>
         ) : null}
@@ -124,9 +126,54 @@ function ActionSection({
   );
 }
 
+function CompactActionButton({
+  title,
+  description,
+  className = "",
+  onClick,
+}: {
+  title: string;
+  description: string;
+  className?: string;
+  onClick: () => void | Promise<void>;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "rounded-xl border border-stone-200 bg-white px-3.5 py-3 text-left shadow-sm transition-all hover:-translate-y-[1px] hover:border-stone-300 hover:shadow-md",
+        className,
+      ].join(" ")}
+    >
+      <div className="text-base font-black text-stone-900">{title}</div>
+      <div className="mt-1 text-xs leading-5 text-stone-600">{description}</div>
+    </button>
+  );
+}
+
+function UtilityActionButton({
+  title,
+  description,
+  onClick,
+}: {
+  title: string;
+  description: string;
+  onClick: () => void | Promise<void>;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex min-h-11 items-center justify-center rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-black text-stone-800 shadow-sm transition hover:-translate-y-[1px] hover:border-stone-400 hover:bg-stone-50 hover:shadow-md"
+      title={description}
+    >
+      {title}
+    </button>
+  );
+}
+
 export default function BookHubActionGrid({
-  hasFullAccess,
-  isTrialAccess = false,
   canUseJapaneseLearningActions = false,
   canUseCuriosityReading,
   canUseSavedWordReading,
@@ -172,9 +219,8 @@ export default function BookHubActionGrid({
 
       {showJapaneseLearningSection ? (
         <ActionSection
-          eyebrow="Japanese Learning"
-          title="Study tools for this Japanese book"
-          description="Additional language-learning tools available with your current access."
+          title="Japanese Learning Tools"
+          description="Extra tools for reading and studying Japanese books."
         >
           <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
             {canUseSavedWordReading ? (
@@ -196,7 +242,7 @@ export default function BookHubActionGrid({
                 title="Review Words"
                 subtitle="Flashcards"
                 description="Review the words you saved from this book."
-                className="bg-violet-50 hover:bg-violet-100"
+                className="bg-blue-50 hover:bg-blue-100"
                 onClick={onStudyFlashcards}
                 size="primary"
               />
@@ -214,28 +260,20 @@ export default function BookHubActionGrid({
             ) : null}
           </div>
 
-          <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 [&>button]:h-[104px]">
+          <div className="flex flex-wrap gap-2 pt-1">
             {canUseVocabularyList ? (
-              <ActionButton
+              <UtilityActionButton
                 title="Vocabulary List"
-                description={
-                  hasFullAccess || isTrialAccess
-                    ? "Open the saved words and vocabulary tools for this book."
-                    : "Open saved words for this book."
-                }
-                className="bg-emerald-50 hover:bg-emerald-100"
+                description="Open the saved words and vocabulary tools for this book."
                 onClick={onVocabularyList}
-                size="secondary"
               />
             ) : null}
 
             {canUseBulkAdd && onBulkAdd ? (
-              <ActionButton
+              <UtilityActionButton
                 title="Bulk Add"
                 description="Add several words to this book at once."
-                className="bg-yellow-50 hover:bg-yellow-100"
                 onClick={onBulkAdd}
-                size="secondary"
               />
             ) : null}
           </div>
@@ -243,49 +281,39 @@ export default function BookHubActionGrid({
       ) : null}
 
       <ActionSection
-        eyebrow="Reading Companion"
-        title="Read, track, and remember this book"
-        description="The universal reading workspace for this book."
+        title="Reading Companion"
+        description="The everyday tools available in all Book Hubs for tracking and engaging with your reading."
       >
-        <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 [&>button]:h-[104px]">
-          <ActionButton
+        <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <CompactActionButton
             title="Read / Listen"
-            description={[
-              "Time reading or listening and update progress.",
-              "You can open the Reading Journal beside it if you want to take notes.",
-            ]}
-            className="bg-emerald-50 hover:bg-emerald-100"
+            description="Time reading or listening and update progress."
+            className="border-emerald-200 bg-emerald-50/60 hover:bg-emerald-50"
             onClick={onFluidReadingJustReading}
-            size="secondary"
           />
 
           {onStoryNotes ? (
-            <ActionButton
+            <CompactActionButton
               title="Reading Journal"
               description="Track characters, plot, quotes, notes, and reviews."
-              className="bg-sky-50 hover:bg-sky-100"
+              className="border-sky-200 bg-sky-50/60 hover:bg-sky-50"
               onClick={onStoryNotes}
-              size="secondary"
             />
           ) : null}
 
           {onBookStats ? (
-            <ActionButton
+            <CompactActionButton
               title="Book Stats"
               description="Open time, pages, sessions, and progress for this book."
-              className="bg-yellow-50 hover:bg-yellow-100"
               onClick={onBookStats}
-              size="secondary"
             />
           ) : null}
 
           {onReadingSessions ? (
-            <ActionButton
+            <CompactActionButton
               title="Reading History"
               description="Edit session records, dates, and reading history for this book."
-              className="bg-purple-50 hover:bg-purple-100"
               onClick={onReadingSessions}
-              size="secondary"
             />
           ) : null}
         </div>

@@ -5356,6 +5356,7 @@ export default function BookHubPage() {
 
   const showBookHubStartButton = !started && realReadingSessions.length === 0;
   const showBookHubFinishDnfButtons = !finishedAt && !dnfAt;
+  const showUpperProgressSummary = isJapaneseLearningBook(book.language_code ?? null);
   return (
     <main className="min-h-screen bg-stone-50 p-6">
       {showBookFlagModal ? (
@@ -5414,37 +5415,60 @@ export default function BookHubPage() {
                 }}
               />
 
-              <BookHubStatusPanel
-                statusLabel={bookHubStatusLabel}
-                startedAt={startedAt}
-                finishedAt={finishedAt}
-                dnfAt={dnfAt}
-                dnfReason={dnfReason}
-                dnfNote={dnfNote}
-                wouldRetry={wouldRetry}
-                showStartButton={showBookHubStartButton}
-                showFinishDnfButtons={showBookHubFinishDnfButtons}
-                showReflectionLink={shouldShowReadingReflectionNudge}
-                showReviewLink={!isEnglishNativeTrackerBook && canUseMyReviewNotes}
-                reviewLinkLabel={isEnglishNativeTrackerBook ? "Review & Ratings" : "My Review"}
-                shouldNudgeStartBook={shouldNudgeStartBook}
-                shouldNudgeFinishBook={shouldNudgeFinishBook}
-                canFillBeginningPages={canFillBeginningPages}
-                canFillEndingPages={canFillEndingPages}
-                earliestTrackedStartPage={earliestTrackedStartPage}
-                furthestTrackedPage={furthestTrackedPage}
-                pageCount={book.page_count}
-                onStartToday={() => void markStartedToday()}
-                onMarkFinished={() => void markFinishedToday()}
-                onMarkDnf={() => void markDnfToday()}
-                onOpenReview={() => {
-                  if (!confirmLeaveIfTimerActive()) return;
-                  router.push(`/books/${row.id}/review`);
-                }}
-                onOpenReflection={openReadingReflection}
-                onFillBeginningPages={fillBeginningPages}
-                onFillEndingPages={fillEndingPages}
-              />
+              <div className={showUpperProgressSummary ? "md:row-span-2" : ""}>
+                <BookHubStatusPanel
+                  statusLabel={bookHubStatusLabel}
+                  startedAt={startedAt}
+                  finishedAt={finishedAt}
+                  dnfAt={dnfAt}
+                  dnfReason={dnfReason}
+                  dnfNote={dnfNote}
+                  wouldRetry={wouldRetry}
+                  showStartButton={showBookHubStartButton}
+                  showFinishDnfButtons={showBookHubFinishDnfButtons}
+                  showReflectionLink={shouldShowReadingReflectionNudge}
+                  showReviewLink={!isEnglishNativeTrackerBook && canUseMyReviewNotes}
+                  reviewLinkLabel={isEnglishNativeTrackerBook ? "Review & Ratings" : "My Review"}
+                  shouldNudgeStartBook={shouldNudgeStartBook}
+                  shouldNudgeFinishBook={shouldNudgeFinishBook}
+                  canFillBeginningPages={canFillBeginningPages}
+                  canFillEndingPages={canFillEndingPages}
+                  earliestTrackedStartPage={earliestTrackedStartPage}
+                  furthestTrackedPage={furthestTrackedPage}
+                  pageCount={book.page_count}
+                  onStartToday={() => void markStartedToday()}
+                  onMarkFinished={() => void markFinishedToday()}
+                  onMarkDnf={() => void markDnfToday()}
+                  onOpenReview={() => {
+                    if (!confirmLeaveIfTimerActive()) return;
+                    router.push(`/books/${row.id}/review`);
+                  }}
+                  onOpenReflection={openReadingReflection}
+                  onFillBeginningPages={fillBeginningPages}
+                  onFillEndingPages={fillEndingPages}
+                />
+              </div>
+
+              {showUpperProgressSummary ? (
+                <div className="md:col-span-2">
+                  <BookHubProgressSummary
+                    progressLabel={bookHubProgressLabel}
+                    progressSummaryLabel={bookHubProgressSummaryLabel}
+                    progressBarWidth={bookHubProgressBarWidth}
+                    progressPercentLabel={bookHubProgressPercentLabel}
+                    lastSavedWordLabel={bookHubLastSavedWordLabel}
+                    lastChapterLabel={bookHubLastChapterLabel}
+                    lastPageLabel={bookHubLastPageLabel}
+                    daysEngagedLabel={bookHubDaysEngagedLabel}
+                    daysEngagedCaption={isEnglishNativeTrackerBook ? "Reading dates" : undefined}
+                    savedWordsPerPageLabel={bookHubSavedWordsPerPageLabel}
+                    averageMinutesPerPageLabel={bookHubAverageMinutesPerPageLabel}
+                    showVocabularyStats={!isEnglishNativeTrackerBook}
+                    showProgressSection={false}
+                    summaryStats={isEnglishNativeTrackerBook ? [] : undefined}
+                  />
+                </div>
+              ) : null}
             </div>
 
             {row.is_teacher_prep && row.teacher_prep_kind === "trial" ? (
@@ -5467,6 +5491,7 @@ export default function BookHubPage() {
                 savedWordsPerPageLabel={bookHubSavedWordsPerPageLabel}
                 averageMinutesPerPageLabel={bookHubAverageMinutesPerPageLabel}
                 showVocabularyStats={!isEnglishNativeTrackerBook}
+                showSummaryCard={false}
                 summaryStats={isEnglishNativeTrackerBook ? [] : undefined}
               />
 
@@ -5479,8 +5504,6 @@ export default function BookHubPage() {
                 saveNoticeTone={saveNoticeTone}
               />
               <BookHubActionGrid
-                hasFullAccess={hasFullLearningAccess || isTeacher}
-                isTrialAccess={isTrialLearningAccess}
                 canUseJapaneseLearningActions={canUseJapaneseLearningActions}
                 canUseCuriosityReading={canUseCuriosityReading}
                 canUseSavedWordReading={canUseSavedWordReading}

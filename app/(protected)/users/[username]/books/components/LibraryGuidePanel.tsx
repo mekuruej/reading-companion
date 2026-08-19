@@ -8,54 +8,162 @@ export default function LibraryGuidePanel({
   onNavigate,
   hasFullAccess,
 }: LibraryGuidePanelProps) {
-  const freeGuide = (
+  const renderReadingCompanionGuide = ({
+    includeAddBookInGrid,
+    useShortDescriptions,
+    showFinishedDnfNote,
+  }: {
+    includeAddBookInGrid: boolean;
+    useShortDescriptions: boolean;
+    showFinishedDnfNote: boolean;
+  }) => (
     <div className="mt-4 space-y-4">
-      <button
-        type="button"
-        onClick={() => onNavigate("/books/add")}
-        className="rounded-2xl border border-sky-100 bg-sky-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-sky-100"
-      >
-        <div className="text-sm font-black text-slate-950">Add Book</div>
-        <p className="mt-1 text-xs leading-5 text-slate-600">
-          Add books you are reading or want to track.
-        </p>
-      </button>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-3 py-2.5">
-          <div className="text-sm font-black text-slate-950">Open a book</div>
+      {!includeAddBookInGrid ? (
+        <button
+          type="button"
+          onClick={() => onNavigate("/books/add")}
+          className="rounded-2xl border border-sky-100 bg-sky-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-sky-100"
+        >
+          <div className="text-sm font-black text-slate-950">Add Book</div>
           <p className="mt-1 text-xs leading-5 text-slate-600">
-            After adding a book or books, click a book cover below to open its Book Hub.
+            {useShortDescriptions
+              ? "Add books to your Library."
+              : "Add books you are reading or want to track."}
+          </p>
+        </button>
+      ) : null}
+
+      <div className={`grid gap-3 sm:grid-cols-2 ${includeAddBookInGrid ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
+        {includeAddBookInGrid ? (
+          <button
+            type="button"
+            onClick={() => onNavigate("/books/add")}
+            className="rounded-2xl border border-sky-100 bg-sky-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-sky-100"
+          >
+            <div className="text-sm font-black text-slate-950">Add Book</div>
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              Add books to your Library.
+            </p>
+          </button>
+        ) : null}
+
+        <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-3 py-2.5">
+          <div className="text-sm font-black text-slate-950">Open a Book Hub</div>
+          <p className="mt-1 text-xs leading-5 text-slate-600">
+            {useShortDescriptions
+              ? "Click a book cover below."
+              : "After adding a book or books, click a book cover below."}
           </p>
         </div>
 
         <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3 py-2.5">
           <div className="text-sm font-black text-slate-950">Read / Listen</div>
           <p className="mt-1 text-xs leading-5 text-slate-600">
-            In the Book Hub, record reading or listening time and progress.
+            {useShortDescriptions
+              ? "Track reading or listening."
+              : "In the Book Hub, record reading or listening time and progress."}
           </p>
         </div>
 
         <div className="rounded-2xl border border-sky-100 bg-sky-50/70 px-3 py-2.5">
           <div className="text-sm font-black text-slate-950">Reading Journal</div>
           <p className="mt-1 text-xs leading-5 text-slate-600">
-            Keep characters, plot, quotes, notes, and reviews with the book.
+            {useShortDescriptions
+              ? "Keep reading notes."
+              : "Keep characters, plot, quotes, notes, and reviews with the book."}
           </p>
         </div>
 
         <div className="rounded-2xl border border-amber-100 bg-amber-50/70 px-3 py-2.5">
-          <div className="text-sm font-black text-slate-950">Look back</div>
+          <div className="text-sm font-black text-slate-950">Reading History</div>
           <p className="mt-1 text-xs leading-5 text-slate-600">
-            Reading History shows sessions. Book Stats shows progress, time, and pace.
+            {useShortDescriptions
+              ? "See your past sessions."
+              : "Review the reading and listening sessions you have logged for the book."}
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-violet-100 bg-violet-50/70 px-3 py-2.5">
+          <div className="text-sm font-black text-slate-950">Book Stats</div>
+          <p className="mt-1 text-xs leading-5 text-slate-600">
+            {useShortDescriptions
+              ? "See progress and pace."
+              : "See progress, time, pace, and related reading stats for the book."}
           </p>
         </div>
       </div>
 
-      <p className="text-xs leading-5 text-slate-500">
-        From the Book Hub, you can also mark a book Finished or DNF.
-      </p>
+      {showFinishedDnfNote ? (
+        <p className="text-xs leading-5 text-slate-500">
+          From the Book Hub, you can also mark a book Finished or DNF.
+        </p>
+      ) : null}
     </div>
   );
+
+  const japaneseLearningGuide = (
+    <div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50/60 px-3 py-3">
+      <div>
+        <h3 className="text-sm font-black text-slate-950">Japanese Learning</h3>
+        <p className="mt-1 text-xs leading-5 text-slate-600">
+          Japanese books include extra tools for reading and studying.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => onNavigate("/library/japanese-books")}
+        className="mt-3 rounded-2xl border border-violet-200 bg-white px-3 py-2.5 text-left text-sm font-black text-violet-950 shadow-sm transition hover:-translate-y-0.5 hover:bg-violet-50"
+      >
+        Open Japanese Books
+      </button>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl border border-white/80 bg-white/75 px-3 py-2.5">
+          <div className="text-sm font-black text-slate-950">Follow-Along</div>
+          <p className="mt-1 text-xs leading-5 text-slate-600">
+            Read with support from saved vocabulary.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-white/80 bg-white/75 px-3 py-2.5">
+          <div className="text-sm font-black text-slate-950">Save Words</div>
+          <p className="mt-1 text-xs leading-5 text-slate-600">
+            Look up and save words as you read.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-white/80 bg-white/75 px-3 py-2.5">
+          <div className="text-sm font-black text-slate-950">Review Words</div>
+          <p className="mt-1 text-xs leading-5 text-slate-600">
+            Study vocabulary from the book.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+
+  const fullAccessGuide = (
+    <>
+      <p className="mt-3 max-w-3xl text-xs leading-5 text-slate-600 sm:text-sm">
+        Use your Library to record and track your books. Open a book&apos;s Book Hub to choose how
+        you want to read, listen, take notes, review progress, or study.
+      </p>
+
+      {renderReadingCompanionGuide({
+        includeAddBookInGrid: true,
+        useShortDescriptions: true,
+        showFinishedDnfNote: false,
+      })}
+      {japaneseLearningGuide}
+    </>
+  );
+
+  const freeAccessGuide = renderReadingCompanionGuide({
+    includeAddBookInGrid: false,
+    useShortDescriptions: false,
+    showFinishedDnfNote: true,
+  });
 
   return (
     <div className="mb-8 w-full">
@@ -65,176 +173,19 @@ export default function LibraryGuidePanel({
         </summary>
 
         {hasFullAccess ? (
-          <div className="mt-4 grid gap-3">
-          <button
-            type="button"
-            onClick={() => onNavigate("/books/add")}
-            className="rounded-2xl border border-sky-100 bg-sky-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-sky-100"
-          >
-            <div className="text-sm font-black text-slate-950">Add Book</div>
-            <p className="mt-1 text-xs leading-5 text-slate-600">
-              Add a new book to your library.
-            </p>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate("/library/curiosity-reading-index")}
-            className="rounded-2xl border border-rose-100 bg-rose-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-rose-100"
-          >
-            <div className="text-sm font-black text-slate-950">Curiosity Read</div>
-            <p className="mt-1 text-xs leading-5 text-slate-600">
-              Time your reading and quickly save words as you go.
-            </p>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate("/library/saved-word-reading-index")}
-            className="rounded-2xl border border-indigo-100 bg-indigo-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-indigo-100"
-          >
-            <div className="text-sm font-black text-slate-950">Follow-Along</div>
-            <p className="mt-1 text-xs leading-5 text-slate-600">
-              Read with support from your book.
-            </p>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate("/library/just-listening-index")}
-            className="rounded-2xl border border-amber-100 bg-amber-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-amber-100"
-          >
-            <div className="text-sm font-black text-slate-950">Listen</div>
-            <p className="mt-1 text-xs leading-5 text-slate-600">
-              Track listening time for a book or audiobook.
-            </p>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate("/library/just-reading-index")}
-            className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-emerald-100"
-          >
-            <div className="text-sm font-black text-slate-950">Just Read</div>
-            <p className="mt-1 text-xs leading-5 text-slate-600">
-              Time your regular reading.
-            </p>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onNavigate("/library-study/book-flashcards")}
-            className="rounded-2xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-violet-100"
-          >
-            <div className="text-sm font-black text-slate-950">Flashcards</div>
-            <p className="mt-1 text-xs leading-5 text-slate-600">
-              Review words from your books.
-            </p>
-          </button>
-          </div>
+          fullAccessGuide
         ) : (
-          freeGuide
+          freeAccessGuide
         )}
       </details>
 
       <details className="hidden max-w-[1200px] rounded-3xl border border-sky-200 bg-white/85 px-5 py-4 text-left shadow-sm md:block">
         <summary className="cursor-pointer text-sm font-black text-slate-900">
-          How do I use this library?
+          How do I use this Library?
         </summary>
 
         {hasFullAccess ? (
-          <>
-            <p className="mt-3 max-w-3xl text-xs leading-5 text-slate-600 sm:text-sm">
-              After requesting a book and adding it to your library, you can choose
-              how you want to read, study, listen, or review.
-            </p>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <div className="grid gap-3">
-            <button
-              type="button"
-              onClick={() => onNavigate("/library/curiosity-reading-index")}
-              className="rounded-2xl border border-rose-100 bg-rose-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-rose-100"
-            >
-              <div className="text-sm font-black text-slate-950">
-                Read + Save Words
-              </div>
-              <p className="mt-1 truncate text-xs text-slate-600">
-                Time your reading while looking up new words.
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onNavigate("/library/saved-word-reading-index")}
-              className="rounded-2xl border border-indigo-100 bg-indigo-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-indigo-100"
-            >
-              <div className="text-sm font-black text-slate-950">
-                Saved Word Reading
-              </div>
-              <p className="mt-1 truncate text-xs text-slate-600">
-                Time your reading with saved-word support.
-              </p>
-            </button>
-          </div>
-
-          <div className="grid gap-3">
-            <button
-              type="button"
-              onClick={() => onNavigate("/library/just-reading-index")}
-              className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-emerald-100"
-            >
-              <div className="text-sm font-black text-slate-950">
-                Just Read
-              </div>
-              <p className="mt-1 truncate text-xs text-slate-600">
-                Just time and read, the old-fashioned way.
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onNavigate("/library/just-listening-index")}
-              className="rounded-2xl border border-amber-100 bg-amber-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-amber-100"
-            >
-              <div className="text-sm font-black text-slate-950">
-                Listen
-              </div>
-              <p className="mt-1 truncate text-xs text-slate-600">
-                Track listening time for a book or audiobook.
-              </p>
-            </button>
-          </div>
-
-          <div className="grid gap-3">
-            <button
-              type="button"
-              onClick={() => onNavigate("/library-study")}
-              className="rounded-2xl border border-violet-100 bg-violet-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-violet-100"
-            >
-              <div className="text-sm font-black text-slate-950">
-                Study Hub
-              </div>
-              <p className="mt-1 truncate text-xs text-slate-600">
-                Study saved words in a variety of ways.
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onNavigate("/community/stats")}
-              className="rounded-2xl border border-sky-100 bg-sky-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-sky-100"
-            >
-              <div className="text-sm font-black text-slate-950">
-                Stats Hub
-              </div>
-              <p className="mt-1 truncate text-xs text-slate-600">
-                See habits, vocab, and progress.
-              </p>
-            </button>
-          </div>
-            </div>
-          </>
+          fullAccessGuide
         ) : (
           <>
             <p className="mt-3 max-w-3xl text-xs leading-5 text-slate-600 sm:text-sm">
@@ -242,7 +193,7 @@ export default function LibraryGuidePanel({
               Book Hub, then track reading, notes, history, and progress there.
             </p>
 
-            {freeGuide}
+            {freeAccessGuide}
           </>
         )}
       </details>
