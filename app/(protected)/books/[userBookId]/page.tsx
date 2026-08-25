@@ -5616,7 +5616,7 @@ export default function BookHubPage() {
 	                    <div className="rounded-2xl border border-violet-100 bg-white/80 px-4 py-3 text-sm font-semibold text-violet-950 shadow-sm">
 	                      {canCompleteReadingReflection
 	                        ? "Give future readers quick advice about this book."
-	                        : "After the book is marked finished, the reflection will appear here."}
+	                        : "After the book is marked finished, the learners reflection will appear here."}
 	                    </div>
                   </div>
 

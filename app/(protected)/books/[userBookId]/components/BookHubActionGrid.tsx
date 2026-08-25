@@ -137,13 +137,17 @@ function CompactActionButton({
   className?: string;
   onClick: () => void | Promise<void>;
 }) {
+  const colorClass =
+    className ||
+    "border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50";
+
   return (
     <button
       type="button"
       onClick={onClick}
       className={[
-        "rounded-xl border border-stone-200 bg-white px-3.5 py-3 text-left shadow-sm transition-all hover:-translate-y-[1px] hover:border-stone-300 hover:shadow-md",
-        className,
+        "rounded-xl border px-3.5 py-3 text-left shadow-sm transition-all hover:-translate-y-[1px] hover:shadow-md",
+        colorClass,
       ].join(" ")}
     >
       <div className="text-base font-black text-stone-900">{title}</div>
