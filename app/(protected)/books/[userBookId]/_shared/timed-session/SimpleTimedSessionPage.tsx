@@ -1114,15 +1114,6 @@ export default function SimpleTimedSessionPage({
                             </button>
                         ) : null}
 
-                        <button
-                            type="button"
-                            onClick={() => {
-                                router.push(`/books/${encodeURIComponent(userBookId)}`);
-                            }}
-                            className="rounded-xl bg-stone-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
-                        >
-                            Book Hub
-                        </button>
                     </div>
                 </div>
             ) : null}
@@ -1234,15 +1225,6 @@ export default function SimpleTimedSessionPage({
                                 </button>
                             ) : null}
 
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    router.push(`/books/${encodeURIComponent(userBookId)}`);
-                                }}
-                                className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
-                            >
-                                Book Hub
-                            </button>
                         </div>
                     </div>
                 ) : null}

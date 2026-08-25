@@ -5404,7 +5404,7 @@ export default function BookHubPage() {
       ) : null}
 
       <div className="mx-auto max-w-6xl">
-        <nav className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <nav className="mb-3 flex flex-wrap items-center gap-3">
           {studentWorkspaceBackContext ? (
             <Link
               href={studentWorkspaceBackContext.href}
@@ -5412,12 +5412,10 @@ export default function BookHubPage() {
             >
               {studentWorkspaceBackContext.label}
             </Link>
-          ) : (
-            <span aria-hidden="true" />
-          )}
+          ) : null}
           <Link
             href={backToLibraryHref}
-            className="ml-auto inline-flex text-sm font-semibold text-stone-500 hover:text-stone-900"
+            className="inline-flex text-sm font-semibold text-stone-500 hover:text-stone-900"
           >
             ← Back to Library
           </Link>
