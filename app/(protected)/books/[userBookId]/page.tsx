@@ -3639,7 +3639,6 @@ export default function BookHubPage() {
       canUseFullAccessFeature(featureAccess, "vocabulary_list")
     );
     setCanUseBulkAdd(featureAccess.canUseBulkAdd);
-    setCanSeeVocabularySummary(featureAccess.canSeeVocabularyColors);
     setHasFullLearningAccess(featureAccess.hasFullAccess);
     setIsTrialLearningAccess(featureAccess.isTrial);
     const profileWantsJapaneseStudyTools = wantsJapaneseLearning(meProfile);
@@ -3912,6 +3911,11 @@ export default function BookHubPage() {
       ownerNativeLanguage: loadedOwnerNativeLanguage,
     });
     const loadedIsJapaneseLearningBook = isJapaneseLearningBook(b?.language_code ?? null);
+    setCanSeeVocabularySummary(
+      profileWantsJapaneseStudyTools &&
+      loadedIsJapaneseLearningBook &&
+      featureAccess.canSeeVocabularyColors
+    );
     const loadedCanUseJapaneseLearningActions =
       profileWantsJapaneseStudyTools &&
       canUseActiveJapaneseLearningActions({
@@ -5483,7 +5487,7 @@ export default function BookHubPage() {
                     daysEngagedCaption={isEnglishNativeTrackerBook ? "Reading dates" : undefined}
                     savedWordsPerPageLabel={bookHubSavedWordsPerPageLabel}
                     averageMinutesPerPageLabel={bookHubAverageMinutesPerPageLabel}
-                    showVocabularyStats={!isEnglishNativeTrackerBook}
+                    showVocabularyStats={canSeeVocabularySummary}
                     showProgressSection={false}
                     summaryStats={isEnglishNativeTrackerBook ? [] : undefined}
                   />
@@ -5510,7 +5514,7 @@ export default function BookHubPage() {
                 daysEngagedCaption={isEnglishNativeTrackerBook ? "Reading dates" : undefined}
                 savedWordsPerPageLabel={bookHubSavedWordsPerPageLabel}
                 averageMinutesPerPageLabel={bookHubAverageMinutesPerPageLabel}
-                showVocabularyStats={!isEnglishNativeTrackerBook}
+                showVocabularyStats={canSeeVocabularySummary}
                 showSummaryCard={false}
                 summaryStats={isEnglishNativeTrackerBook ? [] : undefined}
               />

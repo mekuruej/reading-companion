@@ -8,6 +8,8 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { wantsJapaneseLearning } from "@/lib/access/japaneseLearningIntent";
+import { isJapaneseLearningBook } from "@/lib/access/readingCompanion";
 import { getBookIdentity } from "@/lib/books/bookIdentity";
 import { bookTypeLabel } from "@/lib/books/bookTypes";
 import { isEnglishNativeTrackerBook as getIsEnglishNativeTrackerBook } from "@/lib/books/englishNativeTracker";
@@ -201,7 +203,7 @@ export default function BookStatsPage() {
 
             const { data: profile } = await supabase
                 .from("profiles")
-                .select("role, is_super_teacher, app_access_type, app_access_expires_at")
+                .select("role, is_super_teacher, target_language, japanese_learning_enabled, app_access_type, app_access_expires_at")
                 .eq("id", user.id)
                 .maybeSingle();
 
@@ -304,10 +306,13 @@ export default function BookStatsPage() {
                 bookLanguageCode: loadedRow.books?.language_code ?? null,
                 ownerNativeLanguage: ownerProfile?.native_language ?? null,
             });
+            const canShowJapaneseVocabularyStats =
+                wantsJapaneseLearning(profile) &&
+                isJapaneseLearningBook(loadedRow.books?.language_code ?? null) &&
+                featureAccess.canUseBookStats &&
+                !trackerBook;
 
-            const canViewVocabularyStats = featureAccess.canUseBookStats && !trackerBook;
-
-            setCanSeeVocabularyStats(canViewVocabularyStats);
+            setCanSeeVocabularyStats(canShowJapaneseVocabularyStats);
             setIsEnglishNativeTrackerBook(trackerBook);
             setCanAccessBook(true);
             setAccessChecked(true);
@@ -319,7 +324,7 @@ export default function BookStatsPage() {
                 if (cancelled) return;
 
                 setSessions(statsData.sessions ?? []);
-                setWordCount(canViewVocabularyStats ? statsData.wordCount ?? 0 : null);
+                setWordCount(canShowJapaneseVocabularyStats ? statsData.wordCount ?? 0 : null);
             } catch (statsError) {
                 if (cancelled) return;
                 console.error("Error loading book session stats:", statsError);
@@ -379,6 +384,7 @@ export default function BookStatsPage() {
     const listeningMinutes = useMemo(() => {
         return listeningSessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
     }, [listeningSessions]);
+    const readingMinutes = curiosityMinutes + fluidMinutes;
 
     const engagementSessions = useMemo(() => {
         return isEnglishNativeTrackerBook ? visualReadingSessions : realSessions;
@@ -417,36 +423,6 @@ export default function BookStatsPage() {
 
     const overallMinPerPage = timedPages > 0 ? timedPageMinutes / timedPages : null;
     const pagesPerHour = overallMinPerPage ? 60 / overallMinPerPage : null;
-
-    const curiosityPageStats = useMemo(() => {
-        const valid = curiositySessions.filter(
-            (s) => s.minutes_read != null && s.minutes_read > 0 && s.start_page != null && s.end_page != null
-        );
-
-        const pages = valid.reduce((sum, s) => {
-            if (s.start_page == null || s.end_page == null) return sum;
-            return sum + (s.end_page - s.start_page + 1);
-        }, 0);
-
-        const minutes = valid.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
-
-        return pages > 0 ? minutes / pages : null;
-    }, [curiositySessions]);
-
-    const fluidPageStats = useMemo(() => {
-        const valid = fluidSessions.filter(
-            (s) => s.minutes_read != null && s.minutes_read > 0 && s.start_page != null && s.end_page != null
-        );
-
-        const pages = valid.reduce((sum, s) => {
-            if (s.start_page == null || s.end_page == null) return sum;
-            return sum + (s.end_page - s.start_page + 1);
-        }, 0);
-
-        const minutes = valid.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
-
-        return pages > 0 ? minutes / pages : null;
-    }, [fluidSessions]);
 
     const nativeActivitySessions = useMemo(() => {
         return realSessions.filter((s) => s.session_mode === "fluid" || s.session_mode === "listening");
@@ -656,9 +632,9 @@ export default function BookStatsPage() {
                 <StatsSection title="Progress Snapshot">
                     <StatCard label="Status" value={statusLabel(row)} />
                     <StatCard
-                        label="Pages Read"
+                        label="Pages Logged"
                         value={pagesRead || "—"}
-                        note="Page-tracked sessions only"
+                        note="Page-tracked reading sessions; rereads count again"
                     />
                     <StatCard
                         label="Days Engaged"
@@ -670,19 +646,11 @@ export default function BookStatsPage() {
 
                 {totalTrackedMinutes > 0 && (
                     <StatsSection title="Time by Mode">
-                        {!isEnglishNativeTrackerBook && curiosityMinutes > 0 && (
+                        {readingMinutes > 0 && (
                             <StatCard
-                                label="Curiosity Reading"
-                                value={formatMinutes(curiosityMinutes)}
-                                note="Intensive reading"
-                            />
-                        )}
-
-                        {fluidMinutes > 0 && (
-                            <StatCard
-                                label="Fluid Reading"
-                                value={formatMinutes(fluidMinutes)}
-                                note="Saved support + just reading"
+                                label="Reading"
+                                value={formatMinutes(readingMinutes)}
+                                note="Timed reading sessions"
                             />
                         )}
 
@@ -703,13 +671,11 @@ export default function BookStatsPage() {
                 )}
 
                 {(overallMinPerPage != null ||
-                    pagesPerHour != null ||
-                    curiosityPageStats != null ||
-                    fluidPageStats != null) && (
+                    pagesPerHour != null) && (
                         <StatsSection title="Pace">
                             {overallMinPerPage != null && (
                                 <StatCard
-                                    label="Overall Min/Page"
+                                    label="Avg Min/Page"
                                     value={overallMinPerPage.toFixed(2)}
                                     note="Page-tracked timed sessions"
                                 />
@@ -723,21 +689,6 @@ export default function BookStatsPage() {
                                 />
                             )}
 
-                            {curiosityPageStats != null && (
-                                <StatCard
-                                    label="Curiosity Min/Page"
-                                    value={curiosityPageStats.toFixed(2)}
-                                    note="Intensive pace"
-                                />
-                            )}
-
-                            {fluidPageStats != null && (
-                                <StatCard
-                                    label="Fluid Min/Page"
-                                    value={fluidPageStats.toFixed(2)}
-                                    note="Extensive pace"
-                                />
-                            )}
                         </StatsSection>
                     )}
 
