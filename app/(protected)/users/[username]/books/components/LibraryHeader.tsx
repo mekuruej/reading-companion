@@ -28,6 +28,12 @@ export default function LibraryHeader({
             {libraryOwnerLabel}
           </span>
 
+          <img
+            src="/mekuru-logo.png"
+            alt="Mekuru"
+            className="h-12 w-12 object-contain sm:h-20 sm:w-20"
+          />
+
           <span className="text-2xl font-semibold sm:text-3xl">
             Library
           </span>
