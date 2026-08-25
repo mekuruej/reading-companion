@@ -13,6 +13,7 @@ import AddBookDestinationSummary from "./components/AddBookDestinationSummary";
 import AddBookCatalogResult from "./components/AddBookCatalogResult";
 import ManualEditionForm, { type ManualEditionMode } from "./components/ManualEditionForm";
 import AddBookModeButton from "./components/AddBookModeButton";
+import AddBookTeacherDestinationOptions from "./components/AddBookTeacherDestinationOptions";
 import { isValidAsin, normalizeAsin } from "@/lib/books/asin";
 import {
     COMMON_BOOK_LANGUAGE_OPTIONS,
@@ -1391,52 +1392,11 @@ export default function AddBookPage() {
                         <p className="text-xs font-black uppercase tracking-[0.16em] text-stone-500">
                             Add this edition to
                         </p>
-                        <div className="mt-3 grid gap-3 lg:grid-cols-3">
-                            {[
-                                {
-                                    value: "catalog_only" as const,
-                                    title: "MEKURU Catalog",
-                                    helper: "Create this edition without adding it to a personal Library.",
-                                },
-                                {
-                                    value: "student_only" as const,
-                                    title: "Student's Library",
-                                    helper: "Add this edition to one student's Library.",
-                                },
-                                {
-                                    value: "teacher_and_student" as const,
-                                    title: "My Library + Student's Library",
-                                    helper: "Add this edition to your Library and the student's Library.",
-                                },
-                            ].map((option) => {
-                                const selected = teacherDestination === option.value;
-                                const disabled = option.value === "catalog_only" && !canUseCatalogOnly;
-                                return (
-                                    <button
-                                        key={option.value}
-                                        type="button"
-                                        disabled={disabled}
-                                        onClick={() => setTeacherDestination(option.value)}
-                                        className={[
-                                            "rounded-2xl border p-4 text-left transition",
-                                            disabled ? "cursor-not-allowed opacity-50" : "",
-                                            selected
-                                                ? "border-stone-900 bg-white shadow-sm"
-                                                : "border-stone-200 bg-white/70 hover:bg-white",
-                                        ].join(" ")}
-                                    >
-                                        <span className="block text-sm font-black text-stone-950">
-                                            {option.title}
-                                        </span>
-                                        <span className="mt-1 block text-xs leading-5 text-stone-600">
-                                            {option.helper}
-                                            {disabled ? " Super teacher access is required." : ""}
-                                        </span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-
+                        <AddBookTeacherDestinationOptions
+                            teacherDestination={teacherDestination}
+                            canUseCatalogOnly={canUseCatalogOnly}
+                            onSelect={setTeacherDestination}
+                        />
                         {isTeacherGlobalStudentDestination ? (
                             <div className="mt-4">
                                 <label className="block text-sm font-black text-stone-900">
