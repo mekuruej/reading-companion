@@ -21,7 +21,7 @@ import { getBookIdentity } from "@/lib/books/bookIdentity";
 import { supabase } from "@/lib/supabaseClient";
 import ReadingJournalPanel from "../components/ReadingJournalPanel";
 
-type ProfileRole = "teacher" | "member" | "student" | "super_teacher" | "admin";
+type ProfileRole = "teacher" | "member" | "super_teacher" | "admin";
 
 type BookRow = {
   title: string | null;
@@ -208,6 +208,7 @@ export default function StoryNotesPage() {
           .select("id")
           .eq("teacher_id", user.id)
           .eq("student_id", loadedRow.user_id)
+          .is("archived_at", null)
           .limit(1)
           .maybeSingle();
 

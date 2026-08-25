@@ -298,6 +298,7 @@ export default function TeacherReadingSnapshotPage() {
           .select("id")
           .eq("teacher_id", user.id)
           .eq("student_id", loadedRow.user_id)
+          .is("archived_at", null)
           .maybeSingle();
 
         if (cancelled) return;

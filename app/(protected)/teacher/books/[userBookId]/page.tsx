@@ -17,7 +17,7 @@ import { SuitableLevelSelector } from "./components/SuitableLevelSelector";
 import { TeacherRatingSelector } from "./components/TeacherRatingSelector";
 import { TeacherNotesCard } from "./components/TeacherNotesCard";
 
-type ProfileRole = "teacher" | "member" | "student";
+type ProfileRole = "teacher" | "member" | "super_teacher" | "admin";
 
 type Book = {
     title: string | null;

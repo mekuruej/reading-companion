@@ -12,7 +12,7 @@ import { getBookIdentity } from "@/lib/books/bookIdentity";
 import { isNativeLanguageBook } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
 
-type ProfileRole = "teacher" | "member" | "student" | "super_teacher" | "admin";
+type ProfileRole = "teacher" | "member" | "super_teacher" | "admin";
 const REVIEW_RATING_VALUES = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 
 function formatReviewRating(value: number | string | null | undefined) {

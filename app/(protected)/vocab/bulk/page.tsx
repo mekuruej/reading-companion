@@ -284,6 +284,7 @@ export default function BulkVocabPage() {
             .select("teacher_id")
             .eq("teacher_id", user.id)
             .eq("student_id", data.user_id)
+            .is("archived_at", null)
             .maybeSingle();
 
           if (teacherStudentError) throw teacherStudentError;

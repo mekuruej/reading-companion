@@ -95,19 +95,19 @@ const SIMULATED_ACCESS_SCENARIOS = [
     {
         label: "Free learner",
         description: "Can enter Mekuru, but does not have full vocabulary/study access.",
-        role: "student",
+        role: "member",
         hasFullAccess: false,
     },
     {
         label: "Full-access learner",
         description: "Current trial/paid/book-club style access.",
-        role: "student",
+        role: "member",
         hasFullAccess: true,
     },
     {
         label: "Expired trial treated as free",
         description: "Future goal: user can still enter free areas, but full-access features lock.",
-        role: "student",
+        role: "member",
         hasFullAccess: false,
     },
     {

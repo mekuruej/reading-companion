@@ -71,7 +71,8 @@ async function canGenerateKanjiMapRows(userId: string, vocabularyCacheId: number
   const { data: linkedRows, error: linkedError } = await supabaseAdmin
     .from("teacher_students")
     .select("student_id")
-    .eq("teacher_id", userId);
+    .eq("teacher_id", userId)
+    .is("archived_at", null);
 
   if (linkedError) {
     console.error("Error checking linked students for kanji-map generation:", linkedError);

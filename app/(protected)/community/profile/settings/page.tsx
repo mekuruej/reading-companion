@@ -21,7 +21,7 @@ import FavoriteGenreEditor from "./components/FavoriteGenreEditor";
 import ProfileSettingsCoreCard from "./components/ProfileSettingsCoreCard";
 import ProfileSettingsPublicCard from "./components/ProfileSettingsPublicCard";
 
-type ProfileRole = "teacher" | "member" | "student" | "super_teacher";
+type ProfileRole = "teacher" | "member" | "super_teacher" | "admin";
 
 type PublicProfileRow = {
   user_id: string;

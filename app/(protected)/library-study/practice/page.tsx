@@ -143,7 +143,7 @@ type MeaningReviewItem = {
   originalOk: boolean;
 };
 
-type ProfileRole = "teacher" | "super_teacher" | "member" | "student";
+type ProfileRole = "teacher" | "super_teacher" | "admin" | "member";
 type PracticeRevealStep = "word" | "reading" | "meaning";
 type PracticeStudyMode = "reveal" | "typing";
 type PracticeTypingStep = "reading" | "meaning";

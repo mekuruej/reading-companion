@@ -169,7 +169,7 @@ type EditingPanel =
   | "bookInfoCopy"
   | "communityGenres"
   | "communityContentNotes";
-type ProfileRole = "teacher" | "member" | "student" | "super_teacher" | "admin";
+type ProfileRole = "teacher" | "member" | "super_teacher" | "admin";
 
 type Character = {
   id: string;
@@ -3752,6 +3752,7 @@ export default function BookHubPage() {
         .select("id")
         .eq("teacher_id", user.id)
         .eq("student_id", r.user_id)
+        .is("archived_at", null)
         .limit(1)
         .maybeSingle();
 

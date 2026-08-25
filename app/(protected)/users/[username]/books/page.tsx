@@ -88,7 +88,7 @@ type UserBookRow = {
   assigned_from_prep_at?: string | null;
 };
 
-type ProfileRole = "teacher" | "super_teacher" | "member" | "student";
+type ProfileRole = "teacher" | "super_teacher" | "admin" | "member";
 
 type TrialBannerState = {
   daysRemaining: number | null;
@@ -572,7 +572,7 @@ export default function BooksPage() {
       const studentAlertUserIds = isSuperTeacher
         ? students.filter((s) => s.id).map((s) => s.id)
         : students
-          .filter((s) => s.id && (s.role === "member" || s.role === "student"))
+          .filter((s) => s.id && s.role === "member")
           .map((s) => s.id);
 
       const alertUserIds = Array.from(
@@ -1192,7 +1192,7 @@ export default function BooksPage() {
       };
 
       const studentOptions: StudentOption[] = (profs ?? [])
-        .filter((p: any) => p.id !== user.id && (p.role === "member" || p.role === "student"))
+        .filter((p: any) => p.id !== user.id && p.role === "member")
         .map((p: any) => ({
           id: p.id,
           display_name: p.display_name,

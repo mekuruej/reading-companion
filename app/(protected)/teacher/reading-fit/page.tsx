@@ -15,7 +15,7 @@ import { TeacherReadingFitLoadingState } from "./components/TeacherReadingFitLoa
 import { TeacherReadingFitMessage } from "./components/TeacherReadingFitMessage";
 import { TeacherReadingFitSummaryGrid } from "./components/TeacherReadingFitSummaryGrid";
 
-type ProfileRole = "teacher" | "super_teacher" | "member" | "student" | string | null;
+type ProfileRole = "teacher" | "super_teacher" | "admin" | "member" | string | null;
 
 type ProfileRow = {
   id: string;

@@ -74,7 +74,7 @@ type WordRow = {
   target_language_code?: string | null;
 };
 
-type ProfileRole = "teacher" | "student" | "super_teacher";
+type ProfileRole = "teacher" | "member" | "super_teacher" | "admin";
 
 type LearningSettingsRow = {
   red_stages: number;
@@ -291,7 +291,7 @@ export default function BookWordsPage() {
   const [fullAccessLocked, setFullAccessLocked] = useState(false);
   const [canUseVocabularyTools, setCanUseVocabularyTools] = useState(false);
 
-  const [myRole, setMyRole] = useState<ProfileRole>("student");
+  const [myRole, setMyRole] = useState<ProfileRole>("member");
   const isTeacher = myRole === "teacher";
   const [learningSettings, setLearningSettings] = useState<LearningSettingsRow>(
     DEFAULT_LEARNING_SETTINGS
@@ -676,7 +676,7 @@ export default function BookWordsPage() {
           console.error("Error loading profile role:", meProfileErr);
         }
 
-        setMyRole((meProfile?.role as ProfileRole | null) ?? "student");
+        setMyRole((meProfile?.role as ProfileRole | null) ?? "member");
 
         const appAccessStatus = meProfile
           ? getAppAccessStatus(meProfile)
@@ -732,6 +732,7 @@ export default function BookWordsPage() {
             .select("teacher_id")
             .eq("teacher_id", authedUser.id)
             .eq("student_id", ownerUserId)
+            .is("archived_at", null)
             .maybeSingle();
 
           if (teacherStudentErr) {

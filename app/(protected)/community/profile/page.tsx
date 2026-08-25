@@ -184,14 +184,11 @@ function AccessLabel({
     role === "super_teacher" ||
     role === "admin" ||
     profile?.is_super_teacher === true;
-  const isStudent = role === "student";
   const roleStatus = profile?.is_super_teacher
     ? "Super Teacher"
     : isTeacher
     ? "Teacher"
-    : isStudent
-      ? "Student"
-      : "Reader";
+    : "Reader";
   const accessStatus = appAccessStatus.isTrialActive
     ? trialEndsAt
       ? `Trial · until ${formatDate(trialEndsAt)}`
@@ -214,9 +211,7 @@ function AccessLabel({
       : "Not Active";
   const headline = isTeacher
     ? "Teacher account"
-    : isStudent
-      ? "Student account"
-      : appAccessStatus.isTrialActive
+    : appAccessStatus.isTrialActive
         ? "Reading Companion trial active"
         : appAccessStatus.hasFullAccess
           ? "Reading Companion active"

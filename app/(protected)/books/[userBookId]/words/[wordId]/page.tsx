@@ -244,7 +244,7 @@ export default function WordDetailPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [canUseVocabularyTools, setCanUseVocabularyTools] = useState(false);
 
-  const [myRole, setMyRole] = useState<"teacher" | "member" | "student" | "super_teacher">("member");
+  const [myRole, setMyRole] = useState<"teacher" | "member" | "super_teacher" | "admin">("member");
   const isTeacher = myRole === "teacher";
 
   const [bookTitle, setBookTitle] = useState("");
@@ -570,7 +570,7 @@ export default function WordDetailPage() {
         console.error("Error loading profile role:", meProfileErr);
       }
 
-      setMyRole((meProfile?.role as "teacher" | "member" | "student" | "super_teacher") ?? "member");
+      setMyRole((meProfile?.role as "teacher" | "member" | "super_teacher" | "admin") ?? "member");
 
       const appAccessStatus = meProfile
         ? getAppAccessStatus(meProfile)
@@ -621,6 +621,7 @@ export default function WordDetailPage() {
           .select("teacher_id")
           .eq("teacher_id", user.id)
           .eq("student_id", bookOwnerUserId)
+          .is("archived_at", null)
           .maybeSingle();
 
         if (teacherStudentErr) {

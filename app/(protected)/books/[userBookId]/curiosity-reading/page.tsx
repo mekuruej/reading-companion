@@ -16,7 +16,7 @@ import {
 } from "./WordTimerExperience";
 
 type CuriosityViewMode = "curiosity" | "workspace";
-type ProfileRole = "teacher" | "member" | "student" | "super_teacher" | "admin";
+type ProfileRole = "teacher" | "member" | "super_teacher" | "admin";
 
 function isSuperTeacherFlag(value: unknown) {
   return value === true || value === "true";
@@ -137,6 +137,7 @@ export default function CuriosityReadingPage() {
           .select("id")
           .eq("teacher_id", user.id)
           .eq("student_id", ownerUserId)
+          .is("archived_at", null)
           .limit(1)
           .maybeSingle();
 

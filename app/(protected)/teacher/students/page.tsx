@@ -21,7 +21,7 @@ import TeacherStudentGroupsPanel from "./components/TeacherStudentGroupsPanel";
 import TeacherStudentsListHeader from "./components/TeacherStudentsListHeader";
 import TeacherLearningTaskModal from "./components/TeacherLearningTaskModal";
 
-type ProfileRole = "teacher" | "super_teacher" | "member" | "student" | string | null;
+type ProfileRole = "teacher" | "super_teacher" | "admin" | "member" | string | null;
 type StudentRelationshipStatus = "future" | "current" | "past";
 type StudentGroupKey = StudentRelationshipStatus;
 
@@ -172,9 +172,7 @@ function formatRelativeDate(dateStr: string | null) {
 }
 
 function isStudentProfile(profile: StudentProfile) {
-    const isStudentRole = profile.role === "member" || profile.role === "student";
-
-    return isStudentRole;
+    return profile.role === "member";
 }
 
 function getStudentRelationshipStatus(profile: StudentProfile): StudentRelationshipStatus {

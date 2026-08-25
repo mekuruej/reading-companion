@@ -316,6 +316,7 @@ export default function AddWordPage() {
       .select("teacher_id")
       .eq("teacher_id", authedUserId)
       .eq("student_id", ownerUserId)
+      .is("archived_at", null)
       .maybeSingle();
 
     if (teacherStudentErr) {

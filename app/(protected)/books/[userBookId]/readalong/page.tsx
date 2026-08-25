@@ -488,6 +488,7 @@ export default function ReadAlongPage() {
                     .select("teacher_id")
                     .eq("teacher_id", user.id)
                     .eq("student_id", ownerUserId)
+                    .is("archived_at", null)
                     .maybeSingle();
 
                 if (!teacherStudentError && teacherStudent) {

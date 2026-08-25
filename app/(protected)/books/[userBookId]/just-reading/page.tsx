@@ -21,7 +21,7 @@ import SimpleTimedSessionPage from "../_shared/timed-session/SimpleTimedSessionP
 
 type JustReadingViewMode = "just-reading" | "workspace";
 type NativeSessionMode = "fluid" | "listening";
-type ProfileRole = "teacher" | "member" | "student" | "super_teacher" | "admin";
+type ProfileRole = "teacher" | "member" | "super_teacher" | "admin";
 
 function isSuperTeacherFlag(value: unknown) {
     return value === true || value === "true";
@@ -149,6 +149,7 @@ export default function JustReadingPage() {
                     .select("id")
                     .eq("teacher_id", user.id)
                     .eq("student_id", ownerUserId)
+                    .is("archived_at", null)
                     .limit(1)
                     .maybeSingle();
 
