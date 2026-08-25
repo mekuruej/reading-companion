@@ -35,6 +35,7 @@ import {
   getTodayKey,
   hideAbilityCheckReminderForToday,
   hidePendingBookRequestsAlert,
+  lockAbilityCheckReminder,
   loadAbilityCheckSeenForToday,
   pendingBookRequestsAlertHidden,
   pendingBookRequestsSignature,
@@ -276,6 +277,7 @@ export default function BooksPage() {
       setAbilityCheckReminderCount(0);
       setAbilityCheckReminderHasUnlocked(false);
       setAbilityCheckReminderLoading(false);
+      lockAbilityCheckReminder();
       return;
     }
 
@@ -1280,7 +1282,12 @@ export default function BooksPage() {
     const hiddenToday = abilityCheckReminderHiddenToday();
 
     setAbilityCheckReminderHidden(hiddenToday);
-    setAbilityCheckReminderHasUnlocked(abilityCheckReminderUnlocked());
+    if (canUseAbilityCheckReminder) {
+      setAbilityCheckReminderHasUnlocked(abilityCheckReminderUnlocked());
+    } else {
+      setAbilityCheckReminderHasUnlocked(false);
+      lockAbilityCheckReminder();
+    }
 
     if (
       !viewingUserId ||
@@ -1305,7 +1312,12 @@ export default function BooksPage() {
       );
 
       setAbilityCheckReminderHidden(hiddenToday);
-      setAbilityCheckReminderHasUnlocked(abilityCheckReminderUnlocked());
+      if (canUseAbilityCheckReminder) {
+        setAbilityCheckReminderHasUnlocked(abilityCheckReminderUnlocked());
+      } else {
+        setAbilityCheckReminderHasUnlocked(false);
+        lockAbilityCheckReminder();
+      }
 
       if (hiddenToday) {
         setAbilityCheckReminderCount(0);

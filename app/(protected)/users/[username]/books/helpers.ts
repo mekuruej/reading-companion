@@ -147,6 +147,11 @@ export function unlockAbilityCheckReminder() {
   window.localStorage.setItem(ABILITY_CHECK_REMINDER_UNLOCKED_KEY, "true");
 }
 
+export function lockAbilityCheckReminder() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(ABILITY_CHECK_REMINDER_UNLOCKED_KEY);
+}
+
 export function hideAbilityCheckReminderForToday() {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(ABILITY_CHECK_REMINDER_HIDE_KEY, getTodayKey());

@@ -10,6 +10,8 @@ import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@/lib/supabaseClient";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { canUseFullAccessFeature } from "@/lib/access/requireFullAccess";
 import { wantsJapaneseLearning } from "@/lib/access/japaneseLearningIntent";
 import DashboardBackground from "./components/DashboardBackground";
 import DashboardLoadingCard from "./components/DashboardLoadingCard";
@@ -183,7 +185,19 @@ export default function DashboardPage() {
         return true;
       }
 
-      setCanUseDashboardWarmup(profile ? getAppAccessStatus(profile).hasFullAccess : false);
+      const appAccessStatus = profile
+        ? getAppAccessStatus(profile)
+        : { hasFullAccess: false, reason: "free" };
+      const featureAccess = getFeatureAccess({
+        role: profile?.is_super_teacher ? "super_teacher" : profile?.role ?? null,
+        isSuperTeacher: profile?.is_super_teacher ?? null,
+        hasFullAccess: appAccessStatus.hasFullAccess,
+        isTrialActive: appAccessStatus.reason === "trial",
+      });
+
+      setCanUseDashboardWarmup(
+        canUseFullAccessFeature(featureAccess, "ability_check")
+      );
 
       if (!isProfileReady(profile ?? null)) {
         router.replace(PROFILE_SETUP_TARGET);
