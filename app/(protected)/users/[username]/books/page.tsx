@@ -9,6 +9,8 @@ import {
   getLibraryStudyEncounterStageCounts,
 } from "@/lib/libraryStudyColor";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { canUseFullAccessFeature } from "@/lib/access/requireFullAccess";
 import LibraryGuidePanel from "./components/LibraryGuidePanel";
 import LibraryHeader from "./components/LibraryHeader";
 import LibraryViewControls from "./components/LibraryViewControls";
@@ -243,6 +245,7 @@ export default function BooksPage() {
   const [abilityCheckReminderLoading, setAbilityCheckReminderLoading] = useState(false);
   const [abilityCheckReminderHidden, setAbilityCheckReminderHidden] = useState(false);
   const [abilityCheckReminderHasUnlocked, setAbilityCheckReminderHasUnlocked] = useState(false);
+  const [canUseAbilityCheckReminder, setCanUseAbilityCheckReminder] = useState(false);
   const [abilityCheckReminderDayKey, setAbilityCheckReminderDayKey] = useState(getTodayKey());
 
   const viewingLabel =
@@ -268,7 +271,14 @@ export default function BooksPage() {
       ? `/books/add?destination=user&targetUserId=${encodeURIComponent(viewingUserId)}`
       : "/books/add";
 
-  async function loadAbilityCheckReminder(userId: string) {
+  async function loadAbilityCheckReminder(userId: string, canUseAbilityCheck: boolean) {
+    if (!canUseAbilityCheck) {
+      setAbilityCheckReminderCount(0);
+      setAbilityCheckReminderHasUnlocked(false);
+      setAbilityCheckReminderLoading(false);
+      return;
+    }
+
     setAbilityCheckReminderLoading(true);
 
     try {
@@ -1089,7 +1099,16 @@ export default function BooksPage() {
       setIsSuperTeacher(superTeacherFlag);
       const appAccessStatus = meProfile
         ? getAppAccessStatus(meProfile)
-        : { hasFullAccess: false };
+        : { hasFullAccess: false, reason: "free" };
+      const featureAccess = getFeatureAccess({
+        role: superTeacherFlag ? "super_teacher" : role,
+        isSuperTeacher: superTeacherFlag,
+        hasFullAccess: appAccessStatus.hasFullAccess,
+        isTrialActive: appAccessStatus.reason === "trial",
+      });
+      setCanUseAbilityCheckReminder(
+        canUseFullAccessFeature(featureAccess, "ability_check")
+      );
       setHasFullLearningAccess(appAccessStatus.hasFullAccess);
       setTrialBanner(
         getActiveTrialBannerState(
@@ -1273,8 +1292,8 @@ export default function BooksPage() {
       return;
     }
 
-    loadAbilityCheckReminder(viewingUserId);
-  }, [viewingUserId, meId, abilityCheckReminderDayKey]);
+    loadAbilityCheckReminder(viewingUserId, canUseAbilityCheckReminder);
+  }, [viewingUserId, meId, abilityCheckReminderDayKey, canUseAbilityCheckReminder]);
 
   useEffect(() => {
     function refreshAbilityCheckReminderDay(options: { refreshCount?: boolean } = {}) {
@@ -1293,8 +1312,13 @@ export default function BooksPage() {
         return;
       }
 
-      if (options.refreshCount && viewingUserId && meId && viewingUserId === meId) {
-        void loadAbilityCheckReminder(viewingUserId);
+      if (
+        options.refreshCount &&
+        viewingUserId &&
+        meId &&
+        viewingUserId === meId
+      ) {
+        void loadAbilityCheckReminder(viewingUserId, canUseAbilityCheckReminder);
       }
     }
 
@@ -1317,7 +1341,7 @@ export default function BooksPage() {
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [viewingUserId, meId]);
+  }, [viewingUserId, meId, canUseAbilityCheckReminder]);
 
   const currentlyReading = validRows.filter(
     (r) => !!r.started_at && !r.finished_at && !r.dnf_at
@@ -1376,6 +1400,7 @@ export default function BooksPage() {
     viewingUserId === meId &&
     !trialBanner &&
     abilityCheckReminderEnabled &&
+    canUseAbilityCheckReminder &&
     abilityCheckReminderHasUnlocked &&
     !abilityCheckReminderLoading &&
     !abilityCheckReminderHidden;

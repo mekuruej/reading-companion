@@ -288,7 +288,7 @@ export default function BookHubActionGrid({
           <CompactActionButton
             title="Read / Listen"
             description="Time reading or listening and update progress."
-            className="border-emerald-200 bg-emerald-50/60 hover:bg-emerald-50"
+            className="border-yellow-300 bg-yellow-100 text-yellow-950 hover:border-yellow-400 hover:bg-yellow-200"
             onClick={onFluidReadingJustReading}
           />
 
@@ -296,7 +296,7 @@ export default function BookHubActionGrid({
             <CompactActionButton
               title="Reading Journal"
               description="Track characters, plot, quotes, notes, and reviews."
-              className="border-sky-200 bg-sky-50/60 hover:bg-sky-50"
+              className="border-green-200 bg-green-50 text-green-950 hover:border-green-300 hover:bg-green-100"
               onClick={onStoryNotes}
             />
           ) : null}
@@ -305,6 +305,7 @@ export default function BookHubActionGrid({
             <CompactActionButton
               title="Book Stats"
               description="Open time, pages, sessions, and progress for this book."
+              className="border-blue-200 bg-blue-50 text-blue-950 hover:border-blue-300 hover:bg-blue-100"
               onClick={onBookStats}
             />
           ) : null}
@@ -313,6 +314,7 @@ export default function BookHubActionGrid({
             <CompactActionButton
               title="Reading History"
               description="Edit session records, dates, and reading history for this book."
+              className="border-purple-200 bg-purple-50 text-purple-950 hover:border-purple-300 hover:bg-purple-100"
               onClick={onReadingSessions}
             />
           ) : null}

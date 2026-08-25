@@ -639,8 +639,8 @@ function FullAccessBookHubTabPanel({
       <p className="mt-3 text-sm leading-6 text-stone-600">{message}</p>
 
       <div className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 p-4 text-sm leading-6 text-stone-600">
-        You can still use this Book Hub for Book Info, Reading History, and
-        Reading Reflection.
+        You can still use this Book Hub for Book Info, Reading Journal, and
+        Reading History.
       </div>
     </div>
   );
@@ -1038,7 +1038,12 @@ export default function BookHubPage() {
         isAdmin)) ||
     isSuperTeacher ||
     isAdmin;
-  const canCompleteReadingReflection = !!finishedAt && !dnfAt && !isEnglishNativeTrackerBook;
+  const canShowReadingReflection =
+    wantsJapaneseStudyTools &&
+    isJapaneseLearningBook(book?.language_code ?? null) &&
+    !isEnglishNativeTrackerBook;
+  const canCompleteReadingReflection =
+    canShowReadingReflection && !!finishedAt && !dnfAt;
   const hasCompletedReadingReflection =
     row?.rating_difficulty != null &&
     row?.rating_overall != null &&
@@ -5587,7 +5592,7 @@ export default function BookHubPage() {
                 }}
               />
 
-              {!isEnglishNativeTrackerBook && (!isTrialLearningAccess || canCompleteReadingReflection) ? (
+              {canShowReadingReflection && (!isTrialLearningAccess || canCompleteReadingReflection) ? (
                 <section
                   id="reading-reflection"
                   className={[

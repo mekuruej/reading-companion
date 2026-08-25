@@ -86,6 +86,6 @@ export function getFullAccessRequiredCopy(feature: FullAccessFeature) {
 
   return {
     title: "Full access needed",
-    message: `${featureLabel} is part of full Mekuru access. Your book tracking, reading reflections, and timer-only reading tools are still available.`,
+    message: `${featureLabel} is part of full Mekuru access. Your book tracking, Reading Journal, and timer-only reading tools are still available.`,
   };
 }
