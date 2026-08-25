@@ -12,6 +12,7 @@ import AddBookActionRow from "./components/AddBookActionRow";
 import AddBookDestinationSummary from "./components/AddBookDestinationSummary";
 import AddBookCatalogResult from "./components/AddBookCatalogResult";
 import ManualEditionForm, { type ManualEditionMode } from "./components/ManualEditionForm";
+import AddBookModeButton from "./components/AddBookModeButton";
 import { isValidAsin, normalizeAsin } from "@/lib/books/asin";
 import {
     COMMON_BOOK_LANGUAGE_OPTIONS,
@@ -132,36 +133,6 @@ function missingGlobalBookFields(book: BookSearchResult) {
     return missing;
 }
 
-function ModeButton({
-    mode,
-    activeMode,
-    children,
-    onSelect,
-}: {
-    mode: AddBookSearchMode;
-    activeMode: AddBookSearchMode;
-    children: string;
-    onSelect: (mode: AddBookSearchMode) => void;
-}) {
-    const selected = mode === activeMode;
-
-    return (
-        <button
-            type="button"
-            role="tab"
-            aria-selected={selected}
-            onClick={() => onSelect(mode)}
-            className={[
-                "flex-1 rounded-2xl px-4 py-3 text-sm font-black transition",
-                selected
-                    ? "bg-stone-900 text-white shadow-sm"
-                    : "bg-white text-stone-700 hover:bg-stone-50",
-            ].join(" ")}
-        >
-            {children}
-        </button>
-    );
-}
 
 export default function AddBookPage() {
     const router = useRouter();
@@ -1192,15 +1163,15 @@ export default function AddBookPage() {
                         aria-label="Add book search mode"
                         className="grid grid-cols-3 gap-1 rounded-[1.35rem] border border-stone-200 bg-stone-100 p-1 sm:min-w-[330px]"
                     >
-                        <ModeButton mode="title" activeMode={activeMode} onSelect={setActiveMode}>
+                        <AddBookModeButton mode="title" activeMode={activeMode} onSelect={setActiveMode}>
                             Title
-                        </ModeButton>
-                        <ModeButton mode="isbn" activeMode={activeMode} onSelect={setActiveMode}>
+                        </AddBookModeButton>
+                        <AddBookModeButton mode="isbn" activeMode={activeMode} onSelect={setActiveMode}>
                             ISBN
-                        </ModeButton>
-                        <ModeButton mode="asin" activeMode={activeMode} onSelect={setActiveMode}>
+                        </AddBookModeButton>
+                        <AddBookModeButton mode="asin" activeMode={activeMode} onSelect={setActiveMode}>
                             ASIN
-                        </ModeButton>
+                        </AddBookModeButton>
                     </div>
                 </div>
 
