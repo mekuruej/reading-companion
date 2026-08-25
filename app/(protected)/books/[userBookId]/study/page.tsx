@@ -2226,7 +2226,7 @@ export default function BookFlashcardsPage() {
         vocabListHref={`/books/${encodeURIComponent(userBookId)}/words`}
       />
 
-      <div className="mb-7 w-full max-w-3xl space-y-0">
+      <div className="mb-7 w-full max-w-3xl space-y-6">
         {filterControls}
 
         {isEnglishBook ? (
@@ -2238,10 +2238,10 @@ export default function BookFlashcardsPage() {
           </div>
         ) : (
           <StudyModePanel
-          studySet={studySet}
-          modeOptions={BOOK_FLASHCARD_MODE_OPTIONS}
-          onStudySetChange={(value) => setStudySet(value as StudySet)}
-        />
+            studySet={studySet}
+            modeOptions={BOOK_FLASHCARD_MODE_OPTIONS}
+            onStudySetChange={(value) => setStudySet(value as StudySet)}
+          />
         )}
       </div>
 

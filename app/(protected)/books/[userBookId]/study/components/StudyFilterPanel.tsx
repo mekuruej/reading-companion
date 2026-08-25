@@ -120,7 +120,8 @@ export default function StudyFilterPanel({
   onPageFilterChange,
   onRepeatsOnlyChange,
 }: StudyFilterPanelProps) {
-  const [open, setOpen] = useState(false);
+  const [locationOpen, setLocationOpen] = useState(false);
+  const [difficultyOpen, setDifficultyOpen] = useState(false);
 
   const selectedColorValue =
     colorSelected.length === 0 || colorSelected.length === colorOptions.length
@@ -129,15 +130,17 @@ export default function StudyFilterPanel({
         ? colorSelected[0]
         : "mixed";
 
-  const filterSummary = [
-    jlptSummary(jlptLevels, jlptSelected),
-    colorSummary(colorOptions, colorSelected),
+  const locationSummary = [
     chapterSummary(chapterFilter, chapterOptions),
     pageSummary(pageFilter),
-    repeatsOnly ? "Repeats only" : null,
   ]
     .filter(Boolean)
     .join(" • ");
+  const difficultySummary = [
+    jlptSummary(jlptLevels, jlptSelected),
+    colorSummary(colorOptions, colorSelected),
+    repeatsOnly ? "Repeats only" : null,
+  ].join(" • ");
 
   function handleColorDropdownChange(value: string) {
     if (value === "mixed") return;
@@ -152,168 +155,202 @@ export default function StudyFilterPanel({
   }
 
   return (
-    <section className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-      <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-        Filters · Step 1
-      </p>
+    <div className="w-full max-w-3xl space-y-3">
+      <section className="rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+        <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+          Location · Step 1
+        </p>
 
-      <div className="mt-1 flex flex-wrap items-center gap-3">
-        <h2 className="text-lg font-black text-slate-950">
-          Choose which words to study
-        </h2>
+        <div className="mt-1 flex flex-wrap items-center gap-3">
+          <h2 className="text-lg font-black text-slate-950">
+            Choose where the flashcards come from
+          </h2>
 
-        <button
-          type="button"
-          onClick={() => setOpen((current) => !current)}
-          className="ml-2 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-2 text-sm font-black text-blue-700 shadow-sm transition hover:bg-blue-100 sm:ml-4"
-        >
-          {open ? "Close" : "Change"}
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={() => setLocationOpen((current) => !current)}
+            className="ml-2 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-2 text-sm font-black text-blue-700 shadow-sm transition hover:bg-blue-100 sm:ml-4"
+          >
+            {locationOpen ? "Close" : "Change"}
+          </button>
+        </div>
 
-      <p className="mt-1 text-sm font-semibold text-slate-500">
-        {filterSummary}
-      </p>
+        <p className="mt-1 text-sm font-semibold text-slate-500">
+          {locationSummary}
+        </p>
 
-      {open ? (
-        <div className="mt-4 border-t border-slate-200 pt-4">
-          <p className="text-sm text-slate-500">
-            Choose a JLPT level, color, or book section for a focused review.
-          </p>
-
-          <div className="mt-4">
-            <p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">
-              JLPT levels
+        {locationOpen ? (
+          <div className="mt-4 border-t border-slate-200 pt-4">
+            <p className="text-sm text-slate-500">
+              Choose a chapter or page focus for this book.
             </p>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {jlptLevels.map((level) => {
-                const checkedLevel = jlptSelected.includes(level);
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">
+                Book section
+              </p>
 
-                return (
-                  <button
-                    key={level}
-                    type="button"
-                    onClick={() => onToggleJlpt(level)}
-                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-sm font-black shadow-sm transition ${
-                      checkedLevel
-                        ? "border-slate-950 bg-slate-950 text-white"
-                        : "border-slate-200 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50"
-                    }`}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="sr-only">Chapter</span>
+                  <select
+                    value={chapterFilter}
+                    onChange={(event) => onChapterFilterChange(event.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   >
-                    <span
-                      className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] ${
-                        checkedLevel
-                          ? "border-white bg-white text-slate-950"
-                          : "border-slate-400 bg-white text-transparent"
-                      }`}
-                    >
-                      ✓
-                    </span>
-                    {jlptLabel(level)}
-                  </button>
-                );
-              })}
+                    <option value="all">All Chapters</option>
+                    {chapterOptions.map((chapter) => (
+                      <option key={chapter.value} value={chapter.value}>
+                        {chapter.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <div className="ml-0 flex gap-2 sm:ml-2">
-                <button
-                  type="button"
-                  onClick={onSelectAllJlpt}
-                  className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-300"
-                >
-                  All
-                </button>
-
-                <button
-                  type="button"
-                  onClick={onClearJlpt}
-                  className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-300"
-                >
-                  Clear
-                </button>
+                <label className="block">
+                  <span className="sr-only">Page</span>
+                  <select
+                    value={pageFilter}
+                    onChange={(event) => onPageFilterChange(event.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  >
+                    <option value="all">All pages</option>
+                    {pageOptions.map((page) => (
+                      <option key={page} value={String(page)}>
+                        Page {page}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
             </div>
           </div>
+        ) : null}
+      </section>
 
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <label className="block">
-              <span className="text-xs font-black uppercase tracking-wide text-slate-500">
-                Color / readiness
-              </span>
+      <section className="rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+        <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+          Difficulty · Step 2
+        </p>
 
-              <select
-                value={selectedColorValue}
-                onChange={(event) => handleColorDropdownChange(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-              >
-                <option value="all">All colors</option>
+        <div className="mt-1 flex flex-wrap items-center gap-3">
+          <h2 className="text-lg font-black text-slate-950">
+            Choose the difficulty
+          </h2>
 
-                {selectedColorValue === "mixed" ? (
-                  <option value="mixed">Multiple colors</option>
-                ) : null}
+          <button
+            type="button"
+            onClick={() => setDifficultyOpen((current) => !current)}
+            className="ml-2 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-2 text-sm font-black text-blue-700 shadow-sm transition hover:bg-blue-100 sm:ml-4"
+          >
+            {difficultyOpen ? "Close" : "Change"}
+          </button>
+        </div>
 
-                {colorOptions.map((color) => (
-                  <option key={color} value={color}>
-                    {colorDropdownLabel(color)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+        <p className="mt-1 text-sm font-semibold text-slate-500">
+          {difficultySummary}
+        </p>
 
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">
-              Book section
+        {difficultyOpen ? (
+          <div className="mt-4 border-t border-slate-200 pt-4">
+            <p className="text-sm text-slate-500">
+              Choose a JLPT level, readiness color, or repeated-word focus.
             </p>
 
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+            <div className="mt-4">
+              <p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">
+                JLPT levels
+              </p>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {jlptLevels.map((level) => {
+                  const checkedLevel = jlptSelected.includes(level);
+
+                  return (
+                    <button
+                      key={level}
+                      type="button"
+                      onClick={() => onToggleJlpt(level)}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-sm font-black shadow-sm transition ${
+                        checkedLevel
+                          ? "border-slate-950 bg-slate-950 text-white"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span
+                        className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] ${
+                          checkedLevel
+                            ? "border-white bg-white text-slate-950"
+                            : "border-slate-400 bg-white text-transparent"
+                        }`}
+                      >
+                        ✓
+                      </span>
+                      {jlptLabel(level)}
+                    </button>
+                  );
+                })}
+
+                <div className="ml-0 flex gap-2 sm:ml-2">
+                  <button
+                    type="button"
+                    onClick={onSelectAllJlpt}
+                    className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-300"
+                  >
+                    All
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={onClearJlpt}
+                    className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-300"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
               <label className="block">
-                <span className="sr-only">Chapter</span>
+                <span className="text-xs font-black uppercase tracking-wide text-slate-500">
+                  Color / readiness
+                </span>
+
                 <select
-                  value={chapterFilter}
-                  onChange={(event) => onChapterFilterChange(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  value={selectedColorValue}
+                  onChange={(event) => handleColorDropdownChange(event.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 >
-                  <option value="all">All Chapters</option>
-                  {chapterOptions.map((chapter) => (
-                    <option key={chapter.value} value={chapter.value}>
-                      {chapter.label}
+                  <option value="all">All colors</option>
+
+                  {selectedColorValue === "mixed" ? (
+                    <option value="mixed">Multiple colors</option>
+                  ) : null}
+
+                  {colorOptions.map((color) => (
+                    <option key={color} value={color}>
+                      {colorDropdownLabel(color)}
                     </option>
                   ))}
                 </select>
-              </label>
-
-              <label className="block">
-                <span className="sr-only">Page</span>
-                <select
-                  value={pageFilter}
-                  onChange={(event) => onPageFilterChange(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                >
-                  <option value="all">All pages</option>
-                  {pageOptions.map((page) => (
-                    <option key={page} value={String(page)}>
-                      Page {page}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label
-                className="flex shrink-0 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm"
-                title="Show only words that appear 2+ times in this book"
-              >
-                <input
-                  type="checkbox"
-                  checked={repeatsOnly}
-                  onChange={(event) => onRepeatsOnlyChange(event.target.checked)}
-                />
-                Repeats only
               </label>
             </div>
+
+            <label
+              className="mt-4 flex w-fit items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm"
+              title="Show only words that appear 2+ times in this book"
+            >
+              <input
+                type="checkbox"
+                checked={repeatsOnly}
+                onChange={(event) => onRepeatsOnlyChange(event.target.checked)}
+              />
+              Repeats only
+            </label>
           </div>
-        </div>
-      ) : null}
-    </section>
+        ) : null}
+      </section>
+    </div>
   );
 }

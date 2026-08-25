@@ -457,7 +457,14 @@ export default function AdvancedStudyPage() {
                             </div>
 
                             <p className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold leading-6 text-emerald-950">
-                                Book-specific flashcards live in Book Study. These tools work across your library.
+                                Book-specific flashcards live in individual{" "}
+                                <Link
+                                    href="/library/book-hubs"
+                                    className="font-black underline underline-offset-4 transition hover:text-emerald-800"
+                                >
+                                    Book Hubs
+                                </Link>
+                                . Advanced Study looks across your whole Library.
                             </p>
                         </section>
                         ) : null}
