@@ -35,10 +35,6 @@ const DEFAULT_LEARNING_SETTINGS: LearningSettingsRow = {
 
 const READINESS_SAMPLE_SIZE = 1000;
 
-function formatReadyScore(value: number) {
-    return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
-
 async function loadAdvancedStudySummaryRows(userId: string) {
     const { data, error } = await supabase
         .from("user_library_word_summaries")
@@ -117,13 +113,13 @@ export default function AdvancedStudyPage() {
     const [accessReason, setAccessReason] = useState<string>("free");
     const [hasSavedWords, setHasSavedWords] = useState(false);
     const [readiness, setReadiness] = useState<AdvancedStudyReadinessResult | null>(null);
-    const [readinessSampleLimited, setReadinessSampleLimited] = useState(false);
     const [readinessLoading, setReadinessLoading] = useState(false);
     const [readinessError, setReadinessError] = useState<string | null>(null);
     const [isTrialAccess, setIsTrialAccess] = useState(false);
     const [isStaffAccess, setIsStaffAccess] = useState(false);
     const [canUseAbilityCheck, setCanUseAbilityCheck] = useState(false);
     const [canUseLibraryReview, setCanUseLibraryReview] = useState(false);
+    const [hasAbilityCheckHistory, setHasAbilityCheckHistory] = useState(false);
     const accessTitle = accessReason === "expired" ? "Japanese Learning ended" : "Free reading tracker";
     const abilityCheckAvailable = canUseAbilityCheck && !isTrialAccess && (isStaffAccess || (readiness?.abilityCheckReady ?? false));
     const libraryReviewAvailable = canUseLibraryReview && !isTrialAccess && (isStaffAccess || (readiness?.libraryReviewReady ?? false));
@@ -132,9 +128,14 @@ export default function AdvancedStudyPage() {
         abilityCheckAvailable ||
         libraryReviewAvailable
     );
-    const trackedWordLabel = readinessSampleLimited
-        ? `Latest ${READINESS_SAMPLE_SIZE}-word sample`
-        : `${readiness?.eligibleWordCount ?? 0} tracked words`;
+    const abilityCheckProgressPercent = readiness
+        ? Math.min(100, Math.round((readiness.eligibleWordCount / readiness.abilityCheckTarget) * 100))
+        : 0;
+    const showAbilityCheckReadinessCard = Boolean(
+        readiness &&
+        !hasAbilityCheckHistory &&
+        readiness.eligibleWordCount < readiness.abilityCheckTarget + 10
+    );
 
     useEffect(() => {
         let mounted = true;
@@ -151,12 +152,12 @@ export default function AdvancedStudyPage() {
                         setAccessReason("free");
                         setHasSavedWords(false);
                         setReadiness(null);
-                        setReadinessSampleLimited(false);
                         setReadinessError(null);
                         setIsTrialAccess(false);
                         setIsStaffAccess(false);
                         setCanUseAbilityCheck(false);
                         setCanUseLibraryReview(false);
+                        setHasAbilityCheckHistory(false);
                         setLoadingAccess(false);
                     }
                     return;
@@ -222,7 +223,7 @@ export default function AdvancedStudyPage() {
                             console.warn("Advanced Study readiness is using default settings:", settingsError);
                         }
 
-                        const { rows: summaryRows, limited } = await loadAdvancedStudySummaryRows(user.id);
+                        const { rows: summaryRows } = await loadAdvancedStudySummaryRows(user.id);
                         let progressRows: AdvancedStudyReadinessProgressRow[] = [];
 
                         try {
@@ -230,6 +231,12 @@ export default function AdvancedStudyPage() {
                         } catch (progressError) {
                             console.warn("Advanced Study readiness is using summary colors without progress:", progressError);
                         }
+                        const hasStartedAbilityCheck = progressRows.some((progress) =>
+                            (progress.reading_gate_attempts ?? 0) > 0 ||
+                            progress.reading_gate_status !== "not_started" ||
+                            progress.meaning_gate_status !== "not_started" ||
+                            progress.mastered === true
+                        );
 
                         const nextReadiness = calculateAdvancedStudyReadiness({
                             summaries: summaryRows,
@@ -242,13 +249,13 @@ export default function AdvancedStudyPage() {
 
                         if (mounted) {
                             setReadiness(nextReadiness);
-                            setReadinessSampleLimited(limited);
+                            setHasAbilityCheckHistory(hasStartedAbilityCheck);
                         }
                     } catch (readinessLoadError) {
                         console.error("Could not load Advanced Study readiness:", readinessLoadError);
                         if (mounted) {
                             setReadiness(null);
-                            setReadinessSampleLimited(false);
+                            setHasAbilityCheckHistory(false);
                             setReadinessError("Could not load Advanced Study readiness.");
                         }
                     } finally {
@@ -274,13 +281,13 @@ export default function AdvancedStudyPage() {
                     setAccessReason("free");
                     setHasSavedWords(false);
                     setReadiness(null);
-                    setReadinessSampleLimited(false);
                     setReadinessLoading(false);
                     setReadinessError("Could not load Advanced Study readiness.");
                     setIsTrialAccess(false);
                     setIsStaffAccess(false);
                     setCanUseAbilityCheck(false);
                     setCanUseLibraryReview(false);
+                    setHasAbilityCheckHistory(false);
                     setLoadingAccess(false);
                 }
             }
@@ -356,29 +363,27 @@ export default function AdvancedStudyPage() {
                             <section className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm font-semibold leading-6 text-amber-950 shadow-sm">
                                 Advanced Study readiness could not load right now. Your saved words and colors are still here.
                             </section>
-                        ) : readiness ? (
+                        ) : showAbilityCheckReadinessCard && readiness ? (
                             <section className="rounded-3xl border border-violet-200 bg-white p-6 text-slate-900 shadow-sm">
                                 <p className="text-xs font-black uppercase tracking-[0.18em] text-violet-600">
-                                    {showAdvancedTools ? "Advanced Study is available" : "Building toward readiness"}
+                                    Ability Check readiness
                                 </p>
                                 <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                                     <div>
                                         <h2 className="text-2xl font-black text-slate-950">
-                                            {showAdvancedTools
-                                                ? "Advanced Study is available."
-                                                : `${readiness.eligibleWordCount} / ${readiness.abilityCheckTarget} tracked words for Ability Check`}
+                                            {readiness.abilityCheckReady
+                                                ? "Ability Check alerts will start appearing on your Library page."
+                                                : `${readiness.eligibleWordCount} / ${readiness.abilityCheckTarget} words saved until Ability Check starts`}
                                         </h2>
                                         <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
-                                            {showAdvancedTools
-                                                ? readinessSampleLimited
-                                                    ? `Showing your latest ${READINESS_SAMPLE_SIZE}-word sample. ${readiness.eligibleWordCount} tracked words in this sample are countable, and ${formatReadyScore(readiness.readyScore)} are strongly marked by color.`
-                                                    : `You have ${readiness.eligibleWordCount} tracked words. ${formatReadyScore(readiness.readyScore)} words are strongly marked by color, which helps show the shape of your review pool.`
-                                                : "You’re building the vocabulary history Advanced Study uses. Keep reading, looking up words, and adding book vocabulary. Your advanced review tools will become more useful as your vocabulary history grows."}
+                                            {readiness.abilityCheckReady
+                                                ? "You have saved enough words for Ability Check. When words are ready to review, MEKURU will show alerts from your Library."
+                                                : "Keep reading, looking up words, and saving vocabulary. Ability Check starts after you have enough saved words to make the review useful."}
                                         </p>
                                     </div>
 
                                     <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700">
-                                        {trackedWordLabel}
+                                        {readiness.eligibleWordCount} saved words
                                     </div>
                                 </div>
 
@@ -386,30 +391,16 @@ export default function AdvancedStudyPage() {
                                     <div
                                         className="h-full rounded-full bg-violet-500"
                                         style={{
-                                            width: `${Math.min(100, (readiness.eligibleWordCount / readiness.abilityCheckTarget) * 100)}%`,
+                                            width: `${abilityCheckProgressPercent}%`,
                                         }}
                                     />
                                 </div>
 
                                 <p className="mt-4 text-sm font-semibold leading-6 text-slate-600">
-                                    {libraryReviewAvailable
-                                        ? `Library Review is available. ${readinessSampleLimited ? "In your latest tracked words" : `You have ${readiness.eligibleWordCount} tracked words`}, ${formatReadyScore(readiness.readyScore)} are strongly marked by color.`
-                                        : `Library Review becomes more useful around ${readiness.libraryReviewTarget} tracked words. You have ${readiness.eligibleWordCount} / ${readiness.libraryReviewTarget}.`}
+                                    {readiness.abilityCheckReady
+                                        ? `You have saved ${readiness.abilityCheckTarget} or more words, so Ability Check can begin surfacing Library alerts.`
+                                        : `${readiness.eligibleWordCount}/${readiness.abilityCheckTarget} words saved (${abilityCheckProgressPercent}%) until your Ability Check starts.`}
                                 </p>
-
-                                <div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50 px-4 py-3 text-sm font-semibold leading-6 text-violet-950">
-                                    Color-marked review pool{readinessSampleLimited ? " from latest words" : ""}: {formatReadyScore(readiness.readyScore)} strongly marked word{readiness.readyScore === 1 ? "" : "s"}.
-                                </div>
-
-                                <div className="mt-4 flex flex-wrap gap-2 text-xs font-black">
-                                    <span className="rounded-full bg-red-50 px-3 py-1.5 text-red-700">Red {readiness.colorCounts.red}</span>
-                                    <span className="rounded-full bg-orange-50 px-3 py-1.5 text-orange-800">Orange {readiness.colorCounts.orange}</span>
-                                    <span className="rounded-full bg-yellow-100 px-3 py-1.5 text-amber-900">Yellow {readiness.colorCounts.yellow}</span>
-                                    <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-800">Green {readiness.colorCounts.green}</span>
-                                    <span className="rounded-full bg-sky-50 px-3 py-1.5 text-sky-800">Blue {readiness.colorCounts.blue}</span>
-                                    <span className="rounded-full bg-violet-50 px-3 py-1.5 text-violet-800">Purple {readiness.colorCounts.purple}</span>
-                                    <span className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-600">Grey {readiness.colorCounts.grey}</span>
-                                </div>
 
                                 {!showAdvancedTools ? (
                                     <div className="mt-5 flex flex-wrap gap-3">
