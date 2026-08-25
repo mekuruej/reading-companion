@@ -20,7 +20,6 @@ export default function Header() {
   const [hasSavedVocabulary, setHasSavedVocabulary] = useState(false);
   const [pendingJapaneseLearningRequestCount, setPendingJapaneseLearningRequestCount] = useState(0);
   const [headerRefreshToken, setHeaderRefreshToken] = useState(0);
-  const [hideJapaneseTaglineForEnglishBook, setHideJapaneseTaglineForEnglishBook] = useState(false);
   const [showLibraryMenu, setShowLibraryMenu] = useState(false);
   const [showDiscoveryMenu, setShowDiscoveryMenu] = useState(false);
   const [showStudyMenu, setShowStudyMenu] = useState(false);
@@ -30,18 +29,6 @@ export default function Header() {
   const discoveryMenuRef = useRef<HTMLDivElement | null>(null);
   const studyMenuRef = useRef<HTMLDivElement | null>(null);
   const teacherMenuRef = useRef<HTMLDivElement | null>(null);
-
-  function userBookIdFromPath(path: string | null) {
-    if (!path) return null;
-
-    const bookMatch = path.match(/^\/books\/([^/]+)/);
-    if (bookMatch?.[1]) return bookMatch[1];
-
-    const teacherStudentBookMatch = path.match(/^\/teacher\/students\/[^/]+\/books\/([^/]+)/);
-    if (teacherStudentBookMatch?.[1]) return teacherStudentBookMatch[1];
-
-    return null;
-  }
 
   useEffect(() => {
     let cancelled = false;
@@ -203,44 +190,6 @@ export default function Header() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadCurrentBookLanguage() {
-      const userBookId = userBookIdFromPath(pathname);
-
-      if (!userBookId) {
-        setHideJapaneseTaglineForEnglishBook(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("user_books")
-        .select("books:book_id(language_code)")
-        .eq("id", userBookId)
-        .maybeSingle();
-
-      if (cancelled) return;
-
-      if (error) {
-        setHideJapaneseTaglineForEnglishBook(false);
-        return;
-      }
-
-      const book = Array.isArray((data as any)?.books)
-        ? (data as any).books[0]
-        : (data as any)?.books;
-
-      setHideJapaneseTaglineForEnglishBook(book?.language_code === "en");
-    }
-
-    void loadCurrentBookLanguage();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [pathname]);
-
   const libraryHref = username ? `/users/${username}/books` : "/books";
   const librarySectionActive =
     pathname === "/library" ||
@@ -298,13 +247,8 @@ export default function Header() {
             >
               MEKURU <span className="align-middle text-xs font-semibold text-red-600 md:text-sm">(Beta)</span>
             </Link>
-            {!hideJapaneseTaglineForEnglishBook ? (
-              <div className="mt-0 text-xs text-stone-500">
-                ページをめくって、話しまくろう！
-              </div>
-            ) : null}
             <div className="mt-1 text-xs text-stone-500">
-              Every word carries the memory of where you met it.
+              Your Reading Companion
             </div>
           </div>
 

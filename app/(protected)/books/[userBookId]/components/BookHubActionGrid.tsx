@@ -223,8 +223,8 @@ export default function BookHubActionGrid({
 
       {showJapaneseLearningSection ? (
         <ActionSection
-          title="Japanese Learning Tools"
-          description="Extra tools for reading and studying Japanese books."
+          title="Japanese Learning"
+          description="ページをめくって、話しまくろう！"
         >
           <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
             {canUseSavedWordReading ? (
@@ -286,7 +286,7 @@ export default function BookHubActionGrid({
 
       <ActionSection
         title="Reading Companion"
-        description="The everyday tools available in all Book Hubs for tracking and engaging with your reading."
+        description="Every word carries the memory of where you met it."
       >
         <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <CompactActionButton

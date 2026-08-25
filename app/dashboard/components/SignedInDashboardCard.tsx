@@ -21,9 +21,7 @@ export default function SignedInDashboardCard({
         <h2 className="text-3xl font-semibold">Welcome to Mekuru</h2>
 
         <p className="mt-3 text-gray-500">
-          Every word carries the memory of where you met it.
-          <br />
-          ページをめくって、話しまくろう！
+          Your Reading Companion
         </p>
 
         {showWarmup ? (
