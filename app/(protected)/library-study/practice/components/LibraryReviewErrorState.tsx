@@ -1,23 +1,27 @@
 type LibraryReviewErrorStateProps = {
   message: string;
-  onBackToLibrary: () => void;
+  onBackToStudyHub: () => void;
 };
 
 export default function LibraryReviewErrorState({
   message,
-  onBackToLibrary,
+  onBackToStudyHub,
 }: LibraryReviewErrorStateProps) {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-100 p-6">
-      <p className="text-red-700">{message}</p>
+    <main className="min-h-screen bg-slate-100 p-6">
+      <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-xl flex-col justify-center">
+        <button
+          type="button"
+          onClick={onBackToStudyHub}
+          className="mb-4 inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
+        >
+          ← Back to Study Hub
+        </button>
 
-      <button
-        type="button"
-        onClick={onBackToLibrary}
-        className="rounded bg-gray-200 px-4 py-2"
-      >
-        Back to Library
-      </button>
+        <p className="rounded-2xl border border-red-100 bg-white p-6 text-red-700 shadow-sm">
+          {message}
+        </p>
+      </div>
     </main>
   );
 }

@@ -1,17 +1,26 @@
 type AbilityCheckCompleteStateProps = {
   endedEarly: boolean;
-  onBackToLibrary: () => void;
+  onBackToStudyHub: () => void;
   onContinueStudy: () => void;
 };
 
 export default function AbilityCheckCompleteState({
   endedEarly,
-  onBackToLibrary,
+  onBackToStudyHub,
   onContinueStudy,
 }: AbilityCheckCompleteStateProps) {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-100 p-6">
-      <div className="relative w-full max-w-xl overflow-hidden rounded-3xl border border-emerald-100 bg-white p-8 text-center shadow-sm">
+    <main className="min-h-screen bg-slate-100 p-6">
+      <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-xl flex-col justify-center">
+        <button
+          type="button"
+          onClick={onBackToStudyHub}
+          className="mb-4 inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
+        >
+          ← Back to Study Hub
+        </button>
+
+      <div className="relative w-full overflow-hidden rounded-3xl border border-emerald-100 bg-white p-8 text-center shadow-sm">
         {!endedEarly ? (
           <>
             <span className="pointer-events-none absolute left-10 top-8 h-2 w-2 animate-[dailySpark_1000ms_ease-out_forwards] rounded-full bg-emerald-300" />
@@ -53,14 +62,6 @@ export default function AbilityCheckCompleteState({
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <button
             type="button"
-            onClick={onBackToLibrary}
-            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-          >
-            Back to Library
-          </button>
-
-          <button
-            type="button"
             onClick={onContinueStudy}
             className="rounded-2xl border border-emerald-200 bg-emerald-100 px-5 py-3 text-sm font-semibold text-emerald-950 shadow-sm transition hover:bg-emerald-50"
           >
@@ -91,6 +92,7 @@ export default function AbilityCheckCompleteState({
             }
           }
         `}</style>
+      </div>
       </div>
     </main>
   );

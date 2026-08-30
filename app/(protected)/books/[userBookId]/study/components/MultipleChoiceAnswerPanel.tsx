@@ -7,20 +7,20 @@ type MultipleChoiceAnswerPanelProps = {
   answered: boolean;
   wasCorrect: boolean | null;
   correctAnswerText: string;
-  correctionInput: string;
-  correctionFeedback: string | null;
-  correctionInputRef: RefObject<HTMLInputElement | null>;
-  correctionPlaceholder: string;
+  correctionInput?: string;
+  correctionFeedback?: string | null;
+  correctionInputRef?: RefObject<HTMLInputElement | null>;
+  correctionPlaceholder?: string;
   correctionTitle?: string;
   correctionHelpText?: string;
   correctionAnswerDisplay?: string;
   correctionFeedbackOk?: boolean;
   isOptionCorrect: (option: string) => boolean;
   onSelectOption: (option: string) => void;
-  onCorrectionInputChange: (value: string) => void;
-  onCorrectionInputKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
+  onCorrectionInputChange?: (value: string) => void;
+  onCorrectionInputKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
   onCorrectionInputCompositionEnd?: (event: CompositionEvent<HTMLInputElement>) => void;
-  onCheckCorrection: () => void;
+  onCheckCorrection?: () => void;
   autoAdvancePaused?: boolean;
   onToggleAutoAdvancePaused?: () => void;
 };
@@ -36,27 +36,11 @@ export default function MultipleChoiceAnswerPanel({
   answered,
   wasCorrect,
   correctAnswerText,
-  correctionInput,
-  correctionFeedback,
-  correctionInputRef,
-  correctionPlaceholder,
-  correctionTitle,
-  correctionHelpText,
-  correctionAnswerDisplay,
-  correctionFeedbackOk = false,
   isOptionCorrect,
   onSelectOption,
-  onCorrectionInputChange,
-  onCorrectionInputKeyDown,
-  onCorrectionInputCompositionEnd,
-  onCheckCorrection,
   autoAdvancePaused = false,
   onToggleAutoAdvancePaused,
 }: MultipleChoiceAnswerPanelProps) {
-  const hasCustomCorrectionCopy = Boolean(
-    correctionTitle || correctionHelpText || correctionAnswerDisplay
-  );
-
   return (
     <div className="w-full max-w-md pt-2">
       <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">
@@ -107,7 +91,7 @@ export default function MultipleChoiceAnswerPanel({
               : `❌ Not quite. Correct answer: ${correctAnswerText}`}
           </p>
 
-          {wasCorrect && onToggleAutoAdvancePaused ? (
+          {onToggleAutoAdvancePaused ? (
             <div className="mt-2 flex flex-col items-center gap-1.5">
               <button
                 type="button"
@@ -126,68 +110,6 @@ export default function MultipleChoiceAnswerPanel({
             </div>
           ) : null}
 
-          {!wasCorrect ? (
-            <div className="mt-3 space-y-2">
-              {hasCustomCorrectionCopy ? (
-                <div className="space-y-1.5">
-                  <p className="text-sm font-black text-slate-700">
-                    {correctionTitle ?? "Type one word from the correct answer to continue."}
-                  </p>
-
-                  {correctionAnswerDisplay ? (
-                    <p className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-2xl font-black leading-none text-slate-950">
-                      {correctionAnswerDisplay}
-                    </p>
-                  ) : null}
-
-                  {correctionHelpText ? (
-                    <p className="text-sm font-bold text-slate-600">
-                      {correctionHelpText}
-                    </p>
-                  ) : null}
-                </div>
-              ) : (
-                <p className="text-xs text-slate-500">
-                  Type one word from the correct answer to continue.
-                </p>
-              )}
-
-              <div className="flex gap-2">
-                <input
-                  ref={correctionInputRef}
-                  type="text"
-                  value={correctionInput}
-                  onChange={(event) => onCorrectionInputChange(event.target.value)}
-                  onKeyDown={onCorrectionInputKeyDown}
-                  onCompositionEnd={onCorrectionInputCompositionEnd}
-                  autoCorrect="off"
-                  autoCapitalize="none"
-                  autoComplete="off"
-                  spellCheck={false}
-                  autoFocus
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
-                  placeholder={correctionPlaceholder}
-                />
-
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onCheckCorrection();
-                  }}
-                  className="rounded-xl bg-gray-200 px-4 py-2 text-sm font-medium text-slate-900 hover:bg-gray-300"
-                >
-                  Check
-                </button>
-              </div>
-
-              {correctionFeedback ? (
-                <p className={`text-xs ${correctionFeedbackOk ? "text-green-700" : "text-red-700"}`}>
-                  {correctionFeedback}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
         </div>
       ) : null}
     </div>

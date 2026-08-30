@@ -939,7 +939,6 @@ export default function WordDetailPage() {
         >
           {canUseVocabularyTools ? (
             <WordDetailFooterActions
-              onBack={() => router.back()}
               hidden={word.hidden}
               onEdit={() => openEdit(word)}
               onResearch={openResearch}
@@ -949,13 +948,6 @@ export default function WordDetailPage() {
             />
           ) : (
             <div className="flex flex-wrap justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => router.back()}
-                className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
-              >
-                Back
-              </button>
               <span className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-semibold text-stone-600">
                 Read-only archive
               </span>

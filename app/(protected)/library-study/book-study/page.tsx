@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import LibraryBookActionIndex from "@/components/library/LibraryBookActionIndex";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { resolveReturnTo, withReturnTo } from "@/lib/navigation/returnTo";
 import { supabase } from "@/lib/supabaseClient";
 
 type ProfileAccessRow = {
@@ -53,6 +55,7 @@ function BookStudyFreeState({ hasSavedWords, accessReason }: { hasSavedWords: bo
 }
 
 export default function BookStudyPage() {
+  const searchParams = useSearchParams();
   const [loadingAccess, setLoadingAccess] = useState(true);
   const [canUseBookStudy, setCanUseBookStudy] = useState(false);
   const [accessReason, setAccessReason] = useState<string>("free");
@@ -161,6 +164,11 @@ export default function BookStudyPage() {
     return <BookStudyFreeState hasSavedWords={hasSavedWords} accessReason={accessReason} />;
   }
 
+  const backDestination = resolveReturnTo(searchParams.get("returnTo"), {
+    href: "/library-study",
+    label: "Back to Study Hub",
+  });
+
   return (
     <LibraryBookActionIndex
       eyebrow="Book Flashcards"
@@ -170,9 +178,11 @@ export default function BookStudyPage() {
       emptyText="No books with saved words yet."
       accent="stone"
       requireSavedWords
-      backHref="/library-study"
-      backLabel="Back to Study Hub"
-      hrefForBook={(userBookId) => `/books/${userBookId}/study`}
+      backHref={backDestination.href}
+      backLabel={backDestination.label}
+      hrefForBook={(userBookId) =>
+        withReturnTo(`/books/${userBookId}/study`, "book-study")
+      }
     />
   );
 }

@@ -3,7 +3,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
@@ -21,6 +21,7 @@ import {
   type LibraryStudyWordColorInfo,
 } from "@/lib/libraryStudyColorLookup";
 import { normalizeKanaReading } from "@/lib/kanaInput";
+import { resolveReturnTo } from "@/lib/navigation/returnTo";
 import { supabase } from "@/lib/supabaseClient";
 import { recordStudyEvent } from "@/lib/studyEvents";
 import StudyBookHeader from "./components/StudyBookHeader";
@@ -51,6 +52,7 @@ type StudySet =
   | "FROM_READING_MC"
   | "FROM_READING_MEANING_MC"
   | "COMPLETE"
+  | "COMPLETE_TYPING"
   | "ENGLISH_READER";
 
 type StepField = "word" | "reading" | "meaning";
@@ -72,7 +74,9 @@ function studySetLabel(s: StudySet) {
     case "FROM_READING_MEANING_MC":
       return "Kana to Meaning MC";
     case "COMPLETE":
-      return "Complete Review";
+      return "Touch Reveal";
+    case "COMPLETE_TYPING":
+      return "Typing Reveal";
     case "ENGLISH_READER":
       return "English → Japanese";
     default:
@@ -97,6 +101,7 @@ const BOOK_FLASHCARD_MODE_OPTIONS = [
   },
   { value: "divider-2", label: "──────────", disabled: true },
   { value: "COMPLETE", label: studySetLabel("COMPLETE") },
+  { value: "COMPLETE_TYPING", label: studySetLabel("COMPLETE_TYPING") },
 ];
 
 type KanjiMetaItem = {
@@ -262,6 +267,7 @@ const STUDY_MODE_ORDER: StudySet[] = [
   "FROM_READING_MC",
   "FROM_READING_MEANING_MC",
   "COMPLETE",
+  "COMPLETE_TYPING",
 ];
 
 function getNextStudySet(studySet: StudySet) {
@@ -357,6 +363,7 @@ export default function BookFlashcardsPage() {
   const params = useParams<{ userBookId: string }>();
   const userBookId = params.userBookId;
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [filteredCards, setFilteredCards] = useState<Flashcard[]>([]);
@@ -391,6 +398,7 @@ export default function BookFlashcardsPage() {
       case "FROM_READING_MEANING_MC":
         return ["reading", "word", "meaning"];
       case "COMPLETE":
+      case "COMPLETE_TYPING":
         return ["word", "reading", "meaning"];
       default:
         return ["word", "meaning", "reading"];
@@ -406,7 +414,8 @@ export default function BookFlashcardsPage() {
   const typeModeEnabled =
     studySet === "READING" ||
     studySet === "MEANING" ||
-    studySet === "FROM_READING_MEANING";
+    studySet === "FROM_READING_MEANING" ||
+    studySet === "COMPLETE_TYPING";
 
   const [typedInput, setTypedInput] = useState("");
   const [typedFeedback, setTypedFeedback] = useState<null | { ok: boolean; message: string }>(
@@ -425,10 +434,8 @@ export default function BookFlashcardsPage() {
   const [mcCorrectAnswer, setMcCorrectAnswer] = useState<string | null>(null);
   const [mcAnswered, setMcAnswered] = useState(false);
   const [mcWasCorrect, setMcWasCorrect] = useState<boolean | null>(null);
-  const [correctionInput, setCorrectionInput] = useState("");
-  const [correctionFeedback, setCorrectionFeedback] = useState<string | null>(null);
   const typedInputRef = useRef<HTMLInputElement | null>(null);
-  const correctionInputRef = useRef<HTMLInputElement | null>(null);
+  const flashcardAnchorRef = useRef<HTMLDivElement | null>(null);
 
   const [stepIndex, setStepIndex] = useState(0);
   const [firstTouch, setFirstTouch] = useState(true);
@@ -489,13 +496,6 @@ export default function BookFlashcardsPage() {
     setInputResetKey((k) => k + 1);
     window.requestAnimationFrame(() => {
       if (typedInputRef.current) typedInputRef.current.value = "";
-    });
-  }
-
-  function clearCorrectionInput() {
-    setCorrectionInput("");
-    window.requestAnimationFrame(() => {
-      if (correctionInputRef.current) correctionInputRef.current.value = "";
     });
   }
 
@@ -1122,8 +1122,6 @@ export default function BookFlashcardsPage() {
       setTypeRevealIndex(0);
       setReadyForNextCard(false);
       setLastTypedResult(null);
-      setCorrectionInput("");
-      setCorrectionFeedback(null);
       return;
     }
 
@@ -1168,8 +1166,6 @@ export default function BookFlashcardsPage() {
     setTypeRevealIndex(0);
     setReadyForNextCard(false);
     setLastTypedResult(null);
-    setCorrectionInput("");
-    setCorrectionFeedback(null);
   }, [
     cards,
     isEnglishBook,
@@ -1193,8 +1189,6 @@ export default function BookFlashcardsPage() {
     setReadyForNextCard(false);
     setLastTypedResult(null);
     setFirstTouch(true);
-    setCorrectionInput("");
-    setCorrectionFeedback(null);
   }, [filteredCards, studyOnceMode]);
 
   useEffect(() => {
@@ -1204,8 +1198,6 @@ export default function BookFlashcardsPage() {
     setReadyForNextCard(false);
     setLastTypedResult(null);
     resetMcState();
-    setCorrectionInput("");
-    setCorrectionFeedback(null);
   }, [sessionIndex]);
 
   useEffect(() => {
@@ -1216,8 +1208,6 @@ export default function BookFlashcardsPage() {
     setReadyForNextCard(false);
     setLastTypedResult(null);
     resetMcState();
-    setCorrectionInput("");
-    setCorrectionFeedback(null);
   }, [studySet]);
 
   function getFirstKana(s: string) {
@@ -1487,11 +1477,11 @@ export default function BookFlashcardsPage() {
       studySet !== "FROM_READING_MC" &&
       studySet !== "FROM_READING_MEANING_MC"
     ) return;
-    if (!mcAnswered || !mcWasCorrect) return;
+    if (!mcAnswered) return;
     if (autoAdvancePaused) return;
 
     const timer = window.setTimeout(() => {
-      goToNextWord("correct");
+      goToNextWord(mcWasCorrect ? "correct" : "wrong");
     }, FLASHCARD_AUTO_ADVANCE_MS);
 
     return () => window.clearTimeout(timer);
@@ -1583,8 +1573,6 @@ export default function BookFlashcardsPage() {
     setTypeRevealIndex(0);
     setReadyForNextCard(false);
     setLastTypedResult(null);
-    setCorrectionInput("");
-    setCorrectionFeedback(null);
     resetMcState();
   }
 
@@ -1604,8 +1592,6 @@ export default function BookFlashcardsPage() {
     setTypeRevealIndex(0);
     setReadyForNextCard(false);
     setLastTypedResult(null);
-    setCorrectionInput("");
-    setCorrectionFeedback(null);
     resetMcState();
   }
 
@@ -1615,8 +1601,6 @@ export default function BookFlashcardsPage() {
     setMcCorrectAnswer(null);
     setMcAnswered(false);
     setMcWasCorrect(null);
-    setCorrectionInput("");
-    setCorrectionFeedback(null);
   }
 
   async function skipCardForToday(cardId: string) {
@@ -1697,8 +1681,6 @@ export default function BookFlashcardsPage() {
     setMcSelected(null);
     setMcAnswered(false);
     setMcWasCorrect(null);
-    setCorrectionInput("");
-    setCorrectionFeedback(null);
   }
 
   async function hideCardPermanently(cardId: string) {
@@ -1824,6 +1806,60 @@ export default function BookFlashcardsPage() {
       return;
     }
 
+    if (studySet === "COMPLETE_TYPING") {
+      if (typeRevealIndex <= 0) {
+        const correctReading = card.reading ?? "";
+        const normalizedCorrect = normalizeReading(correctReading);
+        const normalizedUser = normalizeReading(userAnsRaw);
+        const ok = !!correctReading && normalizedUser === normalizedCorrect;
+
+        if (ok) {
+          clearTypedInput();
+          setTypedFeedback({
+            ok: true,
+            message: "Reading correct. Now type the meaning.",
+          });
+          setTypeRevealIndex(1);
+          setLastTypedResult("correct");
+          setReadyForNextCard(false);
+          return;
+        }
+
+        clearTypedInput();
+        setTypedFeedback({
+          ok: false,
+          message: `Correct: ${correctReading}`,
+        });
+        setLastTypedResult("wrong");
+        setReadyForNextCard(false);
+        return;
+      }
+
+      const possible = [card.meaning, ...(card.meaningChoices ?? [])];
+      const ok = meaningMatchesOneWord(userAnsRaw, possible);
+
+      if (ok) {
+        setTypedFeedback({
+          ok: true,
+          message: `Correct: ${card.meaning || "—"}`,
+        });
+        setTypeRevealIndex(steps.length - 1);
+        setLastTypedResult("correct");
+        setReadyForNextCard(true);
+        return;
+      }
+
+      clearTypedInput();
+      setTypedFeedback({
+        ok: false,
+        message: `Correct: ${card.meaning || "—"}`,
+      });
+      setTypeRevealIndex(steps.length - 1);
+      setLastTypedResult("wrong");
+      setReadyForNextCard(false);
+      return;
+    }
+
     const wordOk = userAnsRaw === (card.word ?? "").trim();
 
     const possibleMeanings = [card.meaning, ...(card.meaningChoices ?? [])];
@@ -1886,36 +1922,6 @@ export default function BookFlashcardsPage() {
     setMcSelected(selected);
     setMcAnswered(true);
     setMcWasCorrect(isCorrect);
-    setCorrectionInput("");
-    setCorrectionFeedback(null);
-  }
-
-  function checkCorrectionAnswer() {
-    if (!card) return;
-
-    const input = correctionInput.trim();
-    if (!input) return;
-
-    let ok = false;
-
-    if (studySet === "READING_MC") {
-      ok = normalizeReading(input) === normalizeReading(card.reading || "");
-    } else if (studySet === "FROM_READING_MC") {
-      ok = input === (card.word || "").trim();
-    } else if (studySet === "MEANING_MC" || studySet === "FROM_READING_MEANING_MC") {
-      ok = meaningMatchesOneWord(input, [card.meaning, ...(card.meaningChoices ?? [])]);
-    }
-
-    if (!ok) {
-      clearCorrectionInput();
-      setCorrectionFeedback("Try typing the correct answer once.");
-      return;
-    }
-
-    setCorrectionFeedback(null);
-    setCorrectionFeedback("Good. Moving to the next card...");
-    setLastTypedResult("wrong");
-    setReadyForNextCard(true);
   }
 
   function flip() {
@@ -1932,7 +1938,11 @@ export default function BookFlashcardsPage() {
           ? "meaning"
           : studySet === "FROM_READING_MEANING"
             ? "meaning"
-            : null
+            : studySet === "COMPLETE_TYPING"
+              ? typeRevealIndex <= 0
+                ? "reading"
+                : "meaning"
+              : null
       : null;
 
   useEffect(() => {
@@ -1946,11 +1956,6 @@ export default function BookFlashcardsPage() {
       if (typeModeEnabled) {
         if (e.key === "Enter") {
           e.preventDefault();
-
-          if (isMultipleChoiceMode && mcAnswered && !mcWasCorrect) {
-            checkCorrectionAnswer();
-            return;
-          }
 
           if (readyForNextCard) {
             goToNextWord(lastTypedResult ?? "revealed");
@@ -1989,17 +1994,16 @@ export default function BookFlashcardsPage() {
         }
       }
 
-      if (e.key === "Enter" && isMultipleChoiceMode && mcAnswered && !mcWasCorrect) {
+      if (e.key === "Enter" && isMultipleChoiceMode && mcAnswered) {
         e.preventDefault();
-        checkCorrectionAnswer();
+        void goToNextWord(mcWasCorrect ? "correct" : "wrong");
         return;
       }
 
-      if (isMultipleChoiceMode && mcAnswered && !mcWasCorrect) {
-        if (e.key === "ArrowRight" || e.key === " ") {
-          e.preventDefault();
-          return;
-        }
+      if (isMultipleChoiceMode && mcAnswered && (e.key === "ArrowRight" || e.key === " ")) {
+        e.preventDefault();
+        void goToNextWord(mcWasCorrect ? "correct" : "wrong");
+        return;
       }
 
       if (e.key === "ArrowRight") nextCardReveal();
@@ -2031,6 +2035,17 @@ export default function BookFlashcardsPage() {
     studySet,
   ]);
 
+  useEffect(() => {
+    if (filteredCards.length === 0 || sessionIndex >= sessionOrder.length) return;
+
+    window.requestAnimationFrame(() => {
+      flashcardAnchorRef.current?.scrollIntoView({
+        block: "start",
+        inline: "nearest",
+      });
+    });
+  }, [filteredCards.length, sessionIndex, sessionOrder.length]);
+
   if (loading) {
     return <StudyLoadingState />;
   }
@@ -2042,6 +2057,13 @@ export default function BookFlashcardsPage() {
   if (!accessChecked) {
     return <StudyLoadingState />;
   }
+
+  const bookHubHref = `/books/${encodeURIComponent(userBookId)}`;
+  const vocabListHref = `/books/${encodeURIComponent(userBookId)}/words`;
+  const studyBackDestination = resolveReturnTo(searchParams.get("returnTo"), {
+    href: bookHubHref,
+    label: "Back to Book Hub",
+  });
 
   if (!canAccessBook) {
     return (
@@ -2059,9 +2081,8 @@ export default function BookFlashcardsPage() {
         title={copy.title}
         message={copy.message}
         bookTitle={bookTitle}
-        onBackToBookHub={() =>
-          router.push(`/books/${encodeURIComponent(userBookId)}`)
-        }
+        backHref={studyBackDestination.href}
+        backLabel={studyBackDestination.label}
         onUseJustReadingTimer={() =>
           router.push(`/books/${encodeURIComponent(userBookId)}/just-reading`)
         }
@@ -2101,8 +2122,6 @@ export default function BookFlashcardsPage() {
     setLastTypedResult(null);
     setFirstTouch(true);
     resetMcState();
-    setCorrectionInput("");
-    setCorrectionFeedback(null);
   };
 
   const nextStudySet = getNextStudySet(studySet);
@@ -2146,8 +2165,10 @@ export default function BookFlashcardsPage() {
         <StudyBookHeader
           bookTitle={bookTitle}
           bookCover={bookCover}
-          bookHubHref={`/books/${encodeURIComponent(userBookId)}`}
-          vocabListHref={`/books/${encodeURIComponent(userBookId)}/words`}
+          bookHubHref={bookHubHref}
+          backHref={studyBackDestination.href}
+          backLabel={studyBackDestination.label}
+          vocabListHref={vocabListHref}
         />
 
         {filterControls ? <div className="w-full max-w-3xl">{filterControls}</div> : null}
@@ -2222,11 +2243,13 @@ export default function BookFlashcardsPage() {
       <StudyBookHeader
         bookTitle={bookTitle}
         bookCover={bookCover}
-        bookHubHref={`/books/${encodeURIComponent(userBookId)}`}
-        vocabListHref={`/books/${encodeURIComponent(userBookId)}/words`}
+        bookHubHref={bookHubHref}
+        backHref={studyBackDestination.href}
+        backLabel={studyBackDestination.label}
+        vocabListHref={vocabListHref}
       />
 
-      <div className="mb-7 w-full max-w-3xl space-y-6">
+      <div className="mb-3 w-full max-w-3xl space-y-3">
         {filterControls}
 
         {isEnglishBook ? (
@@ -2253,6 +2276,7 @@ export default function BookFlashcardsPage() {
         />
       </div>
 
+      <div ref={flashcardAnchorRef} className="scroll-mt-4" />
       <StudyFlashcardShell
         isClickable={!isMultipleChoiceMode}
         onReveal={flip}
@@ -2335,16 +2359,6 @@ export default function BookFlashcardsPage() {
                         ? card.word || "—"
                         : card.meaning || "—"
                 }
-                correctionInput={correctionInput}
-                correctionFeedback={correctionFeedback}
-                correctionInputRef={correctionInputRef}
-                correctionPlaceholder={
-                  studySet === "READING_MC"
-                    ? "Type kana or Hepburn romaji"
-                    : studySet === "FROM_READING_MC"
-                      ? "Type the kanji word"
-                      : "Type one meaning word"
-                }
                 isOptionCorrect={(option) =>
                   studySet === "READING_MC"
                     ? normalizeReading(option) === mcCorrectAnswer
@@ -2353,18 +2367,6 @@ export default function BookFlashcardsPage() {
                       : option.trim().toLowerCase() === mcCorrectAnswer
                 }
                 onSelectOption={handleMcAnswer}
-                onCorrectionInputChange={(value) => {
-                  setCorrectionInput(value);
-                  setCorrectionFeedback(null);
-                }}
-                onCorrectionInputKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    checkCorrectionAnswer();
-                  }
-                }}
-                onCheckCorrection={checkCorrectionAnswer}
                 autoAdvancePaused={autoAdvancePaused}
                 onToggleAutoAdvancePaused={() => setAutoAdvancePaused((current) => !current)}
               />
@@ -2377,6 +2379,7 @@ export default function BookFlashcardsPage() {
                 visible={
                   studySet === "READING" ||
                   studySet === "MEANING" ||
+                  studySet === "COMPLETE_TYPING" ||
                   (studySet === "FROM_READING_MEANING" && typedFeedback != null)
                 }
                 big
@@ -2388,7 +2391,8 @@ export default function BookFlashcardsPage() {
                 value={card.reading || "—"}
                 visible={
                   studySet === "MEANING" ||
-                  studySet === "FROM_READING_MEANING"
+                  studySet === "FROM_READING_MEANING" ||
+                  (studySet === "COMPLETE_TYPING" && typeRevealIndex >= 1)
                 }
                 placeholder="---"
               />
@@ -2396,39 +2400,35 @@ export default function BookFlashcardsPage() {
               <Row
                 label="Meaning"
                 value={card.meaning || "—"}
-                visible={studySet === "READING"}
+                visible={studySet === "READING" || (studySet === "COMPLETE_TYPING" && readyForNextCard)}
                 placeholder="---"
               />
 
               {currentTypeAnswerField ? (
                 <TypingAnswerPanel
                   answerLabel={
-                    studySet === "READING"
+                    currentTypeAnswerField === "reading"
                       ? "Reading"
-                      : studySet === "MEANING"
+                      : currentTypeAnswerField === "meaning"
                         ? "Meaning"
-                        : studySet === "FROM_READING_MEANING"
-                          ? "Meaning"
-                          : "Answer"
+                        : "Answer"
                   }
-                  showReadingHint={studySet === "READING"}
+                  showReadingHint={currentTypeAnswerField === "reading"}
                   inputKey={`${studySet}-${sessionIndex}-${typeRevealIndex}-${inputResetKey}`}
                   typedInput={typedInput}
                   typedFeedback={typedFeedback}
                   readyForNextCard={readyForNextCard}
                   placeholder={
-                    studySet === "READING"
+                    currentTypeAnswerField === "reading"
                       ? "Type kana or Hepburn romaji"
-                      : studySet === "MEANING"
+                      : currentTypeAnswerField === "meaning"
                         ? "Type a meaning"
-                        : studySet === "FROM_READING_MEANING"
-                          ? "Type a meaning"
-                          : "Type your answer"
+                        : "Type your answer"
                   }
                   feedbackHelpText={
-                    studySet === "READING"
+                    currentTypeAnswerField === "reading"
                       ? "Type the correct reading to continue."
-                      : studySet === "MEANING" || studySet === "FROM_READING_MEANING"
+                      : currentTypeAnswerField === "meaning"
                         ? "Type one correct meaning word to continue."
                         : null
                   }
@@ -2438,7 +2438,10 @@ export default function BookFlashcardsPage() {
 
                     if (!typedFeedback) {
                       setLastTypedResult(null);
-                    } else if (studySet === "READING" && typedFeedback.ok) {
+                    } else if (
+                      (studySet === "READING" || studySet === "COMPLETE_TYPING") &&
+                      typedFeedback.ok
+                    ) {
                       setTypedFeedback(null);
                       setLastTypedResult(null);
                     }

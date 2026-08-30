@@ -2,6 +2,7 @@
 
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
@@ -310,6 +311,13 @@ export default function CommunityStatsHomePage() {
   return (
     <main className="min-h-screen bg-[#f5efe7] px-4 py-5">
       <div className="mx-auto max-w-6xl">
+        <Link
+          href="/discovery"
+          className="mb-4 inline-flex text-sm font-semibold text-stone-500 hover:text-stone-900"
+        >
+          ← Back to Discovery Hub
+        </Link>
+
         <CommunityStatsHeader
           eyebrow="Stats"
           title="Stats Home"

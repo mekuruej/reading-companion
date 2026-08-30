@@ -14,7 +14,7 @@ type KanjiStudyOptionListProps = {
 };
 
 function optionClassName(state: KanjiStudyOptionState, largeText: boolean, compactText: boolean) {
-  const textSize = compactText ? "text-base sm:text-lg text-left" : largeText ? "text-3xl sm:text-4xl" : "text-2xl sm:text-3xl";
+  const textSize = compactText ? "text-base sm:text-lg text-left" : largeText ? "text-2xl sm:text-3xl" : "text-xl sm:text-2xl";
   const base = `w-full rounded border px-4 py-3 ${textSize} `;
 
   if (state === "idle") return `${base}bg-white hover:bg-gray-50`;

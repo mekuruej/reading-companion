@@ -2540,7 +2540,7 @@ export default function LibraryStudyPage() {
   function finishPracticeMeaningReview() {
     setMeaningReviewItems([]);
     setShowPracticeMeaningReview(false);
-    router.push("/books");
+    router.push("/library-study");
   }
 
   function queuePracticeMeaningReview(
@@ -3271,7 +3271,7 @@ export default function LibraryStudyPage() {
             ? "During your trial, you can build vocabulary, use Book Study, and see your word colors begin. Ability Check opens after paid access and enough vocabulary is ready."
             : copy.message
         }
-        onBackToLibrary={() => router.push("/books")}
+        onBackToStudyHub={() => router.push("/library-study")}
         onViewStats={() => router.push("/community/stats")}
       />
     );
@@ -3281,7 +3281,7 @@ export default function LibraryStudyPage() {
     return (
       <AbilityCheckErrorState
         message={errorMsg}
-        onBackToLibrary={() => router.push("/books")}
+        onBackToStudyHub={() => router.push("/library-study")}
       />
     );
   }
@@ -3289,7 +3289,7 @@ export default function LibraryStudyPage() {
   if (allCards.length === 0) {
     return (
       <AbilityCheckNoCardsState
-        onBackToLibrary={() => router.push("/books")}
+        onBackToStudyHub={() => router.push("/library-study")}
         onContinueStudy={() => router.push("/library-study/advanced")}
       />
     );
@@ -3301,7 +3301,7 @@ export default function LibraryStudyPage() {
         <AbilityCheckRestingState
           dueCount={allLevelsDueCount}
           minDueCards={ABILITY_CHECK_MIN_DUE_CARDS}
-          onBackToLibrary={() => router.push("/books")}
+          onBackToStudyHub={() => router.push("/library-study")}
           onContinueStudy={() => router.push("/library-study/advanced")}
         />
       );
@@ -3317,7 +3317,7 @@ export default function LibraryStudyPage() {
         onIncludeKatakanaTodayChange={setIncludeKatakanaToday}
         onStartDailyCheck={startDailyCheck}
         onResetDueQueue={resetDueQueueForToday}
-        onBackToLibrary={() => router.push("/books")}
+        onBackToStudyHub={() => router.push("/library-study")}
       />
     );
   }
@@ -3326,7 +3326,7 @@ export default function LibraryStudyPage() {
     return (
       <AbilityCheckNoDueState
         minDueCards={ABILITY_CHECK_MIN_DUE_CARDS}
-        onBackToLibrary={() => router.push("/books")}
+        onBackToStudyHub={() => router.push("/library-study")}
         onContinueStudy={() => router.push("/library-study/advanced")}
       />
     );
@@ -3339,20 +3339,29 @@ export default function LibraryStudyPage() {
   ) {
     return (
       <main className="min-h-screen bg-slate-100 p-6">
-        <div className="mx-auto w-full max-w-3xl rounded-2xl border bg-white p-6 shadow-sm">
-          <div className="text-center">
-            <div className="text-xs font-semibold uppercase tracking-wide text-violet-500">
-              久しぶり Review
-            </div>
-            <h1 className="mt-2 text-2xl font-semibold text-slate-950">
-              Review meaning answers
-            </h1>
-            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
-              Regular review does not move colors. Purple review can move forgotten words back to the gate they need.
-            </p>
-          </div>
+        <div className="mx-auto w-full max-w-3xl">
+          <button
+            type="button"
+            onClick={() => setShowPracticeMeaningReview(false)}
+            className="mb-4 inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
+          >
+            ← Back to practice
+          </button>
 
-          <div className="mt-6 space-y-3">
+          <div className="rounded-2xl border bg-white p-6 shadow-sm">
+            <div className="text-center">
+              <div className="text-xs font-semibold uppercase tracking-wide text-violet-500">
+                久しぶり Review
+              </div>
+              <h1 className="mt-2 text-2xl font-semibold text-slate-950">
+                Review meaning answers
+              </h1>
+              <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
+                Regular review does not move colors. Purple review can move forgotten words back to the gate they need.
+              </p>
+            </div>
+
+            <div className="mt-6 space-y-3">
             {meaningReviewItems.map((item) => (
               <div
                 key={item.id}
@@ -3391,24 +3400,17 @@ export default function LibraryStudyPage() {
                 </div>
               </div>
             ))}
-          </div>
+            </div>
 
-          <div className="mt-6 flex flex-wrap justify-center gap-3">
-            <button
-              type="button"
-              onClick={finishPracticeMeaningReview}
-              className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-black"
-            >
-              Finish Review
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowPracticeMeaningReview(false)}
-              className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-            >
-              Back to practice
-            </button>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <button
+                type="button"
+                onClick={finishPracticeMeaningReview}
+                className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-black"
+              >
+                Finish Review
+              </button>
+            </div>
           </div>
         </div>
       </main>
@@ -3424,7 +3426,7 @@ export default function LibraryStudyPage() {
       <AbilityCheckMeaningReviewScreen
         items={meaningReviewItems}
         onFinishReview={finishMeaningReview}
-        onBackToLibrary={() => router.push("/books")}
+        onBackToStudyHub={() => router.push("/library-study")}
         onCountPassed={countMeaningReviewAsPassed}
         onKeepMissed={keepMeaningReviewMissed}
       />
@@ -3435,7 +3437,7 @@ export default function LibraryStudyPage() {
     return (
       <AbilityCheckCompleteState
         endedEarly={endedEarly}
-        onBackToLibrary={() => router.push("/books")}
+        onBackToStudyHub={() => router.push("/library-study")}
         onContinueStudy={() => router.push("/library-study/advanced")}
       />
     );

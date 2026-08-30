@@ -27,7 +27,7 @@ export default function KanjiStudyPrompt({
         {label}
       </div>
 
-      <div className="text-5xl font-bold">
+      <div className="text-4xl font-bold sm:text-5xl">
         {readingPrompt ? (
           <>
             {readingPrompt.before ? (

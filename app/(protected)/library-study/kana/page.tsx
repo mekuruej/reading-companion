@@ -489,11 +489,10 @@ export default function KanaStudyPage() {
     return (
         <main className="flex min-h-screen flex-col items-center bg-slate-100 px-6 py-4 text-slate-900">
             <KanaStudyHeader
-                onOpenCharacterStudy={() => router.push("/library-study/characters")}
-                onOpenLibrary={() => router.push("/library")}
+                onBackToFoundationSets={() => router.push("/library-study/characters")}
             />
 
-            <div className="mb-4 w-full max-w-3xl space-y-0">
+            <div className="mb-3 w-full max-w-3xl space-y-3">
                 <KanaStudyCharacterSetSelector
                     kanaSetSummary={kanaSetSummary}
                     includeBasic={includeBasic}
@@ -515,7 +514,7 @@ export default function KanaStudyPage() {
                     answeredCount={answeredCount}
                     onStudySetAgain={handleStudySetAgain}
                     onNextMode={handleNextMode}
-                    onBackToLibraryStudy={() => router.push("/library-study")}
+                    onBackToFoundationSets={() => router.push("/library-study/characters")}
                 />
             ) : card ? (
                 <>

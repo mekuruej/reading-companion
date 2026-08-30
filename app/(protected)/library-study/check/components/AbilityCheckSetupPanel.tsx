@@ -7,7 +7,7 @@ type AbilityCheckSetupPanelProps = {
   onIncludeKatakanaTodayChange: (value: boolean) => void;
   onStartDailyCheck: () => void;
   onResetDueQueue: () => void;
-  onBackToLibrary: () => void;
+  onBackToStudyHub: () => void;
 };
 
 export default function AbilityCheckSetupPanel({
@@ -19,29 +19,38 @@ export default function AbilityCheckSetupPanel({
   onIncludeKatakanaTodayChange,
   onStartDailyCheck,
   onResetDueQueue,
-  onBackToLibrary,
+  onBackToStudyHub,
 }: AbilityCheckSetupPanelProps) {
   const hasKatakanaDue = katakanaDueCount > 0;
 
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-8 sm:px-6">
-      <div className="mx-auto w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-            Ability Check
-          </p>
+      <div className="mx-auto w-full max-w-2xl">
+        <button
+          type="button"
+          onClick={onBackToStudyHub}
+          className="mb-4 inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
+        >
+          ← Back to Study Hub
+        </button>
 
-          <h1 className="mt-2 text-3xl font-black text-slate-950">
-            Start today’s check
-          </h1>
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+              Ability Check
+            </p>
 
-          <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-600">
-            Test the reading and meaning of words that are ready to check.
-          </p>
-        </div>
+            <h1 className="mt-2 text-3xl font-black text-slate-950">
+              Start today’s check
+            </h1>
 
-        {hasKatakanaDue ? (
-          <section className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-600">
+              Test the reading and meaning of words that are ready to check.
+            </p>
+          </div>
+
+          {hasKatakanaDue ? (
+            <section className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-3">
             <p className="px-1 text-sm leading-6 text-slate-600">
               Would you like to test your knowledge of katakana words today or
               leave them out of today&apos;s study?
@@ -78,30 +87,22 @@ export default function AbilityCheckSetupPanel({
                 </div>
               </button>
             </div>
-          </section>
-        ) : null}
+            </section>
+          ) : null}
 
-        <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <button
-            type="button"
-            onClick={onStartDailyCheck}
-            disabled={selectedDueCount === 0}
-            className="rounded-2xl bg-slate-950 px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-black disabled:opacity-40"
-          >
-            Start Ability Check
-          </button>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <button
+              type="button"
+              onClick={onStartDailyCheck}
+              disabled={selectedDueCount === 0}
+              className="rounded-2xl bg-slate-950 px-6 py-3 text-sm font-black text-white shadow-sm transition hover:bg-black disabled:opacity-40"
+            >
+              Start Ability Check
+            </button>
+          </div>
 
-          <button
-            type="button"
-            onClick={onBackToLibrary}
-            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-          >
-            Back to Library
-          </button>
-        </div>
-
-        {showQueueReset ? (
-          <section className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-center">
+          {showQueueReset ? (
+            <section className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-center">
             <p className="text-sm font-black text-amber-950">
               Overwhelmed?
             </p>
@@ -116,8 +117,9 @@ export default function AbilityCheckSetupPanel({
             >
               Reset queue to zero
             </button>
-          </section>
-        ) : null}
+            </section>
+          ) : null}
+        </div>
       </div>
     </main>
   );

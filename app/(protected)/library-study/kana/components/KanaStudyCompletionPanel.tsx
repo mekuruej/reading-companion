@@ -3,7 +3,7 @@ type KanaStudyCompletionPanelProps = {
     answeredCount: number;
     onStudySetAgain: () => void;
     onNextMode: () => void;
-    onBackToLibraryStudy: () => void;
+    onBackToFoundationSets: () => void;
 };
 
 export function KanaStudyCompletionPanel({
@@ -11,9 +11,18 @@ export function KanaStudyCompletionPanel({
     answeredCount,
     onStudySetAgain,
     onNextMode,
-    onBackToLibraryStudy,
+    onBackToFoundationSets,
 }: KanaStudyCompletionPanelProps) {
     return (
+        <>
+        <button
+            type="button"
+            onClick={onBackToFoundationSets}
+            className="mt-6 w-full max-w-xl text-left text-sm font-semibold text-slate-500 transition hover:text-slate-900"
+        >
+            ← Back to Foundation Sets
+        </button>
+
         <section className="mt-6 w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
             <h2 className="text-2xl font-semibold text-slate-950">
                 Set complete
@@ -41,15 +50,8 @@ export function KanaStudyCompletionPanel({
                 >
                     Next mode
                 </button>
-
-                <button
-                    type="button"
-                    onClick={onBackToLibraryStudy}
-                    className="rounded bg-gray-200 px-4 py-2 text-slate-800 transition hover:bg-gray-300"
-                >
-                    Back to Library Study
-                </button>
             </div>
         </section>
+        </>
     );
 }

@@ -10,7 +10,7 @@ export default function DiscoveryHubHeader({
   description,
 }: DiscoveryHubHeaderProps) {
   return (
-    <div className="mx-auto max-w-3xl text-center">
+    <div className="mx-auto mb-6 max-w-3xl text-center">
       <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">
         {eyebrow}
       </p>

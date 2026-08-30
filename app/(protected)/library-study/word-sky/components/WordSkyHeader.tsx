@@ -10,38 +10,40 @@ export default function WordSkyHeader({
   onBackToStudy,
 }: WordSkyHeaderProps) {
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur md:flex-row md:items-center md:justify-between">
-      <div>
-        <h1 className="text-2xl font-semibold">Word Sky</h1>
-        <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500">
-          Pick words you can already read and change them to green.
-          <br />
-          These words will start to appear in your Ability Check and Library Practice, where you can
-          <br />
-          strengthen your reading and understanding as you move toward mastery.
-          <br />
-          <br />
-          But remember: leveling up words naturally through your reading is still the
-          ideal path!
-        </p>
-      </div>
+    <div>
+      <button
+        type="button"
+        onClick={onBackToStudy}
+        className="mb-4 inline-flex text-sm font-semibold text-slate-500 transition hover:text-slate-900"
+      >
+        ← Back to Study Hub
+      </button>
 
-      <div className="flex flex-wrap gap-2">
-        <div className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">
-          {claimedCount} claimed
+      <div className="flex flex-col gap-3 rounded-2xl border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Word Sky</h1>
+          <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500">
+            Pick words you can already read and change them to green.
+            <br />
+            These words will start to appear in your Ability Check and Library Practice, where you can
+            <br />
+            strengthen your reading and understanding as you move toward mastery.
+            <br />
+            <br />
+            But remember: leveling up words naturally through your reading is still the
+            ideal path!
+          </p>
         </div>
 
-        <div className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">
-          {wordPoolCount} in sky
-        </div>
+        <div className="flex flex-wrap gap-2">
+          <div className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">
+            {claimedCount} claimed
+          </div>
 
-        <button
-          type="button"
-          onClick={onBackToStudy}
-          className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-        >
-          Ability Check
-        </button>
+          <div className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">
+            {wordPoolCount} in sky
+          </div>
+        </div>
       </div>
     </div>
   );

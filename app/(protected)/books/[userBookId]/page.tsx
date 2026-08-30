@@ -5415,7 +5415,7 @@ export default function BookHubPage() {
           ) : null}
           <Link
             href={backToLibraryHref}
-            className="inline-flex text-sm font-semibold text-stone-500 hover:text-stone-900"
+            className="inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
           >
             ← Back to Library
           </Link>

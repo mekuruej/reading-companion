@@ -1539,8 +1539,8 @@ export default function KanjiReadingStudyPage() {
       <KanjiStudyAccessState
         title="Kanji Study could not load"
         message={errorMsg}
-        primaryHref="/books"
-        primaryLabel="Back to Library"
+        primaryHref="/library-study/characters"
+        primaryLabel="Back to Foundation Sets"
       />
     );
   }
@@ -1550,8 +1550,8 @@ export default function KanjiReadingStudyPage() {
       <KanjiStudyAccessState
         title="No kanji cards are ready yet"
         message="Kanji Study does not have cards available right now."
-        primaryHref="/books"
-        primaryLabel="Back to Library"
+        primaryHref="/library-study/characters"
+        primaryLabel="Back to Foundation Sets"
       />
     );
   }
@@ -1567,7 +1567,7 @@ export default function KanjiReadingStudyPage() {
       <KanjiStudyCompleteState
         endedEarly={endedEarly}
         nextModeLabel={studyModeSummary(nextKanjiStudyMode(studyMode))}
-        onBackToStudyHub={() => router.push("/library-study")}
+        onBackToFoundationSets={() => router.push("/library-study/characters")}
         onNextMode={moveDeckToNextMode}
         onRestart={restartDeck}
       />
@@ -1578,35 +1578,36 @@ export default function KanjiReadingStudyPage() {
     <main className="min-h-screen flex flex-col items-center bg-slate-100 px-6 py-4">
       <KanjiStudyHeader
         note="This is kanji reading practice, so easier kanji may appear in harder words, and harder kanji may appear in easier words. To study whole words, use Library Review."
-        onOpenCharacterStudy={() => router.push("/library-study/characters")}
-        onOpenLibrary={() => router.push("/library")}
+        onBackToFoundationSets={() => router.push("/library-study/characters")}
       />
 
-      <div className="mb-4 w-full max-w-3xl space-y-0"></div>
-      <KanjiStudyFilterPanel
-        selectedLevels={levelFilters}
-        onToggleLevel={handleToggleLevelFilter}
-        onSelectAll={handleSelectAllLevelFilters}
-        onClear={handleClearLevelFilters}
-      />
+      <div className="mb-3 w-full max-w-3xl space-y-3">
+        <KanjiStudyFilterPanel
+          selectedLevels={levelFilters}
+          onToggleLevel={handleToggleLevelFilter}
+          onSelectAll={handleSelectAllLevelFilters}
+          onClear={handleClearLevelFilters}
+        />
 
-      <KanjiStudyModeSelector
-        value={studyMode}
-        options={KANJI_STUDY_MODE_OPTIONS}
-        onChange={(value) => setStudyMode(value as KanjiStudyMode)}
-        showAnswerStyle={cardQuestionMode === "readingChoice" && !noCardsForCurrentMode}
-        answerStyle={effectiveAnswerStyle}
-        onAnswerStyleChange={setAnswerStyle}
-      />
+        <KanjiStudyModeSelector
+          value={studyMode}
+          options={KANJI_STUDY_MODE_OPTIONS}
+          onChange={(value) => setStudyMode(value as KanjiStudyMode)}
+          showAnswerStyle={cardQuestionMode === "readingChoice" && !noCardsForCurrentMode}
+          answerStyle={effectiveAnswerStyle}
+          onAnswerStyleChange={setAnswerStyle}
+        />
+      </div>
 
-      <div className="mb-5 w-full max-w-3xl"></div>
-      <KanjiStudyProgressPanel
-        current={index + 1}
-        total={deck.length}
-        summaryText={studyModeSummary(studyMode)}
-        answerModeLabel={effectiveAnswerStyle === "typing" ? "Typing" : "Multiple Choice"}
-        levelSummaryLabel={kanjiLevelSummaryLabel(levelFilters)}
-      />
+      <div className="mb-3 w-full max-w-3xl">
+        <KanjiStudyProgressPanel
+          current={index + 1}
+          total={deck.length}
+          summaryText={studyModeSummary(studyMode)}
+          answerModeLabel={effectiveAnswerStyle === "typing" ? "Typing" : "Multiple Choice"}
+          levelSummaryLabel={kanjiLevelSummaryLabel(levelFilters)}
+        />
+      </div>
 
       <KanjiStudyNotice notice={notice} />
 

@@ -665,9 +665,9 @@ export default function AboutBookPage() {
       <div className="mx-auto max-w-6xl">
         <Link
           href={`/books/${row.id}`}
-          className="inline-flex text-sm font-black text-stone-600 transition hover:text-stone-950"
+          className="inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
         >
-          &larr; Back to Book Hub
+          ← Back to Book Hub
         </Link>
 
         <section className="mt-5 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">

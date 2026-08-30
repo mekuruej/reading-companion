@@ -14,7 +14,7 @@ type AbilityCheckMeaningReviewScreenProps<
 > = {
   items: TItem[];
   onFinishReview: () => void;
-  onBackToLibrary: () => void;
+  onBackToStudyHub: () => void;
   onCountPassed: (item: TItem) => void | Promise<void>;
   onKeepMissed: (item: TItem) => void;
 };
@@ -24,29 +24,38 @@ export default function AbilityCheckMeaningReviewScreen<
 >({
   items,
   onFinishReview,
-  onBackToLibrary,
+  onBackToStudyHub,
   onCountPassed,
   onKeepMissed,
 }: AbilityCheckMeaningReviewScreenProps<TItem>) {
   return (
     <main className="min-h-screen bg-slate-100 p-6">
-      <div className="mx-auto w-full max-w-3xl rounded-2xl border bg-white p-6 shadow-sm">
-        <div className="text-center">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Meaning Review
+      <div className="mx-auto w-full max-w-3xl">
+        <button
+          type="button"
+          onClick={onBackToStudyHub}
+          className="mb-4 inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
+        >
+          ← Back to Study Hub
+        </button>
+
+        <div className="rounded-2xl border bg-white p-6 shadow-sm">
+          <div className="text-center">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Meaning Review
+            </div>
+
+            <h1 className="mt-2 text-2xl font-semibold text-slate-950">
+              Review meaning answers
+            </h1>
+
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
+              Correct answers are already saved. For missed answers, change the result
+              only if the app was too strict.
+            </p>
           </div>
 
-          <h1 className="mt-2 text-2xl font-semibold text-slate-950">
-            Review meaning answers
-          </h1>
-
-          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
-            Correct answers are already saved. For missed answers, change the result
-            only if the app was too strict.
-          </p>
-        </div>
-
-        <div className="mt-6 space-y-3">
+          <div className="mt-6 space-y-3">
           {items.map((item) => (
             <div
               key={item.id}
@@ -126,24 +135,17 @@ export default function AbilityCheckMeaningReviewScreen<
               </div>
             </div>
           ))}
-        </div>
+          </div>
 
-        <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <button
-            type="button"
-            onClick={onFinishReview}
-            className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-black"
-          >
-            Finish Review
-          </button>
-
-          <button
-            type="button"
-            onClick={onBackToLibrary}
-            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-          >
-            Back to Library
-          </button>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <button
+              type="button"
+              onClick={onFinishReview}
+              className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-black"
+            >
+              Finish Review
+            </button>
+          </div>
         </div>
       </div>
     </main>

@@ -26,7 +26,7 @@ export default function KanaStudyModeSelector({
 
   return (
     <section className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-      <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+      <p className="text-sm font-black uppercase tracking-wide text-blue-700">
         Study Mode · Step 2
       </p>
 

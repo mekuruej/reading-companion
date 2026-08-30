@@ -14,6 +14,21 @@ type StudyModePanelProps = {
   onStudySetChange: (value: string) => void;
 };
 
+const MODE_GROUPS = [
+  {
+    label: "Typing",
+    values: ["READING", "MEANING", "FROM_READING_MEANING"],
+  },
+  {
+    label: "Multiple Choice",
+    values: ["READING_MC", "MEANING_MC", "FROM_READING_MC", "FROM_READING_MEANING_MC"],
+  },
+  {
+    label: "Complete",
+    values: ["COMPLETE", "COMPLETE_TYPING"],
+  },
+];
+
 function descriptionForMode(value: string, fallback: string) {
   if (value === "READING") {
     return "Show the word and meaning, then type the reading.";
@@ -47,6 +62,10 @@ function descriptionForMode(value: string, fallback: string) {
     return "Reveal the word, reading, and meaning step by step.";
   }
 
+  if (value === "COMPLETE_TYPING") {
+    return "Type the reading, then type the meaning.";
+  }
+
   return fallback;
 }
 
@@ -62,10 +81,16 @@ export default function StudyModePanel({
     modeOptions.find((option) => !option.disabled);
 
   const activeOptions = modeOptions.filter((option) => !option.disabled);
+  const groupedOptions = MODE_GROUPS.map((group) => ({
+    ...group,
+    options: group.values
+      .map((value) => activeOptions.find((option) => option.value === value))
+      .filter((option): option is ModeOption => Boolean(option)),
+  })).filter((group) => group.options.length > 0);
 
   return (
     <section className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-      <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+      <p className="text-sm font-black uppercase tracking-wide text-blue-700">
         Study Mode · Step 3
       </p>
 
@@ -89,36 +114,46 @@ export default function StudyModePanel({
             Choose mode
           </p>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            {activeOptions.map((option) => {
-              const selected = option.value === studySet;
+          <div className="space-y-4">
+            {groupedOptions.map((group) => (
+              <div key={group.label}>
+                <p className="mb-2 text-xs font-black uppercase tracking-wide text-blue-700">
+                  {group.label}
+                </p>
 
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => {
-                    onStudySetChange(option.value);
-                    setOpen(false);
-                  }}
-                  className={`rounded-2xl border px-4 py-3 text-left shadow-sm transition ${
-                    selected
-                      ? "border-slate-950 bg-slate-950 text-white"
-                      : "border-slate-200 bg-slate-50 text-slate-800 hover:border-slate-400 hover:bg-white"
-                  }`}
-                >
-                  <p className="text-sm font-black">{option.label}</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {group.options.map((option) => {
+                    const selected = option.value === studySet;
 
-                  <p
-                    className={`mt-1 text-sm leading-5 ${
-                      selected ? "text-slate-200" : "text-slate-500"
-                    }`}
-                  >
-                    {descriptionForMode(option.value, option.label)}
-                  </p>
-                </button>
-              );
-            })}
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          onStudySetChange(option.value);
+                          setOpen(false);
+                        }}
+                        className={`rounded-2xl border px-4 py-3 text-left shadow-sm transition ${
+                          selected
+                            ? "border-slate-950 bg-slate-950 text-white"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50"
+                        }`}
+                      >
+                        <p className="text-sm font-black">{option.label}</p>
+
+                        <p
+                          className={`mt-1 text-sm leading-5 ${
+                            selected ? "text-slate-200" : "text-slate-500"
+                          }`}
+                        >
+                          {descriptionForMode(option.value, option.label)}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       ) : null}

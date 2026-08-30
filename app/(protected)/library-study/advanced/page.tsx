@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import VocabularyGrowthCycleSection from "./components/VocabularyGrowthCycleSection";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { withReturnTo } from "@/lib/navigation/returnTo";
 import {
     calculateAdvancedStudyReadiness,
     type AdvancedStudyReadinessProgressRow,
@@ -88,22 +89,25 @@ async function loadAdvancedStudyProgressRows(
 
 const advancedTools = [
     {
-        title: "Ability Check",
-        href: "/library-study/check",
-        eyebrow: "Smart gates",
-        className: "border-emerald-200 bg-emerald-50 text-emerald-950",
-    },
-    {
         title: "Library Review",
         href: "/library-study/practice",
         eyebrow: "Across books",
+        description: "Study words from all your books using useful filters.",
         className: "border-sky-200 bg-sky-50 text-sky-950",
     },
     {
         title: "Word Sky",
         href: "/library-study/word-sky",
         eyebrow: "Word growth",
+        description: "Move up words that you already know.",
         className: "border-violet-200 bg-violet-50 text-violet-950",
+    },
+    {
+        title: "Ability Check",
+        href: "/library-study/check",
+        eyebrow: "Confirm knowledge",
+        description: "Turn words you recognize into words you can use.",
+        className: "border-emerald-200 bg-emerald-50 text-emerald-950",
     },
 ];
 
@@ -303,18 +307,36 @@ export default function AdvancedStudyPage() {
     return (
         <main className="min-h-screen bg-slate-100 px-5 py-8">
             <div className="mx-auto max-w-5xl">
-                <div className="mb-8 text-center">
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                        Advanced Study
+                <Link
+                    href="/library-study"
+                    className="mb-5 inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
+                >
+                    ← Back to Study Hub
+                </Link>
+
+                <div className="mb-8">
+                    <p className="text-sm font-black leading-6 text-slate-500 sm:text-base">
+                        Study words across your whole Library.
                     </p>
 
-                    <h1 className="mt-2 text-3xl font-black text-slate-950 sm:text-4xl">
-                        Mekuru Vocabulary Growth Cycle
+                    <h1 className="mt-2 text-4xl font-black text-slate-950 sm:text-5xl">
+                        Mekuru&apos;s Advanced Study
                     </h1>
 
-                    <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-                        Save words while reading, study them in different ways, and meet them
-                        again until they become easier to notice in real books.
+                    <p className="mt-3 max-w-3xl text-base font-semibold leading-7 text-slate-700">
+                        Bring all your reading effort together to understand where words currently
+                        are in your understanding.
+                    </p>
+
+                    <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
+                        For book-specific flashcards, choose a book from the{" "}
+                        <Link
+                            href={withReturnTo("/library-study/book-flashcards", "advanced-study")}
+                            className="font-black text-slate-950 underline underline-offset-4 transition hover:text-slate-700"
+                        >
+                            Book Flashcards Index
+                        </Link>
+                        .
                     </p>
                 </div>
 
@@ -405,7 +427,7 @@ export default function AdvancedStudyPage() {
                                 {!showAdvancedTools ? (
                                     <div className="mt-5 flex flex-wrap gap-3">
                                         <Link
-                                            href="/library-study/book-study"
+                                            href={withReturnTo("/library-study/book-study", "advanced-study")}
                                             className="rounded-full border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-950 transition hover:bg-indigo-100"
                                         >
                                             Book Study
@@ -424,7 +446,7 @@ export default function AdvancedStudyPage() {
                         {showAdvancedTools ? (
                         <section className="mt-4">
                             <p className="mb-2 text-xs font-black uppercase tracking-[0.18em] text-slate-400">
-                                Quick study jumps
+                                Choose a study path
                             </p>
 
                             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -437,35 +459,29 @@ export default function AdvancedStudyPage() {
                                     <Link
                                         key={tool.href}
                                         href={tool.href}
-                                        className={`group rounded-2xl border px-4 py-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${tool.className}`}
+                                        className={`group flex min-h-36 flex-col justify-between rounded-2xl border px-4 py-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${tool.className}`}
                                     >
-                                        <div className="text-[10px] font-black uppercase tracking-[0.16em] opacity-60">
-                                            {tool.eyebrow}
-                                        </div>
+                                        <div>
+                                            <div className="text-[10px] font-black uppercase tracking-[0.16em] opacity-60">
+                                                {tool.eyebrow}
+                                            </div>
 
-                                        <div className="mt-2 flex items-center justify-between gap-3">
-                                            <h3 className="min-w-0 text-base font-black leading-tight">
+                                            <h3 className="mt-2 min-w-0 text-lg font-black leading-tight">
                                                 {tool.title}
                                             </h3>
 
-                                            <span className="shrink-0 rounded-full bg-white/80 px-2.5 py-1 text-xs font-black shadow-sm transition group-hover:bg-white">
-                                                →
-                                            </span>
+                                            <p className="mt-2 text-sm font-semibold leading-6 opacity-75">
+                                                {tool.description}
+                                            </p>
                                         </div>
+
+                                        <span className="mt-4 w-fit rounded-full bg-white/80 px-3 py-1 text-xs font-black shadow-sm transition group-hover:bg-white">
+                                            Open
+                                        </span>
                                     </Link>
                                 ))}
                             </div>
 
-                            <p className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold leading-6 text-emerald-950">
-                                Book-specific flashcards live in individual{" "}
-                                <Link
-                                    href="/library/book-hubs"
-                                    className="font-black underline underline-offset-4 transition hover:text-emerald-800"
-                                >
-                                    Book Hubs
-                                </Link>
-                                . Advanced Study looks across your whole Library.
-                            </p>
                         </section>
                         ) : null}
 
@@ -491,11 +507,7 @@ export default function AdvancedStudyPage() {
 
                             <div className="mt-5 border-t border-slate-200 pt-5">
                                 <p className="text-sm leading-7 text-slate-700">
-                                    Mekuru’s goal is to support natural learning through native
-                                    material. Advanced vocabulary study is built around noticing:
-                                    meeting a word in real reading, seeing it again in a focused
-                                    study moment, checking it lightly, and then returning it to books
-                                    so recognition can grow.
+                                    Mekuru’s goal is to support natural learning through native material. Advanced vocabulary study is built around noticing: meeting a word naturally, seeing it again in a focused study moment, reviewing it lightly, and then returning to real books so recognition has another chance to grow.
                                 </p>
 
                                 <p className="mt-3 text-sm leading-7 text-slate-700">
@@ -682,14 +694,6 @@ export default function AdvancedStudyPage() {
                     </>
                 )}
 
-                <div className="mt-6 text-center">
-                    <Link
-                        href="/library-study"
-                        className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                    >
-                        Back to Study Hub
-                    </Link>
-                </div>
             </div>
         </main>
     );

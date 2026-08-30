@@ -3,6 +3,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AddBookMessagePanel from "./components/AddBookMessagePanel";
@@ -193,6 +194,8 @@ export default function AddBookPage() {
     const [bookSearchAuthor, setBookSearchAuthor] = useState("");
     const [bookSearchResults, setBookSearchResults] = useState<BookSearchResult[]>([]);
     const [bookSearchLoading, setBookSearchLoading] = useState(false);
+    const [lastBookSearchQuery, setLastBookSearchQuery] = useState("");
+    const [bookSearchHadNoResults, setBookSearchHadNoResults] = useState(false);
     const [addingExistingBookId, setAddingExistingBookId] = useState<string | null>(null);
     const [error, setError] = useState("");
     const [bookSearchError, setBookSearchError] = useState("");
@@ -752,6 +755,8 @@ export default function AddBookPage() {
         const query = bookSearch.trim();
         setLibraryNotice(null);
         setBookSearchResults([]);
+        setLastBookSearchQuery("");
+        setBookSearchHadNoResults(false);
         setConfirmedEditionLanguageCode("");
         resetManualAdd();
         setBookSearchError("");
@@ -762,6 +767,7 @@ export default function AddBookPage() {
             return;
         }
 
+        setLastBookSearchQuery(query);
         setBookSearchLoading(true);
 
         try {
@@ -790,12 +796,12 @@ export default function AddBookPage() {
             setBookSearchResults(results);
 
             if (results.length === 0) {
+                setBookSearchHadNoResults(true);
                 openManualAdd("manual", {
                     title: query,
                     author: bookSearchAuthor,
                     format: fallbackRequestFormat,
                 });
-                setBookSearchError("No matching edition found. Add the details you know.");
             }
         } catch (searchError) {
             console.error("Book title/author search failed:", searchError);
@@ -1130,6 +1136,13 @@ export default function AddBookPage() {
 
     return (
         <main className="mx-auto max-w-4xl px-4 py-8">
+            <Link
+                href="/library"
+                className="mb-3 inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
+            >
+                ← Back to Library
+            </Link>
+
             <header className="mb-5">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
                     {pageEyebrow}
@@ -1186,6 +1199,8 @@ export default function AddBookPage() {
                                     onChange={(event) => {
                                         setBookSearch(event.target.value);
                                         setBookSearchError("");
+                                        setBookSearchHadNoResults(false);
+                                        setLastBookSearchQuery("");
                                         setLibraryNotice(null);
                                     }}
                                     onKeyDown={(event) => {
@@ -1200,6 +1215,8 @@ export default function AddBookPage() {
                                     onChange={(event) => {
                                         setBookSearchAuthor(event.target.value);
                                         setBookSearchError("");
+                                        setBookSearchHadNoResults(false);
+                                        setLastBookSearchQuery("");
                                         setLibraryNotice(null);
                                     }}
                                     onKeyDown={(event) => {
@@ -1214,6 +1231,8 @@ export default function AddBookPage() {
                                     onChange={(event) => {
                                         setFallbackRequestFormat(event.target.value);
                                         setBookSearchError("");
+                                        setBookSearchHadNoResults(false);
+                                        setLastBookSearchQuery("");
                                     }}
                                     className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
                                 >
@@ -1547,6 +1566,20 @@ export default function AddBookPage() {
                             onCancel={() => router.push(targetLibraryHref)}
                         />
                     </LookupBookPreviewCard>
+                ) : null}
+
+                {bookSearchHadNoResults ? (
+                    <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
+                        <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">
+                            Search complete
+                        </p>
+                        <h3 className="mt-1 text-base font-black text-stone-950">
+                            No MEKURU catalog match for “{lastBookSearchQuery}”
+                        </h3>
+                        <p className="mt-2 text-sm leading-6 text-stone-700">
+                            The manual details form is ready below with your search filled in.
+                        </p>
+                    </div>
                 ) : null}
 
                 {manualAddMode ? (

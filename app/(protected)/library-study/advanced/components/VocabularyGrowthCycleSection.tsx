@@ -1,3 +1,5 @@
+import { withReturnTo } from "@/lib/navigation/returnTo";
+
 const cycleSteps = [
     {
         title: "Read and Notice",
@@ -13,7 +15,7 @@ const cycleSteps = [
         title: "Book Flashcards",
         description:
             "Study saved words from one book when you want a focused session.",
-        href: "/library-study/book-flashcards",
+        href: withReturnTo("/library-study/book-flashcards", "advanced-study"),
     },
     {
         title: "Saved Words Review",
@@ -202,7 +204,7 @@ export default function VocabularyGrowthCycleSection() {
                                 fontWeight="900"
                                 textAnchor="middle"
                             >
-                                Read and Notice
+                                Notice New Words
                             </text>
                             <text
                                 x="465"
@@ -255,7 +257,7 @@ export default function VocabularyGrowthCycleSection() {
                         </a>
 
                         <a
-                            href="/library-study/book-flashcards"
+                            href={withReturnTo("/library-study/book-flashcards", "advanced-study")}
                             aria-label="Open Book Flashcards"
                             className="cursor-pointer"
                         >
@@ -316,7 +318,7 @@ export default function VocabularyGrowthCycleSection() {
                                 fontWeight="900"
                                 textAnchor="middle"
                             >
-                                Saved Words Review
+                                All Past Words
                             </text>
                             <text
                                 x="460"
@@ -325,7 +327,7 @@ export default function VocabularyGrowthCycleSection() {
                                 fontSize="14"
                                 textAnchor="middle"
                             >
-                                Encounter
+                                Review
                             </text>
                             </g>
                         </a>
@@ -358,7 +360,7 @@ export default function VocabularyGrowthCycleSection() {
                                 fontSize="14"
                                 textAnchor="middle"
                             >
-                                Check
+                                Test yourself
                             </text>
                         </g>
 
@@ -405,7 +407,7 @@ export default function VocabularyGrowthCycleSection() {
                                 fontSize="14"
                                 textAnchor="middle"
                             >
-                                Mastered Words
+                                Strengthen what you know
                             </text>
                             </g>
                         </a>

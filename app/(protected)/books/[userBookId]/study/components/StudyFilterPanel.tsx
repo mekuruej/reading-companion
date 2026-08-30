@@ -123,13 +123,6 @@ export default function StudyFilterPanel({
   const [locationOpen, setLocationOpen] = useState(false);
   const [difficultyOpen, setDifficultyOpen] = useState(false);
 
-  const selectedColorValue =
-    colorSelected.length === 0 || colorSelected.length === colorOptions.length
-      ? "all"
-      : colorSelected.length === 1
-        ? colorSelected[0]
-        : "mixed";
-
   const locationSummary = [
     chapterSummary(chapterFilter, chapterOptions),
     pageSummary(pageFilter),
@@ -142,22 +135,10 @@ export default function StudyFilterPanel({
     repeatsOnly ? "Repeats only" : null,
   ].join(" • ");
 
-  function handleColorDropdownChange(value: string) {
-    if (value === "mixed") return;
-
-    if (value === "all") {
-      onSelectAllColors();
-      return;
-    }
-
-    onClearColors();
-    onToggleColor(value as LibraryStudyColor);
-  }
-
   return (
     <div className="w-full max-w-3xl space-y-3">
       <section className="rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-        <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+        <p className="text-sm font-black uppercase tracking-wide text-blue-700">
           Location · Step 1
         </p>
 
@@ -229,7 +210,7 @@ export default function StudyFilterPanel({
       </section>
 
       <section className="rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-        <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+        <p className="text-sm font-black uppercase tracking-wide text-blue-700">
           Difficulty · Step 2
         </p>
 
@@ -312,29 +293,57 @@ export default function StudyFilterPanel({
             </div>
 
             <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <label className="block">
-                <span className="text-xs font-black uppercase tracking-wide text-slate-500">
-                  Color / readiness
-                </span>
+              <p className="mb-2 text-xs font-black uppercase tracking-wide text-slate-500">
+                Color / readiness
+              </p>
 
-                <select
-                  value={selectedColorValue}
-                  onChange={(event) => handleColorDropdownChange(event.target.value)}
-                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                >
-                  <option value="all">All colors</option>
+              <div className="flex flex-wrap items-center gap-2">
+                {colorOptions.map((color) => {
+                  const checkedColor = colorSelected.includes(color);
 
-                  {selectedColorValue === "mixed" ? (
-                    <option value="mixed">Multiple colors</option>
-                  ) : null}
-
-                  {colorOptions.map((color) => (
-                    <option key={color} value={color}>
+                  return (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => onToggleColor(color)}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-sm font-black shadow-sm transition ${
+                        checkedColor
+                          ? "border-slate-950 bg-slate-950 text-white"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span
+                        className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] ${
+                          checkedColor
+                            ? "border-white bg-white text-slate-950"
+                            : "border-slate-400 bg-white text-transparent"
+                        }`}
+                      >
+                        ✓
+                      </span>
                       {colorDropdownLabel(color)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                    </button>
+                  );
+                })}
+
+                <div className="ml-0 flex gap-2 sm:ml-2">
+                  <button
+                    type="button"
+                    onClick={onSelectAllColors}
+                    className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-300"
+                  >
+                    All
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={onClearColors}
+                    className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-black text-slate-700 transition hover:bg-slate-300"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
             </div>
 
             <label

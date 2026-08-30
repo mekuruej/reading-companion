@@ -657,9 +657,9 @@ export default function WordSkyPage() {
           <button
             type="button"
             onClick={() => router.push("/library-study")}
-            className="w-fit rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            className="w-fit text-sm font-semibold text-slate-500 transition hover:text-slate-900"
           >
-            ← Back to Library Study
+            ← Back to Study Hub
           </button>
 
           <section className="rounded-3xl border border-white/80 bg-white/85 p-6 shadow-sm backdrop-blur">

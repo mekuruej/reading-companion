@@ -3,6 +3,7 @@
 
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { computeLibraryStudyColorStatus } from "@/lib/libraryStudyColor";
@@ -389,6 +390,13 @@ export default function DictionaryPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-6 pb-10 pt-15">
+      <Link
+        href="/discovery"
+        className="mb-4 inline-flex text-sm font-semibold text-stone-500 hover:text-stone-900"
+      >
+        ← Back to Discovery Hub
+      </Link>
+
       <DictionaryHeader
         title="Dictionary / Word Explorer"
         description="Look up a word and see where you have saved it in your books."

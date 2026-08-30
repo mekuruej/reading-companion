@@ -25,7 +25,7 @@ export default function BookVocabContextCard({
     <>
       <Link
         href={bookHubHref}
-        className="mb-2 inline-flex text-sm font-medium text-stone-500 underline-offset-4 transition hover:text-stone-800 hover:underline"
+        className="mb-2 inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
       >
         ← Back to Book Hub
       </Link>

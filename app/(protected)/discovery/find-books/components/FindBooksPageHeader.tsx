@@ -15,7 +15,7 @@ export default function FindBooksPageHeader({
         href="/discovery"
         className="inline-flex text-sm font-semibold text-stone-500 transition hover:text-stone-900"
       >
-        ← Discovery Hub
+        ← Back to Discovery Hub
       </Link>
 
       <div>

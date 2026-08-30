@@ -7,6 +7,13 @@ export default function ReaderInsightsComingSoonPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">
       <div className="mx-auto max-w-3xl">
+        <Link
+          href="/discovery"
+          className="mb-4 inline-flex text-sm font-semibold text-violet-700 hover:text-violet-950"
+        >
+          ← Back to Discovery Hub
+        </Link>
+
         <div className="rounded-3xl border border-violet-200 bg-violet-50 p-6 text-violet-950 shadow-sm">
           <p className="text-xs font-black uppercase tracking-[0.22em] opacity-60">
             Coming soon
@@ -33,13 +40,6 @@ export default function ReaderInsightsComingSoonPage() {
           </div>
 
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link
-              href="/discovery"
-              className="rounded-2xl border border-violet-200 bg-white px-5 py-3 text-sm font-semibold text-violet-950 shadow-sm transition hover:bg-violet-100"
-            >
-              Back to Discovery
-            </Link>
-
             <Link
               href="/discovery/dictionary"
               className="rounded-2xl border border-sky-200 bg-sky-50 px-5 py-3 text-sm font-semibold text-sky-950 shadow-sm transition hover:bg-sky-100"

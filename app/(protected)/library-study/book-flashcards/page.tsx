@@ -5,9 +5,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import LibraryBookActionIndex from "@/components/library/LibraryBookActionIndex";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { resolveReturnTo, withReturnTo } from "@/lib/navigation/returnTo";
 import { supabase } from "@/lib/supabaseClient";
 
 type ProfileAccessRow = {
@@ -18,38 +20,37 @@ type ProfileAccessRow = {
   trial_started_at: string | null;
 };
 
-function BookFlashcardsFullAccessLockedState() {
+function BookFlashcardsFullAccessLockedState({
+  backHref,
+  backLabel,
+}: {
+  backHref: string;
+  backLabel: string;
+}) {
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-5 sm:px-5 sm:py-8">
-      <div className="mx-auto max-w-3xl rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
-        <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
-          Japanese Learning 🔒
-        </p>
+      <div className="mx-auto max-w-3xl">
+        <Link
+          href={backHref}
+          className="mb-4 inline-flex text-sm font-semibold text-stone-500 hover:text-stone-950"
+        >
+          ← {backLabel}
+        </Link>
 
-        <h1 className="mt-2 text-3xl font-black text-stone-950">
-          Book Flashcards are locked
-        </h1>
+        <div className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
+            Japanese Learning 🔒
+          </p>
 
-        <p className="mt-3 text-sm leading-6 text-stone-600">
-          Book Flashcards use saved vocabulary from your books, so they are part
-          of Japanese Learning. Your book tracking, reading reflections, and
-          timer-only reading tools are still available.
-        </p>
+          <h1 className="mt-2 text-3xl font-black text-stone-950">
+            Book Flashcards are locked
+          </h1>
 
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link
-            href="/library-study/book-study"
-            className="rounded-full bg-stone-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-black"
-          >
-            Back to Book Study
-          </Link>
-
-          <Link
-            href="/library-study"
-            className="rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
-          >
-            Back to Study Hub
-          </Link>
+          <p className="mt-3 text-sm leading-6 text-stone-600">
+            Book Flashcards use saved vocabulary from your books, so they are part
+            of Japanese Learning. Your book tracking, reading reflections, and
+            timer-only reading tools are still available.
+          </p>
         </div>
       </div>
     </main>
@@ -57,8 +58,13 @@ function BookFlashcardsFullAccessLockedState() {
 }
 
 export default function BookFlashcardsIndexPage() {
+  const searchParams = useSearchParams();
   const [loadingAccess, setLoadingAccess] = useState(true);
   const [canUseBookFlashcards, setCanUseBookFlashcards] = useState(false);
+  const backDestination = resolveReturnTo(searchParams.get("returnTo"), {
+    href: "/library-study/book-study",
+    label: "Back to Book Study",
+  });
 
   useEffect(() => {
     let mounted = true;
@@ -139,7 +145,12 @@ export default function BookFlashcardsIndexPage() {
   }
 
   if (!canUseBookFlashcards) {
-    return <BookFlashcardsFullAccessLockedState />;
+    return (
+      <BookFlashcardsFullAccessLockedState
+        backHref={backDestination.href}
+        backLabel={backDestination.label}
+      />
+    );
   }
 
   return (
@@ -150,9 +161,11 @@ export default function BookFlashcardsIndexPage() {
       actionLabel="Book Flashcards"
       accent="stone"
       requireSavedWords
-      backHref="/library-study/book-study"
-      backLabel="Back to Book Study"
-      hrefForBook={(userBookId) => `/books/${userBookId}/study`}
+      backHref={backDestination.href}
+      backLabel={backDestination.label}
+      hrefForBook={(userBookId) =>
+        withReturnTo(`/books/${userBookId}/study`, "book-flashcards")
+      }
     />
   );
 }

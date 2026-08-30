@@ -442,6 +442,14 @@ export default function WordHistorySearchPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-6 pb-10 pt-15">
+      <button
+        type="button"
+        onClick={() => router.back()}
+        className="mb-4 inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
+      >
+        ← Back
+      </button>
+
       <VocabExplorePageHeader
         title="Word History in This Book"
         description="Search this book to see where a word appeared and how you saved it."
@@ -505,7 +513,6 @@ export default function WordHistorySearchPage() {
       <OtherMatchesPanel matches={otherMatches} />
 
       <VocabExploreFooterActions
-        onBack={() => router.back()}
         onClear={clearSearch}
       />
     </main>

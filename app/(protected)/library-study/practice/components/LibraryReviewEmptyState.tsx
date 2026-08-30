@@ -3,7 +3,7 @@ type LibraryReviewEmptyStateProps = {
   message?: string;
   showWordSkyButton?: boolean;
   onOpenWordSky: () => void;
-  onBackToLibrary: () => void;
+  onBackToStudyHub: () => void;
 };
 
 export default function LibraryReviewEmptyState({
@@ -11,11 +11,20 @@ export default function LibraryReviewEmptyState({
   message = "Add words from books or use Word Sky to build your practice pool.",
   showWordSkyButton = true,
   onOpenWordSky,
-  onBackToLibrary,
+  onBackToStudyHub,
 }: LibraryReviewEmptyStateProps) {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-100 p-6">
-      <div className="w-full max-w-xl rounded-2xl border bg-white p-8 text-center shadow-sm">
+    <main className="min-h-screen bg-slate-100 p-6">
+      <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-xl flex-col justify-center">
+        <button
+          type="button"
+          onClick={onBackToStudyHub}
+          className="mb-4 inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
+        >
+          ← Back to Study Hub
+        </button>
+
+      <div className="w-full rounded-2xl border bg-white p-8 text-center shadow-sm">
         <p className="text-2xl font-semibold text-gray-700">
           {title}
         </p>
@@ -34,15 +43,8 @@ export default function LibraryReviewEmptyState({
               Open Word Sky
             </button>
           ) : null}
-
-          <button
-            type="button"
-            onClick={onBackToLibrary}
-            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-          >
-            Back to Library
-          </button>
         </div>
+      </div>
       </div>
     </main>
   );

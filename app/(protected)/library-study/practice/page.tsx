@@ -95,6 +95,7 @@ type LibraryWordSummaryRow = {
   meaning: string | null;
   jlpt: string | null;
   total_encounter_count: number | null;
+  book_count: number | null;
   check_ready_encounter_count: number | null;
   hidden_encounter_count: number | null;
   sample_user_book_word_id: string | null;
@@ -126,6 +127,7 @@ type StudyCard = {
   meaning: string;
   jlpt: string | null;
   encounterCount: number;
+  bookCount: number;
   encounterIds: string[];
   colorStatus: LibraryStudyColorStatus;
   activeGate: LibraryCheckGate;
@@ -145,11 +147,19 @@ type MeaningReviewItem = {
 
 type ProfileRole = "teacher" | "super_teacher" | "admin" | "member";
 type PracticeRevealStep = "word" | "reading" | "meaning";
-type PracticeStudyMode = "reveal" | "typing";
+type PracticeStudyMode =
+  | "READING"
+  | "READING_MC"
+  | "MEANING"
+  | "MEANING_MC"
+  | "FROM_READING_MEANING"
+  | "FROM_READING_MC"
+  | "FROM_READING_MEANING_MC"
+  | "COMPLETE"
+  | "COMPLETE_TYPING";
 type PracticeTypingStep = "reading" | "meaning";
 type PracticeTypingAdvance = "meaning" | "next";
 type PracticeColorFilter =
-  | "all"
   | "red"
   | "orange"
   | "yellow"
@@ -159,17 +169,100 @@ type PracticeColorFilter =
   | "grey"
   | "katakana";
 
+const LIBRARY_PRACTICE_COLOR_FILTERS: PracticeColorFilter[] = [
+  "purple",
+  "blue",
+  "green",
+  "yellow",
+  "orange",
+  "red",
+  "grey",
+  "katakana",
+];
+
+function isPracticeTypingMode(mode: PracticeStudyMode) {
+  return (
+    mode === "READING" ||
+    mode === "MEANING" ||
+    mode === "FROM_READING_MEANING" ||
+    mode === "COMPLETE_TYPING"
+  );
+}
+
+function isPracticeMultipleChoiceMode(mode: PracticeStudyMode) {
+  return (
+    mode === "READING_MC" ||
+    mode === "MEANING_MC" ||
+    mode === "FROM_READING_MC" ||
+    mode === "FROM_READING_MEANING_MC"
+  );
+}
+
+function practiceModeTarget(mode: PracticeStudyMode): PracticeTypingStep | "word" {
+  if (mode === "READING" || mode === "READING_MC") return "reading";
+  if (mode === "FROM_READING_MC") return "word";
+  return "meaning";
+}
+
+function practiceCorrectAnswer(card: StudyCard, mode: PracticeStudyMode) {
+  const target = practiceModeTarget(mode);
+  if (target === "reading") return card.reading;
+  if (target === "word") return card.surface;
+  return card.meaning;
+}
+
+function practicePromptLabel(mode: PracticeStudyMode) {
+  const target = practiceModeTarget(mode);
+  if (target === "reading") return "Reading";
+  if (target === "word") return "Word";
+  return "Meaning";
+}
+
 const LIBRARY_PRACTICE_LAST_FIRST_CARD_KEY = "library-practice-last-first-card";
 const LIBRARY_PROGRESS_KEY_BATCH_SIZE = 75;
 const LIBRARY_REVIEW_AUTO_ADVANCE_MS = 3000;
 const LIBRARY_CHECK_WORD_PAGE_SIZE = 1000;
 
-function nextPracticeStudyMode(mode: PracticeStudyMode): PracticeStudyMode {
-  return mode === "reveal" ? "typing" : "reveal";
+function practiceStudyModeLabel(mode: PracticeStudyMode) {
+  switch (mode) {
+    case "READING":
+      return "Reading Typing";
+    case "MEANING":
+      return "Meaning Typing";
+    case "FROM_READING_MEANING":
+      return "Kana to Meaning Typing";
+    case "READING_MC":
+      return "Reading MC";
+    case "MEANING_MC":
+      return "Meaning MC";
+    case "FROM_READING_MC":
+      return "Kana to Kanji MC";
+    case "FROM_READING_MEANING_MC":
+      return "Kana to Meaning MC";
+    case "COMPLETE":
+      return "Touch Reveal";
+    case "COMPLETE_TYPING":
+      return "Typing Reveal";
+    default:
+      return "Reading Typing";
+  }
 }
 
-function practiceStudyModeLabel(mode: PracticeStudyMode) {
-  return mode === "reveal" ? "Reveal" : "Typing";
+const LIBRARY_REVIEW_MODE_ORDER: PracticeStudyMode[] = [
+  "READING",
+  "MEANING",
+  "FROM_READING_MEANING",
+  "READING_MC",
+  "MEANING_MC",
+  "FROM_READING_MC",
+  "FROM_READING_MEANING_MC",
+  "COMPLETE",
+  "COMPLETE_TYPING",
+];
+
+function nextPracticeStudyMode(mode: PracticeStudyMode): PracticeStudyMode {
+  const index = LIBRARY_REVIEW_MODE_ORDER.indexOf(mode);
+  return LIBRARY_REVIEW_MODE_ORDER[(index + 1) % LIBRARY_REVIEW_MODE_ORDER.length] ?? "READING";
 }
 
 const DEFAULT_LEARNING_SETTINGS: LearningSettingsRow = {
@@ -257,6 +350,11 @@ function isKatakanaOnly(value: string | null | undefined) {
   return compact.length > 0 && /^[ァ-ヶー・･]+$/.test(compact);
 }
 
+function isKanaOnly(value: string | null | undefined) {
+  const compact = (value ?? "").trim().replace(/\s+/g, "");
+  return compact.length > 0 && /^[ぁ-ゖァ-ヶー・･]+$/.test(compact);
+}
+
 function studyIdentityKey(surface: string | null | undefined, reading: string | null | undefined) {
   const normalizedSurface = normalizeText(surface ?? "");
   const normalizedReading = normalizeKana(reading ?? "");
@@ -293,6 +391,44 @@ function definitionLabel(card: StudyCard | null | undefined) {
       : `Definition ${card.definitionNumber}`;
   }
   return "";
+}
+
+function isNonPrimaryDefinition(card: StudyCard | null | undefined) {
+  const progressDefinition = card?.progress?.definition_key?.trim();
+  if (progressDefinition) return progressDefinition !== "1";
+  return card?.definitionNumber != null && card.definitionNumber !== 1;
+}
+
+function libraryReviewDefinitionChipClass(card: StudyCard | null | undefined) {
+  const base =
+    "rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-wide shadow-sm sm:px-3 sm:py-1.5 sm:text-xs";
+  const pulseClass = isNonPrimaryDefinition(card) ? " animate-pulse" : "";
+
+  if (card?.colorStatus.color === "yellow") {
+    return `${base} border-yellow-300 bg-yellow-100 text-yellow-950${pulseClass}`;
+  }
+
+  if (card?.colorStatus.color === "blue") {
+    return `${base} border-sky-300 bg-sky-100 text-sky-950${pulseClass}`;
+  }
+
+  if (card?.colorStatus.color === "purple") {
+    return `${base} border-violet-300 bg-violet-100 text-violet-950${pulseClass}`;
+  }
+
+  if (card?.colorStatus.color === "red") {
+    return `${base} border-red-300 bg-red-100 text-red-950${pulseClass}`;
+  }
+
+  if (card?.colorStatus.color === "orange") {
+    return `${base} border-orange-300 bg-orange-100 text-orange-950${pulseClass}`;
+  }
+
+  if (card?.colorStatus.color === "grey") {
+    return `${base} border-slate-300 bg-slate-100 text-slate-700${pulseClass}`;
+  }
+
+  return `${base} border-emerald-300 bg-emerald-100 text-emerald-950${pulseClass}`;
 }
 
 async function loadAllLibraryCheckWords(userBookIds: string[]) {
@@ -340,6 +476,7 @@ async function loadAllLibraryWordSummaries(userId: string) {
           meaning,
           jlpt,
           total_encounter_count,
+          book_count,
           check_ready_encounter_count,
           hidden_encounter_count,
           sample_user_book_word_id,
@@ -534,10 +671,6 @@ function makeClaimStudyCard(
 
   if (!key || !surface || !reading || !meaning) return null;
 
-  if (colorSettings.skip_katakana_library_check && isKatakanaOnly(surface)) {
-    return null;
-  }
-
   const progress = progressWithWordSkyClaim(
     userId,
     key,
@@ -568,9 +701,10 @@ function makeClaimStudyCard(
     meaning,
     jlpt: null,
     encounterCount: 0,
+    bookCount: 0,
     encounterIds: [],
     colorStatus,
-    activeGate: pickLibraryCheckGate(colorStatus, key),
+    activeGate: pickLibraryCheckGate(colorStatus, key, surface),
     studyIdentityKey: key,
     progress,
     definitionNumber: null,
@@ -610,16 +744,22 @@ function libraryStudyColorName(status: LibraryStudyColorStatus | undefined) {
   return color.charAt(0).toUpperCase() + color.slice(1);
 }
 
-function pickLibraryCheckGate(status: LibraryStudyColorStatus, _seed: string): LibraryCheckGate {
+function pickLibraryCheckGate(
+  status: LibraryStudyColorStatus,
+  _seed: string,
+  surface?: string | null
+): LibraryCheckGate {
+  if (isKanaOnly(surface) && status.nextGate === "reading") return "meaning";
   if (status.nextGate === "reading") return "reading";
   if (status.nextGate === "meaning") return "meaning";
-  return "reading";
+  return isKanaOnly(surface) ? "meaning" : "reading";
 }
 
 function isCardAvailableForLibraryPractice(
   card: StudyCard,
   selectedJlptLevels: string[],
-  colorFilter: PracticeColorFilter
+  selectedColorFilters: PracticeColorFilter[],
+  multiBookOnly: boolean
 ) {
   const allLevelsSelected =
     selectedJlptLevels.length === 0 ||
@@ -629,15 +769,25 @@ function isCardAvailableForLibraryPractice(
     allLevelsSelected || selectedJlptLevels.includes(normalizeJlpt(card.jlpt));
 
   if (!jlptMatch) return false;
+  if (multiBookOnly && card.bookCount < 2) return false;
 
-  if (colorFilter === "all") return true;
-  if (colorFilter === "katakana") return isKatakanaOnly(card.surface);
+  if (
+    selectedColorFilters.length === 0 ||
+    selectedColorFilters.length === LIBRARY_PRACTICE_COLOR_FILTERS.length
+  ) {
+    return true;
+  }
 
-  return card.colorStatus.color === colorFilter;
+  if (selectedColorFilters.includes("katakana") && isKatakanaOnly(card.surface)) {
+    return true;
+  }
+
+  return selectedColorFilters.includes(card.colorStatus.color as PracticeColorFilter);
 }
 
 function LibraryPracticePanel({
   card,
+  cards,
   total,
   revealStep,
   practiceMode,
@@ -653,6 +803,7 @@ function LibraryPracticePanel({
   onOpenWordSky,
 }: {
   card: StudyCard | undefined;
+  cards: StudyCard[];
   total: number;
   revealStep: PracticeRevealStep;
   practiceMode: PracticeStudyMode;
@@ -672,7 +823,7 @@ function LibraryPracticePanel({
   onReviewMeanings: () => void;
   onOpenWordSky: () => void;
 }) {
-  const [typingStep, setTypingStep] = useState<PracticeTypingStep>("reading");
+  const cardSkipsReading = isKanaOnly(card?.surface);
   const [typingInput, setTypingInput] = useState("");
   const [typingFeedback, setTypingFeedback] = useState<null | {
     ok: boolean;
@@ -680,12 +831,28 @@ function LibraryPracticePanel({
     label: string;
   }>(null);
   const [typingMissedStep, setTypingMissedStep] = useState<PracticeTypingStep | null>(null);
+  const [mcSelected, setMcSelected] = useState<string | null>(null);
+  const [mcAnswered, setMcAnswered] = useState(false);
+  const [mcWasCorrect, setMcWasCorrect] = useState<boolean | null>(null);
   const [autoAdvancePaused, setAutoAdvancePaused] = useState(false);
   const [pendingTypingAdvance, setPendingTypingAdvance] =
     useState<PracticeTypingAdvance | null>(null);
   const typingPracticeInputRef = useRef<HTMLInputElement | null>(null);
   const [flaggedCardKeys, setFlaggedCardKeys] = useState<Set<string>>(() => new Set());
   const [flaggingCard, setFlaggingCard] = useState(false);
+  const initialTypingStep =
+    practiceMode === "COMPLETE_TYPING" && !cardSkipsReading ? "reading" : "meaning";
+  const [typingStep, setTypingStep] = useState<PracticeTypingStep>(initialTypingStep);
+  const modeTarget =
+    practiceMode === "COMPLETE_TYPING"
+      ? typingStep
+      : cardSkipsReading && (practiceMode === "READING" || practiceMode === "READING_MC")
+      ? "meaning"
+      : practiceModeTarget(practiceMode);
+  const typingLabel = modeTarget === "word" ? "Word" : modeTarget === "reading" ? "Reading" : "Meaning";
+  const isTypingMode = isPracticeTypingMode(practiceMode);
+  const isMultipleChoiceMode = isPracticeMultipleChoiceMode(practiceMode);
+  const isCompleteReviewMode = practiceMode === "COMPLETE";
 
   function focusTypingPracticeInput() {
     for (const delay of [0, 80, 220]) {
@@ -697,22 +864,25 @@ function LibraryPracticePanel({
   }
 
   useEffect(() => {
-    setTypingStep("reading");
     setTypingInput("");
     setTypingFeedback(null);
     setTypingMissedStep(null);
+    setMcSelected(null);
+    setMcAnswered(false);
+    setMcWasCorrect(null);
     setAutoAdvancePaused(false);
     setPendingTypingAdvance(null);
-  }, [card?.id, practiceMode]);
+    setTypingStep(initialTypingStep);
+  }, [card?.id, initialTypingStep, practiceMode]);
 
   useEffect(() => {
-    if (practiceMode !== "typing") return;
+    if (!isTypingMode) return;
     if (typingFeedback) return;
 
     const timer = window.setTimeout(focusTypingPracticeInput, 40);
 
     return () => window.clearTimeout(timer);
-  }, [card?.id, practiceMode, typingFeedback, typingStep]);
+  }, [card?.id, isTypingMode, typingFeedback, modeTarget]);
 
   useEffect(() => {
     if (!pendingTypingAdvance) return;
@@ -729,7 +899,6 @@ function LibraryPracticePanel({
         return;
       }
 
-      setTypingStep("reading");
       setTypingInput("");
       setTypingFeedback(null);
       setTypingMissedStep(null);
@@ -741,14 +910,40 @@ function LibraryPracticePanel({
     return () => window.clearTimeout(timer);
   }, [pendingTypingAdvance, autoAdvancePaused, onNext]);
 
+  useEffect(() => {
+    if (!isMultipleChoiceMode) return;
+    if (!mcAnswered) return;
+    if (autoAdvancePaused) return;
+
+    const timer = window.setTimeout(() => {
+      onNext();
+    }, LIBRARY_REVIEW_AUTO_ADVANCE_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [isMultipleChoiceMode, mcAnswered, autoAdvancePaused, onNext]);
+
+  const correctAnswer = card ? practiceCorrectAnswer(card, practiceMode) : "";
+  const mcOptions = useMemo(() => {
+    if (!card || !isMultipleChoiceMode) return [];
+
+    const target = practiceModeTarget(practiceMode);
+    const values = cards
+      .map((candidate) => {
+        if (target === "reading") return candidate.reading;
+        if (target === "word") return candidate.surface;
+        return candidate.meaning;
+      })
+      .filter((value) => value.trim() && value.trim() !== correctAnswer.trim());
+    const uniqueDistractors = Array.from(new Set(values));
+    return shuffleArray([correctAnswer, ...shuffleArray(uniqueDistractors).slice(0, 3)]);
+  }, [card, cards, correctAnswer, isMultipleChoiceMode, practiceMode]);
+
   if (!card) {
     return <LibraryPracticeNoCardsState />;
   }
 
-  const showReading = revealStep === "reading" || revealStep === "meaning";
+  const showReading = !cardSkipsReading && (revealStep === "reading" || revealStep === "meaning");
   const showMeaning = revealStep === "meaning";
-  const typingLabel = typingStep === "reading" ? "Reading" : "Meaning";
-
   const currentCardWasFlagged = flaggedCardKeys.has(card.studyIdentityKey);
 
   async function handleFlagCardClick() {
@@ -775,13 +970,18 @@ function LibraryPracticePanel({
     if (!typingInput.trim()) return;
 
     const userAnswer = typingInput.trim();
-    const correctAnswer = typingStep === "reading" ? card.reading : card.meaning;
+    const correctAnswer =
+      modeTarget === "reading"
+        ? card.reading
+        : modeTarget === "word"
+          ? card.surface
+          : card.meaning;
     const ok =
-      typingStep === "reading"
+      modeTarget === "reading"
         ? normalizeKana(userAnswer) === normalizeKana(correctAnswer)
         : matchesAnyMeaning(userAnswer, correctAnswer);
 
-    if (typingStep === "reading") {
+    if (modeTarget === "reading") {
       if (!ok) {
         if (typingMissedStep !== "reading") onTypingMissed(card, "reading");
         setTypingMissedStep("reading");
@@ -792,7 +992,7 @@ function LibraryPracticePanel({
       }
 
       setTypingFeedback({ ok, answer: correctAnswer || "—", label: typingLabel });
-      setPendingTypingAdvance("meaning");
+      setPendingTypingAdvance(practiceMode === "COMPLETE_TYPING" ? "meaning" : "next");
       return;
     }
 
@@ -815,9 +1015,31 @@ function LibraryPracticePanel({
     setPendingTypingAdvance("next");
   }
 
+  function chooseMultipleChoiceAnswer(choice: string) {
+    if (mcAnswered) return;
+
+    const ok =
+      modeTarget === "reading"
+        ? normalizeKana(choice) === normalizeKana(correctAnswer)
+        : choice.trim() === correctAnswer.trim();
+
+    setMcSelected(choice);
+    setMcAnswered(true);
+    setMcWasCorrect(ok);
+
+    if (modeTarget === "reading" && !ok) {
+      onTypingMissed(card, "reading");
+    }
+
+    if (modeTarget === "meaning") {
+      onMeaningAnswered(card, choice, correctAnswer, ok);
+      if (!ok) onTypingMissed(card, "meaning");
+    }
+  }
+
   return (
     <div className="w-full max-w-3xl space-y-2">
-      {practiceMode === "reveal" ? (
+      {isCompleteReviewMode ? (
         <button
           type="button"
           onClick={onAdvance}
@@ -830,7 +1052,7 @@ function LibraryPracticePanel({
             colorName={libraryStudyColorName(card.colorStatus)}
             showKatakanaBadge={isKatakanaOnly(card.surface)}
             definitionText={definitionLabel(card)}
-            definitionChipClassName={libraryStudyChipClass(card.colorStatus)}
+            definitionChipClassName={libraryReviewDefinitionChipClass(card)}
             readChipClassName={libraryStudyChipClass(card.colorStatus)}
             encounterCount={card.encounterCount}
           />
@@ -842,14 +1064,16 @@ function LibraryPracticePanel({
             <div className="text-5xl font-bold text-slate-950">{card.surface}</div>
 
             <div className="grid w-full max-w-md gap-3 text-center">
-              <div className="rounded-2xl border border-slate-100 bg-white/75 px-4 py-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Reading
+              {!cardSkipsReading ? (
+                <div className="rounded-2xl border border-slate-100 bg-white/75 px-4 py-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Reading
+                  </div>
+                  <div className={`mt-1 text-2xl font-semibold ${showReading ? "text-slate-900" : "text-slate-300"}`}>
+                    {showReading ? card.reading : "Hidden"}
+                  </div>
                 </div>
-                <div className={`mt-1 text-2xl font-semibold ${showReading ? "text-slate-900" : "text-slate-300"}`}>
-                  {showReading ? card.reading : "Hidden"}
-                </div>
-              </div>
+              ) : null}
 
               <div className="rounded-2xl border border-slate-100 bg-white/75 px-4 py-3">
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -862,17 +1086,17 @@ function LibraryPracticePanel({
             </div>
           </div>
         </button>
-      ) : (
+      ) : isTypingMode ? (
 
         <div className="relative flex min-h-[24rem] w-full max-w-3xl items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-2xl sm:min-h-[28rem]">
           <LibraryPracticeCardBadges
-            modeLabel="Typing Practice"
+            modeLabel={practiceStudyModeLabel(practiceMode)}
             jlpt={card.jlpt}
             colorDotClassName={libraryStudyDotClass(card.colorStatus)}
             colorName={libraryStudyColorName(card.colorStatus)}
             showKatakanaBadge={isKatakanaOnly(card.surface)}
             definitionText={definitionLabel(card)}
-            definitionChipClassName={libraryStudyChipClass(card.colorStatus)}
+            definitionChipClassName={libraryReviewDefinitionChipClass(card)}
             readChipClassName={libraryStudyChipClass(card.colorStatus)}
             encounterCount={card.encounterCount}
           />
@@ -881,13 +1105,22 @@ function LibraryPracticePanel({
             <div className="text-base font-black uppercase tracking-[0.16em] text-slate-600">
               {typingLabel}
             </div>
-            <div className="text-5xl font-bold text-slate-950">{card.surface}</div>
-            {typingStep === "meaning" ? (
+            {practiceMode === "FROM_READING_MEANING" ? (
               <div className="text-lg font-semibold text-slate-500">{card.reading}</div>
+            ) : (
+              <div className="text-5xl font-bold text-slate-950">{card.surface}</div>
+            )}
+            {(practiceMode === "MEANING" ||
+              (practiceMode === "COMPLETE_TYPING" && modeTarget === "meaning")) &&
+              !cardSkipsReading ? (
+              <div className="text-lg font-semibold text-slate-500">{card.reading}</div>
+            ) : null}
+            {practiceMode === "READING" ? (
+              <div className="text-base font-semibold text-slate-500">{card.meaning}</div>
             ) : null}
 
             <div className="w-full max-w-md space-y-3">
-              {typingStep === "reading" ? (
+              {modeTarget === "reading" ? (
                 <p className="text-center text-xs text-gray-500">
                   <span className="inline sm:whitespace-nowrap">Kana is best; </span>
                   <span className="inline sm:whitespace-nowrap">Hepburn romaji also works</span>
@@ -904,7 +1137,7 @@ function LibraryPracticePanel({
                   e.stopPropagation();
                   if (!typingFeedback || !typingFeedback.ok) submitTypingPractice();
                 }}
-                placeholder={typingStep === "reading" ? "Type kana or Hepburn romaji" : "Type the meaning"}
+                placeholder={modeTarget === "reading" ? "Type kana or Hepburn romaji" : "Type the meaning"}
                 inputMode="text"
                 autoCorrect="off"
                 autoCapitalize="none"
@@ -946,10 +1179,8 @@ function LibraryPracticePanel({
                   ) : (
                     <p className="mt-2 text-xs font-medium text-slate-500">
                       {typingFeedback.ok
-                        ? pendingTypingAdvance === "meaning"
-                          ? "Meaning check comes automatically."
-                          : "Next card comes automatically."
-                        : typingStep === "reading"
+                        ? "Next card comes automatically."
+                        : modeTarget === "reading"
                           ? "Retype the reading once to continue."
                           : "Type one meaning word once to continue."}
                     </p>
@@ -965,6 +1196,89 @@ function LibraryPracticePanel({
                 </button>
               )}
             </div>
+          </div>
+        </div>
+      ) : (
+        <div className="relative flex min-h-[24rem] w-full max-w-3xl items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-2xl sm:min-h-[28rem]">
+          <LibraryPracticeCardBadges
+            modeLabel={practiceStudyModeLabel(practiceMode)}
+            jlpt={card.jlpt}
+            colorDotClassName={libraryStudyDotClass(card.colorStatus)}
+            colorName={libraryStudyColorName(card.colorStatus)}
+            showKatakanaBadge={isKatakanaOnly(card.surface)}
+            definitionText={definitionLabel(card)}
+            definitionChipClassName={libraryReviewDefinitionChipClass(card)}
+            readChipClassName={libraryStudyChipClass(card.colorStatus)}
+            encounterCount={card.encounterCount}
+          />
+
+          <div className="flex w-full flex-col items-center gap-5 pt-12 pb-10">
+            <div className="text-base font-black uppercase tracking-[0.16em] text-slate-600">
+              Choose {practicePromptLabel(practiceMode)}
+            </div>
+
+            {practiceMode === "READING_MC" ? (
+              <>
+                <div className="text-5xl font-bold text-slate-950">{card.surface}</div>
+                <div className="text-base font-semibold text-slate-500">{card.meaning}</div>
+              </>
+            ) : practiceMode === "MEANING_MC" ? (
+              <>
+                <div className="text-5xl font-bold text-slate-950">{card.surface}</div>
+                {!cardSkipsReading ? (
+                  <div className="text-lg font-semibold text-slate-500">{card.reading}</div>
+                ) : null}
+              </>
+            ) : practiceMode === "FROM_READING_MC" ? (
+              <>
+                <div className="text-3xl font-bold text-slate-950">{card.reading}</div>
+                <div className="text-base font-semibold text-slate-500">{card.meaning}</div>
+              </>
+            ) : (
+              <div className="text-3xl font-bold text-slate-950">{card.reading}</div>
+            )}
+
+            <div className="grid w-full max-w-md gap-2">
+              {mcOptions.length < 2 ? (
+                <p className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                  Not enough answer choices for this mode. Skip or shuffle to keep going.
+                </p>
+              ) : (
+                mcOptions.map((option) => {
+                  const isSelected = mcSelected === option;
+                  const isCorrect = option === correctAnswer;
+                  const optionStateClass = !mcAnswered
+                    ? "border-slate-200 bg-white text-slate-800 hover:border-blue-200 hover:bg-blue-50"
+                    : isCorrect
+                      ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+                      : isSelected
+                        ? "border-rose-300 bg-rose-50 text-rose-900"
+                        : "border-slate-200 bg-white text-slate-400";
+
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      disabled={mcAnswered}
+                      onClick={() => chooseMultipleChoiceAnswer(option)}
+                      className={`rounded-2xl border px-4 py-3 text-left text-base font-semibold shadow-sm transition ${optionStateClass}`}
+                    >
+                      {option}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {mcAnswered ? (
+              <div className={`w-full max-w-md rounded-2xl border px-4 py-3 text-sm font-semibold ${
+                mcWasCorrect
+                  ? "border-emerald-100 bg-emerald-50 text-emerald-800"
+                  : "border-rose-100 bg-rose-50 text-rose-800"
+              }`}>
+                {mcWasCorrect ? "Looks right." : `Answer: ${correctAnswer || "—"}`}
+              </div>
+            ) : null}
           </div>
         </div>
       )}
@@ -1020,7 +1334,7 @@ function LibraryPracticePanel({
           </button>
         </div>
 
-        {practiceMode === "typing" ? (
+        {isTypingMode || isMultipleChoiceMode ? (
           <div className="mt-3 flex justify-center">
             <button
               type="button"
@@ -1111,11 +1425,29 @@ function matchesAnyMeaning(input: string, fullMeaning: string) {
 }
 
 function practiceColorFilterLabel(filter: PracticeColorFilter) {
-  if (filter === "all") return "All Colors";
   if (filter === "grey") return "Limbo words";
   if (filter === "katakana") return "Katakana words";
 
   return `${filter.charAt(0).toUpperCase() + filter.slice(1)} words`;
+}
+
+function practiceColorFiltersLabel(filters: PracticeColorFilter[]) {
+  if (
+    filters.length === 0 ||
+    filters.length === LIBRARY_PRACTICE_COLOR_FILTERS.length
+  ) {
+    return "All Colors";
+  }
+
+  const ordered = LIBRARY_PRACTICE_COLOR_FILTERS.filter((filter) =>
+    filters.includes(filter)
+  );
+
+  if (ordered.length <= 3) {
+    return ordered.map(practiceColorFilterLabel).join(" + ");
+  }
+
+  return `${ordered.length} color groups`;
 }
 
 function jlptFilterLabel(levels: string[]) {
@@ -1145,23 +1477,26 @@ const LIBRARY_PRACTICE_JLPT_LEVELS = [
 ] as const;
 
 function libraryReviewStudyingNowLabel({
-  colorFilter,
+  colorFilters,
   jlptLevels,
   mode,
+  multiBookOnly,
 }: {
-  colorFilter: PracticeColorFilter;
+  colorFilters: PracticeColorFilter[];
   jlptLevels: string[];
   mode: PracticeStudyMode;
+  multiBookOnly: boolean;
 }) {
-  const colorLabel = practiceColorFilterLabel(colorFilter);
+  const colorLabel = practiceColorFiltersLabel(colorFilters);
   const levelLabel = jlptFilterLabel(jlptLevels);
   const modeLabel = practiceStudyModeLabel(mode);
+  const sourceLabel = multiBookOnly ? "Multiple books" : "";
 
-  if (colorFilter === "all" && levelLabel === "All levels") {
+  if (colorLabel === "All Colors" && levelLabel === "All levels" && !sourceLabel) {
     return `${colorLabel} • ${modeLabel}`;
   }
 
-  return `${colorLabel} • ${levelLabel} • ${modeLabel}`;
+  return [colorLabel, levelLabel, sourceLabel, modeLabel].filter(Boolean).join(" • ");
 }
 
 export default function LibraryStudyPage() {
@@ -1186,22 +1521,24 @@ export default function LibraryStudyPage() {
   const [practiceFinished, setPracticeFinished] = useState(false);
   const [practiceStarted, setPracticeStarted] = useState(false);
   const [practiceStarting, setPracticeStarting] = useState(false);
-  const [practiceStudyMode, setPracticeStudyMode] = useState<PracticeStudyMode>("reveal");
+  const [practiceStudyMode, setPracticeStudyMode] = useState<PracticeStudyMode>("READING");
 
   const [selectedJlptLevels, setSelectedJlptLevels] = useState<string[]>([]);
-  const [practiceColorFilter, setPracticeColorFilter] =
-    useState<PracticeColorFilter>("all");
-  const effectivePracticeColorFilter: PracticeColorFilter = lockedMasteredWordsMode
-    ? "purple"
-    : practiceColorFilter;
+  const [practiceColorFilters, setPracticeColorFilters] = useState<PracticeColorFilter[]>([]);
+  const [multiBookOnly, setMultiBookOnly] = useState(false);
+  const effectivePracticeColorFilters: PracticeColorFilter[] = lockedMasteredWordsMode
+    ? ["purple"]
+    : practiceColorFilters;
   const [, setNotice] = useState<string | null>(null);
   const [meaningReviewItems, setMeaningReviewItems] = useState<MeaningReviewItem[]>([]);
   const [showPracticeMeaningReview, setShowPracticeMeaningReview] = useState(false);
+  const practiceCardAnchorRef = useRef<HTMLDivElement | null>(null);
 
   const libraryReviewStudyingNowLabelText = libraryReviewStudyingNowLabel({
-    colorFilter: effectivePracticeColorFilter,
+    colorFilters: effectivePracticeColorFilters,
     jlptLevels: selectedJlptLevels,
     mode: practiceStudyMode,
+    multiBookOnly,
   });
   const reviewTitle = lockedMasteredWordsMode ? "Mastered Words" : "Saved Words Review";
   const reviewSubtitle = lockedMasteredWordsMode
@@ -1210,20 +1547,14 @@ export default function LibraryStudyPage() {
 
   useEffect(() => {
     const requestedColor = searchParams.get("color");
-    const allowedColors: PracticeColorFilter[] = [
-      "all",
-      "red",
-      "orange",
-      "yellow",
-      "green",
-      "blue",
-      "purple",
-      "grey",
-      "katakana",
-    ];
 
-    if (requestedColor && allowedColors.includes(requestedColor as PracticeColorFilter)) {
-      setPracticeColorFilter(requestedColor as PracticeColorFilter);
+    if (requestedColor === "all") {
+      setPracticeColorFilters([]);
+      return;
+    }
+
+    if (requestedColor && LIBRARY_PRACTICE_COLOR_FILTERS.includes(requestedColor as PracticeColorFilter)) {
+      setPracticeColorFilters([requestedColor as PracticeColorFilter]);
     }
   }, [searchParams]);
 
@@ -1234,10 +1565,11 @@ export default function LibraryStudyPage() {
       isCardAvailableForLibraryPractice(
         card,
         selectedJlptLevels,
-        effectivePracticeColorFilter
+        effectivePracticeColorFilters,
+        multiBookOnly
       )
     );
-  }, [libraryReviewCards, selectedJlptLevels, effectivePracticeColorFilter]);
+  }, [libraryReviewCards, selectedJlptLevels, effectivePracticeColorFilters, multiBookOnly]);
 
   useEffect(() => {
     async function load() {
@@ -1428,10 +1760,6 @@ export default function LibraryStudyPage() {
                 return null;
               }
 
-              if (colorSettings.skip_katakana_library_check && isKatakanaOnly(surface)) {
-                return null;
-              }
-
               const colorStatus = computeLibraryStudyColorStatus({
                 encounterCount,
                 settings: colorSettings,
@@ -1453,9 +1781,10 @@ export default function LibraryStudyPage() {
                 meaning,
                 jlpt: summary.jlpt ?? null,
                 encounterCount,
+                bookCount: summary.book_count ?? 0,
                 encounterIds: [summary.sample_user_book_word_id],
                 colorStatus,
-                activeGate: pickLibraryCheckGate(colorStatus, summary.study_identity_key),
+                activeGate: pickLibraryCheckGate(colorStatus, summary.study_identity_key, surface),
                 studyIdentityKey: summary.study_identity_key,
                 progress,
                 definitionNumber: null,
@@ -1530,13 +1859,6 @@ export default function LibraryStudyPage() {
               claimByKey.get(key)
             );
 
-            if (
-              colorSettings.skip_katakana_library_check &&
-              isKatakanaOnly(representative.surface)
-            ) {
-              return null;
-            }
-
             const colorStatus = computeLibraryStudyColorStatus({
               encounterCount: group.length,
               settings: colorSettings,
@@ -1558,9 +1880,10 @@ export default function LibraryStudyPage() {
               meaning: representative.meaning!.trim(),
               jlpt: representative.jlpt ?? null,
               encounterCount: group.length,
+              bookCount: new Set(group.map((word) => word.user_book_id).filter(Boolean)).size,
               encounterIds: group.map((word) => word.id),
               colorStatus,
-              activeGate: pickLibraryCheckGate(colorStatus, key),
+              activeGate: pickLibraryCheckGate(colorStatus, key, surface),
               studyIdentityKey: key,
               progress,
               definitionNumber: definitionNumberFromIndex(representative.meaning_choice_index),
@@ -1587,6 +1910,17 @@ export default function LibraryStudyPage() {
 
     load();
   }, []);
+
+  useEffect(() => {
+    if (!practiceStarted || practiceFinished || practiceDeck.length === 0) return;
+
+    window.requestAnimationFrame(() => {
+      practiceCardAnchorRef.current?.scrollIntoView({
+        block: "start",
+        inline: "nearest",
+      });
+    });
+  }, [practiceStarted, practiceFinished, practiceIndex, practiceDeck.length]);
 
   function resetPracticeDeck(cards: StudyCard[]) {
     setPracticeDeck(buildShuffledPracticeDeck(cards));
@@ -1692,7 +2026,7 @@ export default function LibraryStudyPage() {
 
   function advancePracticeCard() {
     if (practiceRevealStep === "word") {
-      setPracticeRevealStep("reading");
+      setPracticeRevealStep(isKanaOnly(practiceCard?.surface) ? "meaning" : "reading");
       return;
     }
 
@@ -1736,7 +2070,7 @@ export default function LibraryStudyPage() {
   function finishPracticeMeaningReview() {
     setMeaningReviewItems([]);
     setShowPracticeMeaningReview(false);
-    router.push("/books");
+    router.push("/library-study");
   }
 
   function queuePracticeMeaningReview(
@@ -1991,7 +2325,7 @@ export default function LibraryStudyPage() {
             ? "During your trial, you can build vocabulary, use Book Study, and see your word colors begin. Library Review is part of paid Advanced Study."
             : copy.message
         }
-        onBackToLibrary={() => router.push("/books")}
+        onBackToStudyHub={() => router.push("/library-study")}
         onViewReadingStats={() => router.push("/community/stats")}
       />
     );
@@ -2001,7 +2335,7 @@ export default function LibraryStudyPage() {
     return (
       <LibraryReviewErrorState
         message={errorMsg}
-        onBackToLibrary={() => router.push("/books")}
+        onBackToStudyHub={() => router.push("/library-study")}
       />
     );
   }
@@ -2021,7 +2355,7 @@ export default function LibraryStudyPage() {
         }
         showWordSkyButton={!lockedMasteredWordsMode}
         onOpenWordSky={() => router.push("/library-study/word-sky")}
-        onBackToLibrary={() => router.push("/books")}
+        onBackToStudyHub={() => router.push("/library-study")}
       />
     );
   }
@@ -2047,14 +2381,15 @@ export default function LibraryStudyPage() {
         eyebrow={lockedMasteredWordsMode ? "Purple review" : "From your library"}
         icon={lockedMasteredWordsMode ? "★" : "📚"}
         iconClassName={lockedMasteredWordsMode ? "text-violet-600" : undefined}
-        onOpenLibrary={() => router.push("/library")}
+        onBackToStudyHub={() => router.push("/library-study")}
       />
 
-      <div className="mb-3 w-full max-w-3xl space-y-0">
+      <div className="mb-3 w-full max-w-3xl space-y-3">
         <LibraryPracticeFilterPanel
           jlptLevels={LIBRARY_PRACTICE_JLPT_LEVELS}
           selectedJlptLevels={selectedJlptLevels}
-          practiceColorFilter={effectivePracticeColorFilter}
+          selectedColorFilters={effectivePracticeColorFilters}
+          multiBookOnly={multiBookOnly}
           colorFilterLocked={lockedMasteredWordsMode}
           lockedColorLabel="Purple (Mastered)"
           onToggleJlpt={(level) =>
@@ -2066,10 +2401,24 @@ export default function LibraryStudyPage() {
           }
           onSelectAllJlpt={() => setSelectedJlptLevels([...LIBRARY_PRACTICE_JLPT_LEVELS])}
           onClearJlpt={() => setSelectedJlptLevels([])}
-          onColorFilterChange={(value) => {
+          onToggleColorFilter={(value) => {
             if (lockedMasteredWordsMode) return;
-            setPracticeColorFilter(value as PracticeColorFilter);
+            const color = value as PracticeColorFilter;
+            setPracticeColorFilters((current) =>
+              current.includes(color)
+                ? current.filter((selectedColor) => selectedColor !== color)
+                : [...current, color]
+            );
           }}
+          onSelectAllColorFilters={() => {
+            if (lockedMasteredWordsMode) return;
+            setPracticeColorFilters([...LIBRARY_PRACTICE_COLOR_FILTERS]);
+          }}
+          onClearColorFilters={() => {
+            if (lockedMasteredWordsMode) return;
+            setPracticeColorFilters([]);
+          }}
+          onMultiBookOnlyChange={setMultiBookOnly}
         />
 
         <LibraryPracticeModeSelector
@@ -2080,7 +2429,7 @@ export default function LibraryStudyPage() {
 
       {!practiceStarted ? (
         <section className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white px-5 py-5 text-center shadow-sm">
-          <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+          <p className="text-sm font-black uppercase tracking-wide text-blue-700">
             {reviewCountsLoading
               ? "Preparing review"
               : lockedMasteredWordsMode
@@ -2135,25 +2484,29 @@ export default function LibraryStudyPage() {
               onOpenWordSky={() => router.push("/library-study/word-sky")}
             />
           ) : (
-            <LibraryPracticePanel
-              card={practiceCard}
-              total={practiceDeck.length}
-              revealStep={practiceRevealStep}
-              practiceMode={practiceStudyMode}
-              onAdvance={advancePracticeCard}
-              onNext={goToNextPracticeCard}
-              onPrevious={goToPreviousPracticeCard}
-              onShuffle={shufflePracticeDeck}
-              onFlagCard={() => {
-                if (!practiceCard) return false;
-                return flagPracticeCard(practiceCard);
-              }}
-              onMeaningAnswered={queuePracticeMeaningReview}
-              onTypingMissed={handlePracticeTypingMiss}
-              meaningReviewCount={meaningReviewItems.length}
-              onReviewMeanings={() => setShowPracticeMeaningReview(true)}
-              onOpenWordSky={() => router.push("/library-study/word-sky")}
-            />
+            <>
+              <div ref={practiceCardAnchorRef} className="scroll-mt-4" />
+              <LibraryPracticePanel
+                card={practiceCard}
+                cards={practiceDeck}
+                total={practiceDeck.length}
+                revealStep={practiceRevealStep}
+                practiceMode={practiceStudyMode}
+                onAdvance={advancePracticeCard}
+                onNext={goToNextPracticeCard}
+                onPrevious={goToPreviousPracticeCard}
+                onShuffle={shufflePracticeDeck}
+                onFlagCard={() => {
+                  if (!practiceCard) return false;
+                  return flagPracticeCard(practiceCard);
+                }}
+                onMeaningAnswered={queuePracticeMeaningReview}
+                onTypingMissed={handlePracticeTypingMiss}
+                meaningReviewCount={meaningReviewItems.length}
+                onReviewMeanings={() => setShowPracticeMeaningReview(true)}
+                onOpenWordSky={() => router.push("/library-study/word-sky")}
+              />
+            </>
           )}
         </>
       )}

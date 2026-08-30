@@ -446,8 +446,16 @@ export default function FoundationVocabularyPage() {
 
   if (complete) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-slate-100 p-6">
-        <div className="w-full max-w-xl rounded-2xl border bg-white p-8 text-center shadow-sm">
+      <main className="min-h-screen bg-slate-100 p-6">
+        <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-xl flex-col justify-center">
+          <Link
+            href="/library-study"
+            className="mb-4 inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
+          >
+            ← Back to Study Hub
+          </Link>
+
+        <div className="w-full rounded-2xl border bg-white p-8 text-center shadow-sm">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
             Foundation Vocabulary
           </p>
@@ -463,13 +471,8 @@ export default function FoundationVocabularyPage() {
             >
               Study Again
             </button>
-            <Link
-              href="/library-study/characters"
-              className="rounded bg-gray-200 px-4 py-2"
-            >
-              Foundation Sets
-            </Link>
           </div>
+        </div>
         </div>
       </main>
     );
@@ -478,7 +481,14 @@ export default function FoundationVocabularyPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-4 sm:px-6">
       <div className="mx-auto flex max-w-3xl flex-col items-center">
-        <div className="mb-4 mt-4 flex w-full flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:mb-8 sm:mt-6 sm:flex-row sm:items-center sm:justify-between">
+        <Link
+          href="/library-study"
+          className="mb-2 w-full text-left text-sm font-semibold text-slate-500 hover:text-slate-900"
+        >
+          ← Back to Study Hub
+        </Link>
+
+        <div className="mb-4 flex w-full flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs uppercase tracking-wide text-stone-500">
               Foundation Set
@@ -490,12 +500,6 @@ export default function FoundationVocabularyPage() {
               JLPT N5 starter words. Free for every reader.
             </p>
           </div>
-          <Link
-            href="/library-study/characters"
-            className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-800"
-          >
-            Foundation Sets
-          </Link>
         </div>
 
         <div className="mb-7 w-full space-y-0">

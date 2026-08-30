@@ -1,5 +1,4 @@
 type WordDetailFooterActionsProps = {
-  onBack: () => void;
   hidden: boolean | null;
   onEdit: () => void;
   onResearch: () => void;
@@ -9,7 +8,6 @@ type WordDetailFooterActionsProps = {
 };
 
 export default function WordDetailFooterActions({
-  onBack,
   hidden,
   onEdit,
   onResearch,
@@ -19,14 +17,6 @@ export default function WordDetailFooterActions({
 }: WordDetailFooterActionsProps) {
   return (
     <div className="flex flex-wrap justify-center gap-2">
-      <button
-        type="button"
-        onClick={onBack}
-        className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
-      >
-        Back
-      </button>
-
         <button
           type="button"
           onClick={onEdit}

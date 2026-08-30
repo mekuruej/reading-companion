@@ -541,7 +541,7 @@ export default function RadicalFlashcardsPage() {
         title="Radical flashcards need a little setup"
         message={errorMsg}
         primaryHref="/library-study/characters"
-        primaryLabel="Back to Basic Study"
+        primaryLabel="Back to Foundation Sets"
       />
     );
   }
@@ -551,7 +551,7 @@ export default function RadicalFlashcardsPage() {
       <KanjiStudyCompleteState
         endedEarly={endedEarly}
         nextModeLabel={studyModeLabel(nextRadicalStudyMode())}
-        onBackToStudyHub={() => router.push("/library-study/characters")}
+        onBackToFoundationSets={() => router.push("/library-study/characters")}
         onNextMode={() => startStudyMode(nextRadicalStudyMode())}
         onRestart={() => restartDeck(filteredBaseCards)}
       />
@@ -563,46 +563,43 @@ export default function RadicalFlashcardsPage() {
       <KanjiStudyHeader
         title="Radical Flashcards"
         description="Practice KangXi main radicals, radical names, and radical stroke counts."
-        onOpenCharacterStudy={() => router.push("/library-study/characters")}
-        onOpenLibrary={() => router.push("/library")}
+        onBackToFoundationSets={() => router.push("/library-study/characters")}
       />
 
-      <div className="mb-4 w-full max-w-3xl space-y-0" />
+      <div className="mb-3 w-full max-w-3xl space-y-3">
+        <KanjiStudyFilterPanel
+          selectedLevels={levelFilters}
+          onToggleLevel={handleToggleLevelFilter}
+          onSelectAll={handleSelectAllLevelFilters}
+          onClear={handleClearLevelFilters}
+        />
 
-      <KanjiStudyFilterPanel
-        selectedLevels={levelFilters}
-        onToggleLevel={handleToggleLevelFilter}
-        onSelectAll={handleSelectAllLevelFilters}
-        onClear={handleClearLevelFilters}
-      />
-
-      <section className="mt-4 w-full max-w-3xl rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-        <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-          Question Type
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {[
-            { value: "mainRadical", label: "Main radical" },
-            { value: "radicalStrokeCount", label: "Radical stroke count" },
-            { value: "radicalName", label: "Radical name" },
-          ].map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => startStudyMode(option.value as RadicalStudyMode)}
-              className={`rounded-full border px-4 py-2 text-sm font-black shadow-sm transition ${
-                studyMode === option.value
-                  ? "border-slate-950 bg-slate-950 text-white"
-                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <div className="mb-5 w-full max-w-3xl" />
+        <section className="w-full rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+          <p className="text-sm font-black uppercase tracking-wide text-blue-700">
+            Question Type
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {[
+              { value: "mainRadical", label: "Main radical" },
+              { value: "radicalStrokeCount", label: "Radical stroke count" },
+              { value: "radicalName", label: "Radical name" },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => startStudyMode(option.value as RadicalStudyMode)}
+                className={`rounded-full border px-4 py-2 text-sm font-black shadow-sm transition ${
+                  studyMode === option.value
+                    ? "border-slate-950 bg-slate-950 text-white"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
 
       {deck.length > 0 ? (
         <KanjiStudyProgressPanel

@@ -521,9 +521,9 @@ export default function ProfileHubPage() {
       <div className="mx-auto max-w-6xl">
         <Link
           href="/library"
-          className="inline-flex text-sm font-black text-stone-600 transition hover:text-stone-950"
+          className="inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
         >
-          &larr; Back to Library
+          ← Back to Library
         </Link>
 
         {errorMsg ? (

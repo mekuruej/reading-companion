@@ -638,7 +638,7 @@ export default function TeacherReadingSnapshotPage() {
     <TeacherSnapshotShell>
       <Link
         href={`/books/${userBookId}`}
-        className="inline-flex w-fit text-sm font-bold text-stone-600 transition hover:text-stone-950"
+        className="inline-flex w-fit text-sm font-semibold text-slate-500 hover:text-slate-900"
       >
         ← Back to Book Hub
       </Link>

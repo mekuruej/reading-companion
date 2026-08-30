@@ -300,9 +300,9 @@ export default function ReviewNotesPage() {
       <div className="mx-auto max-w-4xl space-y-5">
         <Link
           href={`/books/${row.id}`}
-          className="inline-flex text-sm font-semibold text-stone-500 hover:text-stone-900"
+          className="inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
         >
-          &larr; Back to Book Hub
+          ← Back to Book Hub
         </Link>
 
         <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">

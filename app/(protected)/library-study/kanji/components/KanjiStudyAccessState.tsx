@@ -13,9 +13,21 @@ export default function KanjiStudyAccessState({
   primaryHref,
   primaryLabel,
 }: KanjiStudyAccessStateProps) {
+  const isBackLink = Boolean(primaryHref && primaryLabel?.startsWith("Back"));
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-100 p-6">
-      <div className="w-full max-w-xl rounded-2xl border bg-white p-8 text-center shadow-sm">
+    <main className="min-h-screen bg-slate-100 p-6">
+      <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-xl flex-col justify-center">
+        {isBackLink && primaryHref && primaryLabel ? (
+          <Link
+            href={primaryHref}
+            className="mb-4 inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
+          >
+            ← {primaryLabel}
+          </Link>
+        ) : null}
+
+      <div className="w-full rounded-2xl border bg-white p-8 text-center shadow-sm">
         <h1 className="text-2xl font-semibold text-slate-900">
           {title}
         </h1>
@@ -24,7 +36,7 @@ export default function KanjiStudyAccessState({
           {message}
         </p>
 
-        {primaryHref && primaryLabel ? (
+        {primaryHref && primaryLabel && !isBackLink ? (
           <div className="mt-6">
             <Link
               href={primaryHref}
@@ -34,6 +46,7 @@ export default function KanjiStudyAccessState({
             </Link>
           </div>
         ) : null}
+      </div>
       </div>
     </main>
   );

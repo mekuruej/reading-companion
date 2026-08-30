@@ -39,6 +39,13 @@ export default function BasicStudyPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">
       <div className="mx-auto max-w-5xl">
+        <Link
+          href="/library-study"
+          className="mb-5 inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
+        >
+          ← Back to Study Hub
+        </Link>
+
         <div className="mb-8 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
             Foundation Sets
@@ -91,15 +98,6 @@ export default function BasicStudyPage() {
             ))}
           </div>
         </section>
-
-        <div className="mt-6 text-center">
-          <Link
-            href="/library-study"
-            className="inline-flex rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-          >
-            Back to Study Hub
-          </Link>
-        </div>
       </div>
     </main>
   );

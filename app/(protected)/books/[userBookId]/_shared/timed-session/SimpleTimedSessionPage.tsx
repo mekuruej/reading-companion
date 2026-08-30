@@ -1173,7 +1173,7 @@ export default function SimpleTimedSessionPage({
                 <button
                     type="button"
                     onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
-                    className="text-sm font-medium text-stone-500 underline underline-offset-4 hover:text-stone-800"
+                    className="inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
                 >
                     ← {backLabel}
                 </button>
