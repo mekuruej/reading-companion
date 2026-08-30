@@ -26,8 +26,12 @@ type TeacherUseStatus =
   | "testing"
   | "currently_using"
   | "approved_for_lesson"
+  | "usable"
   | "use_with_caution"
   | "do_not_use";
+
+type TeachingDifficulty = "n5" | "n4" | "n3" | "n2" | "n1" | "above_n1";
+type TeachingSuitability = "excellent" | "usable" | "poor_fit";
 
 type TeacherBookRow = {
   id: string;
@@ -36,9 +40,20 @@ type TeacherBookRow = {
   user_book_id: string | null;
   teacher_use_status: TeacherUseStatus | null;
   teacher_use_note: string | null;
+  teacher_jlpt_difficulty: TeachingDifficulty | null;
+  teaching_suitability: TeachingSuitability | null;
   created_at: string | null;
   updated_at: string | null;
   books: BookMeta | BookMeta[] | null;
+  user_books: UserBookDnfMeta | UserBookDnfMeta[] | null;
+};
+
+type UserBookDnfMeta = {
+  id: string;
+  dnf_at: string | null;
+  dnf_reason: string | null;
+  dnf_note: string | null;
+  would_retry: string | null;
 };
 
 type ToolCard = {
@@ -66,12 +81,24 @@ function firstBook(book: TeacherBookRow["books"]) {
   return book ?? null;
 }
 
+function firstUserBook(row: TeacherBookRow["user_books"]) {
+  if (Array.isArray(row)) return row[0] ?? null;
+  return row ?? null;
+}
+
 const teacherUseStatusOptions: Array<{ value: TeacherUseStatus; label: string }> = [
   { value: "want_to_test", label: "Want to Test" },
   { value: "testing", label: "Testing" },
   { value: "currently_using", label: "Currently Using" },
-  { value: "approved_for_lesson", label: "Approved for Lesson" },
+  { value: "approved_for_lesson", label: "Perfect for Lesson" },
+  { value: "usable", label: "Usable" },
   { value: "use_with_caution", label: "Use with Caution" },
+  { value: "do_not_use", label: "Do Not Use" },
+];
+
+const visibleTeacherUseStatusOptions: Array<{ value: TeacherUseStatus; label: string }> = [
+  { value: "approved_for_lesson", label: "Perfect for Lesson" },
+  { value: "usable", label: "Usable" },
   { value: "do_not_use", label: "Do Not Use" },
 ];
 
@@ -80,8 +107,51 @@ const teacherUseStatusLabels = teacherUseStatusOptions.reduce(
   {} as Record<TeacherUseStatus, string>
 );
 
+const difficultyOptions: Array<{ value: TeachingDifficulty; label: string }> = [
+  { value: "n5", label: "N5" },
+  { value: "n4", label: "N4" },
+  { value: "n3", label: "N3" },
+  { value: "n2", label: "N2" },
+  { value: "n1", label: "N1" },
+  { value: "above_n1", label: "Above N1" },
+];
+
+const suitabilityOptions: Array<{ value: TeachingSuitability; label: string }> = [
+  { value: "excellent", label: "Excellent" },
+  { value: "usable", label: "Usable" },
+  { value: "poor_fit", label: "Poor Fit" },
+];
+
+const dnfReasonLabels: Record<string, string> = {
+  too_difficult_right_now: "Too difficult right now",
+  wrong_timing_mood: "Wrong timing or mood",
+  too_much_unknown_vocabulary: "Too much unknown vocabulary",
+  too_dense_slow: "Too dense or slow",
+  lost_interest: "Lost interest",
+  did_not_like_it: "Did not like it",
+  other: "Other",
+};
+
+const difficultyLabels = difficultyOptions.reduce(
+  (labels, option) => ({ ...labels, [option.value]: option.label }),
+  {} as Record<TeachingDifficulty, string>
+);
+
+const suitabilityLabels = suitabilityOptions.reduce(
+  (labels, option) => ({ ...labels, [option.value]: option.label }),
+  {} as Record<TeachingSuitability, string>
+);
+
 function isTeacherUseStatus(value: string): value is TeacherUseStatus {
   return teacherUseStatusOptions.some((option) => option.value === value);
+}
+
+function isTeachingDifficulty(value: string): value is TeachingDifficulty {
+  return difficultyOptions.some((option) => option.value === value);
+}
+
+function isTeachingSuitability(value: string): value is TeachingSuitability {
+  return suitabilityOptions.some((option) => option.value === value);
 }
 
 function normalizeTeacherUseStatus(value: string | null | undefined): TeacherUseStatus {
@@ -89,13 +159,44 @@ function normalizeTeacherUseStatus(value: string | null | undefined): TeacherUse
 }
 
 function teacherUseStatusLabel(status: TeacherUseStatus | null | undefined) {
+  if (isBlankTeacherUseStatus(status)) return "--";
   return teacherUseStatusLabels[normalizeTeacherUseStatus(status)];
 }
 
+function difficultyLabel(value: TeachingDifficulty | null | undefined) {
+  return value ? difficultyLabels[value] : "No JLPT";
+}
+
+function suitabilityLabel(value: TeachingSuitability | null | undefined) {
+  return value ? suitabilityLabels[value] : "No Suitability";
+}
+
+function dnfReasonLabel(value: string | null | undefined) {
+  if (!value) return "No reason saved";
+  return dnfReasonLabels[value] ?? value;
+}
+
+function wouldRetryLabel(value: string | null | undefined) {
+  if (value === "yes") return "Would retry";
+  if (value === "maybe") return "Might retry later";
+  if (value === "no") return "Would not retry";
+  return null;
+}
+
+function isAssessed(row: TeacherBookRow | null) {
+  return Boolean(row?.teacher_jlpt_difficulty && row?.teaching_suitability);
+}
+
 function teacherUseStatusBadgeClass(status: TeacherUseStatus | null | undefined) {
+  if (isBlankTeacherUseStatus(status)) {
+    return "border-stone-200 bg-stone-50 text-stone-600";
+  }
+
   switch (normalizeTeacherUseStatus(status)) {
     case "approved_for_lesson":
       return "border-emerald-200 bg-emerald-50 text-emerald-800";
+    case "usable":
+      return "border-sky-200 bg-sky-50 text-sky-800";
     case "currently_using":
       return "border-sky-200 bg-sky-50 text-sky-800";
     case "testing":
@@ -107,6 +208,27 @@ function teacherUseStatusBadgeClass(status: TeacherUseStatus | null | undefined)
     default:
       return "border-stone-200 bg-stone-50 text-stone-700";
   }
+}
+
+function isBlankTeacherUseStatus(status: TeacherUseStatus | null | undefined) {
+  return (
+    !status ||
+    status === "want_to_test" ||
+    status === "testing" ||
+    status === "currently_using"
+  );
+}
+
+function difficultyBadgeClass(value: TeachingDifficulty | null | undefined) {
+  if (!value) return "border-stone-200 bg-stone-50 text-stone-600";
+  return "border-blue-200 bg-blue-50 text-blue-800";
+}
+
+function suitabilityBadgeClass(value: TeachingSuitability | null | undefined) {
+  if (value === "excellent") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (value === "usable") return "border-sky-200 bg-sky-50 text-sky-800";
+  if (value === "poor_fit") return "border-amber-200 bg-amber-50 text-amber-800";
+  return "border-stone-200 bg-stone-50 text-stone-600";
 }
 
 function bookTypeLabel(value: string | null | undefined) {
@@ -151,7 +273,9 @@ export default function TeacherBookWorkspacePage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isSuperTeacher, setIsSuperTeacher] = useState(false);
   const [teacherBook, setTeacherBook] = useState<TeacherBookRow | null>(null);
-  const [statusDraft, setStatusDraft] = useState<TeacherUseStatus>("want_to_test");
+  const [statusDraft, setStatusDraft] = useState<TeacherUseStatus | "">("");
+  const [difficultyDraft, setDifficultyDraft] = useState<TeachingDifficulty | "">("");
+  const [suitabilityDraft, setSuitabilityDraft] = useState<TeachingSuitability | "">("");
   const [noteDraft, setNoteDraft] = useState("");
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
@@ -167,7 +291,9 @@ export default function TeacherBookWorkspacePage() {
     setCurrentUserId(null);
     setIsSuperTeacher(false);
     setTeacherBook(null);
-    setStatusDraft("want_to_test");
+    setStatusDraft("");
+    setDifficultyDraft("");
+    setSuitabilityDraft("");
     setNoteDraft("");
     setStatusMessage("");
 
@@ -208,6 +334,8 @@ export default function TeacherBookWorkspacePage() {
           user_book_id,
           teacher_use_status,
           teacher_use_note,
+          teacher_jlpt_difficulty,
+          teaching_suitability,
           created_at,
           updated_at,
           books:book_id (
@@ -218,6 +346,13 @@ export default function TeacherBookWorkspacePage() {
             book_type,
             isbn13,
             page_count
+          ),
+          user_books:user_book_id (
+            id,
+            dnf_at,
+            dnf_reason,
+            dnf_note,
+            would_retry
           )
         `
         )
@@ -234,7 +369,11 @@ export default function TeacherBookWorkspacePage() {
       const row = data as TeacherBookRow;
       setCanAccess(true);
       setTeacherBook(row);
-      setStatusDraft(normalizeTeacherUseStatus(row.teacher_use_status));
+      setStatusDraft(
+        isBlankTeacherUseStatus(row.teacher_use_status) ? "" : row.teacher_use_status ?? ""
+      );
+      setDifficultyDraft(row.teacher_jlpt_difficulty ?? "");
+      setSuitabilityDraft(row.teaching_suitability ?? "");
       setNoteDraft(row.teacher_use_note ?? "");
     } catch (error: any) {
       console.error("Error loading Teacher Book Workspace:", error);
@@ -257,7 +396,7 @@ export default function TeacherBookWorkspacePage() {
       return;
     }
 
-    if (!isTeacherUseStatus(statusDraft)) {
+    if (statusDraft && !isTeacherUseStatus(statusDraft)) {
       setStatusMessage("Choose a valid Teacher Book status.");
       return;
     }
@@ -270,7 +409,9 @@ export default function TeacherBookWorkspacePage() {
       const { error } = await supabase
         .from("teacher_books")
         .update({
-          teacher_use_status: statusDraft,
+          teacher_use_status: statusDraft || null,
+          teacher_jlpt_difficulty: difficultyDraft || null,
+          teaching_suitability: suitabilityDraft || null,
           teacher_use_note: cleanedNote,
         })
         .eq("id", teacherBook.id);
@@ -324,6 +465,8 @@ export default function TeacherBookWorkspacePage() {
   }
 
   const book = firstBook(teacherBook?.books ?? null);
+  const linkedUserBook = firstUserBook(teacherBook?.user_books ?? null);
+  const retryLabel = wouldRetryLabel(linkedUserBook?.would_retry);
   const userBookId = teacherBook?.user_book_id ?? null;
 
   const readerTools = useMemo<ToolCard[]>(() => {
@@ -459,12 +602,40 @@ export default function TeacherBookWorkspacePage() {
                 <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1">
                   {bookTypeLabel(book?.book_type)}
                 </span>
+                {linkedUserBook?.dnf_at ? (
+                  <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-rose-800">
+                    DNF
+                  </span>
+                ) : null}
                 <span
                   className={`rounded-full border px-3 py-1 ${teacherUseStatusBadgeClass(
                     teacherBook.teacher_use_status
                   )}`}
                 >
                   {teacherUseStatusLabel(teacherBook.teacher_use_status)}
+                </span>
+                <span
+                  className={`rounded-full border px-3 py-1 ${
+                    isAssessed(teacherBook)
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : "border-blue-200 bg-blue-50 text-blue-800"
+                  }`}
+                >
+                  {isAssessed(teacherBook) ? "Assessed" : "Needs Assessment"}
+                </span>
+                <span
+                  className={`rounded-full border px-3 py-1 ${difficultyBadgeClass(
+                    teacherBook.teacher_jlpt_difficulty
+                  )}`}
+                >
+                  {difficultyLabel(teacherBook.teacher_jlpt_difficulty)}
+                </span>
+                <span
+                  className={`rounded-full border px-3 py-1 ${suitabilityBadgeClass(
+                    teacherBook.teaching_suitability
+                  )}`}
+                >
+                  {suitabilityLabel(teacherBook.teaching_suitability)}
                 </span>
                 {book?.page_count != null ? (
                   <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1">
@@ -477,10 +648,31 @@ export default function TeacherBookWorkspacePage() {
                   </span>
                 ) : null}
               </div>
+              {linkedUserBook?.dnf_at ? (
+                <div className="mt-3 max-w-2xl border-l-4 border-rose-200 pl-4">
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-rose-700">
+                    DNF
+                  </p>
+                  <p className="mt-1 text-sm font-black text-stone-800">
+                    {dnfReasonLabel(linkedUserBook.dnf_reason)}
+                    {retryLabel ? ` · ${retryLabel}` : ""}
+                  </p>
+                  {linkedUserBook.dnf_note ? (
+                    <p className="mt-1 text-sm leading-6 text-stone-700">
+                      {linkedUserBook.dnf_note}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               {teacherBook.teacher_use_note ? (
-                <p className="mt-3 max-w-2xl rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-600">
-                  {teacherBook.teacher_use_note}
-                </p>
+                <div className="mt-3 max-w-2xl border-l-4 border-blue-200 pl-4">
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-blue-700">
+                    Teacher note
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-stone-700">
+                    {teacherBook.teacher_use_note}
+                  </p>
+                </div>
               ) : null}
               <p className="mt-5 max-w-2xl text-sm leading-6 text-stone-600">
                 My Reader Tools use your My Mekuru Library history. Teacher support stays with this Teacher Book.
@@ -493,11 +685,11 @@ export default function TeacherBookWorkspacePage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
-                Teacher Use Status
+                Teaching Assessment
               </p>
               <h2 className="mt-1 text-xl font-black text-stone-950">Book fit for lessons</h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">
-                This is separate from your My Mekuru Library reading status. Use the note for cautions such as level fit, content warning, personal-read-only, or too much dialect.
+                Difficulty and suitability decide whether the book is assessed. Status is a separate workflow note, and none of this changes your My Mekuru Library reading status.
               </p>
             </div>
             <button
@@ -506,7 +698,7 @@ export default function TeacherBookWorkspacePage() {
               disabled={!canEditTeacherUseStatus || statusSaving}
               className="rounded-2xl border border-stone-900 bg-stone-900 px-5 py-3 text-sm font-black text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {statusSaving ? "Saving..." : "Save Status"}
+              {statusSaving ? "Saving..." : "Save Assessment"}
             </button>
             <button
               type="button"
@@ -518,21 +710,22 @@ export default function TeacherBookWorkspacePage() {
             </button>
           </div>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-[260px_minmax(0,1fr)]">
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
             <label className="block">
               <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-400">
-                Status
+                JLPT Difficulty
               </span>
               <select
-                value={statusDraft}
+                value={difficultyDraft}
                 onChange={(event) => {
-                  const nextStatus = event.target.value;
-                  if (isTeacherUseStatus(nextStatus)) setStatusDraft(nextStatus);
+                  const value = event.target.value;
+                  setDifficultyDraft(isTeachingDifficulty(value) ? value : "");
                 }}
                 disabled={!canEditTeacherUseStatus || statusSaving}
                 className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-sm font-semibold text-stone-900 disabled:bg-stone-100"
               >
-                {teacherUseStatusOptions.map((option) => (
+                <option value="">Choose difficulty</option>
+                {difficultyOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -541,6 +734,52 @@ export default function TeacherBookWorkspacePage() {
             </label>
 
             <label className="block">
+              <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-400">
+                Teaching Suitability
+              </span>
+              <select
+                value={suitabilityDraft}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setSuitabilityDraft(isTeachingSuitability(value) ? value : "");
+                }}
+                disabled={!canEditTeacherUseStatus || statusSaving}
+                className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-sm font-semibold text-stone-900 disabled:bg-stone-100"
+              >
+                <option value="">Choose suitability</option>
+                {suitabilityOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-400">
+                Status
+              </span>
+              <select
+                value={statusDraft}
+                onChange={(event) => {
+                  const nextStatus = event.target.value;
+                  if (nextStatus === "" || isTeacherUseStatus(nextStatus)) {
+                    setStatusDraft(nextStatus);
+                  }
+                }}
+                disabled={!canEditTeacherUseStatus || statusSaving}
+                className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-sm font-semibold text-stone-900 disabled:bg-stone-100"
+              >
+                <option value="">--</option>
+                {visibleTeacherUseStatusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block md:col-span-3">
               <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-400">
                 Note or reason
               </span>

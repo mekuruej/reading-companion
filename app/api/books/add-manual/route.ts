@@ -317,6 +317,10 @@ export async function POST(request: Request) {
     const asin = rawAsin || null;
     const languageCode = normalizeBookLanguageCode(body?.languageCode ?? body?.language_code);
     const editionFormat = cleanOptionalText(body?.editionFormat ?? body?.edition_format);
+    const editionNote =
+      editionFormat === "other"
+        ? cleanOptionalText(body?.editionNote ?? body?.edition_note)
+        : null;
     const pageCountResult = cleanPageCount(body?.pageCount ?? body?.page_count);
     const confirmDifferentEdition = body?.confirmDifferentEdition === true;
     const mode =
@@ -480,6 +484,7 @@ export async function POST(request: Request) {
         asin,
         language_code: languageCode,
         edition_format: editionFormat,
+        edition_note: editionNote,
         page_count: pageCountResult.value,
         allow_missing_isbn: !isbn13 && !asin,
         needs_review: true,
@@ -497,6 +502,7 @@ export async function POST(request: Request) {
           asin,
           language_code: languageCode,
           edition_format: editionFormat,
+          edition_note: editionNote,
           page_count: pageCountResult.value,
         })
         .select("id")

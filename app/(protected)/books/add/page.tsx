@@ -142,6 +142,7 @@ export default function AddBookPage() {
     const searchParams = useSearchParams();
     const destination = searchParams.get("destination") ?? "";
     const addBookContext = searchParams.get("context") ?? "";
+    const sourceParam = searchParams.get("from");
     const targetUserIdParam = searchParams.get("targetUserId")?.trim() ?? "";
     const isTeacherGlobalContext =
         addBookContext === "teacher-global" || destination === "teacher-global";
@@ -150,13 +151,16 @@ export default function AddBookPage() {
     const [isbn, setIsbn] = useState("");
     const [asin, setAsin] = useState("");
     const [asinEditionFormat, setAsinEditionFormat] = useState("");
+    const [asinEditionNote, setAsinEditionNote] = useState("");
     const [identifierRequestTitle, setIdentifierRequestTitle] = useState("");
     const [fallbackRequestFormat, setFallbackRequestFormat] = useState("");
+    const [fallbackRequestFormatNote, setFallbackRequestFormatNote] = useState("");
     const [confirmedEditionLanguageCode, setConfirmedEditionLanguageCode] = useState("");
     const [manualAddMode, setManualAddMode] = useState<ManualEditionMode | null>(null);
     const [manualTitle, setManualTitle] = useState("");
     const [manualAuthor, setManualAuthor] = useState("");
     const [manualEditionFormat, setManualEditionFormat] = useState("");
+    const [manualEditionNote, setManualEditionNote] = useState("");
     const [manualLanguageCode, setManualLanguageCode] = useState("");
     const [manualPageCount, setManualPageCount] = useState("");
     const [manualAddError, setManualAddError] = useState("");
@@ -477,6 +481,17 @@ export default function AddBookPage() {
         : currentUsername
         ? `/users/${currentUsername}/books`
         : "/books";
+    const teacherGlobalBackLink =
+        sourceParam === "site-upkeep"
+            ? { href: "/teacher/general-upkeep", label: "← Back to Site Upkeep" }
+            : sourceParam === "teacher-books"
+            ? { href: "/teacher/books", label: "← Back to Teaching Books" }
+            : sourceParam === "teacher-library"
+            ? { href: "/teacher/library", label: "← Back to Teaching Books" }
+            : { href: "/teacher/books", label: "← Back to Teaching Books" };
+    const pageBackLink = isTeacherGlobalContext
+        ? teacherGlobalBackLink
+        : { href: "/library", label: "← Back to Library" };
     function studentLessonBookPayload() {
         if (!isStudentLessonBookContext) return {};
         return {
@@ -540,17 +555,22 @@ export default function AddBookPage() {
         setManualTitle("");
         setManualAuthor("");
         setManualEditionFormat("");
+        setManualEditionNote("");
         setManualLanguageCode("");
         setManualPageCount("");
         setManualAddError("");
         setManualPossibleMatches([]);
     }
 
-    function openManualAdd(mode: ManualEditionMode, seed?: { title?: string; author?: string; format?: string }) {
+    function openManualAdd(
+        mode: ManualEditionMode,
+        seed?: { title?: string; author?: string; format?: string; editionNote?: string }
+    ) {
         setManualAddMode(mode);
         setManualTitle(seed?.title ?? "");
         setManualAuthor(seed?.author ?? "");
         setManualEditionFormat(seed?.format ?? "");
+        setManualEditionNote(seed?.format === "other" ? seed?.editionNote ?? "" : "");
         setManualLanguageCode("");
         setManualPageCount("");
         setManualAddError("");
@@ -572,8 +592,8 @@ export default function AddBookPage() {
                     message: "Added to the MEKURU Catalog",
                     detail: "No personal Library copy was created.",
                     bookId: data.bookId,
-                    returnLabel: "Back to Teacher Books",
-                    returnHref: "/teacher/books",
+                    returnLabel: teacherGlobalBackLink.label.replace(/^←\s*/, ""),
+                    returnHref: teacherGlobalBackLink.href,
                 });
                 return;
             }
@@ -583,8 +603,8 @@ export default function AddBookPage() {
                     message: `Added to your Library and ${selectedTeacherStudentName}'s Library`,
                     detail: "No Active Lesson Book relationship was created.",
                     userBookId: data.studentUserBookId,
-                    returnLabel: "Back to Teacher Books",
-                    returnHref: "/teacher/books",
+                    returnLabel: teacherGlobalBackLink.label.replace(/^←\s*/, ""),
+                    returnHref: teacherGlobalBackLink.href,
                 });
                 return;
             }
@@ -593,8 +613,8 @@ export default function AddBookPage() {
                 message: `Added to ${selectedTeacherStudentName}'s Library`,
                 detail: "No Active Lesson Book relationship was created.",
                 userBookId: data.userBookId,
-                returnLabel: "Back to Teacher Books",
-                returnHref: "/teacher/books",
+                returnLabel: teacherGlobalBackLink.label.replace(/^←\s*/, ""),
+                returnHref: teacherGlobalBackLink.href,
             });
             return;
         }
@@ -654,6 +674,7 @@ export default function AddBookPage() {
                     title: identifierRequestTitle || bookSearch,
                     author: bookSearchAuthor,
                     format: fallbackRequestFormat,
+                    editionNote: fallbackRequestFormatNote,
                 });
                 setError(
                     data.error ??
@@ -670,6 +691,7 @@ export default function AddBookPage() {
                     title: identifierRequestTitle || bookSearch,
                     author: bookSearchAuthor,
                     format: fallbackRequestFormat,
+                    editionNote: fallbackRequestFormatNote,
                 });
                 setError(
                     "We couldn’t retrieve this edition automatically. Add the details you know."
@@ -682,6 +704,7 @@ export default function AddBookPage() {
                     title: identifierRequestTitle || bookSearch,
                     author: bookSearchAuthor,
                     format: fallbackRequestFormat,
+                    editionNote: fallbackRequestFormatNote,
                 });
                 setError(
                     "We couldn’t retrieve this edition automatically. Add the details you know."
@@ -739,6 +762,12 @@ export default function AddBookPage() {
                 title: identifierRequestTitle || bookSearch,
                 author: bookSearchAuthor,
                 format: asinEditionFormat || fallbackRequestFormat,
+                editionNote:
+                    (asinEditionFormat || fallbackRequestFormat) === "other"
+                        ? asinEditionFormat === "other"
+                            ? asinEditionNote
+                            : fallbackRequestFormatNote
+                        : "",
             });
             setError(
                 "We do not have this Amazon edition yet. Add the details you know."
@@ -801,6 +830,7 @@ export default function AddBookPage() {
                     title: query,
                     author: bookSearchAuthor,
                     format: fallbackRequestFormat,
+                    editionNote: fallbackRequestFormatNote,
                 });
             }
         } catch (searchError) {
@@ -949,6 +979,7 @@ export default function AddBookPage() {
                     title: manualTitle,
                     author: manualAuthor,
                     editionFormat: manualEditionFormat || null,
+                    editionNote: manualEditionFormat === "other" ? manualEditionNote : null,
                     languageCode: manualLanguageCode,
                     pageCount: manualPageCount || null,
                     ...addModePayload(),
@@ -1137,10 +1168,10 @@ export default function AddBookPage() {
     return (
         <main className="mx-auto max-w-4xl px-4 py-8">
             <Link
-                href="/library"
+                href={pageBackLink.href}
                 className="mb-3 inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
             >
-                ← Back to Library
+                {pageBackLink.label}
             </Link>
 
             <header className="mb-5">
@@ -1230,6 +1261,9 @@ export default function AddBookPage() {
                                     value={fallbackRequestFormat}
                                     onChange={(event) => {
                                         setFallbackRequestFormat(event.target.value);
+                                        if (event.target.value !== "other") {
+                                            setFallbackRequestFormatNote("");
+                                        }
                                         setBookSearchError("");
                                         setBookSearchHadNoResults(false);
                                         setLastBookSearchQuery("");
@@ -1253,6 +1287,24 @@ export default function AddBookPage() {
                                     {bookSearchLoading ? "Searching..." : "Search"}
                                 </button>
                             </div>
+                            {fallbackRequestFormat === "other" ? (
+                                <label className="mt-3 block">
+                                    <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-stone-500">
+                                        Other format note
+                                    </span>
+                                    <input
+                                        value={fallbackRequestFormatNote}
+                                        onChange={(event) => {
+                                            setFallbackRequestFormatNote(event.target.value);
+                                            setBookSearchError("");
+                                            setBookSearchHadNoResults(false);
+                                            setLastBookSearchQuery("");
+                                        }}
+                                        placeholder="Short note, e.g. large print, magazine, special edition"
+                                        className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                                    />
+                                </label>
+                            ) : null}
                             <p className="mt-2 text-xs leading-5 text-stone-500">
                                 Title search checks the MEKURU catalog. Author and format help if you need to add the edition manually.
                             </p>
@@ -1321,7 +1373,12 @@ export default function AddBookPage() {
 
                                 <select
                                     value={asinEditionFormat}
-                                    onChange={(event) => setAsinEditionFormat(event.target.value)}
+                                    onChange={(event) => {
+                                        setAsinEditionFormat(event.target.value);
+                                        if (event.target.value !== "other") {
+                                            setAsinEditionNote("");
+                                        }
+                                    }}
                                     className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
                                 >
                                     <option value="">Format if known</option>
@@ -1341,6 +1398,19 @@ export default function AddBookPage() {
                                     {asinLookupLoading ? "Checking..." : "Check MEKURU"}
                                 </button>
                             </div>
+                            {asinEditionFormat === "other" ? (
+                                <label className="mt-3 block">
+                                    <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-stone-500">
+                                        Other format note
+                                    </span>
+                                    <input
+                                        value={asinEditionNote}
+                                        onChange={(event) => setAsinEditionNote(event.target.value)}
+                                        placeholder="Short note, e.g. large print, magazine, special edition"
+                                        className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+                                    />
+                                </label>
+                            ) : null}
                             <label className="mt-3 block">
                                 <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-stone-500">
                                     Title if this ASIN is new
@@ -1398,6 +1468,7 @@ export default function AddBookPage() {
                                     title: bookSearch,
                                     author: bookSearchAuthor,
                                     format: fallbackRequestFormat,
+                                    editionNote: fallbackRequestFormatNote,
                                 })
                             }
                             className="rounded-2xl border border-stone-200 bg-white px-5 py-3 text-sm font-bold text-stone-700 shadow-sm transition hover:bg-stone-50"
@@ -1589,6 +1660,7 @@ export default function AddBookPage() {
                         title={manualTitle}
                         author={manualAuthor}
                         editionFormat={manualEditionFormat}
+                        editionNote={manualEditionNote}
                         languageCode={manualLanguageCode}
                         pageCount={manualPageCount}
                         error={manualAddError}
@@ -1613,6 +1685,14 @@ export default function AddBookPage() {
                         }}
                         onEditionFormatChange={(value) => {
                             setManualEditionFormat(value);
+                            if (value !== "other") {
+                                setManualEditionNote("");
+                            }
+                            setManualAddError("");
+                            setManualPossibleMatches([]);
+                        }}
+                        onEditionNoteChange={(value) => {
+                            setManualEditionNote(value);
                             setManualAddError("");
                             setManualPossibleMatches([]);
                         }}

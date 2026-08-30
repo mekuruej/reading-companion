@@ -344,15 +344,26 @@ export default function TeacherBooksQueuePage() {
       </Link>
 
       <section className="mt-4 rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
-          Book flags
-        </p>
-        <h1 className="mt-2 text-3xl font-black text-stone-900">
-          Books Needing My Attention
-        </h1>
-        <p className="mt-2 text-sm leading-6 text-stone-600">
-          Pending book requests are separate from global books missing core info.
-        </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
+              Book flags
+            </p>
+            <h1 className="mt-2 text-3xl font-black text-stone-900">
+              Books Needing My Attention
+            </h1>
+            <p className="mt-2 text-sm leading-6 text-stone-600">
+              Pending book requests are separate from global books missing core info.
+            </p>
+          </div>
+
+          <Link
+            href="/teacher/books/add?from=teacher-books"
+            className="inline-flex shrink-0 rounded-xl border border-stone-300 bg-stone-900 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-stone-800"
+          >
+            Add Global Book
+          </Link>
+        </div>
       </section>
 
       {message ? <p className="mt-4 text-sm text-amber-700">{message}</p> : null}

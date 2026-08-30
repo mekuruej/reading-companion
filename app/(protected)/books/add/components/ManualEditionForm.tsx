@@ -41,6 +41,7 @@ type ManualEditionFormProps = {
   title: string;
   author: string;
   editionFormat: string;
+  editionNote: string;
   languageCode: string;
   pageCount: string;
   error: string;
@@ -51,6 +52,7 @@ type ManualEditionFormProps = {
   onTitleChange: (value: string) => void;
   onAuthorChange: (value: string) => void;
   onEditionFormatChange: (value: string) => void;
+  onEditionNoteChange: (value: string) => void;
   onLanguageCodeChange: (value: string) => void;
   onPageCountChange: (value: string) => void;
   onSubmit: () => void;
@@ -72,6 +74,7 @@ export default function ManualEditionForm({
   title,
   author,
   editionFormat,
+  editionNote,
   languageCode,
   pageCount,
   error,
@@ -82,6 +85,7 @@ export default function ManualEditionForm({
   onTitleChange,
   onAuthorChange,
   onEditionFormatChange,
+  onEditionNoteChange,
   onLanguageCodeChange,
   onPageCountChange,
   onSubmit,
@@ -161,6 +165,20 @@ export default function ManualEditionForm({
               ))}
             </select>
           </label>
+
+          {editionFormat === "other" ? (
+            <label className="block">
+              <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-stone-500">
+                Other format note
+              </span>
+              <input
+                value={editionNote}
+                onChange={(event) => onEditionNoteChange(event.target.value)}
+                placeholder="Short note, e.g. large print, magazine, special edition"
+                className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
+              />
+            </label>
+          ) : null}
 
           <div>
             <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-stone-500">
