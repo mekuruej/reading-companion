@@ -69,6 +69,8 @@ type BookSearchResult = {
     missing_info_cleared_at?: string | null;
     needs_review?: boolean | null;
     language_code?: string | null;
+    edition_format?: string | null;
+    edition_note?: string | null;
 };
 
 type AddBookSearchMode = "title" | "isbn" | "asin";
@@ -745,7 +747,7 @@ export default function AddBookPage() {
             const { data, error: asinSearchError } = await supabase
                 .from("books")
                 .select(
-                    "id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at, language_code"
+                    "id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at, language_code, edition_format, edition_note"
                 )
                 .ilike("asin", normalizedAsin)
                 .limit(1)
@@ -805,7 +807,7 @@ export default function AddBookPage() {
             } = await supabase.auth.getSession();
 
             const response = await fetch(
-                `/api/books/search?q=${encodeURIComponent(query)}`,
+                `/api/books/search?q=${encodeURIComponent(query)}&preserveEditions=1`,
                 {
                     headers: session?.access_token
                         ? { Authorization: `Bearer ${session.access_token}` }

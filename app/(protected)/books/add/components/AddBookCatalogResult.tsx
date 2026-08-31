@@ -10,6 +10,8 @@ type CatalogBookResult = {
   isbn13: string | null;
   asin: string | null;
   language_code?: string | null;
+  edition_format?: string | null;
+  edition_note?: string | null;
 };
 
 type AddBookCatalogResultProps = {
@@ -22,6 +24,27 @@ type AddBookCatalogResultProps = {
   onRequestReview: () => void;
 };
 
+const editionFormatLabels: Record<string, string> = {
+  bunko: "Bunkobon",
+  tankobon_softcover: "Tankobon (softcover)",
+  tankobon_hardcover: "Tankobon (hardcover)",
+  paperback: "Paperback",
+  hardcover: "Hardcover",
+  ebook: "Ebook",
+  audiobook: "Audiobook",
+  other: "Other",
+};
+
+function editionFormatLabel(format: string | null | undefined, note: string | null | undefined) {
+  const cleanFormat = format?.trim();
+  const cleanNote = note?.trim();
+
+  if (!cleanFormat && !cleanNote) return null;
+  if (cleanFormat === "other" && cleanNote) return cleanNote;
+  if (cleanFormat) return editionFormatLabels[cleanFormat] ?? cleanFormat;
+  return cleanNote;
+}
+
 export default function AddBookCatalogResult({
   result,
   missingFields,
@@ -32,6 +55,7 @@ export default function AddBookCatalogResult({
   onRequestReview,
 }: AddBookCatalogResultProps) {
   const displayLanguage = bookLanguageLabel(result.language_code);
+  const displayEditionFormat = editionFormatLabel(result.edition_format, result.edition_note);
   const hasMissingDetails = missingFields.length > 0;
 
   return (
@@ -55,7 +79,12 @@ export default function AddBookCatalogResult({
         <p className="mt-1 text-sm text-stone-600">
           {result.author || "Author not listed"}
         </p>
-        <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold">
+          {displayEditionFormat ? (
+            <span className="rounded-full border border-blue-300 bg-blue-50 px-3 py-1.5 text-sm font-black text-blue-800 shadow-sm">
+              Format: {displayEditionFormat}
+            </span>
+          ) : null}
           {result.book_type ? (
             <span className="rounded-full border border-stone-200 bg-white px-2 py-1 text-stone-600">
               {bookTypeLabel(result.book_type)}

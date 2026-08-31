@@ -7,7 +7,7 @@ const supabaseAdmin = createClient(
 );
 
 const BOOK_BASE_SELECT =
-  "id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, language_code";
+  "id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, language_code, edition_format, edition_note";
 const BOOK_REVIEW_SELECT = `${BOOK_BASE_SELECT}, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at`;
 
 function isMissingColumnError(error: any) {
@@ -50,12 +50,63 @@ function searchTermsForQuery(query: string) {
   );
 }
 
+function normalizeDuplicateText(value: string | null | undefined) {
+  return (value ?? "")
+    .normalize("NFKC")
+    .replace(/\s+/g, "")
+    .replace(/[「」『』"']/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function primaryTitleForDuplicate(value: string | null | undefined) {
+  return normalizeDuplicateText((value ?? "").split(/[=＝]/)[0]);
+}
+
+function duplicateKey(book: any) {
+  const title = primaryTitleForDuplicate(book.title);
+  const author = normalizeDuplicateText(book.author);
+  if (!title || !author) return `id:${book.id}`;
+  return `title-author:${title}:${author}`;
+}
+
+function bookCompletenessScore(book: any) {
+  let score = 0;
+  if (String(book.cover_url ?? "").trim()) score += 8;
+  if (String(book.book_type ?? "").trim()) score += 6;
+  if (String(book.language_code ?? "").trim()) score += 4;
+  if (String(book.author ?? "").trim()) score += 4;
+  if (String(book.publisher ?? "").trim()) score += 3;
+  if (String(book.published_date ?? "").trim()) score += 3;
+  if (book.page_count != null) score += 3;
+  if (String(book.isbn13 ?? "").trim()) score += 2;
+  if (String(book.asin ?? "").trim()) score += 2;
+  if (String(book.edition_format ?? "").trim()) score += 1;
+  if (String(book.edition_note ?? "").trim()) score += 1;
+  if (book.missing_info_cleared_at) score += 2;
+  if (book.needs_review) score -= 4;
+  return score;
+}
+
+function preferBookResult(current: any, candidate: any) {
+  const currentScore = bookCompletenessScore(current);
+  const candidateScore = bookCompletenessScore(candidate);
+  if (candidateScore !== currentScore) {
+    return candidateScore > currentScore ? candidate : current;
+  }
+
+  return String(candidate.title ?? "").length < String(current.title ?? "").length
+    ? candidate
+    : current;
+}
+
 async function searchBooksByTerm(term: string) {
   const escaped = escapeLikePattern(term.trim());
 
-  const [titleResponse, authorResponse] = await Promise.all([
+  const [titleResponse, authorResponse, publisherResponse] = await Promise.all([
     runBookSearch("title", escaped),
     runBookSearch("author", escaped),
+    runBookSearch("publisher", escaped),
   ]);
 
   const titleReadingResponse = await runBookSearch("title_reading", escaped);
@@ -63,7 +114,7 @@ async function searchBooksByTerm(term: string) {
     ? await runBookSearch("asin", escaped.toUpperCase())
     : { data: [], error: null };
 
-  const errors = [titleResponse.error, authorResponse.error].filter(Boolean);
+  const errors = [titleResponse.error, authorResponse.error, publisherResponse.error].filter(Boolean);
 
   if (errors.length > 0) {
     throw errors[0];
@@ -72,6 +123,7 @@ async function searchBooksByTerm(term: string) {
   return [
     ...(titleResponse.data ?? []),
     ...(authorResponse.data ?? []),
+    ...(publisherResponse.data ?? []),
     ...(titleReadingResponse.error ? [] : titleReadingResponse.data ?? []),
     ...(asinResponse.error ? [] : asinResponse.data ?? []),
   ];
@@ -106,6 +158,7 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const query = (url.searchParams.get("q") ?? "").trim();
+  const preserveEditions = url.searchParams.get("preserveEditions") === "1";
 
   if (!query) {
     return NextResponse.json({ books: [] });
@@ -131,7 +184,19 @@ export async function GET(request: Request) {
     booksById.set(book.id, book);
   }
 
-  const books = Array.from(booksById.values())
+  const booksForDisplay = preserveEditions
+    ? Array.from(booksById.values())
+    : (() => {
+        const booksByDuplicateKey = new Map<string, any>();
+        for (const book of booksById.values()) {
+          const key = duplicateKey(book);
+          const existing = booksByDuplicateKey.get(key);
+          booksByDuplicateKey.set(key, existing ? preferBookResult(existing, book) : book);
+        }
+        return Array.from(booksByDuplicateKey.values());
+      })();
+
+  const books = booksForDisplay
     .sort((a, b) => String(a.title ?? "").localeCompare(String(b.title ?? ""), "ja"))
     .slice(0, 12);
 
