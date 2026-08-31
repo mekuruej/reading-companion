@@ -204,18 +204,23 @@ export async function POST(
 
     if (sessionError) throw sessionError;
 
-    let userBookPatch: { started_at: string | null } | null = null;
+    let userBookPatch: { started_at: string | null; personal_tracking_status: "reading" } | null = null;
     if (!access.userBook.started_at) {
       const { data: updatedBook, error: updateError } = await supabaseAdmin
         .from("user_books")
-        .update({ status: "reading", started_at: payload.read_on })
+        .update({
+          status: "reading",
+          personal_tracking_status: "reading",
+          started_at: payload.read_on,
+        })
         .eq("id", userBookId)
-        .select("started_at")
+        .select("started_at, personal_tracking_status")
         .maybeSingle();
 
       if (updateError) throw updateError;
       userBookPatch = {
         started_at: (updatedBook as any)?.started_at ?? payload.read_on,
+        personal_tracking_status: "reading",
       };
     }
 

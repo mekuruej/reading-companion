@@ -8,6 +8,7 @@ type LibraryBookCardBook = {
 
 type LibraryBookCardRow = {
   id: string;
+  isTeachingOnly?: boolean;
   started_at: string | null;
   finished_at: string | null;
   dnf_at: string | null;
@@ -68,6 +69,12 @@ export default function LibraryBookCard({
       >
         {displayTitle}
       </a>
+
+      {row.isTeachingOnly ? (
+        <div className="mt-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-sky-700">
+          Teaching Only
+        </div>
+      ) : null}
 
       <div className="mt-2 w-full text-center">
         {row.finished_at ? (

@@ -27,9 +27,17 @@ import TeacherPrepAssignBox from "./components/TeacherPrepAssignBox";
 import BookHubActionGrid from "./components/BookHubActionGrid";
 import BookFlagModal from "./components/BookFlagModal";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
+import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 import { BOOK_TYPE_OPTIONS, bookTypeLabel as formatBookTypeLabel } from "@/lib/books/bookTypes";
 import { isValidAsin, normalizeAsin } from "@/lib/books/asin";
 import { isEnglishNativeTrackerBook as getIsEnglishNativeTrackerBook } from "@/lib/books/englishNativeTracker";
+import {
+  type PersonalTrackingStatus,
+  legacyUserBookStatusForPersonalTracking,
+  personalTrackingStatusFromDates,
+  personalTrackingStatusLabel,
+  resolvePersonalTrackingStatus,
+} from "@/lib/personalTracking";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import BookHubLoadingState from "./components/BookHubLoadingState";
 import RemoveFromLibraryDialog from "./components/RemoveFromLibraryDialog";
@@ -107,6 +115,8 @@ type UserBook = {
   id: string;
   user_id: string;
   book_id: string;
+  personal_tracking_status?: string | null;
+  status?: string | null;
   started_at: string | null;
   finished_at: string | null;
   dnf_at: string | null;
@@ -708,6 +718,8 @@ export default function BookHubPage() {
   const [startedAt, setStartedAt] = useState<string>("");
   const [finishedAt, setFinishedAt] = useState<string>("");
   const [dnfAt, setDnfAt] = useState<string>("");
+  const [personalTrackingStatus, setPersonalTrackingStatus] =
+    useState<PersonalTrackingStatus>("want_to_read");
   const [dnfReason, setDnfReason] = useState<string>("");
   const [dnfNote, setDnfNote] = useState<string>("");
   const [wouldRetry, setWouldRetry] = useState<string>("");
@@ -1393,11 +1405,17 @@ export default function BookHubPage() {
         finished_at ? "finished" :
           started_at ? "reading" :
             "what_to_read";
+    const nextPersonalTrackingStatus = personalTrackingStatusFromDates({
+      startedAt: started_at,
+      finishedAt: finished_at,
+      dnfAt: dnf_at,
+    });
 
     const { error } = await supabase
       .from("user_books")
       .update({
         status,
+        personal_tracking_status: nextPersonalTrackingStatus,
         started_at,
         finished_at,
         dnf_at,
@@ -1420,6 +1438,7 @@ export default function BookHubPage() {
           started_at,
           finished_at,
           dnf_at,
+          personal_tracking_status: nextPersonalTrackingStatus,
           dnf_reason: nextDnfReason,
           dnf_note: nextDnfNote,
           would_retry: nextWouldRetry,
@@ -1429,6 +1448,7 @@ export default function BookHubPage() {
     setDnfReason(nextDnfReason ?? "");
     setDnfNote(nextDnfNote ?? "");
     setWouldRetry(nextWouldRetry ?? "");
+    setPersonalTrackingStatus(nextPersonalTrackingStatus);
   }
 
   async function saveSettingItem(item: SettingItem) {
@@ -1899,6 +1919,12 @@ export default function BookHubPage() {
 
   async function saveCharacter(item: Character) {
     if (!row?.id) return;
+
+    const parsedQuickPage = parseOptionalPageLocationInput(quickPreview.page, book?.page_count ?? null);
+    if (parsedQuickPage.error) {
+      alert(parsedQuickPage.error);
+      return;
+    }
 
     const payload = {
       user_book_id: row.id,
@@ -3203,11 +3229,17 @@ export default function BookHubPage() {
         finished_at ? "finished" :
           started_at ? "reading" :
             "what_to_read";
+    const nextPersonalTrackingStatus = personalTrackingStatusFromDates({
+      startedAt: started_at,
+      finishedAt: finished_at,
+      dnfAt: dnf_at,
+    });
 
     const { error } = await supabase
       .from("user_books")
       .update({
         status,
+        personal_tracking_status: nextPersonalTrackingStatus,
         started_at,
         finished_at,
         dnf_at,
@@ -3229,6 +3261,7 @@ export default function BookHubPage() {
     setDnfReason(nextDnfReason ?? "");
     setDnfNote(nextDnfNote ?? "");
     setWouldRetry(nextWouldRetry ?? "");
+    setPersonalTrackingStatus(nextPersonalTrackingStatus);
 
     setRow((prev) =>
       prev
@@ -3237,6 +3270,7 @@ export default function BookHubPage() {
           started_at,
           finished_at,
           dnf_at,
+          personal_tracking_status: nextPersonalTrackingStatus,
           dnf_reason: nextDnfReason,
           dnf_note: nextDnfNote,
           would_retry: nextWouldRetry,
@@ -3248,6 +3282,45 @@ export default function BookHubPage() {
   async function markStartedToday() {
     const today = todayYmdAppTimeZone();
     await saveBookStatusDates(today, "", "");
+  }
+
+  async function savePersonalTrackingStatus(nextStatus: PersonalTrackingStatus) {
+    if (!row?.id) return;
+
+    const legacyStatus = legacyUserBookStatusForPersonalTracking(nextStatus);
+    const patch: Record<string, string | null> = {
+      personal_tracking_status: nextStatus,
+      status: legacyStatus,
+    };
+
+    if (nextStatus === "reading" && !startedAt) {
+      patch.started_at = todayYmdAppTimeZone();
+    }
+
+    const { error } = await supabase
+      .from("user_books")
+      .update(patch)
+      .eq("id", row.id);
+
+    if (error) {
+      console.error("Error saving personal tracking status:", error);
+      alert(`Could not save personal reading status.\n${error.message || "Unknown error"}`);
+      return;
+    }
+
+    const nextStartedAt = patch.started_at ?? startedAt;
+    setPersonalTrackingStatus(nextStatus);
+    if (patch.started_at) setStartedAt(patch.started_at);
+    setRow((prev) =>
+      prev
+        ? {
+          ...prev,
+          personal_tracking_status: nextStatus,
+          status: legacyStatus,
+          started_at: nextStartedAt || null,
+        } as any
+        : prev
+    );
   }
 
   function openReadingReflection() {
@@ -3293,21 +3366,26 @@ export default function BookHubPage() {
     const parsedStart =
       sessionMode === "listening" || sessionStartPage.trim() === ""
         ? null
-        : Number(sessionStartPage);
+        : parseOptionalPageLocationInput(sessionStartPage, book?.page_count ?? null).value;
     const parsedEnd =
       sessionEndPage.trim() === ""
         ? null
         : sessionMode === "listening"
           ? listeningEndInput?.value ?? null
-          : Number(sessionEndPage);
+          : parseOptionalPageLocationInput(sessionEndPage, book?.page_count ?? null).value;
+    const startPageInputError =
+      sessionMode !== "listening" && sessionStartPage.trim()
+        ? parseOptionalPageLocationInput(sessionStartPage, book?.page_count ?? null).error
+        : null;
+    const endPageInputError =
+      sessionMode !== "listening" && sessionEndPage.trim()
+        ? parseOptionalPageLocationInput(sessionEndPage, book?.page_count ?? null).error
+        : null;
 
-    const start =
-      usingPercentMode && sessionMode !== "listening"
-        ? percentToPage(parsedStart, book?.page_count ?? null)
-        : parsedStart;
+    const start = parsedStart;
 
     const end =
-      endInputIsPercent
+      sessionMode === "listening" && endInputIsPercent
         ? percentToPage(parsedEnd, book?.page_count ?? null) ?? parsedEnd
         : parsedEnd;
 
@@ -3331,42 +3409,24 @@ export default function BookHubPage() {
       }
 
       if (
+        startPageInputError ||
+        endPageInputError ||
         (usingPercentMode &&
           (!Number.isFinite(parsedStart) || !Number.isFinite(parsedEnd))) ||
         (!usingPercentMode &&
           (!Number.isFinite(start) || !Number.isFinite(end)))
       ) {
-        alert(
-          usingPercentMode
-            ? "Please fill in date, start percent, and end percent."
-            : "Please fill in date, start page, and end page."
-        );
+        alert(startPageInputError || endPageInputError || "Please fill in date, start page/end page or percent.");
         return;
       }
 
-      if (usingPercentMode) {
-        if ((parsedStart as number) < 0 || (parsedEnd as number) < 0) {
-          alert("Percents must be 0 or higher.");
-          return;
-        }
-
-        if ((parsedStart as number) > 100 || (parsedEnd as number) > 100) {
-          alert("Percents must be 100 or lower.");
-          return;
-        }
-      } else {
-        if ((start as number) <= 0 || (end as number) <= 0) {
-          alert("Pages must be greater than 0.");
-          return;
-        }
+      if ((start as number) <= 0 || (end as number) <= 0) {
+        alert("Pages must be greater than 0.");
+        return;
       }
 
       if ((end as number) < (start as number)) {
-        alert(
-          usingPercentMode
-            ? "End percent must be greater than or equal to start percent."
-            : "End page must be greater than or equal to start page."
-        );
+        alert("End page must be greater than or equal to start page.");
         return;
       }
     } else {
@@ -3433,6 +3493,7 @@ export default function BookHubPage() {
         .from("user_books")
         .update({
           status: "reading",
+          personal_tracking_status: "reading",
           started_at: sessionDate,
         })
         .eq("id", row.id);
@@ -3446,6 +3507,7 @@ export default function BookHubPage() {
             ? {
               ...prev,
               started_at: sessionDate,
+              personal_tracking_status: "reading",
             }
             : prev
         );
@@ -3648,6 +3710,8 @@ export default function BookHubPage() {
         id,
         user_id,
         book_id,
+        personal_tracking_status,
+        status,
         started_at,
         finished_at,
         dnf_at,
@@ -3838,6 +3902,7 @@ export default function BookHubPage() {
     setStartedAt(r.started_at ? formatYmd(new Date(r.started_at)) : "");
     setFinishedAt(r.finished_at ? formatYmd(new Date(r.finished_at)) : "");
     setDnfAt(r.dnf_at ? formatYmd(new Date(r.dnf_at)) : "");
+    setPersonalTrackingStatus(resolvePersonalTrackingStatus(r));
     setDnfReason(r.dnf_reason ?? "");
     setDnfNote(r.dnf_note ?? "");
     setWouldRetry(r.would_retry ?? "");
@@ -4591,6 +4656,11 @@ export default function BookHubPage() {
         finished_at ? "finished" :
           started_at ? "reading" :
             "what_to_read";
+    const nextPersonalTrackingStatus = personalTrackingStatusFromDates({
+      startedAt: started_at,
+      finishedAt: finished_at,
+      dnfAt: dnf_at,
+    });
 
     const pc = pageCount.trim() ? Number(pageCount.trim()) : null;
     const page_count = Number.isFinite(pc as any) ? (pc as number) : null;
@@ -4617,6 +4687,7 @@ export default function BookHubPage() {
       .from("user_books")
       .update({
         status,
+        personal_tracking_status: nextPersonalTrackingStatus,
         started_at,
         finished_at,
         dnf_at,
@@ -5145,6 +5216,15 @@ export default function BookHubPage() {
       }
     }
 
+    const parsedQuickPage = parseOptionalPageLocationInput(
+      quickPreview.page,
+      book?.page_count ?? null
+    );
+    if (parsedQuickPage.error) {
+      alert(parsedQuickPage.error);
+      return;
+    }
+
     const payload = {
       user_book_id: row.id,
       vocabulary_cache_id: vocabularyCacheId,
@@ -5155,7 +5235,7 @@ export default function BookHubPage() {
       meaning_choice_index: quickPreview.isCustomMeaning
         ? null
         : quickPreview.selectedMeaningIndex,
-      page_number: quickPreview.page ? Number(quickPreview.page) : null,
+      page_number: parsedQuickPage.value,
       chapter_number: quickPreview.chapterNumber
         ? Number(quickPreview.chapterNumber)
         : null,
@@ -5225,13 +5305,20 @@ export default function BookHubPage() {
   async function saveEditedQuickSessionWord() {
     if (!editingQuickSessionWord) return;
 
+    const parsedQuickPage = parseOptionalPageLocationInput(
+      editingQuickSessionWord.page,
+      book?.page_count ?? null
+    );
+    if (parsedQuickPage.error) {
+      alert(parsedQuickPage.error);
+      return;
+    }
+
     const payload = {
       surface: editingQuickSessionWord.surface || null,
       reading: editingQuickSessionWord.reading || null,
       meaning: editingQuickSessionWord.meaning || null,
-      page_number: editingQuickSessionWord.page
-        ? Number(editingQuickSessionWord.page)
-        : null,
+      page_number: parsedQuickPage.value,
       chapter_number: editingQuickSessionWord.chapterNumber
         ? Number(editingQuickSessionWord.chapterNumber)
         : null,
@@ -5362,13 +5449,7 @@ export default function BookHubPage() {
     ? `/users/${encodeURIComponent(bookHubOwnerUsername)}/books`
     : "/dashboard";
 
-  const bookHubStatusLabel = dnfAt
-    ? "DNF"
-    : finishedAt
-      ? "Finished"
-      : startedAt
-        ? "Reading"
-        : "Not started";
+  const bookHubStatusLabel = personalTrackingStatusLabel(personalTrackingStatus);
 
   const showBookHubStartButton = !started && realReadingSessions.length === 0;
   const showBookHubFinishDnfButtons = !finishedAt && !dnfAt;
@@ -5440,6 +5521,10 @@ export default function BookHubPage() {
               <div className={showUpperProgressSummary ? "md:row-span-2" : ""}>
                 <BookHubStatusPanel
                   statusLabel={bookHubStatusLabel}
+                  personalTrackingStatus={personalTrackingStatus}
+                  showNotTrackingOption={
+                    isOwnBookHub && (isTeacherContext || isAdmin || isSuperTeacher)
+                  }
                   startedAt={startedAt}
                   finishedAt={finishedAt}
                   dnfAt={dnfAt}
@@ -5459,6 +5544,9 @@ export default function BookHubPage() {
                   furthestTrackedPage={furthestTrackedPage}
                   pageCount={book.page_count}
                   onStartToday={() => void markStartedToday()}
+                  onPersonalTrackingStatusChange={(value) =>
+                    void savePersonalTrackingStatus(value)
+                  }
                   onMarkFinished={() => void markFinishedToday()}
                   onMarkDnf={() => void markDnfToday()}
                   onOpenReview={() => {

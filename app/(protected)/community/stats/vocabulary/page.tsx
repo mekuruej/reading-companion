@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { resolvePersonalTrackingStatus } from "@/lib/personalTracking";
 import SectionBand from "./components/SectionBand";
 import BookCategoryFilterSelector from "./components/BookCategoryFilterSelector";
 import VocabularyHeader from "./components/VocabularyHeader";
@@ -53,6 +54,11 @@ type StudyEventRow = {
 
 type RawUserBookRow = {
   id: string;
+  personal_tracking_status?: string | null;
+  status?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  dnf_at?: string | null;
   books:
   | {
     id: string;
@@ -481,6 +487,11 @@ export default function VocabularyGrowthPage() {
           .select(
             `
               id,
+              personal_tracking_status,
+              status,
+              started_at,
+              finished_at,
+              dnf_at,
               books:book_id (
                 id,
                 title,
@@ -493,7 +504,8 @@ export default function VocabularyGrowthPage() {
 
         if (userBooksError) throw userBooksError;
 
-        const loadedRows: UserBookRow[] = ((userBooks ?? []) as RawUserBookRow[]).map(
+        const rawRows = (userBooks ?? []) as RawUserBookRow[];
+        const loadedRows: UserBookRow[] = rawRows.map(
           (row) => ({
             id: row.id,
             books: Array.isArray(row.books)
@@ -503,6 +515,10 @@ export default function VocabularyGrowthPage() {
         );
 
         const userBookIds = loadedRows.map((row) => row.id).filter(Boolean);
+        const trackedUserBookIds = rawRows
+          .filter((row) => resolvePersonalTrackingStatus(row) !== "not_tracking")
+          .map((row) => row.id)
+          .filter(Boolean);
 
         if (userBookIds.length === 0) {
           if (!isMounted) return;
@@ -514,7 +530,9 @@ export default function VocabularyGrowthPage() {
         }
 
         const [sessionData, wordData, studyEventData] = await Promise.all([
-          fetchAllReadingSessionsForBooks(userBookIds),
+          trackedUserBookIds.length > 0
+            ? fetchAllReadingSessionsForBooks(trackedUserBookIds)
+            : Promise.resolve([]),
           fetchAllWordsForBooks(userBookIds),
           fetchAllStudyEventsForBooks(userBookIds),
         ]);

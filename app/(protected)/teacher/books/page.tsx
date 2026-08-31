@@ -135,11 +135,12 @@ export default function TeacherBooksQueuePage() {
       if (profileError) throw profileError;
 
       const canAccess =
+        profile?.role === "admin" ||
         profile?.role === "super_teacher" ||
         isSuperTeacherFlag(profile?.is_super_teacher);
 
       if (!canAccess) {
-        setMessage("Super teacher access is required for book attention flags.");
+        setMessage("Super teacher or admin access is required for book attention flags.");
         setFlags([]);
         setPendingRequests([]);
         return;
@@ -219,10 +220,10 @@ export default function TeacherBooksQueuePage() {
           book_id: book.id,
           message: `Missing book info: ${missing.join(", ")}.`,
           created_at: null,
-          bookTitle: book.title ?? "Untitled global book",
+          bookTitle: book.title ?? "Untitled catalog book",
           coverUrl: book.cover_url ?? null,
           href: `/teacher/books/add?bookId=${book.id}`,
-          actionLabel: "Open Global Book Entry",
+          actionLabel: "Open Catalog Editor",
         });
       }
 
@@ -353,7 +354,7 @@ export default function TeacherBooksQueuePage() {
               Books Needing My Attention
             </h1>
             <p className="mt-2 text-sm leading-6 text-stone-600">
-              Pending book requests are separate from global books missing core info.
+              Pending book requests are separate from catalog books missing core info.
             </p>
           </div>
 
@@ -361,7 +362,7 @@ export default function TeacherBooksQueuePage() {
             href="/teacher/books/add?from=teacher-books"
             className="inline-flex shrink-0 rounded-xl border border-stone-300 bg-stone-900 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-stone-800"
           >
-            Add Global Book
+            Catalog Editor
           </Link>
         </div>
       </section>
@@ -441,7 +442,7 @@ export default function TeacherBooksQueuePage() {
                     href={`/teacher/books/add?requestId=${request.id}`}
                     className="inline-flex rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100"
                   >
-                    Open Global Book Entry
+                    Open Catalog Editor
                   </Link>
                   <button
                     type="button"

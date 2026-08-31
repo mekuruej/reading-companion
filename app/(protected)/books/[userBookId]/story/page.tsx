@@ -31,6 +31,7 @@ type BookRow = {
   author_reading: string | null;
   cover_url: string | null;
   language_code: string | null;
+  page_count: number | null;
 };
 
 type UserBookRow = {
@@ -176,7 +177,8 @@ export default function StoryNotesPage() {
             author_english_name,
             author_reading,
             cover_url,
-            language_code
+            language_code,
+            page_count
           ),
           favorite_quotes
         `
@@ -345,6 +347,7 @@ export default function StoryNotesPage() {
           ownerUserId={row.user_id}
           favoriteQuotes={row.favorite_quotes}
           bookLanguageCode={book?.language_code ?? null}
+          pageCount={book?.page_count ?? null}
           canUseJapaneseLearningJournal={canUseJapaneseLearningJournal}
           japaneseLearningArchiveTabs={japaneseLearningArchiveTabs}
           vocabListHref={

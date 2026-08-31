@@ -13,6 +13,7 @@ import {
   normalizeChapterNameOptions,
   sortChapterNameOptionsByNumber,
 } from "@/lib/chapterNameOptions";
+import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 import TeacherLibraryBookAccessState from "./components/TeacherLibraryBookAccessState";
 import TeacherLibraryBookHeader from "./components/TeacherLibraryBookHeader";
 import TeacherLibraryBookLoadingState from "./components/TeacherLibraryBookLoadingState";
@@ -164,14 +165,16 @@ function InlinePageNumberInput({
 
   return (
     <input
-      type="number"
+      type="text"
+      inputMode="decimal"
       value={draft}
       onChange={(event) => setDraft(event.target.value)}
       onBlur={() => void commit()}
       onKeyDown={handleKeyDown}
       disabled={disabled}
-      aria-label="Page number"
-      className="w-14 rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-center text-sm font-semibold text-stone-700 shadow-sm focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:bg-stone-100 disabled:opacity-60"
+      placeholder="%"
+      aria-label="Page number or percent"
+      className="w-20 rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-center text-sm font-semibold text-stone-700 shadow-sm focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:bg-stone-100 disabled:opacity-60"
     />
   );
 }
@@ -827,6 +830,7 @@ export default function TeacherBookPrepPage() {
 
     try {
       const payload = [];
+      const book = firstBook(teacherBook?.books ?? null);
       const existingMaxPageOrder = savedItems.reduce((maxOrder, item) => {
         const pageOrder = Number(item.page_order);
         return Number.isFinite(pageOrder) ? Math.max(maxOrder, pageOrder) : maxOrder;
@@ -843,6 +847,9 @@ export default function TeacherBookPrepPage() {
           knownChapterNumber ||
           "";
 
+        const parsedPage = parseOptionalPageLocationInput(pageValue, book?.page_count ?? null);
+        if (parsedPage.error) throw new Error(parsedPage.error);
+
         payload.push({
           teacher_book_id: teacherBookId,
           item_type: draft.itemType,
@@ -850,7 +857,7 @@ export default function TeacherBookPrepPage() {
           reading: cleanNullable(draft.reading),
           meaning: cleanNullable(draft.meaning),
           vocabulary_cache_id: draft.vocabularyCacheId,
-          page_number: toNullableInt(pageValue),
+          page_number: parsedPage.value,
           page_order: existingMaxPageOrder + payload.length + 1,
           chapter_number: toNullableInt(chapterNumberValue),
           chapter_name: cleanNullable(chapterNameValue),
@@ -928,12 +935,16 @@ export default function TeacherBookPrepPage() {
     setMessage("Saving prep item...");
 
     try {
+      const book = firstBook(teacherBook?.books ?? null);
+      const parsedPage = parseOptionalPageLocationInput(editDraft.page, book?.page_count ?? null);
+      if (parsedPage.error) throw new Error(parsedPage.error);
+
       const payload = {
         item_type: editDraft.itemType,
         surface_text: cleanNullable(editDraft.surfaceText),
         reading: cleanNullable(editDraft.reading),
         meaning: cleanNullable(editDraft.meaning),
-        page_number: toNullableInt(editDraft.page),
+        page_number: parsedPage.value,
         chapter_number: toNullableInt(editDraft.chapterNumber),
         chapter_name: cleanNullable(editDraft.chapterName),
         teacher_note: cleanNullable(editDraft.teacherNote),
@@ -978,7 +989,13 @@ export default function TeacherBookPrepPage() {
   }
 
   async function saveSavedItemPage(item: TeacherBookItem, value: string) {
-    const nextPage = toNullableInt(value);
+    const book = firstBook(teacherBook?.books ?? null);
+    const parsedPage = parseOptionalPageLocationInput(value, book?.page_count ?? null);
+    if (parsedPage.error) {
+      setMessage(parsedPage.error);
+      return;
+    }
+    const nextPage = parsedPage.value;
     if ((item.page_number ?? null) === nextPage) return;
 
     const previousPage = item.page_number ?? null;
@@ -1442,10 +1459,11 @@ export default function TeacherBookPrepPage() {
 
                       <div className="grid gap-3 md:grid-cols-3">
                         <label className="text-sm">
-                          <span className="mb-1 block text-xs text-gray-500">Page</span>
+                          <span className="mb-1 block text-xs text-gray-500">Page or %</span>
                           <input
                             value={draft.page}
                             onChange={(event) => updateDraft(index, { page: event.target.value })}
+                            placeholder="p. 42 or 18%"
                             className="w-full rounded border p-2 text-sm"
                           />
                         </label>
@@ -1770,11 +1788,12 @@ export default function TeacherBookPrepPage() {
 
                 <div className="mt-3 grid gap-3 md:grid-cols-3">
                   <label className="text-sm">
-                    <span className="mb-1 block text-xs text-gray-500">Page</span>
+                    <span className="mb-1 block text-xs text-gray-500">Page or %</span>
                     <input
-                      value={editDraft.page}
-                      onChange={(event) => updateEditDraft({ page: event.target.value })}
-                      className="w-full rounded border p-2 text-sm"
+	                      value={editDraft.page}
+	                      onChange={(event) => updateEditDraft({ page: event.target.value })}
+	                      placeholder="p. 42 or 18%"
+	                      className="w-full rounded border p-2 text-sm"
                     />
                   </label>
                   <ChapterNameCombobox

@@ -62,7 +62,7 @@ const attentionCards: NeedsAttentionCard[] = [
   {
     title: "Books",
     eyebrow: "Books",
-    description: "Review book requests, book flags, and global books missing core information.",
+    description: "Review book requests, book flags, and catalog books missing core information.",
     countKey: "books",
     actions: [
       {

@@ -1,66 +1,97 @@
-type TeacherGlobalDestination = "catalog_only" | "student_only" | "teacher_and_student";
-
 type AddBookTeacherDestinationOptionsProps = {
-  teacherDestination: TeacherGlobalDestination;
   canUseCatalogOnly: boolean;
-  onSelect: (destination: TeacherGlobalDestination) => void;
+  addToCatalogOnly: boolean;
+  addToTeachingBooks: boolean;
+  addToMyLibrary: boolean;
+  addToStudentLibrary: boolean;
+  onCatalogOnlyChange: (checked: boolean) => void;
+  onTeachingBooksChange: (checked: boolean) => void;
+  onMyLibraryChange: (checked: boolean) => void;
+  onStudentLibraryChange: (checked: boolean) => void;
 };
 
-const TEACHER_DESTINATION_OPTIONS: Array<{
-  value: TeacherGlobalDestination;
-  title: string;
-  helper: string;
-}> = [
+const TEACHER_DESTINATION_OPTIONS = [
   {
-    value: "catalog_only",
-    title: "MEKURU Catalog",
-    helper: "Create this edition without adding it to a personal Library.",
+    key: "catalogOnly",
+    title: "MEKURU Catalog only",
+    helper: "Create or reuse the shared catalog record without adding it anywhere.",
   },
   {
-    value: "student_only",
+    key: "teachingBooks",
+    title: "My Teaching Books",
+    helper: "Create or reuse the teaching workspace for this edition.",
+  },
+  {
+    key: "myLibrary",
+    title: "My Library",
+    helper: "Save this edition to your personal reading Library.",
+  },
+  {
+    key: "studentLibrary",
     title: "Student's Library",
-    helper: "Add this edition to one student's Library.",
+    helper: "Add this edition to one linked student's Library.",
   },
-  {
-    value: "teacher_and_student",
-    title: "My Library + Student's Library",
-    helper: "Add this edition to your Library and the student's Library.",
-  },
-];
+] as const;
 
 export default function AddBookTeacherDestinationOptions({
-  teacherDestination,
   canUseCatalogOnly,
-  onSelect,
+  addToCatalogOnly,
+  addToTeachingBooks,
+  addToMyLibrary,
+  addToStudentLibrary,
+  onCatalogOnlyChange,
+  onTeachingBooksChange,
+  onMyLibraryChange,
+  onStudentLibraryChange,
 }: AddBookTeacherDestinationOptionsProps) {
+  const checkedByKey = {
+    catalogOnly: addToCatalogOnly,
+    teachingBooks: addToTeachingBooks,
+    myLibrary: addToMyLibrary,
+    studentLibrary: addToStudentLibrary,
+  };
+  const changeByKey = {
+    catalogOnly: onCatalogOnlyChange,
+    teachingBooks: onTeachingBooksChange,
+    myLibrary: onMyLibraryChange,
+    studentLibrary: onStudentLibraryChange,
+  };
+
   return (
     <div className="mt-3 grid gap-3 lg:grid-cols-3">
       {TEACHER_DESTINATION_OPTIONS.map((option) => {
-        const selected = teacherDestination === option.value;
-        const disabled = option.value === "catalog_only" && !canUseCatalogOnly;
+        if (option.key === "catalogOnly" && !canUseCatalogOnly) return null;
+
+        const selected = checkedByKey[option.key];
+        const disabled = addToCatalogOnly && option.key !== "catalogOnly";
 
         return (
-          <button
-            key={option.value}
-            type="button"
-            disabled={disabled}
-            onClick={() => onSelect(option.value)}
+          <label
+            key={option.key}
             className={[
-              "rounded-2xl border p-4 text-left transition",
-              disabled ? "cursor-not-allowed opacity-50" : "",
+              "flex gap-3 rounded-2xl border p-4 text-left transition",
+              disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
               selected
-                ? "border-stone-900 bg-white shadow-sm"
+                ? "border-sky-300 bg-sky-50 shadow-sm"
                 : "border-stone-200 bg-white/70 hover:bg-white",
             ].join(" ")}
           >
-            <span className="block text-sm font-black text-stone-950">
-              {option.title}
+            <input
+              type="checkbox"
+              checked={selected}
+              disabled={disabled}
+              onChange={(event) => changeByKey[option.key](event.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-stone-300 text-sky-600 focus:ring-sky-500"
+            />
+            <span>
+              <span className="block text-sm font-black text-stone-950">
+                {option.title}
+              </span>
+              <span className="mt-1 block text-xs leading-5 text-stone-600">
+                {option.helper}
+              </span>
             </span>
-            <span className="mt-1 block text-xs leading-5 text-stone-600">
-              {option.helper}
-              {disabled ? " Super teacher access is required." : ""}
-            </span>
-          </button>
+          </label>
         );
       })}
     </div>

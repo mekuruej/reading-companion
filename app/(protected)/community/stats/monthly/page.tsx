@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { resolvePersonalTrackingStatus } from "@/lib/personalTracking";
 import MonthlyStatsPageHeader from "./components/MonthlyStatsPageHeader";
 import MonthlyStatsErrorBanner from "./components/MonthlyStatsErrorBanner";
 import MonthlyTopStatsGrid from "./components/MonthlyTopStatsGrid";
@@ -34,7 +35,11 @@ type WordRow = {
 
 type RawUserBookRow = {
   id: string;
+  personal_tracking_status?: string | null;
+  status?: string | null;
+  started_at?: string | null;
   finished_at: string | null;
+  dnf_at?: string | null;
   books:
   | {
     book_type: string | null;
@@ -316,7 +321,11 @@ export default function MonthlyDetailsPage() {
           .select(
             `
               id,
+              personal_tracking_status,
+              status,
+              started_at,
               finished_at,
+              dnf_at,
               books:book_id (
                 book_type
               )
@@ -327,6 +336,8 @@ export default function MonthlyDetailsPage() {
         if (userBooksError) throw userBooksError;
 
         const books: UserBookRow[] = ((userBooks ?? []) as RawUserBookRow[]).map(
+          (row) => row
+        ).filter((row) => resolvePersonalTrackingStatus(row) !== "not_tracking").map(
           (row) => {
             const book = Array.isArray(row.books)
               ? row.books[0] ?? null

@@ -1,4 +1,4 @@
-// Teacher Add / Edit Global Book
+// Teacher Catalog Editor
 
 "use client";
 
@@ -364,15 +364,15 @@ export default function TeacherAddBookPage() {
                 .eq("id", user.id)
                 .single();
 
-            const isTeacher =
-                profile?.role === "teacher" ||
+            const canUseCatalogEditor =
+                profile?.role === "admin" ||
                 profile?.role === "super_teacher" ||
                 !!profile?.is_super_teacher;
 
-            setCanAccess(isTeacher);
+            setCanAccess(canUseCatalogEditor);
 
-            if (!isTeacher) {
-                setMessage("Teacher access is required.");
+            if (!canUseCatalogEditor) {
+                setMessage("Super teacher or admin access is required for Catalog Editor.");
                 setLoading(false);
                 return;
             }
@@ -381,9 +381,6 @@ export default function TeacherAddBookPage() {
                 await loadBook(bookId);
             } else if (requestId) {
                 await loadBookRequest(requestId);
-            } else {
-                router.replace(`/books/add?context=teacher-global${sourceParam ? `&from=${encodeURIComponent(sourceParam)}` : ""}`);
-                return;
             }
 
             setLoading(false);
@@ -698,7 +695,7 @@ export default function TeacherAddBookPage() {
         if (!title.trim()) {
             setMessage(
                 bookRequest
-                    ? "Please enter the researched book title before creating the manual global book entry."
+                    ? "Please enter the researched book title before creating the manual catalog book entry."
                     : "Please enter a title."
             );
             return;
@@ -794,7 +791,7 @@ export default function TeacherAddBookPage() {
             );
             router.replace(`/teacher/books/add?bookId=${data.id}${sourceQuerySuffix}`);
         } catch (error: any) {
-            console.error("Create/load global book error:", JSON.stringify(error, null, 2));
+            console.error("Create/load catalog book error:", JSON.stringify(error, null, 2));
             setMessage(error?.message ?? "Failed to create or load book.");
         }
 
@@ -830,7 +827,7 @@ export default function TeacherAddBookPage() {
         setIsbnLookupError("");
 
         if (!isbnLookupPreview) {
-            setIsbnLookupError("Look up an ISBN before creating a global book from metadata.");
+            setIsbnLookupError("Look up an ISBN before creating a catalog book from metadata.");
             return;
         }
 
@@ -843,10 +840,10 @@ export default function TeacherAddBookPage() {
             setSaving(true);
             try {
                 await loadBook(isbnLookupPreview.existing_book_id);
-                setMessage("This ISBN already exists in Mekuru. Loaded the existing global book.");
+                setMessage("This ISBN already exists in Mekuru. Loaded the existing catalog book.");
                 router.replace(`/teacher/books/add?bookId=${isbnLookupPreview.existing_book_id}${sourceQuerySuffix}`);
             } catch (error: any) {
-                setIsbnLookupError(error?.message ?? "Could not load the existing global book.");
+                setIsbnLookupError(error?.message ?? "Could not load the existing catalog book.");
             } finally {
                 setSaving(false);
             }
@@ -873,7 +870,7 @@ export default function TeacherAddBookPage() {
 
             if (existingBook) {
                 await loadBook(existingBook.id);
-                setMessage("This ISBN already exists in Mekuru. Loaded the existing global book.");
+                setMessage("This ISBN already exists in Mekuru. Loaded the existing catalog book.");
                 router.replace(`/teacher/books/add?bookId=${existingBook.id}${sourceQuerySuffix}`);
                 setSaving(false);
                 return;
@@ -903,11 +900,11 @@ export default function TeacherAddBookPage() {
             if (error) throw error;
 
             await loadBook(data.id);
-            setMessage("Global book created from ISBN metadata. Review and edit details below.");
+            setMessage("Catalog book created from ISBN metadata. Review and edit details below.");
             router.replace(`/teacher/books/add?bookId=${data.id}${sourceQuerySuffix}`);
         } catch (error: any) {
-            console.error("Create global book from ISBN metadata error:", JSON.stringify(error, null, 2));
-            setIsbnLookupError(error?.message ?? "Failed to create global book from metadata.");
+            console.error("Create catalog book from ISBN metadata error:", JSON.stringify(error, null, 2));
+            setIsbnLookupError(error?.message ?? "Failed to create catalog book from metadata.");
         } finally {
             setSaving(false);
         }
@@ -1010,7 +1007,7 @@ export default function TeacherAddBookPage() {
             setEditingPanel(null);
             await loadBook(currentBookId);
         } catch (error: any) {
-            console.error("Save global book info error:", JSON.stringify(error, null, 2));
+            console.error("Save catalog book info error:", JSON.stringify(error, null, 2));
             setMessage(error?.message ?? "Failed to save book info.");
         }
 

@@ -51,7 +51,15 @@ type TeacherUseStatus =
 
 type TeachingDifficulty = "n5" | "n4" | "n3" | "n2" | "n1" | "above_n1";
 type TeachingSuitability = "excellent" | "usable" | "poor_fit";
-type AssessmentFilter = "all" | "needs_assessment" | "want_to_read" | "dnf" | "assessed";
+type AssessmentFilter =
+  | "active"
+  | "all"
+  | "needs_assessment"
+  | "currently_reading"
+  | "want_to_read"
+  | "dnf"
+  | "assessed"
+  | "not_for_teaching";
 type StatusFilter = "all" | "none" | TeacherUseStatus;
 
 type TeacherBookRow = {
@@ -123,13 +131,13 @@ const teacherUseStatusOptions: Array<{ value: TeacherUseStatus; label: string }>
   { value: "approved_for_lesson", label: "Perfect for Lesson" },
   { value: "usable", label: "Usable" },
   { value: "use_with_caution", label: "Use with Caution" },
-  { value: "do_not_use", label: "Do Not Use" },
+  { value: "do_not_use", label: "Not for Teaching" },
 ];
 
 const visibleTeacherUseStatusOptions: Array<{ value: TeacherUseStatus; label: string }> = [
   { value: "approved_for_lesson", label: "Perfect for Lesson" },
   { value: "usable", label: "Usable" },
-  { value: "do_not_use", label: "Do Not Use" },
+  { value: "do_not_use", label: "Not for Teaching" },
 ];
 
 const difficultyOptions: Array<{ value: TeachingDifficulty; label: string }> = [
@@ -262,7 +270,12 @@ function bookTypeLabel(value: string | null | undefined) {
 }
 
 function isAssessed(entry: TeachingBookEntry) {
+  if (entry.teacher_use_status === "do_not_use") return true;
   return Boolean(entry.teacher_jlpt_difficulty && entry.teaching_suitability);
+}
+
+function isNotForTeaching(entry: TeachingBookEntry) {
+  return entry.teacher_use_status === "do_not_use";
 }
 
 function isDnf(entry: TeachingBookEntry) {
@@ -275,8 +288,16 @@ function isWantToRead(entry: TeachingBookEntry) {
   return !entry.reading_status || entry.reading_status === "what_to_read";
 }
 
+function isCurrentlyReading(entry: TeachingBookEntry) {
+  if (!entry.userBookId) return false;
+  if (entry.dnf_at || entry.finished_at) return false;
+  return Boolean(entry.started_at) || entry.reading_status === "reading";
+}
+
 function teachingBookCategory(entry: TeachingBookEntry) {
+  if (isNotForTeaching(entry)) return "not_for_teaching";
   if (isDnf(entry)) return "dnf";
+  if (isCurrentlyReading(entry)) return "currently_reading";
   if (isWantToRead(entry)) return "want_to_read";
   if (isAssessed(entry)) return "assessed";
   return "needs_assessment";
@@ -285,9 +306,11 @@ function teachingBookCategory(entry: TeachingBookEntry) {
 function teachingBookCategoryRank(entry: TeachingBookEntry) {
   const category = teachingBookCategory(entry);
   if (category === "needs_assessment") return 0;
-  if (category === "want_to_read") return 1;
-  if (category === "dnf") return 2;
-  return 3;
+  if (category === "currently_reading") return 1;
+  if (category === "want_to_read") return 2;
+  if (category === "dnf") return 3;
+  if (category === "assessed") return 4;
+  return 5;
 }
 
 function createDraft(entry: TeachingBookEntry): AssessmentDraft {
@@ -425,7 +448,7 @@ export default function TeacherLibraryPage() {
   const [message, setMessage] = useState("");
   const [entries, setEntries] = useState<TeachingBookEntry[]>([]);
   const [query, setQuery] = useState("");
-  const [assessmentFilter, setAssessmentFilter] = useState<AssessmentFilter>("all");
+  const [assessmentFilter, setAssessmentFilter] = useState<AssessmentFilter>("active");
   const [difficultyFilter, setDifficultyFilter] = useState<TeachingDifficulty | "all">("all");
   const [suitabilityFilter, setSuitabilityFilter] = useState<TeachingSuitability | "all">("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -670,7 +693,8 @@ export default function TeacherLibraryPage() {
       const category = teachingBookCategory(entry);
 
       if (cleanQuery && !`${title} ${author} ${isbn} ${note} ${dnfNote} ${dnfReason}`.includes(cleanQuery)) return false;
-      if (assessmentFilter !== "all" && category !== assessmentFilter) return false;
+      if (assessmentFilter === "active" && category === "not_for_teaching") return false;
+      if (assessmentFilter !== "active" && assessmentFilter !== "all" && category !== assessmentFilter) return false;
       if (difficultyFilter !== "all" && entry.teacher_jlpt_difficulty !== difficultyFilter) return false;
       if (suitabilityFilter !== "all" && entry.teaching_suitability !== suitabilityFilter) return false;
       if (statusFilter === "none" && !isBlankTeacherUseStatus(entry.teacher_use_status)) return false;
@@ -684,12 +708,15 @@ export default function TeacherLibraryPage() {
   const wantToReadCount = entries.filter(
     (entry) => teachingBookCategory(entry) === "want_to_read"
   ).length;
+  const currentlyReadingCount = entries.filter(
+    (entry) => teachingBookCategory(entry) === "currently_reading"
+  ).length;
   const dnfCount = entries.filter((entry) => teachingBookCategory(entry) === "dnf").length;
   const assessedCount = entries.filter((entry) => teachingBookCategory(entry) === "assessed").length;
   const needsAssessmentCount = entries.filter(
     (entry) => teachingBookCategory(entry) === "needs_assessment"
   ).length;
-  const doNotUseCount = entries.filter((entry) => entry.teacher_use_status === "do_not_use").length;
+  const notForTeachingCount = entries.filter((entry) => entry.teacher_use_status === "do_not_use").length;
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
@@ -712,6 +739,11 @@ export default function TeacherLibraryPage() {
           <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-blue-800">
             {needsAssessmentCount} need assessment
           </span>
+          {currentlyReadingCount > 0 ? (
+            <span className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-cyan-800">
+              {currentlyReadingCount} currently reading
+            </span>
+          ) : null}
           {wantToReadCount > 0 ? (
             <span className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-violet-800">
               {wantToReadCount} want to read
@@ -725,9 +757,9 @@ export default function TeacherLibraryPage() {
           <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-800">
             {assessedCount} assessed
           </span>
-          {doNotUseCount > 0 ? (
+          {notForTeachingCount > 0 ? (
             <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-rose-800">
-              {doNotUseCount} do not use
+              {notForTeachingCount} not for teaching
             </span>
           ) : null}
         </div>
@@ -772,11 +804,14 @@ export default function TeacherLibraryPage() {
                   onChange={(event) => setAssessmentFilter(event.target.value as AssessmentFilter)}
                   className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-sm font-semibold text-stone-900"
                 >
-                  <option value="all">All assessments</option>
+                  <option value="active">All active</option>
+                  <option value="all">All books</option>
                   <option value="needs_assessment">Needs Assessment</option>
+                  <option value="currently_reading">Currently Reading</option>
                   <option value="want_to_read">Want to Read</option>
                   <option value="dnf">DNF</option>
                   <option value="assessed">Assessed</option>
+                  <option value="not_for_teaching">Not for Teaching</option>
                 </select>
               </label>
 
@@ -873,10 +908,10 @@ export default function TeacherLibraryPage() {
                 </p>
               </div>
               <Link
-                href="/books/add?context=teacher-global&from=teacher-library"
+                href="/books/add?destination=teaching&from=teacher-library"
                 className="text-sm font-black text-blue-700 hover:text-blue-900"
               >
-                Add Global Book
+                Add a Book
               </Link>
             </div>
 
@@ -890,6 +925,8 @@ export default function TeacherLibraryPage() {
                   const book = entry.books;
                   const editing = editingKey === entry.key && draft;
                   const assessed = isAssessed(entry);
+                  const notForTeaching = isNotForTeaching(entry);
+                  const currentlyReading = isCurrentlyReading(entry);
                   const wantToRead = isWantToRead(entry);
                   const recentlySaved = recentlySavedKey === entry.key;
                   const noteExpanded = expandedNoteKeys.includes(entry.key);
@@ -898,8 +935,7 @@ export default function TeacherLibraryPage() {
                   const dnfExpanded = expandedNoteKeys.includes(`${entry.key}:dnf`);
                   const retryLabel = wouldRetryLabel(entry.would_retry);
                   const notRecommended =
-                    entry.teacher_use_status === "do_not_use" ||
-                    entry.teaching_suitability === "poor_fit";
+                    notForTeaching || entry.teaching_suitability === "poor_fit";
                   const cardClass = recentlySaved
                     ? "border-emerald-300 bg-emerald-50/70 ring-2 ring-emerald-100"
                     : notRecommended
@@ -941,6 +977,11 @@ export default function TeacherLibraryPage() {
                                 DNF
                               </span>
                             ) : null}
+                            {currentlyReading ? (
+                              <span className="rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-black text-cyan-800">
+                                Currently Reading
+                              </span>
+                            ) : null}
                             {wantToRead ? (
                               <span className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-black text-violet-800">
                                 Want to Read
@@ -953,12 +994,18 @@ export default function TeacherLibraryPage() {
                             ) : (
                               <span
                                 className={`rounded-full border px-2.5 py-1 text-xs font-black ${
-                                  assessed
+                                  notForTeaching
+                                    ? "border-rose-200 bg-rose-50 text-rose-800"
+                                    : assessed
                                     ? "border-emerald-300 bg-emerald-100 text-emerald-900"
                                     : "border-blue-200 bg-blue-50 text-blue-800"
                                 }`}
                               >
-                                {assessed ? "Saved" : "Needs Assessment"}
+                                {notForTeaching
+                                  ? "Not for Teaching"
+                                  : assessed
+                                    ? "Saved"
+                                    : "Needs Assessment"}
                               </span>
                             )}
                             <span
@@ -1056,7 +1103,7 @@ export default function TeacherLibraryPage() {
                           onClick={() => beginEditing(entry)}
                           className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-black text-blue-800 hover:bg-blue-100"
                         >
-                          {assessed ? "Edit" : "Assess"}
+                          {assessed || notForTeaching ? "Edit" : "Assess"}
                         </button>
                       </div>
 

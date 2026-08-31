@@ -8,6 +8,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { getLearnerAccessLabel } from "@/lib/access/learnerDisplayLabels";
+import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 import { getTeacherBackLink } from "../components/teacherBackLink";
 import TeacherStudentsAccessState from "./components/TeacherStudentsAccessState";
 import TeacherStudentsErrorBanner from "./components/TeacherStudentsErrorBanner";
@@ -59,12 +60,14 @@ type UserBookRow = {
         title: string | null;
         cover_url: string | null;
         book_type: string | null;
+        page_count: number | null;
     }
     | {
         id: string;
         title: string | null;
         cover_url: string | null;
         book_type: string | null;
+        page_count: number | null;
     }[]
     | null;
 };
@@ -86,6 +89,7 @@ type TaskBookOption = {
     id: string;
     userId: string;
     title: string;
+    pageCount: number | null;
 };
 
 type ActiveLearningTask = {
@@ -730,7 +734,8 @@ export default function TeacherStudentsPage() {
             id,
             title,
             cover_url,
-            book_type
+            book_type,
+            page_count
           )
         `
                 )
@@ -754,6 +759,7 @@ export default function TeacherStudentsPage() {
                         id: row.id,
                         userId: row.user_id,
                         title: book.title,
+                        pageCount: book.page_count ?? null,
                     });
                     nextTaskBookOptions[row.user_id] = options;
                 }
@@ -1047,9 +1053,6 @@ export default function TeacherStudentsPage() {
         }
 
         const cleanInstructions = taskInstructions.trim();
-        const pageStart =
-            taskPageStart.trim() === "" ? null : Number(taskPageStart.trim());
-        const pageEnd = taskPageEnd.trim() === "" ? null : Number(taskPageEnd.trim());
         const chapterNumber =
             taskChapterNumber.trim() === "" ? null : Number(taskChapterNumber.trim());
         const kanjiCardCount =
@@ -1074,11 +1077,29 @@ export default function TeacherStudentsPage() {
             return;
         }
 
+        const selectedTaskBook = learnerBookOptions.find((book) => book.id === taskUserBookId);
+        const parsedPageStart = parseOptionalPageLocationInput(
+            taskPageStart,
+            selectedTaskBook?.pageCount ?? null
+        );
+        const parsedPageEnd = parseOptionalPageLocationInput(
+            taskPageEnd,
+            selectedTaskBook?.pageCount ?? null
+        );
+        const pageStart = parsedPageStart.value;
+        const pageEnd = parsedPageEnd.value;
+
         if (
+            parsedPageStart.error ||
+            parsedPageEnd.error ||
             (pageStart != null && (!Number.isFinite(pageStart) || pageStart <= 0)) ||
             (pageEnd != null && (!Number.isFinite(pageEnd) || pageEnd <= 0))
         ) {
-            setTaskMessage("Page numbers should be positive numbers.");
+            setTaskMessage(
+                parsedPageStart.error ||
+                    parsedPageEnd.error ||
+                    "Page numbers should be positive numbers."
+            );
             return;
         }
 

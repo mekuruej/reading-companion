@@ -76,6 +76,7 @@ type StoryTabProps = {
   setStoryTab: (value: StoryTabMode) => void;
   tabOrder: StoryTabMode[];
   showCharacterReadingField?: boolean;
+  pageCount?: number | null;
   learningArchiveReadOnlyTabs?: Partial<Record<"detective" | "setting" | "cultural", boolean>>;
 
   detectiveEntries: DetectiveEntry[];
@@ -275,6 +276,7 @@ export default function StoryTab({
   setStoryTab,
   tabOrder,
   showCharacterReadingField = true,
+  pageCount,
   learningArchiveReadOnlyTabs,
 
   detectiveEntries,
@@ -482,6 +484,7 @@ export default function StoryTab({
 
       {storyTab === "detective" && (
         <ReadingJournalDetectiveTab
+          pageCount={pageCount}
           detectiveEntries={detectiveEntries}
           detectiveSearch={detectiveSearch}
           setDetectiveSearch={setDetectiveSearch}

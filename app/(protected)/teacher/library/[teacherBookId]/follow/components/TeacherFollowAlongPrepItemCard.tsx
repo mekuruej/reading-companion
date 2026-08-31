@@ -7,7 +7,7 @@ type SupportMode = "full" | "reading" | "meaning";
 
 type TeacherFollowAlongPrepItem = {
   id: string;
-  source?: "reader_vocab" | "teacher_support";
+  source?: "reader_vocab" | "teaching_vocab" | "teacher_support";
   item_type: ItemType;
   surface_text: string | null;
   reading: string | null;
@@ -237,7 +237,9 @@ export function TeacherFollowAlongPrepItemCard({
   const showMeaning =
     (supportMode === "full" || supportMode === "meaning") && item.meaning;
 
-  const isReaderWord = item.source === "reader_vocab" && item.item_type === "word";
+  const isReaderWord =
+    (item.source === "reader_vocab" || item.source === "teaching_vocab") &&
+    item.item_type === "word";
 
   if (isReaderWord) {
     return (
@@ -248,6 +250,11 @@ export function TeacherFollowAlongPrepItemCard({
         )}`}
       >
         <div className="mb-2 flex flex-wrap gap-2 sm:absolute sm:right-4 sm:top-3 sm:mb-0">
+          {item.source === "teaching_vocab" ? (
+            <span className="inline-flex items-center rounded-full border border-blue-100 bg-white px-2.5 py-1 text-[11px] font-semibold text-blue-700 shadow-sm">
+              Teaching
+            </span>
+          ) : null}
           <ReaderWordBadge item={item} />
         </div>
 

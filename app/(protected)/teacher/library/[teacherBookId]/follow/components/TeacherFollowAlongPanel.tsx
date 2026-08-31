@@ -8,6 +8,17 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import JapaneseDictionaryCapture, {
+  type JapaneseDictionaryCaptureValue,
+} from "@/components/vocabulary/JapaneseDictionaryCapture";
+import {
+  loadSharedTeacherVocabulary,
+  loadTeacherBookContext,
+  saveTeacherVocabularyAndInclude,
+  type SharedTeacherVocabularyWord,
+  type TeacherBookContext,
+  updateTeachingVocabularyVisibility,
+} from "@/lib/teacher/teacherBookVocabulary";
 import ReadAlongReaderShell from "../../../../../books/[userBookId]/_shared/readalong/ReadAlongReaderShell";
 import TeacherNotebookPanel from "../../../../components/TeacherNotebookPanel";
 import { TeacherFollowAlongHeader } from "./TeacherFollowAlongHeader";
@@ -35,7 +46,7 @@ type TeacherBookRow = {
 
 type TeacherFollowAlongItem = {
   id: string;
-  source: "reader_vocab" | "teacher_support";
+  source: "reader_vocab" | "teaching_vocab" | "teacher_support";
   source_id: string;
   item_type: ItemType;
   surface_text: string | null;
@@ -64,6 +75,25 @@ type ReaderVocabWord = {
   chapter_number?: number | null;
   chapter_name: string | null;
   jlpt?: string | null;
+  meaning_choice_index?: number | null;
+  created_at?: string | null;
+};
+
+type TeachingVocabWord = {
+  id: string;
+  linked_user_book_word_id?: string | null;
+  surface: string | null;
+  reading: string | null;
+  meaning: string | null;
+  page_number: number | null;
+  page_order?: number | null;
+  chapter_number?: number | null;
+  chapter_name: string | null;
+  follow_along_support_note?: string | null;
+  hidden_from_teaching?: boolean | null;
+  included_in_follow_along?: boolean | null;
+  origin_my_library?: boolean | null;
+  origin_teaching?: boolean | null;
   meaning_choice_index?: number | null;
   created_at?: string | null;
 };
@@ -180,6 +210,39 @@ function readerWordToFollowAlongItem(word: ReaderVocabWord): TeacherFollowAlongI
   };
 }
 
+function teachingVocabToFollowAlongItem(word: TeachingVocabWord): TeacherFollowAlongItem {
+  return {
+    id: `teaching-vocab-${word.id}`,
+    source: "teaching_vocab",
+    source_id: word.id,
+    item_type: "word",
+    surface_text: word.surface,
+    reading: word.reading,
+    meaning: word.meaning,
+    page_number: word.page_number,
+    page_order: word.page_order,
+    chapter_number: word.chapter_number,
+    chapter_name: word.chapter_name,
+    teacher_note: word.follow_along_support_note ?? null,
+    explanation: null,
+    translation: null,
+    support_url: null,
+    jlpt: null,
+    meaning_choice_index: word.meaning_choice_index,
+    created_at: word.created_at,
+  };
+}
+
+function isMissingTeachingVocabularyTable(error: any) {
+  const text = readableSupabaseError(error).toLowerCase();
+  return (
+    error?.code === "42P01" ||
+    error?.code === "42703" ||
+    error?.code === "PGRST205" ||
+    text.includes("teacher_book_vocabulary")
+  );
+}
+
 function hasUsefulReaderVocabSupport(word: ReaderVocabWord) {
   return Boolean(word.meaning?.trim());
 }
@@ -242,6 +305,8 @@ export function TeacherFollowAlongPanel({
   const [message, setMessage] = useState("");
   const [teacherBook, setTeacherBook] = useState<TeacherBookRow | null>(null);
   const [items, setItems] = useState<TeacherFollowAlongItem[]>([]);
+  const [teacherVocabContext, setTeacherVocabContext] = useState<TeacherBookContext | null>(null);
+  const [vocabularyPool, setVocabularyPool] = useState<SharedTeacherVocabularyWord[]>([]);
   const [missingReaderLink, setMissingReaderLink] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
   const [jumpPageInput, setJumpPageInput] = useState("");
@@ -313,7 +378,17 @@ export function TeacherFollowAlongPanel({
         return;
       }
 
+      const nextTeacherVocabContext = await loadTeacherBookContext(supabase, teacherBookId, user.id);
+      setTeacherVocabContext(nextTeacherVocabContext);
+      setVocabularyPool(
+        await loadSharedTeacherVocabulary(supabase, nextTeacherVocabContext, {
+          view: "teaching",
+          showHidden: true,
+        })
+      );
+
       let readerVocabItems: TeacherFollowAlongItem[] = [];
+      let missingPersonalReaderVocab = false;
       if (loadedTeacherBook.user_book_id) {
         const { data: wordRows, error: wordError } = await supabase
           .from("user_book_words")
@@ -331,7 +406,36 @@ export function TeacherFollowAlongPanel({
           .filter(hasUsefulReaderVocabSupport)
           .map(readerWordToFollowAlongItem);
       } else {
-        setMissingReaderLink(true);
+        missingPersonalReaderVocab = true;
+      }
+
+      let teachingVocabItems: TeacherFollowAlongItem[] = [];
+      const { data: teachingVocabRows, error: teachingVocabError } = await supabase
+        .from("teacher_book_vocabulary")
+        .select(
+          "id, linked_user_book_word_id, surface, reading, meaning, page_number, page_order, chapter_number, chapter_name, follow_along_support_note, hidden_from_teaching, included_in_follow_along, origin_my_library, origin_teaching, meaning_choice_index, created_at"
+        )
+        .eq("teacher_book_id", teacherBookId)
+        .order("follow_along_order", { ascending: true, nullsFirst: false })
+        .order("page_number", { ascending: true, nullsFirst: false })
+        .order("page_order", { ascending: true, nullsFirst: false })
+        .order("created_at", { ascending: true });
+
+      if (teachingVocabError) {
+        if (!isMissingTeachingVocabularyTable(teachingVocabError)) throw teachingVocabError;
+      } else {
+        const linkedPersonalWordIds = new Set(
+          ((teachingVocabRows ?? []) as TeachingVocabWord[])
+            .map((word) => word.linked_user_book_word_id)
+            .filter(Boolean)
+        );
+        readerVocabItems = readerVocabItems.filter(
+          (item) => !linkedPersonalWordIds.has(item.source_id)
+        );
+        teachingVocabItems = ((teachingVocabRows ?? []) as TeachingVocabWord[])
+          .filter((word) => !word.hidden_from_teaching && word.included_in_follow_along)
+          .filter((word) => Boolean(word.surface?.trim() || word.meaning?.trim()))
+          .map(teachingVocabToFollowAlongItem);
       }
 
       const { data: itemRows, error: itemsError } = await supabase
@@ -375,13 +479,42 @@ export function TeacherFollowAlongPanel({
 
       setCanAccess(true);
       setTeacherBook(loadedTeacherBook);
-      setItems(sortTeacherFollowAlongItems([...readerVocabItems, ...teacherSupportItems]));
+      setMissingReaderLink(missingPersonalReaderVocab && teachingVocabItems.length === 0);
+      setItems(sortTeacherFollowAlongItems([...readerVocabItems, ...teachingVocabItems, ...teacherSupportItems]));
     } catch (error: any) {
       console.error("Error loading teacher follow-along:", readableSupabaseError(error), error);
       setCanAccess(false);
       setMessage(readableSupabaseError(error) || "Could not load follow-along page.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function refreshFollowAlong() {
+    await loadFollowAlong();
+  }
+
+  async function saveCapturedFollowAlongWord(value: JapaneseDictionaryCaptureValue) {
+    if (!teacherVocabContext) throw new Error("Follow-Along vocabulary is still loading.");
+    setMessage("");
+
+    const result = await saveTeacherVocabularyAndInclude(supabase, teacherVocabContext, value);
+    await refreshFollowAlong();
+    return result.status;
+  }
+
+  async function updateFollowAlongWord(
+    word: SharedTeacherVocabularyWord,
+    patch: Parameters<typeof updateTeachingVocabularyVisibility>[2]
+  ) {
+    if (!teacherVocabContext) return;
+    setMessage("");
+
+    try {
+      await updateTeachingVocabularyVisibility(supabase, word, patch, teacherVocabContext);
+      await refreshFollowAlong();
+    } catch (error: any) {
+      setMessage(error?.message ?? "Could not update Follow-Along vocabulary.");
     }
   }
 
@@ -514,6 +647,17 @@ export function TeacherFollowAlongPanel({
   const book = firstBook(teacherBook?.books ?? null);
   const isEmbedded = presentation === "embedded";
   const supportMode: SupportMode = "full";
+  const includedVocabulary = vocabularyPool
+    .filter((word) => word.includedInFollowAlong && !word.hiddenFromTeaching)
+    .sort((a, b) => {
+      const aOrder = a.followAlongOrder ?? Number.MAX_SAFE_INTEGER;
+      const bOrder = b.followAlongOrder ?? Number.MAX_SAFE_INTEGER;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return a.surface.localeCompare(b.surface);
+    });
+  const availableVocabulary = vocabularyPool.filter(
+    (word) => !word.includedInFollowAlong && !word.hiddenFromTeaching
+  );
 
   if (loading) {
     return (
@@ -573,9 +717,108 @@ export function TeacherFollowAlongPanel({
               : "rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-900"
           }
         >
-          Reader vocabulary is unavailable because this Teacher Book is not linked to a proven My Library copy. Run the teacher-book reader-link diagnostic and repair with the existing link migration before using reader words here.
+          This teaching-only book does not have personal Reader vocabulary linked. Follow-Along still uses teacher support items, and teaching-context vocabulary can be added without changing My Library.
         </div>
       ) : null}
+
+      <section className={isEmbedded ? "rounded-2xl border border-blue-100 bg-blue-50 p-3" : "rounded-3xl border border-blue-100 bg-blue-50 p-4"}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">
+              Follow-Along Vocabulary
+            </p>
+            <h2 className="mt-1 text-xl font-black text-stone-950">Lesson word list</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-blue-950">
+              Add teaching words here or include saved words from either book context. Removing from Follow-Along does not delete the saved word.
+            </p>
+          </div>
+          <a
+            href={`/teacher/library/${encodeURIComponent(teacherBookId)}/vocabulary`}
+            className="rounded-2xl border border-blue-200 bg-white px-4 py-2 text-sm font-black text-blue-800 hover:bg-blue-100"
+          >
+            Open Teacher Vocabulary
+          </a>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-blue-100 bg-white p-3">
+          <JapaneseDictionaryCapture
+            title="Add a lesson word"
+            description="Search, choose the meaning, and add the word to this Follow-Along list without changing My Library."
+            saveLabel="Add to Follow-Along"
+            variant="embedded"
+            onSave={saveCapturedFollowAlongWord}
+          />
+        </div>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          <div className="rounded-2xl border border-blue-100 bg-white p-3">
+            <h3 className="text-sm font-black text-stone-950">Included</h3>
+            <div className="mt-3 space-y-2">
+              {includedVocabulary.length === 0 ? (
+                <p className="text-sm leading-6 text-stone-500">No words are selected yet.</p>
+              ) : (
+                includedVocabulary.map((word, wordIndex) => (
+                  <div key={word.id} className="rounded-xl border border-stone-200 bg-stone-50 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="text-lg font-black text-stone-950">{word.surface}</p>
+                        <p className="text-sm text-stone-600">{word.reading || "—"} · {word.meaning || "No meaning"}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {word.origins.includes("my_library") ? <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-black text-emerald-800">My Library</span> : null}
+                        {word.origins.includes("teaching") ? <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-black text-blue-800">Teaching</span> : null}
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button type="button" onClick={() => void updateFollowAlongWord(word, { included_in_follow_along: false })} className="rounded-xl border border-stone-300 bg-white px-3 py-1.5 text-xs font-black text-stone-700">Remove</button>
+                      <button type="button" disabled={wordIndex === 0} onClick={() => void updateFollowAlongWord(word, { follow_along_order: Math.max(0, wordIndex - 1) })} className="rounded-xl border border-stone-300 bg-white px-3 py-1.5 text-xs font-black text-stone-700 disabled:opacity-40">Up</button>
+                      <button type="button" disabled={wordIndex === includedVocabulary.length - 1} onClick={() => void updateFollowAlongWord(word, { follow_along_order: wordIndex + 1 })} className="rounded-xl border border-stone-300 bg-white px-3 py-1.5 text-xs font-black text-stone-700 disabled:opacity-40">Down</button>
+                    </div>
+                    {word.teacherVocabularyId ? (
+                      <label className="mt-2 block">
+                        <span className="mb-1 block text-xs font-black uppercase tracking-[0.12em] text-stone-400">Support note</span>
+                        <textarea
+                          defaultValue={word.followAlongSupportNote ?? ""}
+                          rows={2}
+                          onBlur={(event) =>
+                            void updateFollowAlongWord(word, {
+                              follow_along_support_note: event.target.value.trim() || null,
+                            })
+                          }
+                          className="w-full resize-y rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm leading-5 text-stone-900"
+                        />
+                      </label>
+                    ) : null}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-blue-100 bg-white p-3">
+            <h3 className="text-sm font-black text-stone-950">Available saved words</h3>
+            <div className="mt-3 max-h-80 space-y-2 overflow-y-auto pr-1">
+              {availableVocabulary.length === 0 ? (
+                <p className="text-sm leading-6 text-stone-500">
+                  No available words. Hidden words can be restored from Teacher Vocabulary.
+                </p>
+              ) : (
+                availableVocabulary.map((word) => (
+                  <div key={word.id} className="rounded-xl border border-stone-200 bg-stone-50 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="text-base font-black text-stone-950">{word.surface}</p>
+                        <p className="text-sm text-stone-600">{word.reading || "—"} · {word.meaning || "No meaning"}</p>
+                      </div>
+                      <button type="button" onClick={() => void updateFollowAlongWord(word, { included_in_follow_along: true, follow_along_order: includedVocabulary.length + 1 })} className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-black text-blue-800">Include</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
 
       <div
         className={

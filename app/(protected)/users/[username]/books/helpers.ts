@@ -1,3 +1,8 @@
+import {
+  personalTrackingStatusLabel,
+  resolvePersonalTrackingStatus,
+} from "@/lib/personalTracking";
+
 export function normalizeBookPart(value: string | null | undefined) {
   return (value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 }
@@ -215,6 +220,7 @@ type SortableLibraryBook = {
 
 type SortableLibraryItem = {
   id: string;
+  personal_tracking_status?: string | null;
   started_at: string | null;
   finished_at: string | null;
   dnf_at: string | null;
@@ -224,18 +230,22 @@ type SortableLibraryItem = {
 };
 
 export function getLibraryItemStatusLabel(row: SortableLibraryItem) {
-  if (row.finished_at && !row.dnf_at) return "Finished";
-  if (row.dnf_at) return "DNF";
-  if (row.started_at) return "In progress";
-  return "Not started";
+  return personalTrackingStatusLabel(resolvePersonalTrackingStatus(row));
 }
 
 function getLibraryItemStatusOrder(row: SortableLibraryItem) {
-  if (row.started_at && !row.finished_at && !row.dnf_at) return 0;
-  if (!row.started_at && !row.finished_at && !row.dnf_at) return 1;
-  if (row.finished_at && !row.dnf_at) return 2;
-  if (row.dnf_at) return 3;
-  return 4;
+  switch (resolvePersonalTrackingStatus(row)) {
+    case "reading":
+      return 0;
+    case "want_to_read":
+      return 1;
+    case "finished":
+      return 2;
+    case "dnf":
+      return 3;
+    case "not_tracking":
+      return 4;
+  }
 }
 
 function compareNullableNumber(

@@ -19,6 +19,9 @@ type LibraryViewControlsProps = {
   onViewModeChange: (value: LibraryViewMode) => void;
   bookTypeFilter: string;
   onBookTypeFilterChange: (value: string) => void;
+  statusFilter: string;
+  onStatusFilterChange: (value: string) => void;
+  showTeachingBooksFilter: boolean;
   sortMode: LibrarySortMode;
   onSortModeChange: (value: LibrarySortMode) => void;
 };
@@ -28,6 +31,9 @@ export default function LibraryViewControls({
   onViewModeChange,
   bookTypeFilter,
   onBookTypeFilterChange,
+  statusFilter,
+  onStatusFilterChange,
+  showTeachingBooksFilter,
   sortMode,
   onSortModeChange,
 }: LibraryViewControlsProps) {
@@ -67,6 +73,21 @@ export default function LibraryViewControls({
               {option.label}
             </option>
           ))}
+        </select>
+
+        <select
+          value={statusFilter}
+          onChange={(event) => onStatusFilterChange(event.target.value)}
+          className="rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
+        >
+          <option value="all">All Books</option>
+          <option value="reading">Currently Reading</option>
+          <option value="want_to_read">Want to Read</option>
+          <option value="finished">Finished</option>
+          <option value="dnf">DNF</option>
+          {showTeachingBooksFilter ? (
+            <option value="teaching_books">Teaching Books</option>
+          ) : null}
         </select>
 
         <select

@@ -32,12 +32,13 @@ export default function BulkApplyFieldsPanel({
     <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="space-y-4">
         <div className="grid items-center gap-3 md:grid-cols-[160px_520px_auto]">
-          <div className="text-sm font-medium text-gray-700">Page number</div>
+          <div className="text-sm font-medium text-gray-700">Page or %</div>
           <input
-            type="number"
+            type="text"
+            inputMode="decimal"
             value={bulkPageNumber}
             onChange={(e) => onBulkPageNumberChange(e.target.value)}
-            placeholder="e.g. 45"
+            placeholder="e.g. 45 or 18%"
             className="rounded border p-2"
           />
           <button

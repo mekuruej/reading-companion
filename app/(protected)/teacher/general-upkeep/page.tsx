@@ -17,10 +17,10 @@ type UpkeepCard = {
 
 const baseUpkeepCards: UpkeepCard[] = [
   {
-    title: "Global Book Entry",
-    href: "/books/add?context=teacher-global&from=site-upkeep",
+    title: "Catalog Editor",
+    href: "/teacher/books/add?from=site-upkeep",
     eyebrow: "Books",
-    description: "Create shared book editions without adding them to a personal Library.",
+    description: "Create and clean up shared book edition metadata.",
   },
   {
     title: "Global Vocabulary Entry",
@@ -98,6 +98,7 @@ function UpkeepCardGrid({ cards }: { cards: UpkeepCard[] }) {
 export default function TeacherGeneralUpkeepPage() {
   const [accessChecked, setAccessChecked] = useState(false);
   const [canAccess, setCanAccess] = useState(false);
+  const [canUseCatalogEditor, setCanUseCatalogEditor] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -106,6 +107,7 @@ export default function TeacherGeneralUpkeepPage() {
     async function checkTeacherAccess() {
       setAccessChecked(false);
       setCanAccess(false);
+      setCanUseCatalogEditor(false);
       setMessage("");
 
       const { data: auth, error: authError } = await supabase.auth.getUser();
@@ -135,9 +137,15 @@ export default function TeacherGeneralUpkeepPage() {
 
       const isTeacher =
         profile?.role === "teacher" ||
+        profile?.role === "admin" ||
+        profile?.role === "super_teacher" ||
+        isSuperTeacherFlag(profile?.is_super_teacher);
+      const isCatalogEditorUser =
+        profile?.role === "admin" ||
         profile?.role === "super_teacher" ||
         isSuperTeacherFlag(profile?.is_super_teacher);
       setCanAccess(isTeacher);
+      setCanUseCatalogEditor(isCatalogEditorUser);
       setMessage(isTeacher ? "" : "Teacher access is required.");
       setAccessChecked(true);
     }
@@ -194,7 +202,11 @@ export default function TeacherGeneralUpkeepPage() {
         </section>
 
         <section className="mt-6">
-          <UpkeepCardGrid cards={baseUpkeepCards} />
+          <UpkeepCardGrid
+            cards={baseUpkeepCards.filter(
+              (card) => card.href !== "/teacher/books/add?from=site-upkeep" || canUseCatalogEditor
+            )}
+          />
         </section>
       </div>
     </main>

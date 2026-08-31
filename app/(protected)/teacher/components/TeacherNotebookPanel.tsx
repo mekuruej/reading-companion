@@ -5,6 +5,10 @@ import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "
 import { supabase } from "@/lib/supabaseClient";
 
 export type NotebookTab =
+  | "book_character"
+  | "book_plot"
+  | "book_quote"
+  | "book_note"
   | "grammar"
   | "phrase"
   | "translation"
@@ -12,6 +16,7 @@ export type NotebookTab =
   | "note";
 
 type EntryType = NotebookTab;
+type JournalGroup = "book_journal" | "teaching_notes";
 
 type TeacherNotebookPanelProps = {
   teacherBookId?: string | null;
@@ -36,6 +41,7 @@ type NotebookEntry = {
   reading: string | null;
   meaning: string | null;
   body: string | null;
+  journal_visibility?: "book_shared" | "teaching_private" | null;
   created_at: string | null;
   updated_at: string | null;
   teacher_notebook_entry_contexts?: NotebookContext[];
@@ -86,15 +92,44 @@ type LocationDraft = {
   percent: string;
 };
 
-const tabs: Array<{ id: NotebookTab; label: string }> = [
+const bookJournalTabs: Array<{ id: NotebookTab; label: string }> = [
+  { id: "book_character", label: "Characters" },
+  { id: "book_plot", label: "Plot" },
+  { id: "book_quote", label: "Quotes" },
+  { id: "book_note", label: "General Notes" },
+];
+
+const teachingNoteTabs: Array<{ id: NotebookTab; label: string }> = [
   { id: "grammar", label: "Grammar" },
   { id: "phrase", label: "Phrases" },
   { id: "translation", label: "Translation" },
   { id: "special_vocab", label: "Special Vocab" },
-  { id: "note", label: "Notes" },
+  { id: "note", label: "Lesson Notes" },
 ];
 
+const tabs = [...bookJournalTabs, ...teachingNoteTabs];
+
 const entryLabels: Record<EntryType, { singular: string; input: string; body: string }> = {
+  book_character: {
+    singular: "Character",
+    input: "Character name",
+    body: "Notes",
+  },
+  book_plot: {
+    singular: "Plot Note",
+    input: "Plot point",
+    body: "Notes",
+  },
+  book_quote: {
+    singular: "Quote",
+    input: "Quote or memorable line",
+    body: "Notes",
+  },
+  book_note: {
+    singular: "General Note",
+    input: "Title",
+    body: "Body",
+  },
   special_vocab: {
     singular: "Special Vocab",
     input: "Name, term, or special word",
@@ -123,6 +158,10 @@ const entryLabels: Record<EntryType, { singular: string; input: string; body: st
 };
 
 const teacherPrepTabHelperText: Record<EntryType, string> = {
+  book_character: "Shared book knowledge. These Book Journal notes can appear in Teacher Journal and future Reader Journal views for this book.",
+  book_plot: "Shared book knowledge. These Book Journal notes can appear in Teacher Journal and future Reader Journal views for this book.",
+  book_quote: "Shared book knowledge. These Book Journal notes can appear in Teacher Journal and future Reader Journal views for this book.",
+  book_note: "Shared book knowledge. These Book Journal notes can appear in Teacher Journal and future Reader Journal views for this book.",
   grammar: "Reusable across books. Add a page or percent when you encounter this in a Student Lesson.",
   phrase: "Reusable across books. Add a page or percent when you encounter this in a Student Lesson.",
   translation: "Usually tied to this book. Add a page or percent if it helps you find the passage again.",
@@ -188,10 +227,17 @@ function formatGrammarBody(draft: EntryDraft) {
 function isTeacherRole(profile: any) {
   return (
     profile?.role === "teacher" ||
+    profile?.role === "admin" ||
     profile?.role === "super_teacher" ||
     profile?.is_super_teacher === true ||
     profile?.is_super_teacher === "true"
   );
+}
+
+function journalGroupForTab(tab: NotebookTab): JournalGroup {
+  return bookJournalTabs.some((candidate) => candidate.id === tab)
+    ? "book_journal"
+    : "teaching_notes";
 }
 
 function clean(value: string) {
@@ -204,6 +250,20 @@ function parseNumber(value: string) {
   if (!next) return null;
   const numberValue = Number(next);
   return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function parseNotebookLocation(pageValue: string, percentValue: string) {
+  const pageText = pageValue.trim();
+  const percentText = percentValue.trim();
+  const pageHasPercent = pageText.includes("%");
+  const pageNumber = pageHasPercent
+    ? null
+    : parseNumber(pageText);
+  const percentLocation = pageHasPercent
+    ? parseNumber(pageText.replace(/%/g, "").trim())
+    : parseNumber(percentText.replace(/%/g, "").trim());
+
+  return { pageNumber, percentLocation };
 }
 
 function contextSummary(context: NotebookContext | undefined) {
@@ -311,7 +371,8 @@ export default function TeacherNotebookPanel({
   const [teacherId, setTeacherId] = useState("");
   const [canAccess, setCanAccess] = useState(false);
   const [message, setMessage] = useState("");
-  const [activeTab, setActiveTab] = useState<NotebookTab>("grammar");
+  const [activeJournalGroup, setActiveJournalGroup] = useState<JournalGroup>("book_journal");
+  const [activeTab, setActiveTab] = useState<NotebookTab>("book_character");
 
   const [wordList, setWordList] = useState<WordList | null>(null);
   const [wordInput, setWordInput] = useState("");
@@ -333,6 +394,8 @@ export default function TeacherNotebookPanel({
   const isLessonMode = mode === "lesson";
   const activeEntryType = activeTab;
   const activeEntryLabels = activeEntryType ? entryLabels[activeEntryType] : null;
+  const visibleTabs =
+    activeJournalGroup === "book_journal" ? bookJournalTabs : teachingNoteTabs;
 
   const selectedWords = useMemo(
     () => wordDrafts.filter((draft) => selectedWordIds.includes(draft.id)),
@@ -368,6 +431,7 @@ export default function TeacherNotebookPanel({
 
   useEffect(() => {
     if (initialTab && tabs.some((tab) => tab.id === initialTab)) {
+      setActiveJournalGroup(journalGroupForTab(initialTab));
       setActiveTab(initialTab);
     }
 
@@ -500,6 +564,7 @@ export default function TeacherNotebookPanel({
         reading,
         meaning,
         body,
+        journal_visibility,
         created_at,
         updated_at,
         teacher_notebook_entry_contexts (*)
@@ -682,7 +747,9 @@ export default function TeacherNotebookPanel({
     if (!activeEntryType || !teacherId || entrySaving) return;
 
     const mainText =
-      activeEntryType === "note" ? entryDraft.title.trim() || entryDraft.body.trim() : entryDraft.surfaceText.trim();
+      activeEntryType === "note" || activeEntryType === "book_note"
+        ? entryDraft.title.trim() || entryDraft.body.trim()
+        : entryDraft.surfaceText.trim();
 
     if (!mainText) {
       setMessage(`Add ${activeEntryLabels?.input.toLowerCase() ?? "text"} first.`);
@@ -696,9 +763,15 @@ export default function TeacherNotebookPanel({
       const payload = {
         teacher_id: teacherId,
         entry_type: activeEntryType,
+        journal_visibility:
+          journalGroupForTab(activeEntryType) === "book_journal"
+            ? "book_shared"
+            : "teaching_private",
         title: clean(entryDraft.title),
         surface_text:
-          activeEntryType === "note" ? clean(entryDraft.title) : clean(entryDraft.surfaceText),
+          activeEntryType === "note" || activeEntryType === "book_note"
+            ? clean(entryDraft.title)
+            : clean(entryDraft.surfaceText),
         reading: clean(entryDraft.reading),
         meaning:
           activeEntryType === "translation" ? clean(entryDraft.meaning) : clean(entryDraft.meaning),
@@ -741,8 +814,7 @@ export default function TeacherNotebookPanel({
   }
 
   async function upsertContext(entryId: string) {
-    const pageNumber = parseNumber(entryDraft.page);
-    const percentLocation = parseNumber(entryDraft.percent);
+    const { pageNumber, percentLocation } = parseNotebookLocation(entryDraft.page, entryDraft.percent);
 
     const contextPayload = {
       entry_id: entryId,
@@ -788,8 +860,7 @@ export default function TeacherNotebookPanel({
   async function saveLessonLocation(entry: NotebookEntry) {
     if (!teacherId || locationSaving) return;
 
-    const pageNumber = parseNumber(locationDraft.page);
-    const percentLocation = parseNumber(locationDraft.percent);
+    const { pageNumber, percentLocation } = parseNotebookLocation(locationDraft.page, locationDraft.percent);
 
     if (pageNumber == null && percentLocation == null) {
       setMessage("Add a page or percent location first.");
@@ -1067,16 +1138,44 @@ export default function TeacherNotebookPanel({
 
         <div className={wordCaptureEnabled ? "mt-4" : ""}>
           <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
-            Teacher Notebook
+            Teacher Journal
           </p>
-          <h2 className="mt-1 text-2xl font-black text-stone-950">Private lesson notes</h2>
+          <h2 className="mt-1 text-2xl font-black text-stone-950">Book knowledge and teaching notes</h2>
           <p className="mt-1 text-xs leading-5 text-stone-500">
-            Teacher-owned entries. Student sharing is not enabled.
+            Teacher-owned entries. Book Journal notes are shared book knowledge; Teaching Notes stay private to teaching.
           </p>
         </div>
 
+        <div className="mt-3 grid grid-cols-2 gap-1 rounded-2xl border border-stone-200 bg-stone-50 p-1">
+          {[
+            { id: "book_journal" as const, label: "Book Journal" },
+            { id: "teaching_notes" as const, label: "Teaching Notes" },
+          ].map((group) => (
+            <button
+              key={group.id}
+              type="button"
+              onClick={() => {
+                setActiveJournalGroup(group.id);
+                setActiveTab(
+                  group.id === "book_journal" ? bookJournalTabs[0].id : teachingNoteTabs[0].id
+                );
+                resetEntryForm();
+                setEntrySearch("");
+                setMessage("");
+              }}
+              className={`rounded-xl px-3 py-2 text-xs font-black transition ${
+                activeJournalGroup === group.id
+                  ? "bg-blue-700 text-white shadow-sm"
+                  : "text-stone-500 hover:bg-white hover:text-stone-900"
+              }`}
+            >
+              {group.label}
+            </button>
+          ))}
+        </div>
+
         <div className="mt-3 flex gap-1 overflow-x-auto rounded-2xl border border-stone-200 bg-stone-50 p-1">
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -1287,9 +1386,13 @@ export default function TeacherNotebookPanel({
                       {activeEntryLabels.input}
                     </span>
                     <input
-                      value={activeEntryType === "note" ? entryDraft.title : entryDraft.surfaceText}
+                      value={
+                        activeEntryType === "note" || activeEntryType === "book_note"
+                          ? entryDraft.title
+                          : entryDraft.surfaceText
+                      }
                       onChange={(event) =>
-                        activeEntryType === "note"
+                        activeEntryType === "note" || activeEntryType === "book_note"
                           ? setEntryDraft((prev) => ({ ...prev, title: event.target.value }))
                           : setEntryDraft((prev) => ({ ...prev, surfaceText: event.target.value }))
                       }
@@ -1379,10 +1482,12 @@ export default function TeacherNotebookPanel({
                   <div className="grid gap-2 sm:grid-cols-2">
                     <label className="block">
                       <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-400">
-                        Page
+                        Page or %
                       </span>
                       <input
                         value={entryDraft.page}
+                        inputMode="decimal"
+                        placeholder="p. 42 or 18%"
                         onChange={(event) =>
                           setEntryDraft((prev) => ({ ...prev, page: event.target.value }))
                         }
@@ -1565,11 +1670,12 @@ export default function TeacherNotebookPanel({
                               </p>
                               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                                 <label className="text-xs font-black uppercase tracking-[0.12em] text-stone-500">
-                                  Page
+                                  Page or %
                                   <input
-                                    type="number"
-                                    min="0"
+                                    type="text"
+                                    inputMode="decimal"
                                     value={locationDraft.page}
+                                    placeholder="p. 42 or 18%"
                                     onChange={(event) =>
                                       setLocationDraft((previous) => ({
                                         ...previous,

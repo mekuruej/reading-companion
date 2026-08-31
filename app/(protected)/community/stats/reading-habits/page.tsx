@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { resolvePersonalTrackingStatus } from "@/lib/personalTracking";
 import SectionBand from "./components/SectionBand";
 import BarStrip from "./components/BarStrip";
 import ModeStrip from "./components/ModeStrip";
@@ -252,12 +253,13 @@ export default function ReadingHabitsPage() {
 
         const { data: userBooks, error: userBooksError } = await supabase
           .from("user_books")
-          .select("id")
+          .select("id, personal_tracking_status, status, started_at, finished_at, dnf_at")
           .eq("user_id", user.id);
 
         if (userBooksError) throw userBooksError;
 
         const userBookIds = (userBooks ?? [])
+          .filter((row) => resolvePersonalTrackingStatus(row) !== "not_tracking")
           .map((row) => row.id)
           .filter(Boolean);
 

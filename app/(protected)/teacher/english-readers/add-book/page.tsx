@@ -273,6 +273,7 @@ export default function EnglishReaderAddBookPage() {
           .insert({
             user_id: teacherId,
             book_id: bookId,
+            personal_tracking_status: "reading",
             started_at: todayYmd(),
             recommended_level: trimmedRecommendedLevel || null,
           })

@@ -75,6 +75,7 @@ type ReadingJournalPanelProps = {
   ownerUserId: string;
   favoriteQuotes?: string | null;
   bookLanguageCode?: string | null;
+  pageCount?: number | null;
   currentPageNumber?: number | null;
   selectedChapterLabel?: string | null;
   selectedChapterNumber?: number | null;
@@ -189,6 +190,7 @@ export default function ReadingJournalPanel({
   ownerUserId,
   favoriteQuotes,
   bookLanguageCode,
+  pageCount,
   currentPageNumber,
   selectedChapterLabel,
   selectedChapterNumber,
@@ -1215,6 +1217,7 @@ export default function ReadingJournalPanel({
 	      setStoryTab={setStoryTab}
 	      tabOrder={tabOrder}
 	      showCharacterReadingField={bookLanguageCode !== "en"}
+      pageCount={pageCount}
       learningArchiveReadOnlyTabs={learningArchiveReadOnlyTabs}
       detectiveEntries={detective.detectiveEntries}
       detectiveSearch={detective.detectiveSearch}

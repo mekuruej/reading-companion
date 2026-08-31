@@ -119,7 +119,7 @@ function teacherUseStatusLabel(value: string | null | undefined) {
     case "use_with_caution":
       return "Use with Caution";
     case "do_not_use":
-      return "Do Not Use";
+      return "Not for Teaching";
     default:
       return "Not set";
   }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,6 +21,7 @@ type AuthorizedBook = {
     title?: string | null;
     cover_url?: string | null;
     language_code?: string | null;
+    page_count?: number | null;
   } | null;
 };
 
@@ -91,6 +93,15 @@ function toNullableInt(value: unknown) {
   const numberValue = Number(text);
   if (!Number.isInteger(numberValue)) return null;
   return numberValue;
+}
+
+function parsePageLocationForBook(value: unknown, pageCount: number | null | undefined) {
+  const parsed = parseOptionalPageLocationInput(
+    typeof value === "string" || typeof value === "number" ? value : null,
+    pageCount ?? null
+  );
+  if (parsed.error) throw new Error(parsed.error);
+  return parsed.value;
 }
 
 function cleanString(value: unknown) {
@@ -202,7 +213,8 @@ async function authorizeTeacherForStudentBook({
       books:book_id (
         title,
         cover_url,
-        language_code
+        language_code,
+        page_count
       )
     `
     )
@@ -546,11 +558,13 @@ async function attachWordToSession({
 async function saveReviewWords({
   sessionId,
   userBookId,
+  pageCount,
   words,
   finalizeReadiness,
 }: {
   sessionId: string;
   userBookId: string;
+  pageCount: number | null | undefined;
   words: LiveLessonWordUpdate[];
   finalizeReadiness: boolean;
 }) {
@@ -586,7 +600,7 @@ async function saveReviewWords({
       meaning_choice_index: nullableNonNegativeInt(
         word.meaning_choice_index ?? word.meaningChoiceIndex
       ),
-      page_number: toNullableInt(word.page_number ?? word.pageNumber),
+      page_number: parsePageLocationForBook(word.page_number ?? word.pageNumber, pageCount),
       chapter_number: toNullableInt(word.chapter_number ?? word.chapterNumber),
       chapter_name: nullableText(word.chapter_name ?? word.chapterName),
     };
@@ -795,7 +809,7 @@ export async function POST(req: Request) {
     const targetLanguageCode =
       access.userBook.books?.language_code?.trim() || "ja";
     const supportLanguageCode = supportLanguageForTarget(targetLanguageCode);
-    const pageNumber = toNullableInt(body?.page);
+    const pageNumber = parsePageLocationForBook(body?.page, access.userBook.books?.page_count ?? null);
     const chapterNumber = toNullableInt(body?.chapterNumber);
     const chapterName = cleanString(body?.chapterName) || null;
 
@@ -908,6 +922,7 @@ export async function PATCH(req: Request) {
     await saveReviewWords({
       sessionId,
       userBookId,
+      pageCount: access.userBook.books?.page_count ?? null,
       words,
       finalizeReadiness: nextStatus === "completed",
     });
@@ -921,7 +936,10 @@ export async function PATCH(req: Request) {
         payload.ended_adding_at = timestamp;
         payload.review_started_at = session.review_started_at ?? timestamp;
         if (shouldSaveStoppingPoint) {
-          const stoppingPageNumber = toNullableInt(body?.stoppingPageNumber);
+          const stoppingPageNumber = parsePageLocationForBook(
+            body?.stoppingPageNumber,
+            access.userBook.books?.page_count ?? null
+          );
           const stoppingText = nullableLimitedText(body?.stoppingText, 500);
 
           if (stoppingPageNumber == null && !stoppingText) {

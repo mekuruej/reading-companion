@@ -32,6 +32,8 @@ type ManualEditionCandidate = {
   };
   missingFields: string[];
   adding: boolean;
+  addLabel?: string;
+  disabled?: boolean;
   requestLoading: boolean;
 };
 
@@ -47,6 +49,7 @@ type ManualEditionFormProps = {
   error: string;
   loading: boolean;
   addLabel?: string;
+  addDisabled?: boolean;
   candidates: ManualEditionCandidate[];
   editionFormatOptions: EditionFormatOption[];
   onTitleChange: (value: string) => void;
@@ -80,6 +83,7 @@ export default function ManualEditionForm({
   error,
   loading,
   addLabel = "Add to Library",
+  addDisabled = false,
   candidates,
   editionFormatOptions,
   onTitleChange,
@@ -245,8 +249,9 @@ export default function ManualEditionForm({
               result={candidate.result}
               missingFields={candidate.missingFields}
               adding={candidate.adding}
+              disabled={candidate.disabled}
               requestLoading={candidate.requestLoading}
-              addLabel="Use This Edition"
+              addLabel={candidate.addLabel ?? "Use This Edition"}
               onAdd={() => onUseExistingEdition(candidate.result.id)}
               onRequestReview={() => onCheckDetails(candidate.result)}
             />
@@ -258,7 +263,7 @@ export default function ManualEditionForm({
         <button
           type="button"
           onClick={onSubmit}
-          disabled={loading}
+          disabled={loading || addDisabled}
           className="rounded-2xl bg-amber-500 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? "Adding..." : addLabel}
@@ -267,7 +272,7 @@ export default function ManualEditionForm({
           <button
             type="button"
             onClick={onSubmitDifferentEdition}
-            disabled={loading}
+            disabled={loading || addDisabled}
             className="rounded-2xl border border-stone-200 bg-white px-5 py-3 text-sm font-bold text-stone-700 shadow-sm transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             This Is a Different Edition

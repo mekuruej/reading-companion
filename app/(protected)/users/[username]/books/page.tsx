@@ -44,6 +44,7 @@ import {
   getLibraryItemStatusLabel,
   sortLibraryItems,
 } from "./helpers";
+import { resolvePersonalTrackingStatus } from "@/lib/personalTracking";
 import {
   isAbilityCheckClaimInDailyPool,
   isAbilityCheckCardInDailyPool,
@@ -72,6 +73,7 @@ type Book = {
 type UserBookRow = {
   id: string;
   book_id: string;
+  personal_tracking_status?: string | null;
   started_at: string | null;
   finished_at: string | null;
   dnf_at: string | null;
@@ -89,6 +91,7 @@ type UserBookRow = {
   prepared_by?: string | null;
   source_user_book_id?: string | null;
   assigned_from_prep_at?: string | null;
+  isTeachingOnly?: boolean;
 };
 
 type ProfileRole = "teacher" | "super_teacher" | "admin" | "member";
@@ -215,6 +218,8 @@ export default function BooksPage() {
     useState("");
 
   const [bookTypeFilter, setBookTypeFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [teachingBookUserBookIds, setTeachingBookUserBookIds] = useState<Set<string>>(new Set());
   const isTeacher = myRole === "teacher" || myRole === "super_teacher" || isSuperTeacher;
 
   const filteredRows = useMemo(() => {
@@ -222,9 +227,16 @@ export default function BooksPage() {
       const matchesBookType =
         bookTypeFilter === "all" || row.books?.book_type === bookTypeFilter;
 
-      return matchesBookType;
+      const personalTrackingStatus = resolvePersonalTrackingStatus(row);
+      const isTeachingBook = teachingBookUserBookIds.has(row.id);
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "teaching_books" && isTeachingBook) ||
+        personalTrackingStatus === statusFilter;
+
+      return matchesBookType && matchesStatus;
     });
-  }, [rows, bookTypeFilter]);
+  }, [rows, bookTypeFilter, statusFilter, teachingBookUserBookIds]);
 
   const pendingBookRequestsAlertSignature = useMemo(
     () => pendingBookRequestsSignature(bookRequests),
@@ -269,8 +281,8 @@ export default function BooksPage() {
 
   const addBookHref =
     viewingUserId && meId && viewingUserId !== meId
-      ? `/books/add?destination=user&targetUserId=${encodeURIComponent(viewingUserId)}`
-      : "/books/add";
+      ? `/books/add?destination=student&targetUserId=${encodeURIComponent(viewingUserId)}`
+      : "/books/add?destination=my-library";
 
   async function loadAbilityCheckReminder(userId: string, canUseAbilityCheck: boolean) {
     if (!canUseAbilityCheck) {
@@ -532,6 +544,7 @@ export default function BooksPage() {
       .select(`
         id,
         user_id,
+        personal_tracking_status,
         started_at,
         finished_at,
         dnf_at,
@@ -566,14 +579,48 @@ export default function BooksPage() {
     }
 
     const loadedRows = (data as any) || [];
-    setLibraryBooksError(null);
-    setRows(loadedRows);
 
-    const userBookIds = loadedRows.map((r: any) => r.id);
+    let teachingIds = new Set<string>();
+
+    if (isTeacher && targetUserId === meId) {
+      const { data: teacherBookRows, error: teacherBookError } = await supabase
+        .from("teacher_books")
+        .select("user_book_id")
+        .eq("teacher_id", meId)
+        .not("user_book_id", "is", null);
+
+      if (teacherBookError) {
+        console.error("Error loading teaching book links:", teacherBookError);
+        setTeachingBookUserBookIds(new Set());
+      } else {
+        teachingIds = new Set(
+          ((teacherBookRows ?? []) as any[])
+            .map((item) => item.user_book_id as string | null)
+            .filter((id): id is string => Boolean(id))
+        );
+        setTeachingBookUserBookIds(teachingIds);
+      }
+    } else {
+      setTeachingBookUserBookIds(new Set());
+    }
+
+    const rowsWithTeachingBadges = loadedRows.map((item: any) => ({
+      ...item,
+      isTeachingOnly:
+        teachingIds.has(item.id) &&
+        resolvePersonalTrackingStatus(item) === "not_tracking",
+    }));
+
+    setLibraryBooksError(null);
+    setRows(rowsWithTeachingBadges);
+
+    const userBookIds = rowsWithTeachingBadges
+      .filter((r: any) => resolvePersonalTrackingStatus(r) !== "not_tracking")
+      .map((r: any) => r.id);
     const pageCountByUserBookId: Record<string, number | null> = {};
     const formatTypeByUserBookId: Record<string, string | null> = {};
 
-    for (const r of loadedRows) {
+    for (const r of rowsWithTeachingBadges) {
       pageCountByUserBookId[r.id] = r.books?.page_count ?? null;
       formatTypeByUserBookId[r.id] = r.format_type ?? null;
     }
@@ -1356,13 +1403,16 @@ export default function BooksPage() {
   }, [viewingUserId, meId, canUseAbilityCheckReminder]);
 
   const currentlyReading = validRows.filter(
-    (r) => !!r.started_at && !r.finished_at && !r.dnf_at
+    (r) => resolvePersonalTrackingStatus(r) === "reading"
   );
   const notStarted = validRows.filter(
-    (r) => !r.started_at && !r.finished_at && !r.dnf_at
+    (r) => resolvePersonalTrackingStatus(r) === "want_to_read"
   );
-  const finished = validRows.filter((r) => !!r.finished_at && !r.dnf_at);
-  const dnf = validRows.filter((r) => !!r.dnf_at);
+  const finished = validRows.filter((r) => resolvePersonalTrackingStatus(r) === "finished");
+  const dnf = validRows.filter((r) => resolvePersonalTrackingStatus(r) === "dnf");
+  const notTracking = validRows.filter(
+    (r) => resolvePersonalTrackingStatus(r) === "not_tracking"
+  );
 
   const sortedValidRows = useMemo(() => {
     return sortLibraryItems(validRows, sortMode, readingStatsByUserBookId);
@@ -1674,6 +1724,9 @@ export default function BooksPage() {
           onViewModeChange={setViewMode}
           bookTypeFilter={bookTypeFilter}
           onBookTypeFilterChange={setBookTypeFilter}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          showTeachingBooksFilter={isTeacher && isViewingOwnLibrary}
           sortMode={sortMode}
           onSortModeChange={setSortMode}
         />
@@ -1730,6 +1783,17 @@ export default function BooksPage() {
                 >
                   {dnf.map((row) => renderBookCard(row))}
                 </LibrarySection>
+
+                {isTeacher && isViewingOwnLibrary && notTracking.length > 0 ? (
+                  <LibrarySection
+                    title="Teaching Only"
+                    subtitle="In Teaching Books but not counted as personal reading"
+                    count={notTracking.length}
+                    gridClassName={gridClass}
+                  >
+                    {notTracking.map((row) => renderBookCard(row))}
+                  </LibrarySection>
+                ) : null}
               </>
             ) : (
               <ul className={gridClass}>

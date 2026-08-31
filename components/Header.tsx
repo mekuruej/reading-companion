@@ -205,8 +205,7 @@ export default function Header() {
     pathname.startsWith("/kanji-reading-study");
   const teacherSectionActive = pathname.startsWith("/teacher");
   const teacherStudentsActive = pathname === "/teacher/students" || pathname.startsWith("/teacher/students/");
-  const teacherLessonPrepActive =
-    pathname === "/teacher/lesson-prep" ||
+  const teacherTeachingBooksActive =
     pathname.startsWith("/teacher/library") ||
     pathname.startsWith("/teacher/clubs");
   const teacherNeedsAttentionActive =
@@ -600,14 +599,14 @@ export default function Header() {
                     </Link>
 
                     <Link
-                      href="/teacher/lesson-prep"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${teacherLessonPrepActive
+                      href="/teacher/library"
+                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${teacherTeachingBooksActive
                         ? "bg-stone-100 font-medium text-stone-900"
                         : "text-stone-700 hover:bg-stone-50"
                         }`}
                       onClick={() => setShowTeacherMenu(false)}
                     >
-                      Lesson Prep
+                      Teaching Books
                     </Link>
 
                     <Link

@@ -43,13 +43,15 @@ export default function BookVocabPageCell({
   return (
     <td className="p-2 text-center">
       <input
-        type="number"
+        type="text"
+        inputMode="decimal"
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
         onBlur={() => void commit()}
         onKeyDown={handleKeyDown}
-        aria-label="Page number"
-        className="w-14 rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-center text-sm font-semibold text-stone-700 shadow-sm focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-100"
+        aria-label="Page number or percent"
+        placeholder="%"
+        className="w-20 rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-center text-sm font-semibold text-stone-700 shadow-sm focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-100"
       />
     </td>
   );

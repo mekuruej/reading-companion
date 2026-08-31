@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 import { TeacherFollowAlongPanel } from "../../../../../library/[teacherBookId]/follow/components/TeacherFollowAlongPanel";
 
 type StudentProfile = {
@@ -24,6 +25,7 @@ type BookMeta = {
   author: string | null;
   cover_url: string | null;
   language_code: string | null;
+  page_count: number | null;
 };
 
 type StudentUserBook = {
@@ -385,6 +387,7 @@ export default function LiveLessonAddWordPage() {
   const [teacherId, setTeacherId] = useState("");
   const [student, setStudent] = useState<StudentProfile | null>(null);
   const [studentBook, setStudentBook] = useState<StudentUserBook | null>(null);
+  const [bookPageCount, setBookPageCount] = useState<number | null>(null);
   const [session, setSession] = useState<LiveLessonSession | null>(null);
   const [word, setWord] = useState("");
   const [currentPage, setCurrentPage] = useState("");
@@ -660,7 +663,8 @@ export default function LiveLessonAddWordPage() {
             title,
             author,
             cover_url,
-            language_code
+            language_code,
+            page_count
           )
         `
         )
@@ -717,6 +721,7 @@ export default function LiveLessonAddWordPage() {
       setTeacherId(nextTeacherId);
       setStudent((studentProfile ?? null) as StudentProfile | null);
       setStudentBook(loadedStudentBook);
+      setBookPageCount(firstBook(loadedStudentBook.books)?.page_count ?? null);
       void loadTeacherFollowAlongMatch(nextTeacherId, loadedStudentBook.book_id);
 
       let restored = await loadSessionFromApi(requestedSessionId);
@@ -760,7 +765,7 @@ export default function LiveLessonAddWordPage() {
   }
 
   function nudgePage(delta: number) {
-    const value = Number(currentPage);
+    const value = parseOptionalPageLocationInput(currentPage, bookPageCount).value;
     if (!Number.isFinite(value)) {
       if (delta > 0) setCurrentPage("1");
       return;
@@ -972,9 +977,7 @@ export default function LiveLessonAddWordPage() {
         const cleanStoppingPage = checkpoint.stoppingPageNumber?.trim() ?? "";
         setLatestStoppingPoint({
           sessionId: nextSession.id,
-          pageNumber: cleanStoppingPage && Number.isInteger(Number(cleanStoppingPage))
-            ? Number(cleanStoppingPage)
-            : null,
+          pageNumber: parseOptionalPageLocationInput(cleanStoppingPage, bookPageCount).value,
           endingText: checkpoint.stoppingText?.trim() || null,
           savedAt: nextSession.stopping_point_saved_at,
           status: nextSession.status,
@@ -1263,14 +1266,15 @@ export default function LiveLessonAddWordPage() {
             <div className="mt-4 grid gap-3 md:grid-cols-[160px_1fr]">
               <label className="block">
                 <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-amber-900">
-                  Page
+                  Page or %
                 </span>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   value={stoppingPageDraft}
                   onChange={(event) => setStoppingPageDraft(event.target.value)}
                   disabled={reviewSaving}
-                  placeholder="Optional"
+                  placeholder="Optional, e.g. p. 42 or 18%"
                   className="w-full rounded-xl border border-amber-200 bg-white px-3 py-3 text-base font-semibold text-stone-950 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100 disabled:bg-stone-100"
                 />
               </label>
@@ -1353,7 +1357,7 @@ export default function LiveLessonAddWordPage() {
 
                 <label className="block">
                   <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-stone-500">
-                    Current page
+                    Current page or %
                   </span>
                   <div className="flex rounded-xl border border-amber-300 bg-amber-50 p-1 shadow-sm">
                     <button
@@ -1365,10 +1369,11 @@ export default function LiveLessonAddWordPage() {
                       -
                     </button>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       value={currentPage}
                       onChange={(event) => setCurrentPage(event.target.value)}
-                      placeholder="Page"
+                      placeholder="Page or %"
                       className="min-w-0 flex-1 bg-transparent px-2 text-center text-2xl font-black text-stone-950 outline-none"
                     />
                     <button
@@ -1470,12 +1475,14 @@ export default function LiveLessonAddWordPage() {
                 <div className="flex flex-wrap items-end gap-3">
                   <label className="block">
                     <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-sky-900">
-                      Page
+                      Page or %
                     </span>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       value={bulkPage}
                       onChange={(event) => setBulkPage(event.target.value)}
+                      placeholder="p. 42 or 18%"
                       className="w-28 rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm"
                     />
                   </label>
@@ -1648,15 +1655,17 @@ export default function LiveLessonAddWordPage() {
                       <div className="mt-3 grid gap-3 md:grid-cols-3">
                         <label className="block">
                           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-stone-500">
-                            Page
+                            Page or %
                           </span>
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="decimal"
                             value={draft.pageNumber}
                             onChange={(event) =>
                               updateReviewDraft(draft.id, { pageNumber: event.target.value })
                             }
                             disabled={isCompleted}
+                            placeholder="p. 42 or 18%"
                             className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm disabled:bg-stone-100"
                           />
                         </label>

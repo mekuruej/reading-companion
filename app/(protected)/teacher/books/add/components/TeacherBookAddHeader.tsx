@@ -22,12 +22,12 @@ export function TeacherBookAddHeader({
 
       <div className="space-y-2">
         <h1 className="text-3xl font-bold text-stone-900">
-          {isEditing ? "Edit shared book" : "Add shared book"}
+          {isEditing ? "Edit Catalog Book" : "Catalog Editor"}
         </h1>
 
         <p className="max-w-2xl text-sm leading-6 text-stone-600">
-          Create or update a shared catalog book. This does not add the book to
-          a student library.
+          Create or update shared book metadata. This does not add the book to
+          a student Library, your Library, or My Teaching Books.
         </p>
       </div>
     </header>

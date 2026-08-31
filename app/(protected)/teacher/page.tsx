@@ -79,14 +79,31 @@ type ReadingFitCountProfileRow = {
   level: string | null;
 };
 
-const teacherHubCards: TeacherHubCard[] = [
+const teachingCards: TeacherHubCard[] = [
   {
-    title: "Lesson Prep",
-    href: "/teacher/lesson-prep",
-    eyebrow: "Prepare",
+    title: "Students",
+    href: "/teacher/students",
+    eyebrow: "Learners",
     description:
-      "Open teaching books, assignments, trial prep, clubs, and reusable lesson materials.",
+      "Open student workspaces, libraries, lesson books, and follow-up actions.",
   },
+  {
+    title: "Teaching Books",
+    href: "/teacher/library?from=teacher-hub",
+    eyebrow: "Book prep",
+    description:
+      "Search your professional teaching collection, assess lesson fit, and open book workspaces.",
+  },
+  {
+    title: "English Readers Prep",
+    href: "/teacher/english-readers",
+    eyebrow: "Early scaffold",
+    description:
+      "Prepare English books with Japanese support for adult learners. Coming soon.",
+  },
+];
+
+const catalogCards: TeacherHubCard[] = [
   {
     title: "Needs Attention",
     href: "/teacher/needs-attention",
@@ -100,13 +117,6 @@ const teacherHubCards: TeacherHubCard[] = [
     eyebrow: "Maintain",
     description:
       "Open global cleanup tools and admin maintenance areas that do not belong to learner follow-up.",
-  },
-  {
-    title: "English Readers Prep",
-    href: "/teacher/english-readers",
-    eyebrow: "Early scaffold",
-    description:
-      "Prepare English books with Japanese support for adult learners. Coming soon.",
   },
 ];
 
@@ -394,7 +404,7 @@ export default function TeacherHubPage() {
               title: "Pending Book Requests",
               href: "/teacher/books",
               count: pendingBookRequestRows.length,
-              description: "Reader book requests waiting for global book entry.",
+              description: "Reader book requests waiting for catalog book entry.",
               hasToday: pendingBookRequestRows.some((row) => isTodayDate(row.created_at)),
               sortDate: oldestDate(pendingBookRequestRows.map((row) => row.created_at)),
             },
@@ -402,7 +412,7 @@ export default function TeacherHubPage() {
               title: "Book Flags / Missing Info",
               href: "/teacher/books",
               count: manualBookFlagRows.length + missingBookInfoItems.length,
-              description: "Manual book flags and global books missing core details.",
+              description: "Manual book flags and catalog books missing core details.",
               hasToday: bookFlagAndMissingDates.some((date) => isTodayDate(date)),
               sortDate: oldestDate(bookFlagAndMissingDates),
             },
@@ -473,7 +483,27 @@ export default function TeacherHubPage() {
       <TeacherHubHeader />
 
       <section className="mt-8">
-        <TeacherHubCardGrid cards={teacherHubCards} />
+        <div className="mb-3">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">
+            Teaching
+          </p>
+          <h2 className="mt-1 text-2xl font-black text-stone-950">
+            Students, lessons, and teaching books
+          </h2>
+        </div>
+        <TeacherHubCardGrid cards={teachingCards} />
+      </section>
+
+      <section className="mt-8">
+        <div className="mb-3">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
+            Catalog
+          </p>
+          <h2 className="mt-1 text-2xl font-black text-stone-950">
+            Attention queues and site upkeep
+          </h2>
+        </div>
+        <TeacherHubCardGrid cards={catalogCards} />
       </section>
 
       <TeacherHubTodaySection

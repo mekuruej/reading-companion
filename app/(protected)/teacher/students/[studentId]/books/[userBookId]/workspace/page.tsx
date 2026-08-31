@@ -78,7 +78,7 @@ const teacherUseStatusLabels: Record<TeacherUseStatus, string> = {
   currently_using: "Currently Using",
   approved_for_lesson: "Approved for Lesson",
   use_with_caution: "Use with Caution",
-  do_not_use: "Do Not Use",
+  do_not_use: "Not for Teaching",
 };
 
 function firstBook(book: StudentUserBook["books"]) {
@@ -176,49 +176,43 @@ function ActionCardLink({ action }: { action: ActionCard }) {
 }
 
 async function ensureTeacherBookSupport(teacherId: string, bookId: string) {
-  const { data: existingUserBook, error: existingUserBookError } = await supabase
-    .from("user_books")
-    .select("id")
-    .eq("user_id", teacherId)
+  const { data: existingTeacherBook, error: existingTeacherBookError } = await supabase
+    .from("teacher_books")
+    .select("id, teacher_use_status, teacher_use_note, user_book_id")
+    .eq("teacher_id", teacherId)
     .eq("book_id", bookId)
+    .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
 
-  if (existingUserBookError) throw existingUserBookError;
-
-  let linkedUserBookId = existingUserBook?.id ?? null;
-
-  if (!linkedUserBookId) {
-    const today = new Date().toISOString().slice(0, 10);
-    const { data: insertedUserBook, error: insertUserBookError } = await supabase
-      .from("user_books")
-      .insert({
-        user_id: teacherId,
-        book_id: bookId,
-        started_at: today,
-      })
-      .select("id")
-      .single();
-
-    if (insertUserBookError) throw insertUserBookError;
-    linkedUserBookId = insertedUserBook.id;
-  }
+  if (existingTeacherBookError) throw existingTeacherBookError;
+  if (existingTeacherBook?.id) return existingTeacherBook as TeacherBookSupport;
 
   const { data: teacherBook, error: teacherBookError } = await supabase
     .from("teacher_books")
-    .upsert(
-      {
-        teacher_id: teacherId,
-        book_id: bookId,
-        user_book_id: linkedUserBookId,
-        teacher_use_status: "want_to_test",
-      },
-      { onConflict: "teacher_id,book_id" }
-    )
+    .insert({
+      teacher_id: teacherId,
+      book_id: bookId,
+      teacher_use_status: null,
+    })
     .select("id, teacher_use_status, teacher_use_note, user_book_id")
     .single();
 
-  if (teacherBookError) throw teacherBookError;
+  if (teacherBookError) {
+    const { data: racedTeacherBook, error: racedLookupError } = await supabase
+      .from("teacher_books")
+      .select("id, teacher_use_status, teacher_use_note, user_book_id")
+      .eq("teacher_id", teacherId)
+      .eq("book_id", bookId)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (racedTeacherBook?.id) return racedTeacherBook as TeacherBookSupport;
+    if (racedLookupError) throw racedLookupError;
+    throw teacherBookError;
+  }
+
   return teacherBook as TeacherBookSupport;
 }
 

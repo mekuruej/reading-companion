@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { isJapaneseLearningBook } from "@/lib/access/readingCompanion";
+import { resolvePersonalTrackingStatus } from "@/lib/personalTracking";
 import { supabase } from "@/lib/supabaseClient";
 
 type BookInfo = {
@@ -16,6 +17,7 @@ type BookInfo = {
 
 type LibraryBookRow = {
     id: string;
+    personal_tracking_status?: string | null;
     status: string | null;
     started_at: string | null;
     finished_at: string | null;
@@ -61,11 +63,11 @@ function getBookCover(row: LibraryBookRow) {
 }
 
 function isFinished(row: LibraryBookRow) {
-    return row.status === "finished" || !!row.finished_at;
+    return resolvePersonalTrackingStatus(row) === "finished";
 }
 
 function isCurrentlyReading(row: LibraryBookRow) {
-    return row.status === "reading" && !isFinished(row);
+    return resolvePersonalTrackingStatus(row) === "reading";
 }
 
 async function loadUserBookIdsWithSavedWords(userBookIds: string[]) {
@@ -290,6 +292,7 @@ export default function LibraryBookActionIndex({
                     .select(
                         `
               id,
+              personal_tracking_status,
               status,
               started_at,
               finished_at,

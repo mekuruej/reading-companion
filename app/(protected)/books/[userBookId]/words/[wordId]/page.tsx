@@ -23,6 +23,7 @@ import {
   makeLibraryStudyColorKey,
   type LibraryStudyWordColorInfo,
 } from "@/lib/libraryStudyColorLookup";
+import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 
 // -------------------------------------------------------------
 // Types
@@ -249,6 +250,7 @@ export default function WordDetailPage() {
 
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState<string | null>(null);
+  const [bookPageCount, setBookPageCount] = useState<number | null>(null);
   const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
 
   const [word, setWord] = useState<WordRow | null>(null);
@@ -355,13 +357,20 @@ export default function WordDetailPage() {
     setEditErr(null);
 
     const hasChoices = (editMeaningChoices?.length ?? 0) > 0;
+    const parsedEditPage = parseOptionalPageLocationInput(editPage, bookPageCount);
+    if (parsedEditPage.error) {
+      setEditErr(parsedEditPage.error);
+      setEditSaving(false);
+      return;
+    }
+
     const patch: any = {
       surface: editSurface.trim(),
       reading: editReading.trim() ? editReading.trim() : null,
       meaning: editMeaning.trim() ? editMeaning.trim() : null,
       other_definition: null,
       jlpt: editJlpt.trim() ? editJlpt.trim().toUpperCase() : null,
-      page_number: parseNullableInt(editPage),
+      page_number: parsedEditPage.value,
       chapter_number: parseNullableInt(editChapterNum),
       chapter_name: editChapterName.trim() ? editChapterName.trim() : null,
       hide_kanji_in_reading_support: editHideKanjiInReadingSupport,
@@ -592,10 +601,11 @@ export default function WordDetailPage() {
           `
           id,
           user_id,
-          books:book_id (
-            title,
-            cover_url
-          )
+	          books:book_id (
+	            title,
+	            cover_url,
+	            page_count
+	          )
         `
         )
         .eq("id", userBookId)
@@ -639,6 +649,7 @@ export default function WordDetailPage() {
 
       setBookTitle((ub as any)?.books?.title ?? "");
       setBookCover((ub as any)?.books?.cover_url ?? null);
+      setBookPageCount((ub as any)?.books?.page_count ?? null);
       setOwnerUserId(bookOwnerUserId);
 
       const { data: w, error: wErr } = await supabase

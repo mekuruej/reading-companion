@@ -35,11 +35,20 @@ import {
   type LibraryStudyColorStatus,
   type LibraryStudyGateStatus,
 } from "@/lib/libraryStudyColor";
+import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 import { BookVocabBackToTopButton } from "./components/BookVocabBackToTopButton";
 import {
   resolveStudentWorkspaceBackContext,
   type StudentWorkspaceBackContext,
 } from "@/lib/teacher/studentWorkspaceContext";
+import {
+  isTeacherProfile,
+  loadSharedTeacherVocabulary,
+  loadTeacherBookContext,
+  updateTeachingVocabularyVisibility,
+  type SharedTeacherVocabularyWord,
+  type TeacherBookContext,
+} from "@/lib/teacher/teacherBookVocabulary";
 
 const DEFAULT_LEARNING_SETTINGS = {
   red_stages: 1,
@@ -306,12 +315,15 @@ export default function BookWordsPage() {
 
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
+  const [bookPageCount, setBookPageCount] = useState<number | null>(null);
   const [studentWorkspaceBackContext, setStudentWorkspaceBackContext] =
     useState<StudentWorkspaceBackContext | null>(null);
 
   const [userId, setUserId] = useState<string | null>(null);
 
   const [words, setWords] = useState<WordRow[]>([]);
+  const [teacherVocabContext, setTeacherVocabContext] = useState<TeacherBookContext | null>(null);
+  const [sharedTeachingWords, setSharedTeachingWords] = useState<SharedTeacherVocabularyWord[]>([]);
   const [query, setQuery] = useState("");
   const [chapterFilter, setChapterFilter] = useState("all");
   const [chapterOptions, setChapterOptions] = useState<{ value: string; label: string }[]>([]);
@@ -498,13 +510,20 @@ export default function BookWordsPage() {
 
     const hasChoices = (editMeaningChoices?.length ?? 0) > 0;
 
+    const parsedEditPage = parseOptionalPageLocationInput(editPage, bookPageCount);
+    if (parsedEditPage.error) {
+      setEditErr(parsedEditPage.error);
+      setEditSaving(false);
+      return;
+    }
+
     const patch: any = {
       surface: editSurface.trim(),
       reading: editReading.trim() ? editReading.trim() : null,
       meaning: editMeaning.trim() ? editMeaning.trim() : null,
       other_definition: null,
       jlpt: editJlpt.trim() ? editJlpt.trim().toUpperCase() : null,
-      page_number: parseNullableInt(editPage),
+      page_number: parsedEditPage.value,
       chapter_number: parseNullableInt(editChapterNum),
       chapter_name: editChapterName.trim() ? editChapterName.trim() : null,
       hide_kanji_in_reading_support: editHideKanjiInReadingSupport,
@@ -578,7 +597,12 @@ export default function BookWordsPage() {
   async function updateWordPage(w: WordRow, value: string) {
     if (!canUseVocabularyTools) return;
 
-    const nextPage = parseNullableInt(value);
+    const parsedPage = parseOptionalPageLocationInput(value, bookPageCount);
+    if (parsedPage.error) {
+      alert(parsedPage.error);
+      return;
+    }
+    const nextPage = parsedPage.value;
     if ((w.page_number ?? null) === nextPage) return;
 
     const previousPage = w.page_number ?? null;
@@ -700,10 +724,12 @@ export default function BookWordsPage() {
             `
               id,
               user_id,
-              books:book_id (
-                title,
-                cover_url
-              )
+              book_id,
+	              books:book_id (
+	                title,
+	                cover_url,
+	                page_count
+	              )
             `
           )
           .eq("id", userBookId)
@@ -719,7 +745,9 @@ export default function BookWordsPage() {
 
         setBookTitle((ub as any)?.books?.title ?? "");
         setBookCover((ub as any)?.books?.cover_url ?? "");
+        setBookPageCount((ub as any)?.books?.page_count ?? null);
         const ownerUserId = (ub as any)?.user_id ?? authedUser.id;
+        const bookId = (ub as any)?.book_id ?? null;
 
         const isOwner = ownerUserId === authedUser.id;
         const isSuperTeacher =
@@ -916,6 +944,39 @@ export default function BookWordsPage() {
         }));
         setWords(list);
 
+        setTeacherVocabContext(null);
+        setSharedTeachingWords([]);
+        if (isOwner && isTeacherProfile(meProfile) && bookId) {
+          const teacherBookResult = await supabase
+            .from("teacher_books")
+            .select("id")
+            .eq("teacher_id", authedUser.id)
+            .eq("book_id", bookId)
+            .limit(1)
+            .maybeSingle();
+
+          if (!teacherBookResult.error && teacherBookResult.data?.id) {
+            const sharedContext = await loadTeacherBookContext(
+              supabase,
+              teacherBookResult.data.id,
+              authedUser.id
+            );
+            const sharedWords = await loadSharedTeacherVocabulary(supabase, sharedContext, {
+              view: "my_library",
+              showHidden,
+            });
+            const personalIds = new Set(list.map((word) => word.id));
+            setTeacherVocabContext(sharedContext);
+            setSharedTeachingWords(
+              sharedWords.filter(
+                (word) =>
+                  word.origins.includes("teaching") &&
+                  (!word.personalWordId || !personalIds.has(word.personalWordId))
+              )
+            );
+          }
+        }
+
         const optMap = new Map<string, string>();
         for (const w of list) {
           optMap.set(chapterKey(w), chapterDisplayParts(w).fallback);
@@ -1094,6 +1155,33 @@ export default function BookWordsPage() {
     )}-vocab.csv`;
 
     downloadCsv(filename, rows);
+  }
+
+  async function updateSharedTeachingWordForMyLibrary(
+    word: SharedTeacherVocabularyWord,
+    hiddenFromMyLibrary: boolean
+  ) {
+    if (!teacherVocabContext) return;
+
+    try {
+      await updateTeachingVocabularyVisibility(supabase, word, {
+        hidden_from_my_library: hiddenFromMyLibrary,
+      });
+      const sharedWords = await loadSharedTeacherVocabulary(supabase, teacherVocabContext, {
+        view: "my_library",
+        showHidden,
+      });
+      const personalIds = new Set(words.map((item) => item.id));
+      setSharedTeachingWords(
+        sharedWords.filter(
+          (item) =>
+            item.origins.includes("teaching") &&
+            (!item.personalWordId || !personalIds.has(item.personalWordId))
+        )
+      );
+    } catch (error: any) {
+      setErrorMsg(error?.message ?? "Could not update shared teaching vocabulary.");
+    }
   }
 
   const headerStickyStyle = { top: "0px" };
@@ -1280,6 +1368,48 @@ export default function BookWordsPage() {
           />
         </div>
       </div>
+
+      {sharedTeachingWords.length > 0 ? (
+        <section className="my-4 rounded-3xl border border-blue-100 bg-blue-50 p-4">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">
+                Shared Teacher Vocabulary
+              </p>
+              <h2 className="mt-1 text-xl font-black text-stone-950">
+                Teaching words also visible here
+              </h2>
+            </div>
+            <p className="text-sm font-semibold text-blue-900">
+              {sharedTeachingWords.length} teaching words
+            </p>
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            {sharedTeachingWords.map((word) => (
+              <article key={word.id} className={`rounded-2xl border border-blue-100 bg-white p-3 ${word.hiddenFromMyLibrary ? "opacity-60" : ""}`}>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <h3 className="text-lg font-black text-stone-950">{word.surface}</h3>
+                    <p className="text-sm text-stone-600">
+                      {word.reading || "—"} · {word.meaning || "No meaning saved"}
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-800">
+                    Teaching
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void updateSharedTeachingWordForMyLibrary(word, !word.hiddenFromMyLibrary)}
+                  className="mt-3 rounded-xl border border-stone-300 bg-white px-3 py-1.5 text-xs font-black text-stone-700 hover:bg-stone-50"
+                >
+                  {word.hiddenFromMyLibrary ? "Restore to My Library view" : "Hide from My Library view"}
+                </button>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <BookVocabReorderHint reordering={reordering} readOnly={!canUseVocabularyTools} />
 

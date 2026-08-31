@@ -1,7 +1,8 @@
 // Teacher Book Workspace
 //
-// Launcher for teacher-owned books. Reader tools use the linked user_books row;
-// teaching prep and follow-along stay anchored to teacher_books.
+// Launcher for teacher-owned books. Personal Reader tools only appear when a
+// real My Library row is linked; teaching prep and follow-along stay anchored
+// to teacher_books.
 
 "use client";
 
@@ -66,6 +67,7 @@ type ToolCard = {
 
 function isSuperTeacherRole(profile: any) {
   return (
+    profile?.role === "admin" ||
     profile?.role === "super_teacher" ||
     profile?.is_super_teacher === true ||
     profile?.is_super_teacher === "true"
@@ -93,13 +95,13 @@ const teacherUseStatusOptions: Array<{ value: TeacherUseStatus; label: string }>
   { value: "approved_for_lesson", label: "Perfect for Lesson" },
   { value: "usable", label: "Usable" },
   { value: "use_with_caution", label: "Use with Caution" },
-  { value: "do_not_use", label: "Do Not Use" },
+  { value: "do_not_use", label: "Not for Teaching" },
 ];
 
 const visibleTeacherUseStatusOptions: Array<{ value: TeacherUseStatus; label: string }> = [
   { value: "approved_for_lesson", label: "Perfect for Lesson" },
   { value: "usable", label: "Usable" },
-  { value: "do_not_use", label: "Do Not Use" },
+  { value: "do_not_use", label: "Not for Teaching" },
 ];
 
 const teacherUseStatusLabels = teacherUseStatusOptions.reduce(
@@ -184,7 +186,13 @@ function wouldRetryLabel(value: string | null | undefined) {
 }
 
 function isAssessed(row: TeacherBookRow | null) {
+  if (row?.teacher_use_status === "do_not_use") return true;
   return Boolean(row?.teacher_jlpt_difficulty && row?.teaching_suitability);
+}
+
+function assessmentLabel(row: TeacherBookRow | null) {
+  if (row?.teacher_use_status === "do_not_use") return "Not for Teaching";
+  return isAssessed(row) ? "Assessed" : "Needs Assessment";
 }
 
 function teacherUseStatusBadgeClass(status: TeacherUseStatus | null | undefined) {
@@ -527,6 +535,18 @@ export default function TeacherBookWorkspacePage() {
     const encodedTeacherBookId = encodeURIComponent(teacherBookId);
     return [
       {
+        title: "Teacher Vocabulary",
+        description: "Manage shared teaching vocabulary for this book without changing My Library status.",
+        href: `/teacher/library/${encodedTeacherBookId}/vocabulary`,
+        tone: "blue",
+      },
+      {
+        title: "Teacher Flashcards",
+        description: "Open a lesson display deck from teaching-visible vocabulary with no personal SRS writes.",
+        href: `/teacher/library/${encodedTeacherBookId}/flashcards`,
+        tone: "green",
+      },
+      {
         title: "Follow-Along Support",
         description: "Use your saved reader words and teacher support items while reading with a learner.",
         href: `/teacher/library/${encodedTeacherBookId}/follow`,
@@ -616,12 +636,14 @@ export default function TeacherBookWorkspacePage() {
                 </span>
                 <span
                   className={`rounded-full border px-3 py-1 ${
-                    isAssessed(teacherBook)
+                    teacherBook.teacher_use_status === "do_not_use"
+                      ? "border-rose-200 bg-rose-50 text-rose-800"
+                      : isAssessed(teacherBook)
                       ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                       : "border-blue-200 bg-blue-50 text-blue-800"
                   }`}
                 >
-                  {isAssessed(teacherBook) ? "Assessed" : "Needs Assessment"}
+                  {assessmentLabel(teacherBook)}
                 </span>
                 <span
                   className={`rounded-full border px-3 py-1 ${difficultyBadgeClass(
@@ -675,7 +697,7 @@ export default function TeacherBookWorkspacePage() {
                 </div>
               ) : null}
               <p className="mt-5 max-w-2xl text-sm leading-6 text-stone-600">
-                My Reader Tools use your My Mekuru Library history. Teacher support stays with this Teacher Book.
+                Personal Reader tools appear only when this book is also in My Library. Teacher support stays with this Teacher Book.
               </p>
             </div>
           </div>
@@ -800,8 +822,8 @@ export default function TeacherBookWorkspacePage() {
         </section>
 
         {!userBookId ? (
-          <section className="mt-5 rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900 shadow-sm">
-            This Teacher Book is not linked to a proven My Library copy yet, so reader words cannot be shown here. Run the teacher-book reader-link diagnostic and repair with the existing link migration before using reader tools.
+          <section className="mt-5 rounded-3xl border border-blue-200 bg-blue-50 p-5 text-sm leading-6 text-blue-900 shadow-sm">
+            This is a teaching-only book right now. Personal Reader tools are hidden so teaching work does not change My Library, reading history, pace, or personal stats.
           </section>
         ) : (
           <section className="mt-6">

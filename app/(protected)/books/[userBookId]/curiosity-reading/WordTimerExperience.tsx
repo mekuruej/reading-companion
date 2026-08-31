@@ -26,6 +26,7 @@ import {
   normalizeChapterNameOptions,
   sortChapterNameOptionsByNumber,
 } from "@/lib/chapterNameOptions";
+import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
 import CuriosityPageHeader from "./components/CuriosityPageHeader";
 import CuriosityStatusMessage from "./components/CuriosityStatusMessage";
@@ -186,11 +187,10 @@ function toNullableInt(value: string): number | null {
   return Math.trunc(n);
 }
 
-function pageNumberForSavedWordLocation(value: string, allowPercent: boolean): number | null {
-  const trimmed = (value ?? "").trim();
-  if (!trimmed) return null;
-  if (allowPercent && trimmed.includes("%")) return null;
-  return toNullableInt(trimmed);
+function pageNumberForSavedWordLocation(value: string, pageCount: number | null): number | null {
+  const parsed = parseOptionalPageLocationInput(value, pageCount);
+  if (parsed.error) return null;
+  return parsed.value;
 }
 
 function sortQuickSessionWords(words: QuickSessionWord[]) {
@@ -652,7 +652,7 @@ export function CuriosityReadingExperience({
 
   useEffect(() => {
     onReadingJournalContextChange?.({
-      currentPageNumber: pageNumberForSavedWordLocation(quickPreview.page, false),
+      currentPageNumber: pageNumberForSavedWordLocation(quickPreview.page, bookPageCount),
       selectedChapterLabel: quickPreview.chapterName.trim() || null,
       selectedChapterNumber: toNullableInt(quickPreview.chapterNumber),
     });
@@ -1251,7 +1251,12 @@ export function CuriosityReadingExperience({
     const isManualEntry = quickPreview.isCustomMeaning && quickPreview.meanings.length === 0;
 
     const chapterNum = quickPreview.chapterNumber ? Number(quickPreview.chapterNumber) : null;
-    const pageNum = pageNumberForSavedWordLocation(quickPreview.page, isListeningMode);
+    const parsedPage = parseOptionalPageLocationInput(quickPreview.page, bookPageCount);
+    if (parsedPage.error) {
+      setQuickError(parsedPage.error);
+      return;
+    }
+    const pageNum = parsedPage.value;
     const chapterNameTrimmed = quickPreview.chapterName?.trim() || null;
 
     let vocabularyCacheId: number | null = null;
@@ -1454,7 +1459,12 @@ export function CuriosityReadingExperience({
     }
 
     const chapterNum = quickPreview.chapterNumber ? Number(quickPreview.chapterNumber) : null;
-    const pageNum = pageNumberForSavedWordLocation(quickPreview.page, isListeningMode);
+    const parsedPage = parseOptionalPageLocationInput(quickPreview.page, bookPageCount);
+    if (parsedPage.error) {
+      setQuickError(parsedPage.error);
+      return;
+    }
+    const pageNum = parsedPage.value;
     const chapterNameTrimmed = quickPreview.chapterName?.trim() || null;
 
     const editingExisting =
@@ -1734,9 +1744,11 @@ export function CuriosityReadingExperience({
 
       const bookStatusUpdate: {
         status: "reading";
+        personal_tracking_status: "reading";
         started_at?: string;
       } = {
         status: "reading",
+        personal_tracking_status: "reading",
       };
 
       // Logging a reading session should only backfill the book's start date.
@@ -2366,7 +2378,7 @@ export function CuriosityReadingExperience({
               onClearWordFields={() => clearQuickWordFields()}
               locationLabel={isListeningMode ? "Page or %" : "Page"}
               locationPlaceholder={isListeningMode ? "p. 42 or 37%" : "Page"}
-              locationHelpText={isListeningMode ? "Use a page if you have the book open, or a Kindle/audio percent as a listening note. Percent is not saved as a page." : undefined}
+              locationHelpText="Use a page or percent. Percent converts to a page when this book has a page count."
               allowPercentLocation={isListeningMode}
               saveAreaWarning={
                 isRunning || isPaused

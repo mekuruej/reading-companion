@@ -20,6 +20,7 @@ import {
   makeLibraryStudyColorKey,
   type LibraryStudyWordColorInfo,
 } from "@/lib/libraryStudyColorLookup";
+import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 import {
   addChapterNameOption,
   normalizeChapterNameOptions,
@@ -228,6 +229,7 @@ export default function AddWordPage() {
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
   const [bookLanguageCode, setBookLanguageCode] = useState<string | null>(null);
+  const [bookPageCount, setBookPageCount] = useState<number | null>(null);
   const [accessChecked, setAccessChecked] = useState(false);
   const [canAccessBook, setCanAccessBook] = useState(false);
   const [canUseAddWord, setCanUseAddWord] = useState(false);
@@ -403,7 +405,8 @@ export default function AddWordPage() {
             books:book_id (
               title,
               cover_url,
-              language_code
+              language_code,
+              page_count
             )
           `
         )
@@ -447,6 +450,7 @@ export default function AddWordPage() {
       setBookTitle(b?.title ?? "");
       setBookCover(b?.cover_url ?? "");
       setBookLanguageCode(b?.language_code ?? null);
+      setBookPageCount(b?.page_count ?? null);
     }
 
     loadBookInfo();
@@ -825,7 +829,13 @@ export default function AddWordPage() {
       }
 
       const chapterNum = toNullableInt(chapterNumber);
-      const pageNum = toNullableInt(pageNumber);
+      const parsedPage = parseOptionalPageLocationInput(pageNumber, bookPageCount);
+      if (parsedPage.error) {
+        setMessage(`❌ ${parsedPage.error}`);
+        setSaving(false);
+        return;
+      }
+      const pageNum = parsedPage.value;
       const chapterNameTrimmed = chapterName.trim() || null;
       const today = new Date().toISOString().slice(0, 10);
 
@@ -1231,7 +1241,13 @@ export default function AddWordPage() {
       }
 
       const chapterNum = toNullableInt(chapterNumber);
-      const pageNum = toNullableInt(pageNumber);
+      const parsedPage = parseOptionalPageLocationInput(pageNumber, bookPageCount);
+      if (parsedPage.error) {
+        setMessage(`❌ ${parsedPage.error}`);
+        setSaving(false);
+        return;
+      }
+      const pageNum = parsedPage.value;
       const chapterNameTrimmed = chapterName.trim() || null;
       const today = new Date().toISOString().slice(0, 10);
 

@@ -136,12 +136,11 @@ export default function CuriosityWordDetailFields({
             {locationLabel}
           </span>
           <input
-            type={allowPercentLocation ? "text" : "number"}
-            min={allowPercentLocation ? undefined : 1}
-            inputMode={allowPercentLocation ? "decimal" : "numeric"}
+            type="text"
+            inputMode="decimal"
             value={quickPreview.page}
             onChange={(event) => onPageChange(event.target.value)}
-            placeholder={locationPlaceholder}
+            placeholder={allowPercentLocation ? locationPlaceholder : "p. 42 or 18%"}
             className="w-full rounded border bg-white px-3 py-2 text-sm"
           />
           {locationHelpText ? (

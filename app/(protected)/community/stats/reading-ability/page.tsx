@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { resolvePersonalTrackingStatus } from "@/lib/personalTracking";
 import SectionBand from "./components/SectionBand";
 import PieChart from "./components/PieChart";
 import ReadingAbilityFilterSelector from "./components/ReadingAbilityFilterSelector";
@@ -40,6 +41,11 @@ type WordRow = {
 
 type RawUserBookRow = {
     id: string;
+    personal_tracking_status?: string | null;
+    status?: string | null;
+    started_at?: string | null;
+    finished_at?: string | null;
+    dnf_at?: string | null;
     books:
     | {
         id: string;
@@ -337,6 +343,11 @@ export default function ReadingAbilityPage() {
                     .select(
                         `
               id,
+              personal_tracking_status,
+              status,
+              started_at,
+              finished_at,
+              dnf_at,
               books:book_id (
                 id,
                 title,
@@ -351,6 +362,8 @@ export default function ReadingAbilityPage() {
                 if (userBooksError) throw userBooksError;
 
                 const loadedRows: UserBookRow[] = ((userBooks ?? []) as RawUserBookRow[]).map(
+                    (row) => row
+                ).filter((row) => resolvePersonalTrackingStatus(row) !== "not_tracking").map(
                     (row) => ({
                         id: row.id,
                         books: Array.isArray(row.books)

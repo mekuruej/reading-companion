@@ -8,6 +8,7 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { displayBookTitle } from "@/lib/books/bookIdentity";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
+import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import {
     clearPersistedTimedSession,
@@ -521,18 +522,16 @@ export default function SimpleTimedSessionPage({
             }
             endPageNum = parsedEndpoint.value;
         } else if (hasAnyPageInput) {
-            startPageNum = Number(trimmedStartPage);
-            endPageNum = Number(trimmedEndPage);
+            const parsedStart = parseOptionalPageLocationInput(trimmedStartPage, bookPageCount);
+            const parsedEnd = parseOptionalPageLocationInput(trimmedEndPage, bookPageCount);
 
-            if (!Number.isFinite(startPageNum) || !Number.isFinite(endPageNum)) {
-                alert("Please enter both a valid start page and end page, or leave both blank.");
+            if (parsedStart.error || parsedEnd.error || parsedStart.value == null || parsedEnd.value == null) {
+                alert(parsedStart.error || parsedEnd.error || "Please enter both a valid start page/end page or percent, or leave both blank.");
                 return;
             }
 
-            if (startPageNum <= 0 || endPageNum <= 0) {
-                alert("Pages must be 1 or higher.");
-                return;
-            }
+            startPageNum = parsedStart.value;
+            endPageNum = parsedEnd.value;
 
             if (endPageNum < startPageNum) {
                 alert("End page cannot be before start page.");
@@ -572,10 +571,12 @@ export default function SimpleTimedSessionPage({
 
         const bookPatch: {
             status: "reading";
+            personal_tracking_status: "reading";
             started_at?: string;
             current_location?: string | null;
         } = {
             status: "reading",
+            personal_tracking_status: "reading",
         };
 
         if (!bookStartedAt) {
@@ -697,14 +698,14 @@ export default function SimpleTimedSessionPage({
             const parsedEndpoint = parseFlexibleListeningEndpoint(trimmedLocation, bookPageCount);
             endPageNum = parsedEndpoint.value;
         } else {
-            const parsedPage = Number(trimmedLocation);
+            const parsedPage = parseOptionalPageLocationInput(trimmedLocation, bookPageCount);
 
-            if (!Number.isFinite(parsedPage) || parsedPage <= 0) {
-                setProgressUpdateMessage("Enter a valid current page.");
+            if (parsedPage.error || parsedPage.value == null) {
+                setProgressUpdateMessage(parsedPage.error || "Enter a valid current page or percent.");
                 return;
             }
 
-            endPageNum = Math.round(parsedPage);
+            endPageNum = parsedPage.value;
         }
 
         setSavingProgressUpdate(true);
@@ -729,10 +730,12 @@ export default function SimpleTimedSessionPage({
 
         const bookPatch: {
             status: "reading";
+            personal_tracking_status: "reading";
             started_at?: string;
             current_location?: string | null;
         } = {
             status: "reading",
+            personal_tracking_status: "reading",
         };
 
         if (!bookStartedAt) {
@@ -936,11 +939,11 @@ export default function SimpleTimedSessionPage({
                     <div>
                         <div className="mb-1 text-sm text-stone-600">{startLocationLabel}</div>
                         <input
-                            type="number"
-                            min={1}
+                            type="text"
+                            inputMode="decimal"
                             value={sessionStartPage}
                             onChange={(e) => setSessionStartPage(e.target.value)}
-                            placeholder="e.g. 45"
+                            placeholder="e.g. p. 45 or 18%"
                             className="w-full rounded-xl border px-3 py-2 text-sm"
                         />
                     </div>
@@ -948,11 +951,11 @@ export default function SimpleTimedSessionPage({
                     <div>
                         <div className="mb-1 text-sm text-stone-600">{endLocationLabel}</div>
                         <input
-                            type="number"
-                            min={1}
+                            type="text"
+                            inputMode="decimal"
                             value={sessionEndPage}
                             onChange={(e) => setSessionEndPage(e.target.value)}
-                            placeholder="e.g. 52"
+                            placeholder="e.g. p. 52 or 21%"
                             className="w-full rounded-xl border px-3 py-2 text-sm"
                         />
                     </div>

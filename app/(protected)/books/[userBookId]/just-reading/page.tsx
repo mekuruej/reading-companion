@@ -65,6 +65,7 @@ export default function JustReadingPage() {
     const [journalOwnerUserId, setJournalOwnerUserId] = useState<string | null>(null);
     const [favoriteQuotes, setFavoriteQuotes] = useState<string | null>(null);
     const [bookLanguageCode, setBookLanguageCode] = useState<string | null>(null);
+    const [bookPageCount, setBookPageCount] = useState<number | null>(null);
     const [isNativeBook, setIsNativeBook] = useState(false);
     const [canUseJapaneseLearningJournal, setCanUseJapaneseLearningJournal] = useState(false);
     const [japaneseLearningArchiveTabs, setJapaneseLearningArchiveTabs] =
@@ -91,7 +92,7 @@ export default function JustReadingPage() {
 
             const { data: userBook, error: userBookError } = await supabase
                 .from("user_books")
-                .select("id, user_id, favorite_quotes, books ( language_code )")
+                .select("id, user_id, favorite_quotes, books ( language_code, page_count )")
                 .eq("id", userBookId)
                 .maybeSingle();
 
@@ -116,6 +117,7 @@ export default function JustReadingPage() {
                 ? (userBook as any).books[0]
                 : (userBook as any).books;
             setBookLanguageCode(book?.language_code ?? null);
+            setBookPageCount(book?.page_count ?? null);
 
             const profileResult = await supabase
                 .from("profiles")
@@ -319,6 +321,7 @@ export default function JustReadingPage() {
                                 ownerUserId={journalOwnerUserId}
                                 favoriteQuotes={favoriteQuotes}
                                 bookLanguageCode={bookLanguageCode}
+                                pageCount={bookPageCount}
                                 canUseJapaneseLearningJournal={canUseJapaneseLearningJournal}
                                 japaneseLearningArchiveTabs={japaneseLearningArchiveTabs}
                                 compact

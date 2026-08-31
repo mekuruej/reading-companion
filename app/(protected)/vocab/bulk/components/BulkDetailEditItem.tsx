@@ -38,10 +38,11 @@ export default function BulkDetailEditItem({
 
       <div className="grid gap-3 md:grid-cols-3">
         <div>
-          <div className="mb-1 text-xs text-gray-500">Page</div>
+          <div className="mb-1 text-xs text-gray-500">Page or %</div>
           <input
-            type="number"
-            placeholder="Page"
+            type="text"
+            inputMode="decimal"
+            placeholder="p. 42 or 18%"
             value={page}
             onChange={(e) => onPageChange(e.target.value)}
             className="w-full rounded border p-2 text-sm"

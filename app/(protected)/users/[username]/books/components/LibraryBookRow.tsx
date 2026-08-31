@@ -8,6 +8,7 @@ type LibraryBookRowBook = {
 
 type LibraryBookRowData = {
   id: string;
+  isTeachingOnly?: boolean;
   books: LibraryBookRowBook | null;
 };
 
@@ -49,7 +50,14 @@ export default function LibraryBookRow({
         <div className="truncate text-sm font-medium text-stone-900">
           {displayTitle}
         </div>
-        <div className="mt-1 text-xs text-stone-500">{status}</div>
+        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-stone-500">
+          <span>{status}</span>
+          {row.isTeachingOnly ? (
+            <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-sky-700">
+              Teaching Only
+            </span>
+          ) : null}
+        </div>
       </div>
 
       {secondaryActionHref ? (

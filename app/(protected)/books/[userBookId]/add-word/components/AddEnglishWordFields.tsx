@@ -91,15 +91,14 @@ export default function AddEnglishWordFields({
       <div className="grid gap-3 sm:grid-cols-3">
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-stone-700">
-            Page
+            Page or %
           </span>
           <input
-            type="number"
-            min={1}
-            inputMode="numeric"
+            type="text"
+            inputMode="decimal"
             value={pageNumber}
             onChange={(event) => onPageNumberChange(event.target.value)}
-            placeholder="Page"
+            placeholder="p. 42 or 18%"
             className="w-full rounded border px-3 py-2 text-sm"
           />
         </label>

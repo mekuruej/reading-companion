@@ -70,7 +70,7 @@ export function TeacherBookRequestPanel({
                     {saving ? "Updating..." : "Reject Request"}
                 </button>
                 <p className="mt-2 text-xs leading-5 text-amber-800">
-                    Use this if this request should not become a global book. Mekuru will keep the request history.
+                    Use this if this request should not become a catalog book. Mekuru will keep the request history.
                 </p>
             </div>
         </section>

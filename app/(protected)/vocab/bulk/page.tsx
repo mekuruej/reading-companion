@@ -20,6 +20,7 @@ import BulkColumnPastePanel from "./components/BulkColumnPastePanel";
 import BulkApplyFieldsPanel from "./components/BulkApplyFieldsPanel";
 import BulkDefinitionReviewItem from "./components/BulkDefinitionReviewItem";
 import BulkDetailEditItem from "./components/BulkDetailEditItem";
+import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 
 
 // -------------------------------------------------------------
@@ -138,6 +139,7 @@ export default function BulkVocabPage() {
   const [userBookId, setUserBookId] = useState("");
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState<string | null>(null);
+  const [bookPageCount, setBookPageCount] = useState<number | null>(null);
   const [teacherStudentContext, setTeacherStudentContext] =
     useState<TeacherStudentBulkContext | null>(null);
 
@@ -218,6 +220,7 @@ export default function BulkVocabPage() {
       setAuthorizedUserBookId("");
       setBookTitle("");
       setBookCover(null);
+      setBookPageCount(null);
       setTeacherStudentContext(null);
 
       if (!userBookId) return;
@@ -245,7 +248,8 @@ export default function BulkVocabPage() {
     user_id,
     books:book_id (
       title,
-      cover_url
+      cover_url,
+      page_count
     )
   `
           )
@@ -333,6 +337,7 @@ export default function BulkVocabPage() {
         setAuthorizedUserBookId((data as any).id);
         setBookTitle(b?.title ?? "");
         setBookCover(b?.cover_url ?? null);
+        setBookPageCount(b?.page_count ?? null);
 
         if (!isOwner && (isLinkedTeacher || isSuperTeacher)) {
           const { data: studentProfile, error: studentProfileError } = await supabase
@@ -839,13 +844,20 @@ export default function BulkVocabPage() {
       }
 
       const today = new Date().toISOString().slice(0, 10);
+      const itemsWithPages = items.map((item, index) => {
+        const parsedPage = parseOptionalPageLocationInput(item.page, bookPageCount);
+        if (parsedPage.error) {
+          throw new Error(`Word ${index + 1}: ${parsedPage.error}`);
+        }
+        return { item, pageNumber: parsedPage.value };
+      });
 
       const comboKeys = Array.from(
         new Set(
-          items.map((i) => {
+          itemsWithPages.map(({ item, pageNumber }) => {
+            const i = item;
             const ch = toNullableInt(i.chapterNumber);
-            const pg = toNullableInt(i.page);
-            return `${ch ?? "null"}||${pg ?? "null"}`;
+            return `${ch ?? "null"}||${pageNumber ?? "null"}`;
           })
         )
       );
@@ -881,10 +893,9 @@ export default function BulkVocabPage() {
 
       const nextOrderByCombo = new Map<string, number>(maxOrderByCombo);
 
-      const payload = items.map((i) => {
+      const payload = itemsWithPages.map(({ item: i, pageNumber }) => {
         const chNum = toNullableInt(i.chapterNumber);
-        const pgNum = toNullableInt(i.page);
-        const comboKey = `${chNum ?? "null"}||${pgNum ?? "null"}`;
+        const comboKey = `${chNum ?? "null"}||${pageNumber ?? "null"}`;
 
         const current = nextOrderByCombo.get(comboKey) ?? 0;
         const nextPageOrder = current + 1;
@@ -900,7 +911,7 @@ export default function BulkVocabPage() {
           meaning_choice_index: i.meaningChoiceIndex,
           jlpt: normalizeJlpt(i.jlpt),
           is_common: !!i.isCommon,
-          page_number: pgNum,
+          page_number: pageNumber,
           page_order: nextPageOrder,
           chapter_number: chNum,
           chapter_name: i.chapterName?.trim() || null,

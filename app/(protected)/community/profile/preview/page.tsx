@@ -130,7 +130,8 @@ export default function PublicProfilePreviewPage() {
           supabase
             .from("user_books")
             .select("id", { count: "exact", head: true })
-            .eq("user_id", user.id),
+            .eq("user_id", user.id)
+            .neq("personal_tracking_status", "not_tracking"),
           supabase
             .from("user_library_word_summaries")
             .select("study_identity_key", { count: "exact", head: true })
@@ -148,6 +149,7 @@ export default function PublicProfilePreviewPage() {
             `
             )
             .eq("user_id", user.id)
+            .neq("personal_tracking_status", "not_tracking")
             .not("started_at", "is", null)
             .is("finished_at", null)
             .is("dnf_at", null)

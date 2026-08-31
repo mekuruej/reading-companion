@@ -409,6 +409,7 @@ export default function AssignBookPage() {
           user_id: studentId,
           book_id: bookId,
           status: "reading",
+          personal_tracking_status: "reading",
           started_at: new Date().toISOString(),
         })
         .select("id, user_id, book_id, status, current_location, started_at, created_at")

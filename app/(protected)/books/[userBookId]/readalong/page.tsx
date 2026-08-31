@@ -43,6 +43,7 @@ import {
     resolveStudentWorkspaceBackContext,
     type StudentWorkspaceBackContext,
 } from "@/lib/teacher/studentWorkspaceContext";
+import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 
 const READ_ALONG_TIMED_SESSION_MODE = "readalong";
 
@@ -376,6 +377,7 @@ export default function ReadAlongPage() {
     const [bookTitle, setBookTitle] = useState("");
     const [bookCover, setBookCover] = useState("");
     const [bookLanguageCode, setBookLanguageCode] = useState<string | null>(null);
+    const [bookPageCount, setBookPageCount] = useState<number | null>(null);
     const [favoriteQuotes, setFavoriteQuotes] = useState<string | null>(null);
     const [username, setUsername] = useState("");
     const [studentWorkspaceBackContext, setStudentWorkspaceBackContext] =
@@ -460,7 +462,8 @@ export default function ReadAlongPage() {
                     books:book_id (
                         title,
                         cover_url,
-                        language_code
+                        language_code,
+                        page_count
                     )
                 `)
                 .eq("id", userBookId)
@@ -530,6 +533,7 @@ export default function ReadAlongPage() {
             setBookTitle(displayBookTitle(book, ""));
             setBookCover(book?.cover_url ?? "");
             setBookLanguageCode(book?.language_code ?? null);
+            setBookPageCount(book?.page_count ?? null);
             setFavoriteQuotes((userBook as any)?.favorite_quotes ?? null);
 
             const appAccessStatus = profile
@@ -948,19 +952,17 @@ export default function ReadAlongPage() {
             return;
         }
 
-        const startPageNum = Number(sessionStartPage);
-        const endPageNum = Number(sessionEndPage);
+        const parsedStartPage = parseOptionalPageLocationInput(sessionStartPage, bookPageCount);
+        const parsedEndPage = parseOptionalPageLocationInput(sessionEndPage, bookPageCount);
         const minutesNum = Number(sessionMinutesRead || Math.max(1, Math.round(elapsed / 60)));
 
-        if (!Number.isFinite(startPageNum) || !Number.isFinite(endPageNum)) {
-            alert("Please enter a valid start page and end page.");
+        if (parsedStartPage.error || parsedEndPage.error || parsedStartPage.value == null || parsedEndPage.value == null) {
+            alert(parsedStartPage.error || parsedEndPage.error || "Please enter a valid start page and end page.");
             return;
         }
 
-        if (startPageNum <= 0 || endPageNum <= 0) {
-            alert("Pages must be 1 or higher.");
-            return;
-        }
+        const startPageNum = parsedStartPage.value;
+        const endPageNum = parsedEndPage.value;
 
         if (endPageNum < startPageNum) {
             alert("End page cannot be before start page.");
@@ -1209,7 +1211,7 @@ export default function ReadAlongPage() {
 
             const { data: book, error: bookError } = await supabase
                 .from("books")
-                .select("title, cover_url, language_code")
+                .select("title, cover_url, language_code, page_count")
                 .eq("id", userBook.book_id)
                 .maybeSingle();
 
@@ -1224,6 +1226,7 @@ export default function ReadAlongPage() {
             setBookTitle(displayBookTitle(book, ""));
             setBookCover(book?.cover_url ?? "");
             setBookLanguageCode(book?.language_code ?? null);
+            setBookPageCount(book?.page_count ?? null);
         }
 
         loadBookInfo();
@@ -2302,6 +2305,7 @@ export default function ReadAlongPage() {
                                 ownerUserId={learnerUserId}
                                 favoriteQuotes={favoriteQuotes}
                                 bookLanguageCode={bookLanguageCode}
+                                pageCount={bookPageCount}
                                 currentPageNumber={currentPageNumber}
                                 selectedChapterLabel={currentPageChapterLabel}
                                 selectedChapterNumber={currentPageChapterNumber}

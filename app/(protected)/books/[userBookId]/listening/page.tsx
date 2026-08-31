@@ -31,6 +31,7 @@ export default function ListeningPage() {
   const [journalOwnerUserId, setJournalOwnerUserId] = useState<string | null>(null);
   const [favoriteQuotes, setFavoriteQuotes] = useState<string | null>(null);
   const [bookLanguageCode, setBookLanguageCode] = useState<string | null>(null);
+  const [bookPageCount, setBookPageCount] = useState<number | null>(null);
   const [isNativeListeningWorkspace, setIsNativeListeningWorkspace] = useState(false);
   const [nativeSessionMode, setNativeSessionMode] = useState<NativeSessionMode>("listening");
   const [accessMessage, setAccessMessage] = useState("");
@@ -61,7 +62,8 @@ export default function ListeningPage() {
           user_id,
           favorite_quotes,
           books (
-            language_code
+            language_code,
+            page_count
           )
         `
         )
@@ -88,6 +90,7 @@ export default function ListeningPage() {
         ? (userBook as any).books[0]
         : (userBook as any).books;
       setBookLanguageCode(book?.language_code ?? null);
+      setBookPageCount(book?.page_count ?? null);
 
       const trackerMode = await getEnglishNativeTrackerBookMode({ supabase, userBookId });
 
@@ -319,6 +322,7 @@ export default function ListeningPage() {
                 ownerUserId={journalOwnerUserId}
                 favoriteQuotes={favoriteQuotes}
                 bookLanguageCode={bookLanguageCode}
+                pageCount={bookPageCount}
                 compact
                 vocabListHref={bookLanguageCode === "en" ? undefined : `/books/${encodeURIComponent(userBookId)}/words`}
                 onFavoriteQuotesChange={setFavoriteQuotes}

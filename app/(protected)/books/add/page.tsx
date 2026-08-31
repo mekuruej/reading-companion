@@ -74,19 +74,12 @@ type BookSearchResult = {
 };
 
 type AddBookSearchMode = "title" | "isbn" | "asin";
-type TeacherGlobalDestination = "catalog_only" | "student_only" | "teacher_and_student";
+type AddBookDestinationKey = "catalog" | "teaching" | "my" | "student";
 
 type TeacherStudentOption = {
     id: string;
     display_name: string | null;
     username: string | null;
-};
-
-type TeacherUserSearchResult = {
-    id: string;
-    displayName: string | null;
-    username: string | null;
-    email: string | null;
 };
 
 const EDITION_FORMAT_OPTIONS = [
@@ -146,8 +139,12 @@ export default function AddBookPage() {
     const addBookContext = searchParams.get("context") ?? "";
     const sourceParam = searchParams.get("from");
     const targetUserIdParam = searchParams.get("targetUserId")?.trim() ?? "";
+    const opensTeachingBooksDestination =
+        addBookContext === "teacher-global" ||
+        destination === "teacher-global" ||
+        destination === "teaching";
     const isTeacherGlobalContext =
-        addBookContext === "teacher-global" || destination === "teacher-global";
+        opensTeachingBooksDestination;
 
     const [activeMode, setActiveMode] = useState<AddBookSearchMode>("title");
     const [isbn, setIsbn] = useState("");
@@ -178,19 +175,25 @@ export default function AddBookPage() {
     const [teacherStudents, setTeacherStudents] = useState<TeacherStudentOption[]>([]);
     const [teacherStudentLoading, setTeacherStudentLoading] = useState(false);
     const [teacherStudentSearch, setTeacherStudentSearch] = useState("");
-    const [allUserSearch, setAllUserSearch] = useState("");
-    const [allUserSearchResults, setAllUserSearchResults] = useState<TeacherUserSearchResult[]>([]);
-    const [allUserSearchLoading, setAllUserSearchLoading] = useState(false);
-    const [allUserSearchError, setAllUserSearchError] = useState("");
-    const [selectedAllUser, setSelectedAllUser] = useState<TeacherUserSearchResult | null>(null);
-    const [teacherDestination, setTeacherDestination] =
-        useState<TeacherGlobalDestination>("catalog_only");
+    const [addToCatalogOnly, setAddToCatalogOnly] = useState(false);
+    const [addToTeachingBooks, setAddToTeachingBooks] = useState(opensTeachingBooksDestination);
+    const [addToMyLibrary, setAddToMyLibrary] = useState(
+        destination === "my-library" || (!opensTeachingBooksDestination && destination !== "student")
+    );
+    const [addToStudentLibrary, setAddToStudentLibrary] = useState(
+        destination === "student" && !!targetUserIdParam
+    );
     const [selectedTeacherStudentId, setSelectedTeacherStudentId] = useState(targetUserIdParam);
+    const canChooseTeacherDestinations =
+        !addBookContext.includes("student-lesson-book") &&
+        (currentUserRole === "teacher" ||
+            currentUserRole === "admin" ||
+            currentUserRole === "super_teacher" ||
+            currentUserIsSuperTeacher);
     const canUseCatalogOnly =
-        currentUserRole === "super_teacher" || currentUserIsSuperTeacher;
-    const canSearchAllUsers =
-        isTeacherGlobalContext &&
-        (currentUserRole === "super_teacher" || currentUserIsSuperTeacher);
+        currentUserRole === "admin" ||
+        currentUserRole === "super_teacher" ||
+        currentUserIsSuperTeacher;
     const [lookupLoading, setLookupLoading] = useState(false);
     const [asinLookupLoading, setAsinLookupLoading] = useState(false);
     const [addLoading, setAddLoading] = useState(false);
@@ -213,6 +216,10 @@ export default function AddBookPage() {
         returnLabel?: string;
         returnHref?: string;
     } | null>(null);
+    const [successfulActionSignature, setSuccessfulActionSignature] = useState("");
+    const [existingDestinationStatus, setExistingDestinationStatus] = useState<
+        Record<string, Partial<Record<AddBookDestinationKey, boolean>>>
+    >({});
 
     useEffect(() => {
         let alive = true;
@@ -290,17 +297,16 @@ export default function AddBookPage() {
     }, [targetUserIdParam]);
 
     useEffect(() => {
-        if (!currentUserId) return;
-        if (isTeacherGlobalContext && !canUseCatalogOnly && teacherDestination === "catalog_only") {
-            setTeacherDestination("student_only");
+        if (!canUseCatalogOnly && addToCatalogOnly) {
+            setAddToCatalogOnly(false);
         }
-    }, [canUseCatalogOnly, currentUserId, isTeacherGlobalContext, teacherDestination]);
+    }, [addToCatalogOnly, canUseCatalogOnly]);
 
     useEffect(() => {
         let alive = true;
 
         async function loadTeacherStudents() {
-            if (!isTeacherGlobalContext || !currentUserId) {
+            if (!canChooseTeacherDestinations || !currentUserId) {
                 setTeacherStudents([]);
                 return;
             }
@@ -310,6 +316,7 @@ export default function AddBookPage() {
             try {
                 if (
                     currentUserRole !== "teacher" &&
+                    currentUserRole !== "admin" &&
                     currentUserRole !== "super_teacher" &&
                     !currentUserIsSuperTeacher
                 ) {
@@ -356,106 +363,43 @@ export default function AddBookPage() {
         return () => {
             alive = false;
         };
-    }, [currentUserId, currentUserIsSuperTeacher, currentUserRole, isTeacherGlobalContext]);
-
-    const isTeacherGlobalStudentDestination =
-        isTeacherGlobalContext &&
-        (teacherDestination === "student_only" || teacherDestination === "teacher_and_student");
-
-    useEffect(() => {
-        let alive = true;
-        const query = allUserSearch.trim();
-
-        if (!canSearchAllUsers || !isTeacherGlobalStudentDestination || query.length < 2) {
-            setAllUserSearchResults([]);
-            setAllUserSearchLoading(false);
-            setAllUserSearchError("");
-            return;
-        }
-
-        setAllUserSearchLoading(true);
-        setAllUserSearchError("");
-
-        const timeout = window.setTimeout(async () => {
-            try {
-                const {
-                    data: { session },
-                } = await supabase.auth.getSession();
-
-                const response = await fetch(
-                    `/api/teacher/users/search?q=${encodeURIComponent(query)}&limit=12`,
-                    {
-                        headers: session?.access_token
-                            ? { Authorization: `Bearer ${session.access_token}` }
-                            : {},
-                    }
-                );
-
-                const data = await response.json().catch(() => null);
-
-                if (!alive) return;
-
-                if (!response.ok) {
-                    setAllUserSearchResults([]);
-                    setAllUserSearchError(data?.error ?? "Could not search users.");
-                    return;
-                }
-
-                setAllUserSearchResults((data?.users ?? []) as TeacherUserSearchResult[]);
-            } catch (searchError) {
-                console.error("All-user search failed:", searchError);
-                if (alive) {
-                    setAllUserSearchResults([]);
-                    setAllUserSearchError("Could not search users.");
-                }
-            } finally {
-                if (alive) setAllUserSearchLoading(false);
-            }
-        }, 300);
-
-        return () => {
-            alive = false;
-            window.clearTimeout(timeout);
-        };
-    }, [allUserSearch, canSearchAllUsers, isTeacherGlobalStudentDestination]);
+    }, [canChooseTeacherDestinations, currentUserId, currentUserIsSuperTeacher, currentUserRole]);
 
     const selectedTeacherStudent = teacherStudents.find(
         (student) => student.id === selectedTeacherStudentId
     );
-    const selectedSearchUser =
-        selectedAllUser?.id === selectedTeacherStudentId ? selectedAllUser : null;
     const selectedTeacherStudentName =
         selectedTeacherStudent?.display_name ||
         selectedTeacherStudent?.username ||
-        selectedSearchUser?.displayName ||
-        selectedSearchUser?.username ||
-        selectedSearchUser?.email ||
         targetDisplayName ||
         "this student";
-    const targetLibraryUserId = isTeacherGlobalStudentDestination
+    const teacherDestinationSummary = [
+        addToCatalogOnly ? "MEKURU Catalog" : null,
+        addToTeachingBooks ? "My Teaching Books" : null,
+        addToMyLibrary ? "My Library" : null,
+        addToStudentLibrary ? `${selectedTeacherStudentName}'s Library` : null,
+    ].filter(Boolean);
+    const isTeacherStudentDestination = canChooseTeacherDestinations && addToStudentLibrary;
+    const targetLibraryUserId = isTeacherStudentDestination
         ? selectedTeacherStudentId
         : targetUserIdParam || currentUserId;
     const isStudentDestination =
         destination === "student" && !!targetUserIdParam && targetUserIdParam !== currentUserId;
     const isOtherUserDestination =
         !isStudentDestination && !!targetUserIdParam && targetUserIdParam !== currentUserId;
-    const targetLibraryLabel = isTeacherGlobalContext
-        ? teacherDestination === "catalog_only"
-            ? "the MEKURU Catalog"
-            : teacherDestination === "teacher_and_student"
-            ? `your library and ${selectedTeacherStudentName}'s library`
-            : `${selectedTeacherStudentName}'s library`
+    const targetLibraryLabel = canChooseTeacherDestinations
+        ? teacherDestinationSummary.length > 0
+            ? teacherDestinationSummary.join(", ")
+            : "the selected destinations"
         : isStudentDestination
         ? `${targetDisplayName ?? "this student"}’s library`
         : isOtherUserDestination
         ? `${targetDisplayName ?? "this user"}’s library`
         : "your library";
-    const targetLibraryShortLabel = isTeacherGlobalContext
-        ? teacherDestination === "catalog_only"
-            ? "the MEKURU Catalog"
-            : teacherDestination === "teacher_and_student"
-            ? "your library and the student's library"
-            : "student library"
+    const targetLibraryShortLabel = canChooseTeacherDestinations
+        ? teacherDestinationSummary.length > 0
+            ? teacherDestinationSummary.join(", ")
+            : "the selected destinations"
         : isStudentDestination
         ? "student library"
         : isOtherUserDestination
@@ -502,7 +446,131 @@ export default function AddBookPage() {
         };
     }
 
+    function handleCatalogOnlyChange(checked: boolean) {
+        setAddToCatalogOnly(checked);
+        if (checked) {
+            setAddToTeachingBooks(false);
+            setAddToMyLibrary(false);
+            setAddToStudentLibrary(false);
+        }
+    }
+
+    function handleRelationshipDestinationChange(
+        setter: (checked: boolean) => void,
+        checked: boolean
+    ) {
+        setter(checked);
+        if (checked) {
+            setAddToCatalogOnly(false);
+        }
+    }
+
+    function selectedDestinationKeys(): AddBookDestinationKey[] {
+        if (canChooseTeacherDestinations) {
+            if (addToCatalogOnly) return ["catalog"];
+            return [
+                addToTeachingBooks ? "teaching" : null,
+                addToMyLibrary ? "my" : null,
+                addToStudentLibrary ? "student" : null,
+            ].filter(Boolean) as AddBookDestinationKey[];
+        }
+
+        if (isStudentDestination || isOtherUserDestination) return ["student"];
+        return ["my"];
+    }
+
+    function destinationLabel(key: AddBookDestinationKey) {
+        if (key === "catalog") return "MEKURU Catalog";
+        if (key === "teaching") return "My Teaching Books";
+        if (key === "my") return "My Library";
+        return `${selectedTeacherStudentName}'s Library`;
+    }
+
+    function actionSignature(actionKey: string) {
+        return [
+            actionKey,
+            selectedDestinationKeys().join("+"),
+            addToStudentLibrary ? selectedTeacherStudentId : "",
+        ].join("|");
+    }
+
+    function satisfiedDestinationLabels(actionKey: string) {
+        const status = existingDestinationStatus[actionKey] ?? {};
+        return selectedDestinationKeys()
+            .filter((key) => status[key])
+            .map(destinationLabel);
+    }
+
+    function selectedDestinationsSatisfied(actionKey: string) {
+        const keys = selectedDestinationKeys();
+        if (keys.length === 0) return false;
+        const status = existingDestinationStatus[actionKey] ?? {};
+        return keys.every((key) => status[key]);
+    }
+
+    function mergedStatusFromAdd(data: any) {
+        return {
+            catalog: data?.addedToCatalogOnly === true || data?.globalOnly === true,
+            teaching: data?.addedToTeachingBooks === true,
+            my: data?.addedToMyLibrary === true,
+            student: data?.addedToStudentLibrary === true,
+        };
+    }
+
+    function markActionSatisfied(actionKey: string, data: any) {
+        const nextStatus = mergedStatusFromAdd(data);
+        setExistingDestinationStatus((current) => ({
+            ...current,
+            [actionKey]: {
+                ...(current[actionKey] ?? {}),
+                ...nextStatus,
+            },
+        }));
+        setSuccessfulActionSignature(actionSignature(actionKey));
+    }
+
+    function addButtonState(actionKey: string, baseLabel = finalAddLabel()) {
+        if (successfulActionSignature && successfulActionSignature === actionSignature(actionKey)) {
+            return { label: "✓ Book Added", disabled: true };
+        }
+
+        if (selectedDestinationsSatisfied(actionKey)) {
+            return { label: "✓ Already Added", disabled: true };
+        }
+
+        if (satisfiedDestinationLabels(actionKey).length > 0) {
+            return { label: "Add to Selected Places", disabled: false };
+        }
+
+        return { label: baseLabel, disabled: false };
+    }
+
     function addModePayload() {
+        if (canChooseTeacherDestinations) {
+            if (addToCatalogOnly) {
+                return {
+                    mode: "add_to_library",
+                    destinations: {
+                        catalogOnly: true,
+                        teachingBooks: false,
+                        myLibrary: false,
+                        studentLibrary: false,
+                    },
+                };
+            }
+
+            return {
+                mode: "add_to_library",
+                targetUserId: addToStudentLibrary ? selectedTeacherStudentId : currentUserId,
+                destinations: {
+                    catalogOnly: false,
+                    teachingBooks: addToTeachingBooks,
+                    myLibrary: addToMyLibrary,
+                    studentLibrary: addToStudentLibrary,
+                },
+            };
+        }
+
         if (!isTeacherGlobalContext) {
             return {
                 mode: "add_to_library",
@@ -511,20 +579,24 @@ export default function AddBookPage() {
             };
         }
 
-        if (teacherDestination === "catalog_only") {
-            return {
-                mode: "global_only",
-            };
-        }
-
         return {
-            mode: teacherDestination === "teacher_and_student" ? "teacher_and_student" : "add_to_library",
-            targetUserId: selectedTeacherStudentId,
+            mode: "add_to_library",
+            targetUserId: targetLibraryUserId,
         };
     }
 
     function validateDestinationReady(setMessage: (message: string) => void) {
-        if (isTeacherGlobalStudentDestination && !selectedTeacherStudentId) {
+        if (canChooseTeacherDestinations && !addToCatalogOnly && !addToTeachingBooks && !addToMyLibrary && !addToStudentLibrary) {
+            setMessage("Choose at least one place to add this book.");
+            return false;
+        }
+
+        if (canChooseTeacherDestinations && addToCatalogOnly && !canUseCatalogOnly) {
+            setMessage("Only super teachers and admins can add to the MEKURU Catalog only.");
+            return false;
+        }
+
+        if (canChooseTeacherDestinations && addToStudentLibrary && !selectedTeacherStudentId) {
             setMessage("Choose a student before adding this book.");
             return false;
         }
@@ -539,6 +611,10 @@ export default function AddBookPage() {
 
     function finalAddLabel() {
         if (isStudentLessonBookContext) return `Add Lesson Book for ${targetDisplayName ?? "Student"}`;
+        if (canChooseTeacherDestinations) {
+            if (addToCatalogOnly) return "Add to MEKURU Catalog";
+            return "Add Book";
+        }
         if (!isTeacherGlobalContext) {
             return isStudentDestination
                 ? "Add to Student Library"
@@ -547,9 +623,7 @@ export default function AddBookPage() {
                 : "Add to My Library";
         }
 
-        if (teacherDestination === "catalog_only") return "Add to MEKURU Catalog";
-        if (teacherDestination === "teacher_and_student") return "Add to My Library + Student's Library";
-        return "Add to Student's Library";
+        return "Add Book";
     }
 
     function resetManualAdd() {
@@ -579,7 +653,9 @@ export default function AddBookPage() {
         setManualPossibleMatches([]);
     }
 
-    function handleSuccessfulAdd(data: any) {
+    function handleSuccessfulAdd(data: any, actionKey: string) {
+        markActionSatisfied(actionKey, data);
+
         if (isStudentLessonBookContext) {
             const notice = data?.alreadyInLibrary
                 ? "lesson-book-existing"
@@ -588,33 +664,20 @@ export default function AddBookPage() {
             return;
         }
 
-        if (isTeacherGlobalContext) {
-            if (data?.globalOnly) {
-                setLibraryNotice({
-                    message: "Added to the MEKURU Catalog",
-                    detail: "No personal Library copy was created.",
-                    bookId: data.bookId,
-                    returnLabel: teacherGlobalBackLink.label.replace(/^←\s*/, ""),
-                    returnHref: teacherGlobalBackLink.href,
-                });
-                return;
-            }
-
-            if (data?.teacherAndStudent) {
-                setLibraryNotice({
-                    message: `Added to your Library and ${selectedTeacherStudentName}'s Library`,
-                    detail: "No Active Lesson Book relationship was created.",
-                    userBookId: data.studentUserBookId,
-                    returnLabel: teacherGlobalBackLink.label.replace(/^←\s*/, ""),
-                    returnHref: teacherGlobalBackLink.href,
-                });
-                return;
-            }
-
+        if (canChooseTeacherDestinations || isTeacherGlobalContext) {
+            const addedDestinations = [
+                data?.addedToCatalogOnly || data?.globalOnly ? "MEKURU Catalog" : null,
+                data?.addedToTeachingBooks ? "My Teaching Books" : null,
+                data?.addedToMyLibrary ? "My Library" : null,
+                data?.addedToStudentLibrary ? `${selectedTeacherStudentName}'s Library` : null,
+            ].filter(Boolean);
             setLibraryNotice({
-                message: `Added to ${selectedTeacherStudentName}'s Library`,
-                detail: "No Active Lesson Book relationship was created.",
-                userBookId: data.userBookId,
+                message: `Added to ${addedDestinations.length > 0 ? addedDestinations.join(", ") : targetLibraryLabel}`,
+                detail: data?.addedToStudentLibrary
+                    ? "No Active Lesson Book relationship was created."
+                    : undefined,
+                userBookId: data.userBookId ?? data.teacherUserBookId ?? data.studentUserBookId,
+                bookId: data.bookId,
                 returnLabel: teacherGlobalBackLink.label.replace(/^←\s*/, ""),
                 returnHref: teacherGlobalBackLink.href,
             });
@@ -843,7 +906,7 @@ export default function AddBookPage() {
         }
     }
 
-    async function handleAddToLibrary() {
+    async function handleAddToLibrary(actionKey: string) {
         if (!book?.isbn13) return;
 
         if (!validateDestinationReady(setError)) return;
@@ -896,13 +959,13 @@ export default function AddBookPage() {
                 return;
             }
 
-            if (!isTeacherGlobalContext && !data.userBookId) {
+            if (!canChooseTeacherDestinations && !isTeacherGlobalContext && !data.userBookId) {
                 console.error("Add book response had no userBookId:", data);
                 setError("The book was added, but Mekuru could not open the Book Hub.");
                 return;
             }
 
-            handleSuccessfulAdd(data);
+            handleSuccessfulAdd(data, actionKey);
         } catch (addError) {
             console.error("Add book failed:", addError);
             setError(`Something went wrong while adding this book to ${targetLibraryShortLabel}.`);
@@ -911,7 +974,7 @@ export default function AddBookPage() {
         }
     }
 
-    async function handleAddExistingBook(bookId: string) {
+    async function handleAddExistingBook(bookId: string, actionKey = `book:${bookId}`) {
         if (!validateDestinationReady(setBookSearchError)) return;
 
         setAddingExistingBookId(bookId);
@@ -944,7 +1007,7 @@ export default function AddBookPage() {
                 return;
             }
 
-            handleSuccessfulAdd(data);
+            handleSuccessfulAdd(data, actionKey);
         } catch (addError) {
             console.error("Add existing book failed:", addError);
             setBookSearchError(`Something went wrong while adding this book to ${targetLibraryShortLabel}.`);
@@ -953,7 +1016,7 @@ export default function AddBookPage() {
         }
     }
 
-    async function handleManualAdd(confirmDifferentEdition = false) {
+    async function handleManualAdd(actionKey: string, confirmDifferentEdition = false) {
         if (!manualAddMode) return;
 
         if (!validateDestinationReady(setManualAddError)) return;
@@ -1002,8 +1065,10 @@ export default function AddBookPage() {
                 return;
             }
 
-            resetManualAdd();
-            handleSuccessfulAdd(data);
+            if (!canChooseTeacherDestinations && !isTeacherGlobalContext) {
+                resetManualAdd();
+            }
+            handleSuccessfulAdd(data, actionKey);
         } catch (manualError) {
             console.error("Manual add failed:", manualError);
             setManualAddError(`Something went wrong while adding this book to ${targetLibraryShortLabel}.`);
@@ -1153,8 +1218,91 @@ export default function AddBookPage() {
             return `${displayName} ${username}`.toLowerCase().includes(query);
         });
     }, [teacherStudentSearch, teacherStudents]);
+
+    useEffect(() => {
+        if (!currentUserId) return;
+
+        const pairs = new Map<string, string>();
+        for (const result of bookSearchResults) {
+            pairs.set(`book:${result.id}`, result.id);
+        }
+        for (const result of manualPossibleMatches) {
+            pairs.set(`book:${result.id}`, result.id);
+        }
+        if (book?.existing_book_id) {
+            pairs.set(`book:${book.existing_book_id}`, book.existing_book_id);
+        }
+
+        if (pairs.size === 0) return;
+
+        let alive = true;
+
+        async function loadStatuses() {
+            const nextStatuses: Record<string, Partial<Record<AddBookDestinationKey, boolean>>> = {};
+
+            for (const [actionKey, bookId] of pairs) {
+                const status: Partial<Record<AddBookDestinationKey, boolean>> = {
+                    catalog: true,
+                };
+
+                try {
+                    const { data: myBook } = await supabase
+                        .from("user_books")
+                        .select("id")
+                        .eq("user_id", currentUserId)
+                        .eq("book_id", bookId)
+                        .maybeSingle();
+                    status.my = Boolean(myBook?.id);
+
+                    if (canChooseTeacherDestinations) {
+                        const { data: teacherBook } = await supabase
+                            .from("teacher_books")
+                            .select("id")
+                            .eq("teacher_id", currentUserId)
+                            .eq("book_id", bookId)
+                            .maybeSingle();
+                        status.teaching = Boolean(teacherBook?.id);
+                    }
+
+                    if (selectedTeacherStudentId) {
+                        const { data: studentBook } = await supabase
+                            .from("user_books")
+                            .select("id")
+                            .eq("user_id", selectedTeacherStudentId)
+                            .eq("book_id", bookId)
+                            .maybeSingle();
+                        status.student = Boolean(studentBook?.id);
+                    }
+                } catch (statusError) {
+                    console.warn("Could not load Add Book destination status:", statusError);
+                }
+
+                nextStatuses[actionKey] = status;
+            }
+
+            if (!alive) return;
+            setExistingDestinationStatus((current) => ({
+                ...current,
+                ...nextStatuses,
+            }));
+        }
+
+        void loadStatuses();
+
+        return () => {
+            alive = false;
+        };
+    }, [
+        book?.existing_book_id,
+        bookSearchResults,
+        canChooseTeacherDestinations,
+        currentUserId,
+        manualPossibleMatches,
+        selectedTeacherStudentId,
+    ]);
+
     const pageEyebrow = isTeacherGlobalContext
-        ? "Teacher Global Add"
+        ? "Teaching Books"
         : isStudentLessonBookContext
         ? "Student Lesson Book"
         : "MEKURU Library";
@@ -1166,6 +1314,17 @@ export default function AddBookPage() {
     const showContextSummary = !isTeacherGlobalContext || isStudentLessonBookContext;
     const hasEditionToActOn =
         Boolean(book) || Boolean(manualAddMode) || bookSearchResults.length > 0;
+    const isbnActionKey = book?.existing_book_id
+        ? `book:${book.existing_book_id}`
+        : book?.isbn13
+        ? `isbn:${book.isbn13}`
+        : "isbn-preview";
+    const manualActionKey = manualAddMode
+        ? `manual:${manualAddMode}:${manualTitle.trim()}:${manualAuthor.trim()}:${manualEditionFormat}:${manualLanguageCode}:${manualPageCount}`
+        : "manual";
+    const isbnButtonState = addButtonState(isbnActionKey);
+    const manualButtonState = addButtonState(manualActionKey);
+    const manualSatisfiedLabels = satisfiedDestinationLabels(manualActionKey);
 
     return (
         <main className="mx-auto max-w-4xl px-4 py-8">
@@ -1480,17 +1639,29 @@ export default function AddBookPage() {
                     ) : null}
                 </div>
 
-                {isTeacherGlobalContext && hasEditionToActOn ? (
+                {canChooseTeacherDestinations && hasEditionToActOn ? (
                     <div className="mt-4 rounded-2xl border border-stone-200 bg-stone-50 p-4">
                         <p className="text-xs font-black uppercase tracking-[0.16em] text-stone-500">
                             Add this edition to
                         </p>
                         <AddBookTeacherDestinationOptions
-                            teacherDestination={teacherDestination}
                             canUseCatalogOnly={canUseCatalogOnly}
-                            onSelect={setTeacherDestination}
+                            addToCatalogOnly={addToCatalogOnly}
+                            addToTeachingBooks={addToTeachingBooks}
+                            addToMyLibrary={addToMyLibrary}
+                            addToStudentLibrary={addToStudentLibrary}
+                            onCatalogOnlyChange={handleCatalogOnlyChange}
+                            onTeachingBooksChange={(checked) =>
+                                handleRelationshipDestinationChange(setAddToTeachingBooks, checked)
+                            }
+                            onMyLibraryChange={(checked) =>
+                                handleRelationshipDestinationChange(setAddToMyLibrary, checked)
+                            }
+                            onStudentLibraryChange={(checked) =>
+                                handleRelationshipDestinationChange(setAddToStudentLibrary, checked)
+                            }
                         />
-                        {isTeacherGlobalStudentDestination ? (
+                        {addToStudentLibrary && !addToCatalogOnly ? (
                             <div className="mt-4">
                                 <label className="block text-sm font-black text-stone-900">
                                     Student
@@ -1503,10 +1674,7 @@ export default function AddBookPage() {
                                 />
                                 <select
                                     value={selectedTeacherStudentId}
-                                    onChange={(event) => {
-                                        setSelectedTeacherStudentId(event.target.value);
-                                        setSelectedAllUser(null);
-                                    }}
+                                    onChange={(event) => setSelectedTeacherStudentId(event.target.value)}
                                     className="mt-3 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
                                 >
                                     <option value="">
@@ -1529,76 +1697,6 @@ export default function AddBookPage() {
                                     <p className="mt-2 text-xs leading-5 text-stone-600">
                                         Selected: <span className="font-bold text-stone-900">{selectedTeacherStudentName}</span>
                                     </p>
-                                ) : null}
-
-                                {canSearchAllUsers ? (
-                                    <div className="mt-4 rounded-2xl border border-stone-200 bg-white p-4">
-                                        <label className="block text-sm font-black text-stone-900">
-                                            Search all users
-                                        </label>
-                                        <input
-                                            value={allUserSearch}
-                                            onChange={(event) => setAllUserSearch(event.target.value)}
-                                            placeholder="Type at least 2 characters"
-                                            className="mt-2 w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
-                                        />
-                                        {allUserSearch.trim().length > 0 && allUserSearch.trim().length < 2 ? (
-                                            <p className="mt-2 text-xs leading-5 text-stone-500">
-                                                Enter at least 2 characters to search.
-                                            </p>
-                                        ) : null}
-                                        {allUserSearchLoading ? (
-                                            <p className="mt-2 text-xs font-bold text-stone-500">Searching users...</p>
-                                        ) : null}
-                                        {allUserSearchError ? (
-                                            <p className="mt-2 text-xs font-bold text-red-700">{allUserSearchError}</p>
-                                        ) : null}
-                                        {!allUserSearchLoading &&
-                                        !allUserSearchError &&
-                                        allUserSearch.trim().length >= 2 &&
-                                        allUserSearchResults.length === 0 ? (
-                                            <p className="mt-2 text-xs leading-5 text-stone-500">No matching users found.</p>
-                                        ) : null}
-                                        {allUserSearchResults.length > 0 ? (
-                                            <div className="mt-3 grid gap-2">
-                                                {allUserSearchResults.map((user) => {
-                                                    const resultName =
-                                                        user.displayName || user.username || user.email || "Unnamed user";
-                                                    const resultDetail = [
-                                                        user.email,
-                                                        user.username ? `@${user.username}` : null,
-                                                    ].filter(Boolean).join(" · ");
-                                                    const selected = selectedTeacherStudentId === user.id;
-
-                                                    return (
-                                                        <button
-                                                            key={user.id}
-                                                            type="button"
-                                                            onClick={() => {
-                                                                setSelectedTeacherStudentId(user.id);
-                                                                setSelectedAllUser(user);
-                                                            }}
-                                                            className={[
-                                                                "rounded-2xl border px-4 py-3 text-left transition",
-                                                                selected
-                                                                    ? "border-stone-900 bg-stone-50"
-                                                                    : "border-stone-200 bg-white hover:bg-stone-50",
-                                                            ].join(" ")}
-                                                        >
-                                                            <span className="block text-sm font-black text-stone-950">
-                                                                {resultName}
-                                                            </span>
-                                                            {resultDetail ? (
-                                                                <span className="mt-1 block text-xs leading-5 text-stone-600">
-                                                                    {resultDetail}
-                                                                </span>
-                                                            ) : null}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        ) : null}
-                                    </div>
                                 ) : null}
                             </div>
                         ) : null}
@@ -1633,11 +1731,21 @@ export default function AddBookPage() {
                         ) : null}
                         <AddBookActionRow
                             addLoading={addLoading}
-                            disabled={needsEditionLanguageConfirmation && !selectedEditionLanguageCode}
-                            addLabel={finalAddLabel()}
-                            onAdd={handleAddToLibrary}
+                            disabled={
+                                isbnButtonState.disabled ||
+                                (needsEditionLanguageConfirmation && !selectedEditionLanguageCode)
+                            }
+                            addLabel={isbnButtonState.label}
+                            onAdd={() => void handleAddToLibrary(isbnActionKey)}
                             onCancel={() => router.push(targetLibraryHref)}
                         />
+                        {satisfiedDestinationLabels(isbnActionKey).length > 0 ? (
+                            <div className="mt-3 space-y-1 text-xs font-bold text-emerald-800">
+                                {satisfiedDestinationLabels(isbnActionKey).map((label) => (
+                                    <p key={label}>✓ Already in {label}</p>
+                                ))}
+                            </div>
+                        ) : null}
                     </LookupBookPreviewCard>
                 ) : null}
 
@@ -1667,11 +1775,14 @@ export default function AddBookPage() {
                         pageCount={manualPageCount}
                         error={manualAddError}
                         loading={manualAddLoading}
-                        addLabel={finalAddLabel()}
+                        addLabel={manualButtonState.label}
+                        addDisabled={manualButtonState.disabled}
                         candidates={manualPossibleMatches.map((result) => ({
                             result,
                             missingFields: missingGlobalBookFields(result),
                             adding: addingExistingBookId === result.id,
+                            addLabel: addButtonState(`book:${result.id}`).label,
+                            disabled: addButtonState(`book:${result.id}`).disabled,
                             requestLoading: requestLoading && requestingBookId === result.id,
                         }))}
                         editionFormatOptions={EDITION_FORMAT_OPTIONS}
@@ -1707,12 +1818,20 @@ export default function AddBookPage() {
                             setManualPageCount(value);
                             setManualAddError("");
                         }}
-                        onSubmit={() => void handleManualAdd(false)}
-                        onSubmitDifferentEdition={() => void handleManualAdd(true)}
+                        onSubmit={() => void handleManualAdd(manualActionKey, false)}
+                        onSubmitDifferentEdition={() => void handleManualAdd(manualActionKey, true)}
                         onCancel={resetManualAdd}
-                        onUseExistingEdition={(bookId) => void handleAddExistingBook(bookId)}
+                        onUseExistingEdition={(bookId) => void handleAddExistingBook(bookId, `book:${bookId}`)}
                         onCheckDetails={(result) => void handleRequestBookDetails(result)}
                     />
+                ) : null}
+
+                {manualAddMode && manualSatisfiedLabels.length > 0 ? (
+                    <div className="mt-3 space-y-1 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-800">
+                        {manualSatisfiedLabels.map((label) => (
+                            <p key={label}>✓ Already in {label}</p>
+                        ))}
+                    </div>
                 ) : null}
 
                 {bookSearchError ? (
@@ -1725,18 +1844,30 @@ export default function AddBookPage() {
                     <div className="mt-4 space-y-3">
                         {bookSearchResults.map((result) => {
                             const missingFields = missingGlobalBookFields(result);
+                            const resultActionKey = `book:${result.id}`;
+                            const resultButtonState = addButtonState(resultActionKey);
+                            const resultSatisfiedLabels = satisfiedDestinationLabels(resultActionKey);
 
                             return (
-                                <AddBookCatalogResult
-                                    key={result.id}
-                                    result={result}
-                                    missingFields={missingFields}
-                                    adding={addingExistingBookId === result.id}
-                                    requestLoading={requestLoading && requestingBookId === result.id}
-                                    addLabel={finalAddLabel()}
-                                    onAdd={() => void handleAddExistingBook(result.id)}
-                                    onRequestReview={() => void handleRequestBookDetails(result)}
-                                />
+                                <div key={result.id}>
+                                    <AddBookCatalogResult
+                                        result={result}
+                                        missingFields={missingFields}
+                                        adding={addingExistingBookId === result.id}
+                                        requestLoading={requestLoading && requestingBookId === result.id}
+                                        addLabel={resultButtonState.label}
+                                        disabled={resultButtonState.disabled}
+                                        onAdd={() => void handleAddExistingBook(result.id, resultActionKey)}
+                                        onRequestReview={() => void handleRequestBookDetails(result)}
+                                    />
+                                    {resultSatisfiedLabels.length > 0 ? (
+                                        <div className="mt-2 space-y-1 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-800">
+                                            {resultSatisfiedLabels.map((label) => (
+                                                <p key={label}>✓ Already in {label}</p>
+                                            ))}
+                                        </div>
+                                    ) : null}
+                                </div>
                             );
                         })}
                     </div>

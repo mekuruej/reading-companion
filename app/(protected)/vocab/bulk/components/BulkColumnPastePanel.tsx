@@ -32,12 +32,12 @@ export default function BulkColumnPastePanel({
 
       <div className="space-y-4">
         <div>
-          <div className="mb-1 text-sm font-medium text-gray-700">Page numbers</div>
+          <div className="mb-1 text-sm font-medium text-gray-700">Page or % values</div>
           <textarea
             value={bulkPageList}
             onChange={(e) => onBulkPageListChange(e.target.value)}
             rows={5}
-            placeholder={`45\n46\n46\n47`}
+            placeholder={`45\n46\n18%\n47`}
             className="w-full rounded border p-3 font-mono text-sm"
           />
           <div className="mt-2">

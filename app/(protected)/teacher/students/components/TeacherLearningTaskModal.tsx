@@ -2,6 +2,7 @@ type TaskBookOption = {
   id: string;
   userId: string;
   title: string;
+  pageCount?: number | null;
 };
 
 type ActiveLearningTask = {
@@ -296,24 +297,24 @@ export default function TeacherLearningTaskModal({
           (taskType !== "review_book_words" || taskFlashcardFilter === "page_range") ? (
             <>
               <label className="grid gap-1 text-sm font-semibold text-stone-700">
-                Start page
+                Start page or %
                 <input
                   value={taskPageStart}
                   onChange={(event) => onTaskPageStartChange(event.target.value)}
-                  inputMode="numeric"
+                  inputMode="decimal"
                   className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
-                  placeholder="Optional"
+                  placeholder="Optional, e.g. p. 42 or 18%"
                 />
               </label>
 
               <label className="grid gap-1 text-sm font-semibold text-stone-700">
-                End page
+                End page or %
                 <input
                   value={taskPageEnd}
                   onChange={(event) => onTaskPageEndChange(event.target.value)}
-                  inputMode="numeric"
+                  inputMode="decimal"
                   className="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-sm font-normal text-stone-900"
-                  placeholder="Optional"
+                  placeholder="Optional, e.g. p. 52 or 21%"
                 />
               </label>
             </>

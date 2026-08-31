@@ -8,6 +8,7 @@ import {
   ensureStudentLessonBook,
   StudentLessonBookError,
 } from "@/lib/teacher/studentLessonBooks";
+import { applyAddBookDestinations } from "@/lib/books/addBookDestinations";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -38,6 +39,7 @@ function isSuperTeacherFlag(value: unknown) {
 
 function isElevatedCatalogUser(profile: { role?: string | null; is_super_teacher?: boolean | string | null } | null) {
   return (
+    profile?.role === "admin" ||
     profile?.role === "super_teacher" ||
     isSuperTeacherFlag(profile?.is_super_teacher)
   );
@@ -131,6 +133,7 @@ async function addBookToLibrary({
       .insert({
         user_id: targetUserId,
         book_id: bookId,
+        personal_tracking_status: "want_to_read",
       })
       .select("id")
       .single();
@@ -263,7 +266,7 @@ export async function POST(request: Request) {
 
   if (mode === "global_only" && !isElevatedCatalogUser(actorProfile)) {
     return NextResponse.json(
-      { error: "Only super teachers can create global catalog books without adding them to a library." },
+      { error: "Only super teachers and admins can add to the MEKURU Catalog only." },
       { status: 403 }
     );
   }
@@ -402,37 +405,26 @@ export async function POST(request: Request) {
     }
   }
 
-  if (mode === "global_only") {
-    return NextResponse.json({
-      userBookId: null,
-      bookId,
-      alreadyInLibrary: false,
-      globalOnly: true,
-    });
-  }
-
-  if (mode === "teacher_and_student") {
-    const libraryResult = await addBookToTeacherAndStudentLibraries({
-      authUserId: auth.user.id,
-      studentUserId: targetUserId,
-      bookId,
-      actorProfile,
-    });
-
-    return NextResponse.json({
-      ...libraryResult,
-      bookId,
-      teacherAndStudent: true,
-    });
-  }
-
-  const libraryResult = await addBookToLibrary({
+  const libraryResult = await applyAddBookDestinations({
+    supabase: supabaseAdmin,
     authUserId: auth.user.id,
-    targetUserId,
-    bookId,
     actorProfile,
-    isStudentLessonBookContext,
-    studentId,
+    bookId,
+    input: {
+      mode,
+      destinations: body?.destinations,
+      targetUserId,
+      context,
+      studentId,
+    },
+    createStudentLessonBook: (userBookId) =>
+      ensureStudentLessonBook({
+        supabase: supabaseAdmin,
+        teacherId: auth.user.id,
+        studentId,
+        userBookId,
+        teacherProfile: actorProfile,
+      }),
   });
 
   return NextResponse.json({

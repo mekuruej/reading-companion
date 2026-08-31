@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { resolvePersonalTrackingStatus } from "@/lib/personalTracking";
 import DifficultyTimeRangeSelector from "./components/DifficultyTimeRangeSelector";
 import BookDifficultyHeader from "./components/BookDifficultyHeader";
 import BookDifficultyDistributionPanels from "./components/BookDifficultyDistributionPanels";
@@ -36,6 +37,8 @@ type RawBook = {
 type RawUserBookRow = {
   id: string;
   created_at: string | null;
+  personal_tracking_status?: string | null;
+  status?: string | null;
   started_at: string | null;
   finished_at: string | null;
   dnf_at: string | null;
@@ -382,6 +385,8 @@ export default function BookDifficultyPage() {
             `
               id,
               created_at,
+              personal_tracking_status,
+              status,
               started_at,
               finished_at,
               dnf_at,
@@ -409,6 +414,8 @@ export default function BookDifficultyPage() {
         if (userBooksError) throw userBooksError;
 
         const loadedRows: UserBookRow[] = ((userBooks ?? []) as RawUserBookRow[]).map(
+          (row) => row
+        ).filter((row) => resolvePersonalTrackingStatus(row) !== "not_tracking").map(
           (row) => ({
             id: row.id,
             created_at: row.created_at,

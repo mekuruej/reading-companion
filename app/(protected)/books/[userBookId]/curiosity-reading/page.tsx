@@ -32,6 +32,7 @@ export default function CuriosityReadingPage() {
   const [journalOwnerUserId, setJournalOwnerUserId] = useState<string | null>(null);
   const [favoriteQuotes, setFavoriteQuotes] = useState<string | null>(null);
   const [bookLanguageCode, setBookLanguageCode] = useState<string | null>(null);
+  const [bookPageCount, setBookPageCount] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<CuriosityViewMode>("curiosity");
   const [journalContext, setJournalContext] = useState<CuriosityReadingJournalContext>({
     currentPageNumber: null,
@@ -70,7 +71,7 @@ export default function CuriosityReadingPage() {
 
       const { data: userBook, error: userBookError } = await supabase
         .from("user_books")
-        .select("id, user_id, favorite_quotes, books ( language_code )")
+        .select("id, user_id, favorite_quotes, books ( language_code, page_count )")
         .eq("id", userBookId)
         .maybeSingle();
 
@@ -92,6 +93,7 @@ export default function CuriosityReadingPage() {
         ? (userBook as any).books[0]
         : (userBook as any).books;
       setBookLanguageCode(book?.language_code ?? null);
+      setBookPageCount(book?.page_count ?? null);
 
       const profileResult = await supabase
         .from("profiles")
@@ -203,6 +205,7 @@ export default function CuriosityReadingPage() {
       ownerUserId={journalOwnerUserId}
       favoriteQuotes={favoriteQuotes}
       bookLanguageCode={bookLanguageCode}
+      pageCount={bookPageCount}
       currentPageNumber={journalContext.currentPageNumber}
       selectedChapterLabel={journalContext.selectedChapterLabel}
       selectedChapterNumber={journalContext.selectedChapterNumber}

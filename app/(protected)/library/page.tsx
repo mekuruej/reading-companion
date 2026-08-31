@@ -24,7 +24,7 @@ const libraryCards = [
   },
   {
     title: "Add a Book",
-    href: "/books/add",
+    href: "/books/add?destination=my-library",
     eyebrow: "New book",
     description: "Look up an ISBN and add a new book to your Mekuru library.",
     className: "border-rose-200 bg-rose-50 text-rose-950",

@@ -79,7 +79,7 @@ export default function TeacherPrepBulkFieldsPanel({
 
       <div className="mt-3 grid gap-3 md:grid-cols-3">
         <BulkFieldInput
-          label="Page"
+          label="Page or %"
           value={pageNumber}
           onChange={onPageNumberChange}
           field="page"

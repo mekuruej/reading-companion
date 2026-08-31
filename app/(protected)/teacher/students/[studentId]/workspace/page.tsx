@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 import TeacherLearningTaskModal from "../../components/TeacherLearningTaskModal";
 
 type StudentProfile = {
@@ -83,6 +84,7 @@ type TaskBookOption = {
   id: string;
   userId: string;
   title: string;
+  pageCount: number | null;
 };
 
 type ActiveLearningTask = {
@@ -263,6 +265,7 @@ export default function StudentWorkspacePage() {
         id: lessonBook.userBookId,
         userId: studentId,
         title: lessonBook.book.title,
+        pageCount: lessonBook.book.pageCount ?? null,
       });
     }
 
@@ -273,6 +276,7 @@ export default function StudentWorkspacePage() {
         id: book.id,
         userId: studentId,
         title: book.title,
+        pageCount: book.pageCount ?? null,
       });
     }
 
@@ -531,8 +535,6 @@ export default function StudentWorkspacePage() {
     }
 
     const cleanInstructions = taskInstructions.trim();
-    const pageStart = taskPageStart.trim() === "" ? null : Number(taskPageStart.trim());
-    const pageEnd = taskPageEnd.trim() === "" ? null : Number(taskPageEnd.trim());
     const chapterNumber =
       taskChapterNumber.trim() === "" ? null : Number(taskChapterNumber.trim());
     const kanjiCardCount =
@@ -553,11 +555,29 @@ export default function StudentWorkspacePage() {
       return;
     }
 
+    const selectedTaskBook = taskBooks.find((book) => book.id === taskUserBookId);
+    const parsedPageStart = parseOptionalPageLocationInput(
+      taskPageStart,
+      selectedTaskBook?.pageCount ?? null
+    );
+    const parsedPageEnd = parseOptionalPageLocationInput(
+      taskPageEnd,
+      selectedTaskBook?.pageCount ?? null
+    );
+    const pageStart = parsedPageStart.value;
+    const pageEnd = parsedPageEnd.value;
+
     if (
+      parsedPageStart.error ||
+      parsedPageEnd.error ||
       (pageStart != null && (!Number.isFinite(pageStart) || pageStart <= 0)) ||
       (pageEnd != null && (!Number.isFinite(pageEnd) || pageEnd <= 0))
     ) {
-      setTaskMessage("Page numbers should be positive numbers.");
+      setTaskMessage(
+        parsedPageStart.error ||
+          parsedPageEnd.error ||
+          "Page numbers should be positive numbers."
+      );
       return;
     }
 
@@ -1078,7 +1098,7 @@ export default function StudentWorkspacePage() {
                     href={`/teacher/books/add?requestId=${encodeURIComponent(request.id)}&from=student-workspace`}
                     className="rounded-xl bg-sky-700 px-4 py-2 text-center text-sm font-bold text-white hover:bg-sky-800"
                   >
-                    Open Book Request
+                    Open in Catalog Editor
                   </Link>
                 </article>
               );

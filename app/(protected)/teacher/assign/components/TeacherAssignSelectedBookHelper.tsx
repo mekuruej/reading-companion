@@ -42,14 +42,14 @@ export function TeacherAssignSelectedBookHelper({
         <div style={{ marginTop: 6, color: "#92400e" }}>
           Missing book info: {missingInfo.join(", ")}.{" "}
           <Link href={`/teacher/books/add?bookId=${selectedBook.id}`}>
-            Edit book info
+            Open Catalog Editor
           </Link>
         </div>
       ) : (
         <div style={{ marginTop: 6, color: "#166534" }}>
           Core book info looks complete.{" "}
           <Link href={`/teacher/books/add?bookId=${selectedBook.id}`}>
-            Edit book info
+            Open Catalog Editor
           </Link>
         </div>
       )}

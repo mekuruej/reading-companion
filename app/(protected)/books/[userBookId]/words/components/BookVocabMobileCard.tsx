@@ -121,13 +121,15 @@ export default function BookVocabMobileCard({
           <label className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-black uppercase tracking-wide text-stone-500">
             Page
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
               value={pageDraft}
               onChange={(event) => setPageDraft(event.target.value)}
               onBlur={() => void commitPage()}
               onKeyDown={handlePageKeyDown}
-              className="w-16 rounded-lg border border-stone-200 bg-white px-2 py-1 text-center text-sm font-semibold normal-case tracking-normal text-stone-700 focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-100"
-              aria-label="Page number"
+              placeholder="%"
+              className="w-20 rounded-lg border border-stone-200 bg-white px-2 py-1 text-center text-sm font-semibold normal-case tracking-normal text-stone-700 focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-100"
+              aria-label="Page number or percent"
             />
           </label>
         )}

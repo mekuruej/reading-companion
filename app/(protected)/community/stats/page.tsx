@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { resolvePersonalTrackingStatus } from "@/lib/personalTracking";
 import { supabase } from "@/lib/supabaseClient";
 import CommunityStatsHeader from "./components/CommunityStatsHeader";
 import StatsExploreSection from "./components/StatsExploreSection";
@@ -200,16 +201,21 @@ export default function CommunityStatsHomePage() {
 
         const { data: userBooks, error: userBooksError } = await supabase
           .from("user_books")
-          .select("id")
+          .select("id, personal_tracking_status, status, started_at, finished_at, dnf_at")
           .eq("user_id", user.id);
 
         if (userBooksError) throw userBooksError;
 
-        const userBookIds = (userBooks ?? [])
+        const allUserBookIds = (userBooks ?? [])
           .map((row) => row.id)
           .filter(Boolean);
 
-        if (userBookIds.length === 0) {
+        const trackedUserBookIds = (userBooks ?? [])
+          .filter((row) => resolvePersonalTrackingStatus(row) !== "not_tracking")
+          .map((row) => row.id)
+          .filter(Boolean);
+
+        if (allUserBookIds.length === 0) {
           if (!isMounted) return;
           setSnapshot({
             daysActive: 0,
@@ -224,17 +230,19 @@ export default function CommunityStatsHomePage() {
           { data: sessionData, error: sessionError },
           wordResponse,
         ] = await Promise.all([
-          supabase
-            .from("user_book_reading_sessions")
-            .select(
-              "user_book_id, read_on, start_page, end_page, minutes_read, session_mode, is_filler"
-            )
-            .in("user_book_id", userBookIds),
+          trackedUserBookIds.length > 0
+            ? supabase
+              .from("user_book_reading_sessions")
+              .select(
+                "user_book_id, read_on, start_page, end_page, minutes_read, session_mode, is_filler"
+              )
+              .in("user_book_id", trackedUserBookIds)
+            : Promise.resolve({ data: [], error: null }),
           canShowLearningSnapshots
             ? supabase
               .from("user_book_words")
               .select("id, user_book_id, created_at")
-              .in("user_book_id", userBookIds)
+              .in("user_book_id", allUserBookIds)
             : Promise.resolve({ data: [], error: null }),
         ]);
 

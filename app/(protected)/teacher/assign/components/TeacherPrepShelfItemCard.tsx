@@ -55,7 +55,7 @@ export function TeacherPrepShelfItemCard({
               fontWeight: 750,
             }}
           >
-            Edit book info
+            Open Catalog Editor
           </Link>
         ) : null}
 

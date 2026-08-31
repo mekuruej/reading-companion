@@ -154,10 +154,12 @@ export default function BookVocabEditFormBody({
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="text-xs text-gray-600">Page</span>
+        <span className="text-xs text-gray-600">Page or %</span>
         <input
           value={editPage}
           onChange={(e) => onEditPageChange(e.target.value)}
+          inputMode="decimal"
+          placeholder="p. 42 or 18%"
           className="border p-2 rounded"
         />
       </label>

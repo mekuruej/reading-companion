@@ -399,30 +399,28 @@ export default function ReadingTab({
             <>
               <div className="rounded border bg-white p-3 text-sm">
                 <div className="text-stone-600">
-                  {usePercentMode ? "Start percent" : "Start page"}
+                  {usePercentMode ? "Start percent" : "Start page or %"}
                 </div>
                 <input
-                  type="number"
-                  min={usePercentMode ? 0 : 1}
-                  max={usePercentMode ? 100 : undefined}
+                  type="text"
+                  inputMode="decimal"
                   value={sessionStartPage}
                   onChange={(e) => setSessionStartPage(e.target.value)}
-                  placeholder={usePercentMode ? "e.g. 12" : "e.g. 4"}
+                  placeholder={usePercentMode ? "e.g. 12%" : "e.g. p. 4 or 12%"}
                   className="mt-1 w-full rounded border px-2 py-1"
                 />
               </div>
 
               <div className="rounded border bg-white p-3 text-sm">
                 <div className="text-stone-600">
-                  {usePercentMode ? "End percent" : "End page"}
+                  {usePercentMode ? "End percent" : "End page or %"}
                 </div>
                 <input
-                  type="number"
-                  min={usePercentMode ? 0 : 1}
-                  max={usePercentMode ? 100 : undefined}
+                  type="text"
+                  inputMode="decimal"
                   value={sessionEndPage}
                   onChange={(e) => setSessionEndPage(e.target.value)}
-                  placeholder={usePercentMode ? "e.g. 18" : "e.g. 10"}
+                  placeholder={usePercentMode ? "e.g. 18%" : "e.g. p. 10 or 18%"}
                   className="mt-1 w-full rounded border px-2 py-1"
                 />
               </div>

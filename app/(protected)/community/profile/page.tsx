@@ -381,11 +381,13 @@ export default function ProfileHubPage() {
 	            .from("user_books")
             .select("id", { count: "exact", head: true })
 	            .eq("user_id", user.id)
+            .neq("personal_tracking_status", "not_tracking")
 	            .or("is_teacher_prep.is.null,is_teacher_prep.eq.false"),
 	          supabase
 	            .from("user_books")
 	            .select("id", { count: "exact", head: true })
 	            .eq("user_id", user.id)
+            .neq("personal_tracking_status", "not_tracking")
 	            .not("finished_at", "is", null)
 	            .or("is_teacher_prep.is.null,is_teacher_prep.eq.false"),
           supabase
@@ -409,6 +411,7 @@ export default function ProfileHubPage() {
             `
             )
             .eq("user_books.user_id", user.id)
+            .neq("user_books.personal_tracking_status", "not_tracking")
             .or("is_teacher_prep.is.null,is_teacher_prep.eq.false", {
               foreignTable: "user_books",
             }),

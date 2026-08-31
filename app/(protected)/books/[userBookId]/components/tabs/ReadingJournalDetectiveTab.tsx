@@ -1,6 +1,8 @@
 import type { DetectiveEntry } from "./readingJournalTypes";
+import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 
 type ReadingJournalDetectiveTabProps = {
+  pageCount?: number | null;
   detectiveEntries: DetectiveEntry[];
   detectiveSearch: string;
   setDetectiveSearch: (value: string) => void;
@@ -105,6 +107,7 @@ function detectiveSearchText(entry: DetectiveEntry) {
 }
 
 export default function ReadingJournalDetectiveTab({
+  pageCount,
   detectiveEntries,
   detectiveSearch,
   setDetectiveSearch,
@@ -300,17 +303,16 @@ export default function ReadingJournalDetectiveTab({
                                       className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-200"
                                     />
                                     <input
-                                      type="number"
-                                      min="1"
                                       value={entry.page_number ?? ""}
                                       onChange={(event) =>
                                         updateDetectiveEntry(
                                           entry.id,
                                           "page_number",
-                                          event.target.value.trim() ? Number(event.target.value) : null
+                                          parseOptionalPageLocationInput(event.target.value, pageCount).value
                                         )
                                       }
-                                      placeholder="Page #"
+                                      inputMode="decimal"
+                                      placeholder="Page # or %"
                                       className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-200"
                                     />
                                   </div>

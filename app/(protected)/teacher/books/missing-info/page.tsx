@@ -115,7 +115,7 @@ export default function TeacherMissingBookInfoPage() {
           {items.length} book attention item{items.length === 1 ? "" : "s"}
         </h1>
         <p className="mt-2 text-sm leading-6 text-stone-600">
-          Global book records missing core details such as author, cover, page count, or publication info.
+          Catalog book records missing core details such as author, cover, page count, or publication info.
         </p>
       </section>
 
@@ -124,7 +124,7 @@ export default function TeacherMissingBookInfoPage() {
 
       {!loading && items.length === 0 ? (
         <div className="mt-6 rounded-3xl border border-stone-200 bg-white p-6 text-sm text-stone-500">
-          No global books are missing core information right now.
+          No catalog books are missing core information right now.
         </div>
       ) : null}
 
@@ -140,7 +140,7 @@ export default function TeacherMissingBookInfoPage() {
 
               <div className="min-w-0 flex-1">
                 <h2 className="text-lg font-black text-stone-900">
-                  {book.title ?? "Untitled global book"}
+                  {book.title ?? "Untitled catalog book"}
                 </h2>
                 <p className="mt-1 text-sm text-stone-600">
                   Missing book info: {missing.join(", ")}.
@@ -151,7 +151,7 @@ export default function TeacherMissingBookInfoPage() {
                     href={`/teacher/books/add?bookId=${book.id}`}
                     className="inline-flex rounded-xl border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
                   >
-                    Open Global Book Entry
+                    Open Catalog Editor
                   </Link>
                   <button
                     type="button"

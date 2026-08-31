@@ -10,6 +10,7 @@ import { getBookIdentity } from "@/lib/books/bookIdentity";
 import { isNativeLanguageBook } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
+import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 
 type ProfileRole = "teacher" | "member" | "super_teacher" | "admin";
 
@@ -352,20 +353,25 @@ export default function ReadingSessionsPage() {
     const parsedStart =
       sessionMode === "listening" || sessionStartPage.trim() === ""
         ? null
-        : Number(sessionStartPage);
+        : parseOptionalPageLocationInput(sessionStartPage, book?.page_count ?? null).value;
     const parsedEnd =
       sessionEndPage.trim() === ""
         ? null
         : sessionMode === "listening"
           ? listeningEndInput?.value ?? null
-          : Number(sessionEndPage);
+          : parseOptionalPageLocationInput(sessionEndPage, book?.page_count ?? null).value;
+    const startPageInputError =
+      sessionMode !== "listening" && sessionStartPage.trim()
+        ? parseOptionalPageLocationInput(sessionStartPage, book?.page_count ?? null).error
+        : null;
+    const endPageInputError =
+      sessionMode !== "listening" && sessionEndPage.trim()
+        ? parseOptionalPageLocationInput(sessionEndPage, book?.page_count ?? null).error
+        : null;
 
-    const start =
-      usingPercentMode && sessionMode !== "listening"
-        ? percentToPage(parsedStart, book?.page_count ?? null)
-        : parsedStart;
+    const start = parsedStart;
     const end =
-      endInputIsPercent
+      sessionMode === "listening" && endInputIsPercent
         ? percentToPage(parsedEnd, book?.page_count ?? null) ?? parsedEnd
         : parsedEnd;
     const minutes = sessionMinutesRead.trim() === "" ? null : Number(sessionMinutesRead);
@@ -382,10 +388,12 @@ export default function ReadingSessionsPage() {
       }
 
       if (
+        startPageInputError ||
+        endPageInputError ||
         (usingPercentMode && (!Number.isFinite(parsedStart) || !Number.isFinite(parsedEnd))) ||
         (!usingPercentMode && (!Number.isFinite(start) || !Number.isFinite(end)))
       ) {
-        alert(usingPercentMode ? "Please fill in start and end percent." : "Please fill in start and end page.");
+        alert(startPageInputError || endPageInputError || "Please fill in start and end page or percent.");
         return;
       }
 
@@ -745,11 +753,11 @@ export default function ReadingSessionsPage() {
                     {usePercentMode ? "Start percent" : "Start page"}
                   </span>
                   <input
-                    type="number"
-                    min={usePercentMode ? 0 : 1}
-                    max={usePercentMode ? 100 : undefined}
+                    type="text"
+                    inputMode="decimal"
                     value={sessionStartPage}
                     onChange={(event) => setSessionStartPage(event.target.value)}
+                    placeholder={usePercentMode ? "e.g. 12%" : "e.g. p. 4 or 12%"}
                     className="mt-1 w-full rounded border px-2 py-1"
                   />
                 </label>
@@ -759,11 +767,11 @@ export default function ReadingSessionsPage() {
                     {usePercentMode ? "End percent" : "End page"}
                   </span>
                   <input
-                    type="number"
-                    min={usePercentMode ? 0 : 1}
-                    max={usePercentMode ? 100 : undefined}
+                    type="text"
+                    inputMode="decimal"
                     value={sessionEndPage}
                     onChange={(event) => setSessionEndPage(event.target.value)}
+                    placeholder={usePercentMode ? "e.g. 18%" : "e.g. p. 10 or 18%"}
                     className="mt-1 w-full rounded border px-2 py-1"
                   />
                 </label>

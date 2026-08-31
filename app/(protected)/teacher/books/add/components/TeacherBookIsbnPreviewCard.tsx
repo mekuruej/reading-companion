@@ -107,8 +107,8 @@ export function TeacherBookIsbnPreviewCard({
                             {saving
                                 ? "Working..."
                                 : preview.found_existing_book
-                                    ? "Load existing global book"
-                                    : "Create global book from this metadata"}
+                                    ? "Load existing catalog book"
+                                    : "Create catalog book from this metadata"}
                         </button>
 
                         {!preview.title ? (

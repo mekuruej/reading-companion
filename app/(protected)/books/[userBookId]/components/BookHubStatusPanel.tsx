@@ -1,5 +1,13 @@
+import {
+  PERSONAL_TRACKING_STATUSES,
+  type PersonalTrackingStatus,
+  personalTrackingStatusLabel,
+} from "@/lib/personalTracking";
+
 type BookHubStatusPanelProps = {
   statusLabel: string;
+  personalTrackingStatus: PersonalTrackingStatus;
+  showNotTrackingOption: boolean;
   startedAt: string;
   finishedAt: string;
   dnfAt: string;
@@ -24,6 +32,7 @@ type BookHubStatusPanelProps = {
 
 
   onStartToday: () => void;
+  onPersonalTrackingStatusChange: (value: PersonalTrackingStatus) => void;
   onMarkFinished: () => void;
   onMarkDnf: () => void;
   onOpenReview: () => void;
@@ -68,6 +77,8 @@ function wouldRetryLabel(value: string) {
 
 export default function BookHubStatusPanel({
   statusLabel,
+  personalTrackingStatus,
+  showNotTrackingOption,
   startedAt,
   finishedAt,
   dnfAt,
@@ -87,6 +98,7 @@ export default function BookHubStatusPanel({
   furthestTrackedPage,
   pageCount,
   onStartToday,
+  onPersonalTrackingStatusChange,
   onMarkFinished,
   onMarkDnf,
   onOpenReview,
@@ -104,6 +116,24 @@ export default function BookHubStatusPanel({
         <div>
           <span className="font-medium">Status:</span> {statusLabel}
         </div>
+        <label className="block">
+          <span className="mb-1 block font-medium">Personal reading status</span>
+          <select
+            value={personalTrackingStatus}
+            onChange={(event) =>
+              onPersonalTrackingStatusChange(event.target.value as PersonalTrackingStatus)
+            }
+            className="w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm font-semibold text-stone-800 shadow-sm"
+          >
+            {PERSONAL_TRACKING_STATUSES.filter(
+              (status) => showNotTrackingOption || status !== "not_tracking"
+            ).map((status) => (
+              <option key={status} value={status}>
+                {personalTrackingStatusLabel(status)}
+              </option>
+            ))}
+          </select>
+        </label>
         <div>
           <span className="font-medium">Started:</span> {startedAt || "—"}
         </div>

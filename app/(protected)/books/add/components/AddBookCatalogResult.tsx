@@ -18,6 +18,7 @@ type AddBookCatalogResultProps = {
   result: CatalogBookResult;
   missingFields: string[];
   adding: boolean;
+  disabled?: boolean;
   requestLoading: boolean;
   addLabel: string;
   onAdd: () => void;
@@ -49,6 +50,7 @@ export default function AddBookCatalogResult({
   result,
   missingFields,
   adding,
+  disabled = false,
   requestLoading,
   addLabel,
   onAdd,
@@ -126,7 +128,7 @@ export default function AddBookCatalogResult({
         <button
           type="button"
           onClick={onAdd}
-          disabled={adding}
+          disabled={adding || disabled}
           className="rounded-2xl bg-amber-500 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-amber-600 disabled:opacity-50"
         >
           {adding ? "Adding..." : addLabel}
