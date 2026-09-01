@@ -4,7 +4,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
@@ -93,6 +93,10 @@ async function loadJapaneseLearningArchiveTabs(userBookId: string) {
 export default function StoryNotesPage() {
   const params = useParams<{ userBookId: string }>();
   const userBookId = params?.userBookId;
+  const searchParams = useSearchParams();
+  const bookHubHref = `/books/${encodeURIComponent(userBookId ?? "")}${
+    searchParams.get("mode") === "teaching" ? "?mode=teaching" : ""
+  }`;
 
   const [loading, setLoading] = useState(true);
   const [accessMessage, setAccessMessage] = useState("");
@@ -276,7 +280,7 @@ export default function StoryNotesPage() {
     return (
       <AccessDeniedMessage
         message={accessMessage || "You do not have access to Reading Journal."}
-        backHref={userBookId ? `/books/${userBookId}` : "/books"}
+        backHref={userBookId ? bookHubHref : "/books"}
         backLabel="Back to Book Hub"
       />
     );
@@ -291,7 +295,7 @@ export default function StoryNotesPage() {
     <main className="min-h-screen bg-stone-50 p-6">
       <div className="mx-auto max-w-6xl space-y-5">
         <Link
-          href={`/books/${row.id}`}
+          href={bookHubHref}
           className="inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
         >
           ← Back to Book Hub

@@ -240,24 +240,41 @@ async function authorizeTeacherForStudentBook({
     };
   }
 
-  if (!isSuperTeacher(profile)) {
-    const { data: link, error: linkError } = await supabaseAdmin
-      .from("teacher_students")
-      .select("teacher_id")
-      .eq("teacher_id", actorId)
-      .eq("student_id", studentId)
-      .is("archived_at", null)
-      .maybeSingle();
+  const { data: link, error: linkError } = await supabaseAdmin
+    .from("teacher_students")
+    .select("teacher_id")
+    .eq("teacher_id", actorId)
+    .eq("student_id", studentId)
+    .is("archived_at", null)
+    .maybeSingle();
 
-    if (linkError) throw linkError;
+  if (linkError) throw linkError;
 
-    if (!link) {
-      return {
-        ok: false as const,
-        error: "You do not have access to this student's book.",
-        status: 403,
-      };
-    }
+  if (!link) {
+    return {
+      ok: false as const,
+      error: "You do not have access to this student's book.",
+      status: 403,
+    };
+  }
+
+  const { data: lessonBook, error: lessonBookError } = await supabaseAdmin
+    .from("teacher_student_lesson_books")
+    .select("id")
+    .eq("teacher_id", actorId)
+    .eq("student_id", studentId)
+    .eq("user_book_id", userBookId)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (lessonBookError) throw lessonBookError;
+
+  if (!lessonBook) {
+    return {
+      ok: false as const,
+      error: "This student is not actively connected to this book.",
+      status: 403,
+    };
   }
 
   return {

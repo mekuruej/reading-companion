@@ -5,7 +5,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import { getBookIdentity } from "@/lib/books/bookIdentity";
 import { bookTypeLabel } from "@/lib/books/bookTypes";
@@ -393,6 +393,10 @@ function statusLabel(row: UserBook) {
 export default function AboutBookPage() {
   const params = useParams<{ userBookId: string }>();
   const userBookId = params?.userBookId;
+  const searchParams = useSearchParams();
+  const bookHubHref = `/books/${encodeURIComponent(userBookId ?? "")}${
+    searchParams.get("mode") === "teaching" ? "?mode=teaching" : ""
+  }`;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [row, setRow] = useState<UserBook | null>(null);
@@ -664,7 +668,7 @@ export default function AboutBookPage() {
     <main className="min-h-screen bg-[#f5efe7] px-5 py-8 text-stone-950">
       <div className="mx-auto max-w-6xl">
         <Link
-          href={`/books/${row.id}`}
+          href={bookHubHref}
           className="inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
         >
           ← Back to Book Hub

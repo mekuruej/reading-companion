@@ -130,6 +130,20 @@ type TeacherStudentBulkContext = {
   backHref: string;
 };
 
+type TeachingBulkDestination =
+  | {
+      type: "teacher";
+      userBookId: string;
+      label: string;
+    }
+  | {
+      type: "student";
+      lessonBookId: string;
+      userBookId: string;
+      studentId: string;
+      label: string;
+    };
+
 // -------------------------------------------------------------
 // Main Component
 // -------------------------------------------------------------
@@ -142,6 +156,10 @@ export default function BulkVocabPage() {
   const [bookPageCount, setBookPageCount] = useState<number | null>(null);
   const [teacherStudentContext, setTeacherStudentContext] =
     useState<TeacherStudentBulkContext | null>(null);
+  const [isTeachingModeBulkAdd, setIsTeachingModeBulkAdd] = useState(false);
+  const [teachingDestinations, setTeachingDestinations] = useState<TeachingBulkDestination[]>([]);
+  const [selectedTeachingDestination, setSelectedTeachingDestination] = useState("teacher");
+  const [teachingDestinationsLoading, setTeachingDestinationsLoading] = useState(false);
 
   // The route/local state can provide a userBookId, but private queries and writes
   // should only use it after confirming it belongs to the logged-in user.
@@ -178,6 +196,24 @@ export default function BulkVocabPage() {
     return parts.join(" · ");
   }, [bulkPageNumber, lastSavedWordContext]);
 
+  const selectedDestination = useMemo(() => {
+    return teachingDestinations.find((destination) =>
+      destination.type === "teacher"
+        ? selectedTeachingDestination === "teacher"
+        : selectedTeachingDestination === `student:${destination.lessonBookId}`
+    ) ?? null;
+  }, [selectedTeachingDestination, teachingDestinations]);
+
+  const backToBookHubHref = isTeachingModeBulkAdd
+    ? `/books/${encodeURIComponent(userBookId)}?mode=teaching`
+    : `/books/${encodeURIComponent(authorizedUserBookId)}`;
+
+  const destinationClarification = selectedDestination?.type === "student"
+    ? `These words will be added to ${selectedDestination.label}'s vocabulary for this book.`
+    : isTeachingModeBulkAdd
+      ? "These words will be added to your vocabulary for this book."
+      : "";
+
   const [rawInput, setRawInput] = useState("");
   const [items, setItems] = useState<BulkItem[]>([]);
 
@@ -197,6 +233,9 @@ export default function BulkVocabPage() {
     const params = new URLSearchParams(window.location.search);
     const id = params.get("userBookId") || "";
     setUserBookId(id);
+    setIsTeachingModeBulkAdd(
+      params.get("mode") === "teaching" && params.get("from") === "book-hub"
+    );
   }, []);
 
   useEffect(() => {
@@ -222,6 +261,9 @@ export default function BulkVocabPage() {
       setBookCover(null);
       setBookPageCount(null);
       setTeacherStudentContext(null);
+      setTeachingDestinations([]);
+      setSelectedTeachingDestination("teacher");
+      setTeachingDestinationsLoading(false);
 
       if (!userBookId) return;
 
@@ -279,6 +321,12 @@ export default function BulkVocabPage() {
 
         const isOwner = data.user_id === user.id;
         const isSuperTeacher = roleForAccess === "super_teacher";
+        const canUseTeachingBulkAdd =
+          isTeachingModeBulkAdd &&
+          isOwner &&
+          (roleForAccess === "teacher" ||
+            roleForAccess === "super_teacher" ||
+            roleForAccess === "admin");
 
         let isLinkedTeacher = false;
 
@@ -339,6 +387,38 @@ export default function BulkVocabPage() {
         setBookCover(b?.cover_url ?? null);
         setBookPageCount(b?.page_count ?? null);
 
+        if (isTeachingModeBulkAdd) {
+          if (!canUseTeachingBulkAdd) {
+            setMessage("❌ Teaching Bulk Add is only available from your own Teaching-mode Book Hub.");
+            setAuthorizedUserBookId("");
+            setTeachingDestinations([]);
+            return;
+          }
+
+          setTeachingDestinationsLoading(true);
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          const response = await fetch(
+            `/api/vocab/bulk/teaching?sourceUserBookId=${encodeURIComponent((data as any).id)}`,
+            {
+              headers: session?.access_token
+                ? { Authorization: `Bearer ${session.access_token}` }
+                : undefined,
+            }
+          );
+          const destinationData = await response.json().catch(() => ({}));
+
+          if (!response.ok) {
+            throw new Error(destinationData?.error ?? "Could not load Teaching Bulk Add destinations.");
+          }
+
+          const destinations = (destinationData?.destinations ?? []) as TeachingBulkDestination[];
+          setTeachingDestinations(destinations);
+          setSelectedTeachingDestination("teacher");
+          setTeachingDestinationsLoading(false);
+        }
+
         if (!isOwner && (isLinkedTeacher || isSuperTeacher)) {
           const { data: studentProfile, error: studentProfileError } = await supabase
             .from("profiles")
@@ -385,6 +465,7 @@ export default function BulkVocabPage() {
         console.error("Could not load authorized book info:", error);
 
         if (!cancelled) {
+          setTeachingDestinationsLoading(false);
           setMessage(`❌ Could not load book info: ${error?.message ?? "Unknown error"}`);
         }
       }
@@ -395,7 +476,7 @@ export default function BulkVocabPage() {
     return () => {
       cancelled = true;
     };
-  }, [userBookId]);
+  }, [isTeachingModeBulkAdd, userBookId]);
 
   useEffect(() => {
     if (!authorizedUserBookId) return;
@@ -500,6 +581,21 @@ export default function BulkVocabPage() {
       setRecentAction((current) => (current === actionKey ? null : current));
     }, 1200);
   }
+
+  function changeTeachingDestination(value: string) {
+    const destination = teachingDestinations.find((item) =>
+      item.type === "teacher"
+        ? value === "teacher"
+        : value === `student:${item.lessonBookId}`
+    );
+
+    setSelectedTeachingDestination(value);
+    if (destination) {
+      setAuthorizedUserBookId(destination.userBookId);
+      setLastSavedWordContext(null);
+    }
+  }
+
   function updateItem(index: number, field: keyof BulkItem, value: any) {
     setItems((prev) => {
       const copy = [...prev];
@@ -708,6 +804,16 @@ export default function BulkVocabPage() {
       return;
     }
 
+    if (isTeachingModeBulkAdd && teachingDestinationsLoading) {
+      setMessage("❌ Choose a destination before previewing words.");
+      return;
+    }
+
+    if (isTeachingModeBulkAdd && !selectedDestination) {
+      setMessage("❌ Choose where these words should be saved.");
+      return;
+    }
+
     const words = parseWords(rawInput);
     if (words.length === 0) {
       setMessage("Paste at least one word.");
@@ -813,6 +919,11 @@ export default function BulkVocabPage() {
 
     if (!authorizedUserBookId || items.length === 0) return;
 
+    if (isTeachingModeBulkAdd && !selectedDestination) {
+      setMessage("❌ Choose where these words should be saved.");
+      return;
+    }
+
     const incompleteWords = getIncompleteWordLabels();
 
     if (incompleteWords.length > 0) {
@@ -851,6 +962,63 @@ export default function BulkVocabPage() {
         }
         return { item, pageNumber: parsedPage.value };
       });
+
+      if (isTeachingModeBulkAdd && selectedDestination?.type === "student") {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        const response = await fetch("/api/vocab/bulk/teaching", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(session?.access_token
+              ? { Authorization: `Bearer ${session.access_token}` }
+              : {}),
+          },
+          body: JSON.stringify({
+            sourceUserBookId: userBookId,
+            lessonBookId: selectedDestination.lessonBookId,
+            items,
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(data?.error ?? "Could not save Teaching Bulk Add words.");
+        }
+
+        setChapterNameOptions((current) =>
+          normalizeChapterNameOptions([
+            ...current,
+            ...items.map((item) => item.chapterName?.trim() || null),
+          ])
+        );
+        setChapterNumberByName((current) => {
+          const next = { ...current };
+          for (const item of items) {
+            const name = item.chapterName.trim();
+            const number = item.chapterNumber.trim();
+            if (name && number) next[name] = number;
+          }
+          return next;
+        });
+        setStep("done");
+        const lastSaved = itemsWithPages[itemsWithPages.length - 1];
+        if (lastSaved?.item.surface) {
+          setLastSavedWordContext({
+            surface: lastSaved.item.surface,
+            page:
+              lastSaved.pageNumber != null
+                ? String(lastSaved.pageNumber)
+                : "",
+          });
+        }
+        setMessage(
+          `✅ ${data.savedCount ?? items.length} words added to ${data.destinationName ?? selectedDestination.label}'s vocabulary.`
+        );
+        return;
+      }
 
       const comboKeys = Array.from(
         new Set(
@@ -951,7 +1119,11 @@ export default function BulkVocabPage() {
               : "",
         });
       }
-      setMessage(`✅ Saved ${payload.length} words!`);
+      setMessage(
+        isTeachingModeBulkAdd
+          ? `✅ ${payload.length} words added to your vocabulary for this book.`
+          : `✅ Saved ${payload.length} words!`
+      );
     } catch (err: any) {
       console.error("SAVE ALL ERROR:", JSON.stringify(err, null, 2), err);
       setMessage(
@@ -1003,16 +1175,16 @@ export default function BulkVocabPage() {
           <>
             <button
               type="button"
-              onClick={() => router.push(`/books/${encodeURIComponent(authorizedUserBookId)}`)}
+              onClick={() => router.push(backToBookHubHref)}
               className="mb-2 inline-flex text-sm font-medium text-stone-500 underline-offset-4 transition hover:text-stone-800 hover:underline"
             >
-              ← Back to Book Hub
+              {isTeachingModeBulkAdd ? "← Back to Teaching Book Hub" : "← Back to Book Hub"}
             </button>
 
             <div className="mb-4 flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-2.5 shadow-sm sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
               <button
                 type="button"
-                onClick={() => router.push(`/books/${encodeURIComponent(authorizedUserBookId)}`)}
+                onClick={() => router.push(backToBookHubHref)}
                 className="flex min-w-0 items-center gap-3 rounded-lg text-left transition hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-stone-400"
                 title={`Go to ${bookTitle} Book Hub`}
               >
@@ -1058,6 +1230,46 @@ export default function BulkVocabPage() {
 
             </div>
           </div>
+          {isTeachingModeBulkAdd ? (
+            <section className="mb-4 rounded-xl border border-blue-100 bg-blue-50/70 p-4 shadow-sm">
+              <label className="block">
+                <span className="mb-1 block text-xs font-black uppercase tracking-[0.16em] text-blue-700">
+                  Add words to
+                </span>
+                <select
+                  value={selectedTeachingDestination}
+                  onChange={(event) => changeTeachingDestination(event.target.value)}
+                  disabled={teachingDestinationsLoading || step === "done"}
+                  className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm font-black text-stone-900 shadow-sm disabled:bg-stone-100"
+                >
+                  {teachingDestinations.length === 0 ? (
+                    <option value="teacher">
+                      {teachingDestinationsLoading
+                        ? "Loading destinations..."
+                        : "My Teaching Vocabulary"}
+                    </option>
+                  ) : (
+                    teachingDestinations.map((destination) => {
+                      const value =
+                        destination.type === "teacher"
+                          ? "teacher"
+                          : `student:${destination.lessonBookId}`;
+                      return (
+                        <option key={value} value={value}>
+                          {destination.label}
+                        </option>
+                      );
+                    })
+                  )}
+                </select>
+              </label>
+              {destinationClarification ? (
+                <p className="mt-2 text-sm font-semibold leading-6 text-blue-900">
+                  {destinationClarification}
+                </p>
+              ) : null}
+            </section>
+          ) : null}
           </>
         ) : (
           <p className="mb-6 text-sm text-gray-500">

@@ -5,9 +5,10 @@ import {
 } from "@/lib/personalTracking";
 
 type BookHubStatusPanelProps = {
-  statusLabel: string;
   personalTrackingStatus: PersonalTrackingStatus;
   showNotTrackingOption: boolean;
+  isSavingStatus: boolean;
+  statusError: string | null;
   startedAt: string;
   finishedAt: string;
   dnfAt: string;
@@ -16,13 +17,11 @@ type BookHubStatusPanelProps = {
   wouldRetry: string;
 
   showStartButton: boolean;
-  showFinishDnfButtons: boolean;
   showReflectionLink: boolean;
   showReviewLink: boolean;
   reviewLinkLabel: string;
 
   shouldNudgeStartBook: boolean;
-  shouldNudgeFinishBook: boolean;
 
   canFillBeginningPages: boolean;
   canFillEndingPages: boolean;
@@ -33,8 +32,6 @@ type BookHubStatusPanelProps = {
 
   onStartToday: () => void;
   onPersonalTrackingStatusChange: (value: PersonalTrackingStatus) => void;
-  onMarkFinished: () => void;
-  onMarkDnf: () => void;
   onOpenReview: () => void;
   onOpenReflection: () => void;
   onFillBeginningPages: () => void;
@@ -76,9 +73,10 @@ function wouldRetryLabel(value: string) {
 }
 
 export default function BookHubStatusPanel({
-  statusLabel,
   personalTrackingStatus,
   showNotTrackingOption,
+  isSavingStatus,
+  statusError,
   startedAt,
   finishedAt,
   dnfAt,
@@ -86,12 +84,10 @@ export default function BookHubStatusPanel({
   dnfNote,
   wouldRetry,
   showStartButton,
-  showFinishDnfButtons,
   showReflectionLink,
   showReviewLink,
   reviewLinkLabel,
   shouldNudgeStartBook,
-  shouldNudgeFinishBook,
   canFillBeginningPages,
   canFillEndingPages,
   earliestTrackedStartPage,
@@ -99,8 +95,6 @@ export default function BookHubStatusPanel({
   pageCount,
   onStartToday,
   onPersonalTrackingStatusChange,
-  onMarkFinished,
-  onMarkDnf,
   onOpenReview,
   onOpenReflection,
   onFillBeginningPages,
@@ -113,16 +107,14 @@ export default function BookHubStatusPanel({
       </div>
 
       <div className="space-y-2 text-sm text-stone-700">
-        <div>
-          <span className="font-medium">Status:</span> {statusLabel}
-        </div>
         <label className="block">
-          <span className="mb-1 block font-medium">Personal reading status</span>
+          <span className="mb-1 block font-medium">Reading Status</span>
           <select
             value={personalTrackingStatus}
             onChange={(event) =>
               onPersonalTrackingStatusChange(event.target.value as PersonalTrackingStatus)
             }
+            disabled={isSavingStatus}
             className="w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm font-semibold text-stone-800 shadow-sm"
           >
             {PERSONAL_TRACKING_STATUSES.filter(
@@ -133,6 +125,12 @@ export default function BookHubStatusPanel({
               </option>
             ))}
           </select>
+          {isSavingStatus ? (
+            <span className="mt-1 block text-xs font-semibold text-violet-700">Saving...</span>
+          ) : null}
+          {statusError ? (
+            <span className="mt-1 block text-xs font-semibold text-red-700">{statusError}</span>
+          ) : null}
         </label>
         <div>
           <span className="font-medium">Started:</span> {startedAt || "—"}
@@ -171,37 +169,16 @@ export default function BookHubStatusPanel({
           <button
             type="button"
             onClick={onStartToday}
+            disabled={isSavingStatus}
             className={`rounded-2xl border px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-200 ${
-              shouldNudgeStartBook
+              isSavingStatus
+                ? "cursor-not-allowed border-stone-300 bg-stone-100 opacity-60"
+                : shouldNudgeStartBook
                 ? "animate-pulse border-emerald-300 bg-emerald-100 shadow-sm shadow-emerald-100"
                 : "border-stone-400 bg-stone-100"
             }`}
           >
             Start Today
-          </button>
-        ) : null}
-
-        {showFinishDnfButtons ? (
-          <button
-            type="button"
-            onClick={onMarkFinished}
-            className={`rounded-2xl border px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-200 ${
-              shouldNudgeFinishBook
-                ? "animate-pulse border-amber-300 bg-amber-100 shadow-sm shadow-amber-100"
-                : "border-stone-400 bg-stone-100"
-            }`}
-          >
-            Mark Finished
-          </button>
-        ) : null}
-
-        {showFinishDnfButtons ? (
-          <button
-            type="button"
-            onClick={onMarkDnf}
-            className="rounded-2xl border border-stone-400 bg-stone-100 px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-200"
-          >
-            Mark DNF
           </button>
         ) : null}
 

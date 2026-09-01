@@ -293,6 +293,9 @@ export default function BookWordsPage() {
   const userBookId = params.userBookId;
   const router = useRouter();
   const searchParams = useSearchParams();
+  const bookHubHref = `/books/${encodeURIComponent(userBookId)}${
+    searchParams.get("mode") === "teaching" ? "?mode=teaching" : ""
+  }`;
 
   const [loading, setLoading] = useState(true);
   const [needsSignIn, setNeedsSignIn] = useState(false);
@@ -1226,7 +1229,7 @@ export default function BookWordsPage() {
         <div className="mx-auto max-w-3xl">
         <button
           type="button"
-          onClick={() => router.push(`/books/${encodeURIComponent(userBookId)}`)}
+          onClick={() => router.push(bookHubHref)}
           className="mb-4 inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
         >
           ← Back to Book Hub
@@ -1279,7 +1282,9 @@ export default function BookWordsPage() {
     const contextSuffix = studentWorkspaceBackContext
       ? `?from=student-workspace&studentId=${encodeURIComponent(studentWorkspaceBackContext.studentId)}`
       : "";
-    router.push(`/books/${encodeURIComponent(userBookId)}${contextSuffix}`);
+    router.push(
+      contextSuffix ? `/books/${encodeURIComponent(userBookId)}${contextSuffix}` : bookHubHref
+    );
   }
 
   return (
@@ -1348,7 +1353,7 @@ export default function BookWordsPage() {
             bookCover={bookCover}
             totalCount={words.length}
             visibleCount={filteredSorted.length}
-            bookHubHref={`/books/${encodeURIComponent(userBookId)}`}
+            bookHubHref={bookHubHref}
           />
 
           <BookVocabFilterPanel

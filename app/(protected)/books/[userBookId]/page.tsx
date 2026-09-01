@@ -35,7 +35,6 @@ import {
   type PersonalTrackingStatus,
   legacyUserBookStatusForPersonalTracking,
   personalTrackingStatusFromDates,
-  personalTrackingStatusLabel,
   resolvePersonalTrackingStatus,
 } from "@/lib/personalTracking";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
@@ -46,6 +45,10 @@ import BookHubNotices from "./components/BookHubNotices";
 import BookHubTabBar from "./components/BookHubTabBar";
 import BookHubHero from "./components/BookHubHero";
 import BookHubStatusPanel from "./components/BookHubStatusPanel";
+import BookHubModeToggle from "./components/BookHubModeToggle";
+import BookHubTeachingOverview from "./components/BookHubTeachingOverview";
+import BookHubStudentsProgress from "./components/BookHubStudentsProgress";
+import BookHubTeachingTools from "./components/BookHubTeachingTools";
 import BookHubActionPrompt from "./components/BookHubActionPrompt";
 import WordExplorerModal from "./components/WordExplorerModal";
 import Detail from "./components/Detail";
@@ -56,6 +59,17 @@ import {
   resolveStudentWorkspaceBackContext,
   type StudentWorkspaceBackContext,
 } from "@/lib/teacher/studentWorkspaceContext";
+import {
+  ensureTeacherBookRelationship,
+  loadTeacherBookRelationship,
+  type TeacherBookRelationship,
+} from "@/lib/teacher/teacherBookRelationship";
+import {
+  isTeachingDifficulty,
+  isTeachingStatus,
+  type TeachingDifficulty,
+  type TeachingStatus,
+} from "@/lib/teachingStatus";
 
 function isMissingSeriesTotalColumnError(error: any) {
   return (
@@ -171,6 +185,7 @@ type ReadingSession = {
 };
 
 type HubTab = "bookInfo" | "reflection";
+type BookHubMode = "reader" | "teaching";
 type EditingPanel =
   | HubTab
   | "bookInfoDetails"
@@ -675,6 +690,15 @@ export default function BookHubPage() {
 
   const [myRole, setMyRole] = useState<ProfileRole>("member");
   const [isSuperTeacher, setIsSuperTeacher] = useState(false);
+  const [canUseWideTeachingMode, setCanUseWideTeachingMode] = useState(false);
+  const [teacherBookRelationship, setTeacherBookRelationship] =
+    useState<TeacherBookRelationship | null>(null);
+  const [teachingStatusDraft, setTeachingStatusDraft] = useState<TeachingStatus | "">("");
+  const [teachingDifficultyDraft, setTeachingDifficultyDraft] =
+    useState<TeachingDifficulty | "">("");
+  const [teachingOverviewSaving, setTeachingOverviewSaving] = useState(false);
+  const [teachingOverviewMessage, setTeachingOverviewMessage] = useState<string | null>(null);
+  const [teachingOverviewError, setTeachingOverviewError] = useState<string | null>(null);
   const [isLinkedStudentToAnyTeacher, setIsLinkedStudentToAnyTeacher] = useState(false);
   const [profileLevel, setProfileLevel] = useState<string>("");
   const [bookHubOwnerName, setBookHubOwnerName] = useState<string>("");
@@ -720,6 +744,8 @@ export default function BookHubPage() {
   const [dnfAt, setDnfAt] = useState<string>("");
   const [personalTrackingStatus, setPersonalTrackingStatus] =
     useState<PersonalTrackingStatus>("want_to_read");
+  const [savingBookStatus, setSavingBookStatus] = useState(false);
+  const [bookStatusError, setBookStatusError] = useState<string | null>(null);
   const [dnfReason, setDnfReason] = useState<string>("");
   const [dnfNote, setDnfNote] = useState<string>("");
   const [wouldRetry, setWouldRetry] = useState<string>("");
@@ -1077,6 +1103,17 @@ export default function BookHubPage() {
     return () => window.clearTimeout(timeout);
   }, [shouldShowReadingReflectionNudge]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const query = window.matchMedia("(min-width: 768px)");
+    const update = () => setCanUseWideTeachingMode(query.matches);
+
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
   const visualReadingSessions = useMemo(() => {
     return realReadingSessions.filter(
       (s) => s.session_mode === "fluid" || s.session_mode === "curiosity"
@@ -1197,9 +1234,6 @@ export default function BookHubPage() {
   const bookHubAverageMinutesPerPageLabel =
     averageMinutesPerPage != null ? averageMinutesPerPage.toFixed(1) : "—";
   const shouldNudgeStartBook = !started && realReadingSessions.length === 0;
-  const shouldNudgeFinishBook =
-    !finishedAt && !dnfAt && progressPercent != null && progressPercent >= 98;
-
   const lastReadDate = useMemo(() => {
     if (visualReadingSessions.length === 0) return null;
     return visualReadingSessions[0]?.read_on ?? null;
@@ -3215,7 +3249,7 @@ export default function BookHubPage() {
     nextFinishedAt: string,
     nextDnfAt: string
   ) {
-    if (!row?.id) return;
+    if (!row?.id) return false;
 
     const started_at = nextStartedAt.trim() ? nextStartedAt.trim() : null;
     const finished_at = nextFinishedAt.trim() ? nextFinishedAt.trim() : null;
@@ -3251,8 +3285,8 @@ export default function BookHubPage() {
 
     if (error) {
       console.error("Error saving dashboard book status:", error);
-      alert(`Could not save book status.\n${error.message || "Unknown error"}`);
-      return;
+      setBookStatusError(`Could not save book status. ${error.message || "Unknown error"}`);
+      return false;
     }
 
     setStartedAt(started_at ?? "");
@@ -3270,6 +3304,7 @@ export default function BookHubPage() {
           started_at,
           finished_at,
           dnf_at,
+          status,
           personal_tracking_status: nextPersonalTrackingStatus,
           dnf_reason: nextDnfReason,
           dnf_note: nextDnfNote,
@@ -3277,25 +3312,29 @@ export default function BookHubPage() {
         }
         : prev
     );
+    setBookStatusError(null);
+    return true;
   }
 
   async function markStartedToday() {
+    if (savingBookStatus) return;
+    setSavingBookStatus(true);
+    setBookStatusError(null);
     const today = todayYmdAppTimeZone();
     await saveBookStatusDates(today, "", "");
+    setSavingBookStatus(false);
   }
 
-  async function savePersonalTrackingStatus(nextStatus: PersonalTrackingStatus) {
-    if (!row?.id) return;
+  async function savePersonalTrackingOnlyStatus(nextStatus: PersonalTrackingStatus) {
+    if (!row?.id) return false;
 
-    const legacyStatus = legacyUserBookStatusForPersonalTracking(nextStatus);
-    const patch: Record<string, string | null> = {
-      personal_tracking_status: nextStatus,
-      status: legacyStatus,
-    };
-
-    if (nextStatus === "reading" && !startedAt) {
-      patch.started_at = todayYmdAppTimeZone();
-    }
+    const patch =
+      nextStatus === "not_tracking"
+        ? { personal_tracking_status: nextStatus }
+        : {
+          personal_tracking_status: nextStatus,
+          status: legacyUserBookStatusForPersonalTracking(nextStatus),
+        };
 
     const { error } = await supabase
       .from("user_books")
@@ -3304,23 +3343,118 @@ export default function BookHubPage() {
 
     if (error) {
       console.error("Error saving personal tracking status:", error);
-      alert(`Could not save personal reading status.\n${error.message || "Unknown error"}`);
-      return;
+      setBookStatusError(`Could not save reading status. ${error.message || "Unknown error"}`);
+      return false;
     }
 
-    const nextStartedAt = patch.started_at ?? startedAt;
     setPersonalTrackingStatus(nextStatus);
-    if (patch.started_at) setStartedAt(patch.started_at);
     setRow((prev) =>
       prev
         ? {
           ...prev,
-          personal_tracking_status: nextStatus,
-          status: legacyStatus,
-          started_at: nextStartedAt || null,
+          ...patch,
         } as any
         : prev
     );
+    setBookStatusError(null);
+    return true;
+  }
+
+  async function savePersonalTrackingStatus(nextStatus: PersonalTrackingStatus) {
+    if (!row?.id || savingBookStatus) return;
+    if (nextStatus === personalTrackingStatus) return;
+
+    const canUseNotTracking = isOwnBookHub && (isTeacherContext || isAdmin || isSuperTeacher);
+    if (nextStatus === "not_tracking" && !canUseNotTracking) {
+      setBookStatusError("Not Personally Tracking is only available on your own teacher Book Hub.");
+      return;
+    }
+
+    setSavingBookStatus(true);
+    setBookStatusError(null);
+
+    try {
+      const today = todayYmdAppTimeZone();
+      let saved = false;
+
+      if (nextStatus === "not_tracking" || nextStatus === "want_to_read") {
+        saved = await savePersonalTrackingOnlyStatus(nextStatus);
+      } else if (nextStatus === "reading") {
+        saved = await saveBookStatusDates(startedAt || today, "", "");
+      } else if (nextStatus === "finished") {
+        saved = await saveBookStatusDates(startedAt || today, finishedAt || today, "");
+        if (saved) {
+          setSaveNoticeTone("success");
+          setSaveNotice(null);
+          openReadingReflection();
+        }
+      } else if (nextStatus === "dnf") {
+        saved = await saveBookStatusDates(startedAt || today, "", dnfAt || today);
+      }
+
+      if (!saved) {
+        setPersonalTrackingStatus(resolvePersonalTrackingStatus(row));
+      }
+    } finally {
+      setSavingBookStatus(false);
+    }
+  }
+
+  async function saveTeachingOverview() {
+    if (!row?.id || !userId || teachingOverviewSaving) return;
+
+    const canSaveTeachingOverview =
+      isOwnBookHub && (isTeacherContext || isAdmin || isSuperTeacher);
+    if (!canSaveTeachingOverview) {
+      setTeachingOverviewError("Teaching access is required.");
+      return;
+    }
+
+    setTeachingOverviewSaving(true);
+    setTeachingOverviewMessage(null);
+    setTeachingOverviewError(null);
+
+    try {
+      const relationship = await ensureTeacherBookRelationship({
+        supabase,
+        teacherId: userId,
+        bookId: row.book_id,
+        userBookId: row.id,
+      });
+
+      const { data, error } = await supabase
+        .from("teacher_books")
+        .update({
+          teaching_status: teachingStatusDraft || null,
+          teacher_jlpt_difficulty: teachingDifficultyDraft || null,
+        })
+        .eq("id", relationship.id)
+        .select(
+          "id, teacher_id, book_id, user_book_id, teaching_status, teacher_jlpt_difficulty, teaching_suitability, teacher_use_note"
+        )
+        .single();
+
+      if (error) throw error;
+
+      const nextRelationship = data as TeacherBookRelationship;
+      setTeacherBookRelationship(nextRelationship);
+      setTeachingStatusDraft(
+        isTeachingStatus(nextRelationship.teaching_status)
+          ? nextRelationship.teaching_status
+          : ""
+      );
+      setTeachingDifficultyDraft(
+        isTeachingDifficulty(nextRelationship.teacher_jlpt_difficulty)
+          ? nextRelationship.teacher_jlpt_difficulty
+          : ""
+      );
+      setTeachingOverviewMessage("Teaching overview saved.");
+    } catch (error: any) {
+      console.error("Error saving Book Hub teaching overview:", error);
+      setTeachingOverviewError(error?.message ?? "Could not save teaching overview.");
+    } finally {
+      setTeachingOverviewSaving(false);
+    }
   }
 
   function openReadingReflection() {
@@ -3329,21 +3463,6 @@ export default function BookHubPage() {
         .getElementById("reading-reflection")
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
-  }
-
-  async function markFinishedToday() {
-    const today = todayYmdAppTimeZone();
-    const nextStartedAt = startedAt || today;
-    await saveBookStatusDates(nextStartedAt, today, "");
-    setSaveNoticeTone("success");
-    setSaveNotice(null);
-    openReadingReflection();
-  }
-
-  async function markDnfToday() {
-    const today = todayYmdAppTimeZone();
-    const nextStartedAt = startedAt || today;
-    await saveBookStatusDates(nextStartedAt, "", today);
   }
 
   async function saveReadingSession() {
@@ -3621,6 +3740,11 @@ export default function BookHubPage() {
     setJapaneseLearningArchive(emptyJapaneseLearningArchivePresence);
     setCanSeeVocabularySummary(false);
     setHasFullLearningAccess(false);
+    setTeacherBookRelationship(null);
+    setTeachingStatusDraft("");
+    setTeachingDifficultyDraft("");
+    setTeachingOverviewMessage(null);
+    setTeachingOverviewError(null);
     setStudentWorkspaceBackContext(null);
     setBookHubOwnerNativeLanguage(null);
 
@@ -3810,6 +3934,36 @@ export default function BookHubPage() {
     }
 
     const r = data as unknown as UserBook;
+    const canSeeOwnTeachingLibraryContext =
+      r.user_id === user.id &&
+      (currentProfileRole === "teacher" ||
+        currentProfileRole === "super_teacher" ||
+        currentProfileRole === "admin" ||
+        currentProfileIsSuperTeacher);
+
+    if (canSeeOwnTeachingLibraryContext) {
+      try {
+        const relationship = await loadTeacherBookRelationship({
+          supabase,
+          teacherId: user.id,
+          bookId: r.book_id,
+          userBookId: r.id,
+        });
+        setTeacherBookRelationship(relationship);
+        setTeachingStatusDraft(
+          isTeachingStatus(relationship?.teaching_status) ? relationship.teaching_status : ""
+        );
+        setTeachingDifficultyDraft(
+          isTeachingDifficulty(relationship?.teacher_jlpt_difficulty)
+            ? relationship.teacher_jlpt_difficulty
+            : ""
+        );
+      } catch (error: any) {
+        console.error("Error loading Book Hub teaching relationship:", error);
+        setTeachingOverviewError(error?.message ?? "Could not load teaching overview.");
+      }
+    }
+
     let canAccessBook =
       r.user_id === user.id ||
       currentProfileIsSuperTeacher;
@@ -5440,19 +5594,36 @@ export default function BookHubPage() {
   const isViewingStudentBookHub =
     isTeacherContext && !!row.user_id && !!userId && row.user_id !== userId;
   const canRemoveFromMyLibrary = !!userId && row.user_id === userId;
-  const canOpenTeacherSnapshot = isTeacherContext;
+  const canUseBookHubTeachingMode =
+    isOwnBookHub && (isTeacherContext || isAdmin || isSuperTeacher) && canUseWideTeachingMode;
+  const requestedBookHubMode = searchParams.get("mode");
+  const bookHubMode: BookHubMode =
+    canUseBookHubTeachingMode && requestedBookHubMode === "teaching"
+      ? "teaching"
+      : "reader";
+  const teachingModeReturnQuery = "?mode=teaching";
+  const teachingModeVocabularyHref = `/books/${encodeURIComponent(row.id)}/words${teachingModeReturnQuery}`;
+  const teachingModeStoryHref = `/books/${encodeURIComponent(row.id)}/story${teachingModeReturnQuery}`;
+  const teachingModeAboutHref = `/books/${encodeURIComponent(row.id)}/about${teachingModeReturnQuery}`;
+
+  function changeBookHubMode(nextMode: BookHubMode) {
+    const href =
+      nextMode === "teaching"
+        ? `/books/${encodeURIComponent(row.id)}?mode=teaching`
+        : `/books/${encodeURIComponent(row.id)}`;
+    router.push(href);
+  }
 
   const bookHubContextLabel = isViewingStudentBookHub
     ? `Student Book Hub · ${bookHubOwnerName || "Student"}`
-    : "My Book Hub";
+    : bookHubMode === "teaching"
+      ? "My Book Hub · Teaching"
+      : "My Book Hub";
   const backToLibraryHref = bookHubOwnerUsername
     ? `/users/${encodeURIComponent(bookHubOwnerUsername)}/books`
     : "/dashboard";
 
-  const bookHubStatusLabel = personalTrackingStatusLabel(personalTrackingStatus);
-
   const showBookHubStartButton = !started && realReadingSessions.length === 0;
-  const showBookHubFinishDnfButtons = !finishedAt && !dnfAt;
   const showUpperProgressSummary = isJapaneseLearningBook(book.language_code ?? null);
   return (
     <main className="min-h-screen bg-stone-50 p-6">
@@ -5501,6 +5672,9 @@ export default function BookHubPage() {
             ← Back to Library
           </Link>
         </nav>
+        {canUseBookHubTeachingMode ? (
+          <BookHubModeToggle mode={bookHubMode} onModeChange={changeBookHubMode} />
+        ) : null}
 
         <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
           <div className="p-5 md:p-8">
@@ -5510,56 +5684,73 @@ export default function BookHubPage() {
                 displayedCoverUrl={isEditingThisTab ? coverUrl : book.cover_url}
                 bookHubContextLabel={bookHubContextLabel}
                 isViewingStudentBookHub={isViewingStudentBookHub}
-                canOpenTeacherSnapshot={canOpenTeacherSnapshot && !isEnglishNativeTrackerBook}
-                teacherSnapshotHref={`/books/${userBookId}/teacher-snapshot`}
                 onAboutBook={() => {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/about`);
                 }}
               />
 
-              <div className={showUpperProgressSummary ? "md:row-span-2" : ""}>
-                <BookHubStatusPanel
-                  statusLabel={bookHubStatusLabel}
-                  personalTrackingStatus={personalTrackingStatus}
-                  showNotTrackingOption={
-                    isOwnBookHub && (isTeacherContext || isAdmin || isSuperTeacher)
-                  }
-                  startedAt={startedAt}
-                  finishedAt={finishedAt}
-                  dnfAt={dnfAt}
-                  dnfReason={dnfReason}
-                  dnfNote={dnfNote}
-                  wouldRetry={wouldRetry}
-                  showStartButton={showBookHubStartButton}
-                  showFinishDnfButtons={showBookHubFinishDnfButtons}
-                  showReflectionLink={shouldShowReadingReflectionNudge}
-                  showReviewLink={false}
-                  reviewLinkLabel="Review & Ratings"
-                  shouldNudgeStartBook={shouldNudgeStartBook}
-                  shouldNudgeFinishBook={shouldNudgeFinishBook}
-                  canFillBeginningPages={canFillBeginningPages}
-                  canFillEndingPages={canFillEndingPages}
-                  earliestTrackedStartPage={earliestTrackedStartPage}
-                  furthestTrackedPage={furthestTrackedPage}
-                  pageCount={book.page_count}
-                  onStartToday={() => void markStartedToday()}
-                  onPersonalTrackingStatusChange={(value) =>
-                    void savePersonalTrackingStatus(value)
-                  }
-                  onMarkFinished={() => void markFinishedToday()}
-                  onMarkDnf={() => void markDnfToday()}
-                  onOpenReview={() => {
-                    if (!confirmLeaveIfTimerActive()) return;
-                    router.push(`/books/${row.id}/review`);
-                  }}
-                  onOpenReflection={openReadingReflection}
-                  onFillBeginningPages={fillBeginningPages}
-                  onFillEndingPages={fillEndingPages}
-                />
+              <div className={showUpperProgressSummary && bookHubMode !== "teaching" ? "md:row-span-2" : ""}>
+                {bookHubMode === "teaching" ? (
+                  <BookHubTeachingOverview
+                    key={teacherBookRelationship?.id ?? "no-teaching-relationship"}
+                    status={teachingStatusDraft}
+                    difficulty={teachingDifficultyDraft}
+                    saving={teachingOverviewSaving}
+                    message={teachingOverviewMessage}
+                    error={teachingOverviewError}
+                    onStatusChange={(value) => {
+                      setTeachingStatusDraft(isTeachingStatus(value) ? value : "");
+                      setTeachingOverviewMessage(null);
+                      setTeachingOverviewError(null);
+                    }}
+                    onDifficultyChange={(value) => {
+                      setTeachingDifficultyDraft(isTeachingDifficulty(value) ? value : "");
+                      setTeachingOverviewMessage(null);
+                      setTeachingOverviewError(null);
+                    }}
+                    onSave={() => void saveTeachingOverview()}
+                  />
+                ) : (
+                  <BookHubStatusPanel
+                    personalTrackingStatus={personalTrackingStatus}
+                    showNotTrackingOption={
+                      isOwnBookHub && (isTeacherContext || isAdmin || isSuperTeacher)
+                    }
+                    isSavingStatus={savingBookStatus}
+                    statusError={bookStatusError}
+                    startedAt={startedAt}
+                    finishedAt={finishedAt}
+                    dnfAt={dnfAt}
+                    dnfReason={dnfReason}
+                    dnfNote={dnfNote}
+                    wouldRetry={wouldRetry}
+                    showStartButton={showBookHubStartButton}
+                    showReflectionLink={shouldShowReadingReflectionNudge}
+                    showReviewLink={false}
+                    reviewLinkLabel="Review & Ratings"
+                    shouldNudgeStartBook={shouldNudgeStartBook}
+                    canFillBeginningPages={canFillBeginningPages}
+                    canFillEndingPages={canFillEndingPages}
+                    earliestTrackedStartPage={earliestTrackedStartPage}
+                    furthestTrackedPage={furthestTrackedPage}
+                    pageCount={book.page_count}
+                    onStartToday={() => void markStartedToday()}
+                    onPersonalTrackingStatusChange={(value) =>
+                      void savePersonalTrackingStatus(value)
+                    }
+                    onOpenReview={() => {
+                      if (!confirmLeaveIfTimerActive()) return;
+                      router.push(`/books/${row.id}/review`);
+                    }}
+                    onOpenReflection={openReadingReflection}
+                    onFillBeginningPages={fillBeginningPages}
+                    onFillEndingPages={fillEndingPages}
+                  />
+                )}
               </div>
 
-              {showUpperProgressSummary ? (
+              {showUpperProgressSummary && bookHubMode !== "teaching" ? (
                 <div className="md:col-span-2">
                   <BookHubProgressSummary
                     progressLabel={bookHubProgressLabel}
@@ -5581,13 +5772,48 @@ export default function BookHubPage() {
               ) : null}
             </div>
 
-            {row.is_teacher_prep && row.teacher_prep_kind === "trial" ? (
-              <div className="mt-6">
-                <TeacherPrepAssignBox userBookId={row.id} />
+            {bookHubMode === "teaching" ? (
+              <div className="mt-6 space-y-4">
+                <BookHubStudentsProgress userBookId={row.id} />
+                <BookHubTeachingTools
+                  canUseVocabularyList={canUseVocabularyList}
+                  canUseBulkAdd={!isEnglishBook && canUseBulkAdd}
+                  canUseStoryNotes
+                  onVocabularyList={() => {
+                    router.push(teachingModeVocabularyHref);
+                  }}
+                  onBulkAdd={() => {
+                    router.push(
+                      `/vocab/bulk?userBookId=${encodeURIComponent(row.id)}&mode=teaching&from=book-hub`
+                    );
+                  }}
+                  onFollowAlongLesson={() => {
+                    router.push(`/books/${encodeURIComponent(row.id)}/lesson`);
+                  }}
+                  onStoryNotes={() => {
+                    router.push(teachingModeStoryHref);
+                  }}
+                  onAboutBook={() => {
+                    router.push(teachingModeAboutHref);
+                  }}
+                  onTeacherSnapshot={() => {
+                    router.push(`/books/${row.id}/teacher-snapshot`);
+                  }}
+                  onFlagBook={() => {
+                    setBookFlagNote("");
+                    setShowBookFlagModal(true);
+                  }}
+                />
               </div>
-            ) : null}
+            ) : (
+              <>
+                {row.is_teacher_prep && row.teacher_prep_kind === "trial" ? (
+                  <div className="mt-6">
+                    <TeacherPrepAssignBox userBookId={row.id} />
+                  </div>
+                ) : null}
 
-            <div className="mt-6 space-y-4">
+                <div className="mt-6 space-y-4">
               <BookHubProgressSummary
                 progressLabel={bookHubProgressLabel}
                 progressSummaryLabel={bookHubProgressSummaryLabel}
@@ -5905,7 +6131,9 @@ export default function BookHubPage() {
                 </div>
               )}
 
-            </div>
+                </div>
+              </>
+            )}
 
             {showWordExplorer ? (
               <WordExplorerModal

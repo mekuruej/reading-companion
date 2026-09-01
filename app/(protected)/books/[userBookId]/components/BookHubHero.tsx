@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getBookIdentity } from "@/lib/books/bookIdentity";
 
 type BookHubHeroBook = {
@@ -16,8 +15,6 @@ type BookHubHeroProps = {
   displayedCoverUrl: string | null;
   bookHubContextLabel: string;
   isViewingStudentBookHub: boolean;
-  canOpenTeacherSnapshot: boolean;
-  teacherSnapshotHref: string;
   onAboutBook: () => void;
 };
 
@@ -26,8 +23,6 @@ export default function BookHubHero({
   displayedCoverUrl,
   bookHubContextLabel,
   isViewingStudentBookHub,
-  canOpenTeacherSnapshot,
-  teacherSnapshotHref,
   onAboutBook,
 }: BookHubHeroProps) {
   const bookIdentity = getBookIdentity(book);
@@ -96,14 +91,6 @@ export default function BookHubHero({
             About this book -&gt;
           </button>
 
-          {canOpenTeacherSnapshot ? (
-            <Link
-              href={teacherSnapshotHref}
-              className="inline-flex rounded-xl bg-purple-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-purple-800"
-            >
-              Teacher Snapshot
-            </Link>
-          ) : null}
         </div>
       </div>
     </>

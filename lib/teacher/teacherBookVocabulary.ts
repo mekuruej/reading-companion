@@ -414,7 +414,7 @@ export async function loadTeacherBookContext(
     teacherId: data.teacher_id,
     bookId: data.book_id,
     linkedUserBookId: data.user_book_id ?? null,
-    personalUserBookId: personalRows?.[0]?.id ?? null,
+    personalUserBookId: data.user_book_id ?? personalRows?.[0]?.id ?? null,
     pageCount: Array.isArray((data as any).books)
       ? (data as any).books[0]?.page_count ?? null
       : (data as any).books?.page_count ?? null,
@@ -662,6 +662,7 @@ export async function ensureTeachingVocabularyAssociationForPersonalWord(
       chapter_name: word.chapterName,
       origin_my_library: true,
       origin_teaching: false,
+      included_in_follow_along: true,
     })
     .select("id")
     .single();

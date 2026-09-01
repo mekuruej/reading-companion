@@ -54,6 +54,7 @@ type TeacherFollowAlongItem = {
   meaning: string | null;
   page_number: number | null;
   page_order?: number | null;
+  follow_along_order?: number | null;
   chapter_number?: number | null;
   chapter_name: string | null;
   teacher_note: string | null;
@@ -87,6 +88,7 @@ type TeachingVocabWord = {
   meaning: string | null;
   page_number: number | null;
   page_order?: number | null;
+  follow_along_order?: number | null;
   chapter_number?: number | null;
   chapter_name: string | null;
   follow_along_support_note?: string | null;
@@ -172,6 +174,10 @@ function isMissingOptionalTeacherBookItemColumn(error: any) {
 
 function sortTeacherFollowAlongItems(items: TeacherFollowAlongItem[]) {
   return [...items].sort((a, b) => {
+    const aFollowOrder = a.follow_along_order ?? Number.MAX_SAFE_INTEGER;
+    const bFollowOrder = b.follow_along_order ?? Number.MAX_SAFE_INTEGER;
+    if (aFollowOrder !== bFollowOrder) return aFollowOrder - bFollowOrder;
+
     const aPage = a.page_number ?? Number.MAX_SAFE_INTEGER;
     const bPage = b.page_number ?? Number.MAX_SAFE_INTEGER;
     if (aPage !== bPage) return aPage - bPage;
@@ -198,6 +204,7 @@ function readerWordToFollowAlongItem(word: ReaderVocabWord): TeacherFollowAlongI
     meaning: word.meaning,
     page_number: word.page_number,
     page_order: word.page_order,
+    follow_along_order: null,
     chapter_number: word.chapter_number,
     chapter_name: word.chapter_name,
     teacher_note: null,
@@ -221,6 +228,7 @@ function teachingVocabToFollowAlongItem(word: TeachingVocabWord): TeacherFollowA
     meaning: word.meaning,
     page_number: word.page_number,
     page_order: word.page_order,
+    follow_along_order: word.follow_along_order ?? null,
     chapter_number: word.chapter_number,
     chapter_name: word.chapter_name,
     teacher_note: word.follow_along_support_note ?? null,
@@ -231,6 +239,39 @@ function teachingVocabToFollowAlongItem(word: TeachingVocabWord): TeacherFollowA
     meaning_choice_index: word.meaning_choice_index,
     created_at: word.created_at,
   };
+}
+
+function sharedVocabularyToFollowAlongItem(word: SharedTeacherVocabularyWord): TeacherFollowAlongItem {
+  return {
+    id: `shared-vocab-${word.id}`,
+    source: word.teacherVocabularyId ? "teaching_vocab" : "reader_vocab",
+    source_id: word.teacherVocabularyId ?? word.personalWordId ?? word.id,
+    item_type: "word",
+    surface_text: word.surface,
+    reading: word.reading,
+    meaning: word.meaning,
+    page_number: word.pageNumber,
+    page_order: word.pageOrder,
+    follow_along_order: word.followAlongOrder,
+    chapter_number: word.chapterNumber,
+    chapter_name: word.chapterName,
+    teacher_note: word.followAlongSupportNote,
+    explanation: null,
+    translation: null,
+    support_url: null,
+    jlpt: word.jlpt,
+    meaning_choice_index: word.meaningChoiceIndex,
+    created_at: word.createdAt,
+  };
+}
+
+function shouldShowInLessonDisplay(word: SharedTeacherVocabularyWord) {
+  if (word.hiddenFromMyLibrary || word.hiddenFromTeaching) return false;
+  if (!word.surface.trim() && !word.meaning?.trim()) return false;
+  if (!word.meaning?.trim()) return false;
+
+  if (!word.teacherVocabularyId) return Boolean(word.personalWordId);
+  return word.includedInFollowAlong;
 }
 
 function isMissingTeachingVocabularyTable(error: any) {
@@ -258,6 +299,7 @@ function teacherSupportToFollowAlongItem(item: TeacherBookItem): TeacherFollowAl
     meaning: item.meaning,
     page_number: item.page_number,
     page_order: item.page_order,
+    follow_along_order: null,
     chapter_number: item.chapter_number,
     chapter_name: item.chapter_name,
     teacher_note: item.teacher_note,
@@ -281,6 +323,8 @@ type TeacherFollowAlongPanelProps = {
   notebookUserBookId?: string | null;
   enableNotebookWordCapture?: boolean;
   hideHeader?: boolean;
+  lessonDisplayOnly?: boolean;
+  emptyMessage?: string;
 };
 
 export function TeacherFollowAlongPanel({
@@ -294,6 +338,8 @@ export function TeacherFollowAlongPanel({
   notebookUserBookId = null,
   enableNotebookWordCapture = false,
   hideHeader = false,
+  lessonDisplayOnly = false,
+  emptyMessage,
 }: TeacherFollowAlongPanelProps) {
 
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
@@ -380,16 +426,19 @@ export function TeacherFollowAlongPanel({
 
       const nextTeacherVocabContext = await loadTeacherBookContext(supabase, teacherBookId, user.id);
       setTeacherVocabContext(nextTeacherVocabContext);
-      setVocabularyPool(
-        await loadSharedTeacherVocabulary(supabase, nextTeacherVocabContext, {
-          view: "teaching",
-          showHidden: true,
-        })
-      );
+      const nextVocabularyPool = await loadSharedTeacherVocabulary(supabase, nextTeacherVocabContext, {
+        view: "teaching",
+        showHidden: true,
+      });
+      setVocabularyPool(nextVocabularyPool);
 
       let readerVocabItems: TeacherFollowAlongItem[] = [];
       let missingPersonalReaderVocab = false;
-      if (loadedTeacherBook.user_book_id) {
+      if (lessonDisplayOnly) {
+        readerVocabItems = nextVocabularyPool
+          .filter(shouldShowInLessonDisplay)
+          .map(sharedVocabularyToFollowAlongItem);
+      } else if (loadedTeacherBook.user_book_id) {
         const { data: wordRows, error: wordError } = await supabase
           .from("user_book_words")
           .select(
@@ -410,32 +459,34 @@ export function TeacherFollowAlongPanel({
       }
 
       let teachingVocabItems: TeacherFollowAlongItem[] = [];
-      const { data: teachingVocabRows, error: teachingVocabError } = await supabase
-        .from("teacher_book_vocabulary")
-        .select(
-          "id, linked_user_book_word_id, surface, reading, meaning, page_number, page_order, chapter_number, chapter_name, follow_along_support_note, hidden_from_teaching, included_in_follow_along, origin_my_library, origin_teaching, meaning_choice_index, created_at"
-        )
-        .eq("teacher_book_id", teacherBookId)
-        .order("follow_along_order", { ascending: true, nullsFirst: false })
-        .order("page_number", { ascending: true, nullsFirst: false })
-        .order("page_order", { ascending: true, nullsFirst: false })
-        .order("created_at", { ascending: true });
+      if (!lessonDisplayOnly) {
+        const { data: teachingVocabRows, error: teachingVocabError } = await supabase
+          .from("teacher_book_vocabulary")
+          .select(
+            "id, linked_user_book_word_id, surface, reading, meaning, page_number, page_order, follow_along_order, chapter_number, chapter_name, follow_along_support_note, hidden_from_teaching, included_in_follow_along, origin_my_library, origin_teaching, meaning_choice_index, created_at"
+          )
+          .eq("teacher_book_id", teacherBookId)
+          .order("follow_along_order", { ascending: true, nullsFirst: false })
+          .order("page_number", { ascending: true, nullsFirst: false })
+          .order("page_order", { ascending: true, nullsFirst: false })
+          .order("created_at", { ascending: true });
 
-      if (teachingVocabError) {
-        if (!isMissingTeachingVocabularyTable(teachingVocabError)) throw teachingVocabError;
-      } else {
-        const linkedPersonalWordIds = new Set(
-          ((teachingVocabRows ?? []) as TeachingVocabWord[])
-            .map((word) => word.linked_user_book_word_id)
-            .filter(Boolean)
-        );
-        readerVocabItems = readerVocabItems.filter(
-          (item) => !linkedPersonalWordIds.has(item.source_id)
-        );
-        teachingVocabItems = ((teachingVocabRows ?? []) as TeachingVocabWord[])
-          .filter((word) => !word.hidden_from_teaching && word.included_in_follow_along)
-          .filter((word) => Boolean(word.surface?.trim() || word.meaning?.trim()))
-          .map(teachingVocabToFollowAlongItem);
+        if (teachingVocabError) {
+          if (!isMissingTeachingVocabularyTable(teachingVocabError)) throw teachingVocabError;
+        } else {
+          const linkedPersonalWordIds = new Set(
+            ((teachingVocabRows ?? []) as TeachingVocabWord[])
+              .map((word) => word.linked_user_book_word_id)
+              .filter(Boolean)
+          );
+          readerVocabItems = readerVocabItems.filter(
+            (item) => !linkedPersonalWordIds.has(item.source_id)
+          );
+          teachingVocabItems = ((teachingVocabRows ?? []) as TeachingVocabWord[])
+            .filter((word) => !word.hidden_from_teaching && word.included_in_follow_along)
+            .filter((word) => Boolean(word.surface?.trim() || word.meaning?.trim()))
+            .map(teachingVocabToFollowAlongItem);
+        }
       }
 
       const { data: itemRows, error: itemsError } = await supabase
@@ -479,7 +530,9 @@ export function TeacherFollowAlongPanel({
 
       setCanAccess(true);
       setTeacherBook(loadedTeacherBook);
-      setMissingReaderLink(missingPersonalReaderVocab && teachingVocabItems.length === 0);
+      setMissingReaderLink(
+        !lessonDisplayOnly && missingPersonalReaderVocab && teachingVocabItems.length === 0
+      );
       setItems(sortTeacherFollowAlongItems([...readerVocabItems, ...teachingVocabItems, ...teacherSupportItems]));
     } catch (error: any) {
       console.error("Error loading teacher follow-along:", readableSupabaseError(error), error);
@@ -721,6 +774,7 @@ export function TeacherFollowAlongPanel({
         </div>
       ) : null}
 
+      {!lessonDisplayOnly ? (
       <section className={isEmbedded ? "rounded-2xl border border-blue-100 bg-blue-50 p-3" : "rounded-3xl border border-blue-100 bg-blue-50 p-4"}>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -819,6 +873,7 @@ export function TeacherFollowAlongPanel({
           </div>
         </div>
       </section>
+      ) : null}
 
       <div
         className={
@@ -847,9 +902,10 @@ export function TeacherFollowAlongPanel({
             {!currentPage || currentPage.items.length === 0 ? (
               <TeacherFollowAlongEmptyPageState
                 message={
-                  enableNotebookWordCapture
+                  emptyMessage ??
+                  (enableNotebookWordCapture
                     ? "No Follow-Along-ready words or support items yet. Use Quick Word in Teacher Notebook to add a student's unknown word from this page."
-                    : undefined
+                    : undefined)
                 }
               />
             ) : (
@@ -874,7 +930,7 @@ export function TeacherFollowAlongPanel({
           </ReadAlongReaderShell>
         </div>
 
-        {isEmbedded ? null : (
+        {isEmbedded || lessonDisplayOnly ? null : (
           <div className="lg:sticky lg:top-4">
             <TeacherNotebookPanel
               teacherBookId={teacherBook.id}
