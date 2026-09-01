@@ -19,7 +19,7 @@ const TEACHER_DESTINATION_OPTIONS = [
   {
     key: "teachingBooks",
     title: "My Teaching Books",
-    helper: "Create or reuse the teaching workspace for this edition.",
+    helper: "Create or reuse the teaching workspace and mark it Currently Teaching.",
   },
   {
     key: "myLibrary",

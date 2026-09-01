@@ -1,4 +1,5 @@
 import { displayBookTitle } from "@/lib/books/bookIdentity";
+import type { ReactNode } from "react";
 
 type LibraryBookRowBook = {
   title: string;
@@ -18,6 +19,7 @@ type LibraryBookRowProps = {
   onOpen: () => void;
   secondaryActionHref?: string | null;
   secondaryActionLabel?: string;
+  teachingControls?: ReactNode;
 };
 
 export default function LibraryBookRow({
@@ -26,6 +28,7 @@ export default function LibraryBookRow({
   onOpen,
   secondaryActionHref = null,
   secondaryActionLabel = "Open",
+  teachingControls = null,
 }: LibraryBookRowProps) {
   const book = row.books;
   if (!book) return null;
@@ -58,6 +61,7 @@ export default function LibraryBookRow({
             </span>
           ) : null}
         </div>
+        {teachingControls}
       </div>
 
       {secondaryActionHref ? (

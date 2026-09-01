@@ -3,6 +3,10 @@ import {
   resolvePersonalTrackingStatus,
 } from "@/lib/personalTracking";
 
+function isMissingColumnError(error: any) {
+  return error?.code === "42703" || error?.code === "PGRST204";
+}
+
 type SupabaseLike = any;
 
 export type AddBookActorProfile = {
@@ -161,6 +165,30 @@ async function getOrCreateUserBook({
   return { userBookId: insertedUserBook.id as string, alreadyInLibrary: false };
 }
 
+async function hasValidTeacherOwnedWorkspace({
+  supabase,
+  teacherId,
+  bookId,
+  userBookId,
+}: {
+  supabase: SupabaseLike;
+  teacherId: string;
+  bookId: string;
+  userBookId?: string | null;
+}) {
+  if (!userBookId) return false;
+
+  const { data: linkedWorkspace, error: linkedWorkspaceError } = await supabase
+    .from("user_books")
+    .select("id, user_id, book_id")
+    .eq("id", userBookId)
+    .maybeSingle();
+
+  if (linkedWorkspaceError) throw linkedWorkspaceError;
+
+  return linkedWorkspace?.user_id === teacherId && linkedWorkspace?.book_id === bookId;
+}
+
 async function getOrCreateTeacherBook({
   supabase,
   teacherId,
@@ -174,24 +202,61 @@ async function getOrCreateTeacherBook({
 }) {
   const { data: existingTeacherBook, error: existingTeacherBookError } = await supabase
     .from("teacher_books")
-    .select("id, user_book_id")
+    .select("id, user_book_id, teaching_status")
     .eq("teacher_id", teacherId)
     .eq("book_id", bookId)
     .maybeSingle();
 
-  if (existingTeacherBookError) throw existingTeacherBookError;
+  if (existingTeacherBookError) {
+    if (isMissingColumnError(existingTeacherBookError)) {
+      throw new Error("The pending teaching status migration must be applied before adding to My Teaching Books.");
+    }
+    throw existingTeacherBookError;
+  }
 
   if (existingTeacherBook?.id) {
-    if (userBookId && !existingTeacherBook.user_book_id) {
+    let hasValidLinkedWorkspace = await hasValidTeacherOwnedWorkspace({
+      supabase,
+      teacherId,
+      bookId,
+      userBookId: existingTeacherBook.user_book_id,
+    });
+
+    const shouldRelinkWorkspace =
+      Boolean(userBookId) &&
+      (!existingTeacherBook.user_book_id || !hasValidLinkedWorkspace);
+
+    if (shouldRelinkWorkspace) {
       const { error: linkError } = await supabase
         .from("teacher_books")
         .update({ user_book_id: userBookId })
         .eq("id", existingTeacherBook.id);
 
       if (linkError) throw linkError;
+      hasValidLinkedWorkspace = true;
     }
 
-    return { teacherBookId: existingTeacherBook.id as string, alreadyInTeachingBooks: true };
+    const alreadyCurrentlyTeaching =
+      hasValidLinkedWorkspace &&
+      existingTeacherBook.teaching_status === "currently_teaching";
+
+    const { error: teachingStatusError } = await supabase
+      .from("teacher_books")
+      .update({ teaching_status: "currently_teaching" })
+      .eq("id", existingTeacherBook.id);
+
+    if (teachingStatusError) {
+      if (isMissingColumnError(teachingStatusError)) {
+        throw new Error("The pending teaching status migration must be applied before adding to My Teaching Books.");
+      }
+      throw teachingStatusError;
+    }
+
+    return {
+      teacherBookId: existingTeacherBook.id as string,
+      alreadyInTeachingBooks: alreadyCurrentlyTeaching,
+      alreadyCurrentlyTeaching,
+    };
   }
 
   const { data: insertedTeacherBook, error: insertTeacherBookError } = await supabase
@@ -200,6 +265,7 @@ async function getOrCreateTeacherBook({
       teacher_id: teacherId,
       book_id: bookId,
       user_book_id: userBookId ?? null,
+      teaching_status: "currently_teaching",
     })
     .select("id")
     .single();
@@ -207,20 +273,67 @@ async function getOrCreateTeacherBook({
   if (insertTeacherBookError?.code === "23505") {
     const { data: racedTeacherBook, error: racedTeacherBookError } = await supabase
       .from("teacher_books")
-      .select("id")
+      .select("id, user_book_id, teaching_status")
       .eq("teacher_id", teacherId)
       .eq("book_id", bookId)
       .maybeSingle();
 
     if (racedTeacherBookError) throw racedTeacherBookError;
     if (racedTeacherBook?.id) {
-      return { teacherBookId: racedTeacherBook.id as string, alreadyInTeachingBooks: true };
+      let hasValidLinkedWorkspace = await hasValidTeacherOwnedWorkspace({
+        supabase,
+        teacherId,
+        bookId,
+        userBookId: racedTeacherBook.user_book_id,
+      });
+      const shouldRelinkWorkspace =
+        Boolean(userBookId) &&
+        (!racedTeacherBook.user_book_id || !hasValidLinkedWorkspace);
+
+      if (shouldRelinkWorkspace) {
+        const { error: linkError } = await supabase
+          .from("teacher_books")
+          .update({ user_book_id: userBookId })
+          .eq("id", racedTeacherBook.id);
+
+        if (linkError) throw linkError;
+        hasValidLinkedWorkspace = true;
+      }
+
+      const alreadyCurrentlyTeaching =
+        hasValidLinkedWorkspace && racedTeacherBook.teaching_status === "currently_teaching";
+      const { error: teachingStatusError } = await supabase
+        .from("teacher_books")
+        .update({ teaching_status: "currently_teaching" })
+        .eq("id", racedTeacherBook.id);
+
+      if (teachingStatusError) {
+        if (isMissingColumnError(teachingStatusError)) {
+          throw new Error("The pending teaching status migration must be applied before adding to My Teaching Books.");
+        }
+        throw teachingStatusError;
+      }
+
+      return {
+        teacherBookId: racedTeacherBook.id as string,
+        alreadyInTeachingBooks: alreadyCurrentlyTeaching,
+        alreadyCurrentlyTeaching,
+      };
     }
   }
 
-  if (insertTeacherBookError) throw insertTeacherBookError;
+  if (insertTeacherBookError) {
+    if (isMissingColumnError(insertTeacherBookError)) {
+      throw new Error("The pending teaching status migration must be applied before adding to My Teaching Books.");
+    }
+    throw insertTeacherBookError;
+  }
 
-  return { teacherBookId: insertedTeacherBook.id as string, alreadyInTeachingBooks: false };
+  return {
+    teacherBookId: insertedTeacherBook.id as string,
+    alreadyInTeachingBooks: false,
+    alreadyCurrentlyTeaching: false,
+  };
 }
 
 function parseDestinations({
@@ -381,6 +494,7 @@ export async function applyAddBookDestinations({
   let alreadyInTeacherLibrary = false;
   let alreadyInStudentLibrary = false;
   let alreadyInTeachingBooks = false;
+  let alreadyCurrentlyTeaching = false;
 
   if (destinations.myLibrary) {
     const teacherResult = await getOrCreateUserBook({
@@ -431,6 +545,7 @@ export async function applyAddBookDestinations({
     });
     teacherBookId = teachingResult.teacherBookId;
     alreadyInTeachingBooks = teachingResult.alreadyInTeachingBooks;
+    alreadyCurrentlyTeaching = teachingResult.alreadyCurrentlyTeaching;
   }
 
   const userBookId = studentUserBookId ?? teacherUserBookId;
@@ -447,6 +562,7 @@ export async function applyAddBookDestinations({
     alreadyInTeacherLibrary,
     alreadyInStudentLibrary,
     alreadyInTeachingBooks,
+    alreadyCurrentlyTeaching,
     addedToMyLibrary: destinations.myLibrary,
     addedToTeachingBooks: destinations.teachingBooks,
     addedToStudentLibrary: destinations.studentLibrary,

@@ -73,7 +73,7 @@ type ActionCard = {
 };
 
 const teacherUseStatusLabels: Record<TeacherUseStatus, string> = {
-  want_to_test: "Want to Test",
+  want_to_test: "Potential",
   testing: "Testing",
   currently_using: "Currently Using",
   approved_for_lesson: "Approved for Lesson",

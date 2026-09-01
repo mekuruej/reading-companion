@@ -1,4 +1,5 @@
 import { displayBookTitle } from "@/lib/books/bookIdentity";
+import type { ReactNode } from "react";
 
 type LibraryBookCardBook = {
   title: string;
@@ -28,6 +29,7 @@ type LibraryBookCardProps = {
   formatRelativeDate: (value: string) => string;
   secondaryActionHref?: string | null;
   secondaryActionLabel?: string;
+  teachingControls?: ReactNode;
 };
 
 export default function LibraryBookCard({
@@ -37,6 +39,7 @@ export default function LibraryBookCard({
   formatRelativeDate,
   secondaryActionHref = null,
   secondaryActionLabel = "Open",
+  teachingControls = null,
 }: LibraryBookCardProps) {
   const book = row.books;
   if (!book) return null;
@@ -128,6 +131,8 @@ export default function LibraryBookCard({
           {secondaryActionLabel}
         </a>
       ) : null}
+
+      {teachingControls}
     </li>
   );
 }

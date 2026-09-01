@@ -109,7 +109,7 @@ function readerStatusLabel(row: UserBook | null) {
 function teacherUseStatusLabel(value: string | null | undefined) {
   switch (value) {
     case "want_to_test":
-      return "Want to Test";
+      return "Potential";
     case "testing":
       return "Testing";
     case "currently_using":

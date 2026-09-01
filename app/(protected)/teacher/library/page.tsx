@@ -125,7 +125,7 @@ function isJapaneseBook(book: BookMeta | null | undefined) {
 }
 
 const teacherUseStatusOptions: Array<{ value: TeacherUseStatus; label: string }> = [
-  { value: "want_to_test", label: "Want to Test" },
+  { value: "want_to_test", label: "Potential" },
   { value: "testing", label: "Testing" },
   { value: "currently_using", label: "Currently Using" },
   { value: "approved_for_lesson", label: "Perfect for Lesson" },

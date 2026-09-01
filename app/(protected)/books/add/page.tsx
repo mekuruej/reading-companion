@@ -23,6 +23,10 @@ import {
     normalizeBookLanguageCode,
 } from "@/lib/books/bookLanguage";
 
+function isMissingColumnError(error: any) {
+    return error?.code === "42703" || error?.code === "PGRST204";
+}
+
 type LookupBook = {
     isbn13: string;
     title: string;
@@ -501,6 +505,17 @@ export default function AddBookPage() {
             .map(destinationLabel);
     }
 
+    function satisfiedDestinationMessages(actionKey: string) {
+        const status = existingDestinationStatus[actionKey] ?? {};
+        return selectedDestinationKeys()
+            .filter((key) => status[key])
+            .map((key) =>
+                key === "teaching"
+                    ? "Already Currently Teaching"
+                    : `Already in ${destinationLabel(key)}`
+            );
+    }
+
     function selectedDestinationsSatisfied(actionKey: string) {
         const keys = selectedDestinationKeys();
         if (keys.length === 0) return false;
@@ -511,7 +526,7 @@ export default function AddBookPage() {
     function mergedStatusFromAdd(data: any) {
         return {
             catalog: data?.addedToCatalogOnly === true || data?.globalOnly === true,
-            teaching: data?.addedToTeachingBooks === true,
+            teaching: data?.addedToTeachingBooks === true || data?.alreadyCurrentlyTeaching === true,
             my: data?.addedToMyLibrary === true,
             student: data?.addedToStudentLibrary === true,
         };
@@ -531,11 +546,23 @@ export default function AddBookPage() {
 
     function addButtonState(actionKey: string, baseLabel = finalAddLabel()) {
         if (successfulActionSignature && successfulActionSignature === actionSignature(actionKey)) {
-            return { label: "✓ Book Added", disabled: true };
+            return {
+                label: selectedDestinationKeys().includes("teaching")
+                    ? "✓ Added — Currently Teaching"
+                    : "✓ Book Added",
+                disabled: true,
+            };
         }
 
         if (selectedDestinationsSatisfied(actionKey)) {
-            return { label: "✓ Already Added", disabled: true };
+            return {
+                label:
+                    selectedDestinationKeys().length === 1 &&
+                    selectedDestinationKeys()[0] === "teaching"
+                        ? "✓ Already Currently Teaching"
+                        : "✓ Already Added",
+                disabled: true,
+            };
         }
 
         if (satisfiedDestinationLabels(actionKey).length > 0) {
@@ -667,7 +694,9 @@ export default function AddBookPage() {
         if (canChooseTeacherDestinations || isTeacherGlobalContext) {
             const addedDestinations = [
                 data?.addedToCatalogOnly || data?.globalOnly ? "MEKURU Catalog" : null,
-                data?.addedToTeachingBooks ? "My Teaching Books" : null,
+                data?.addedToTeachingBooks || data?.alreadyCurrentlyTeaching
+                    ? "Currently Teaching"
+                    : null,
                 data?.addedToMyLibrary ? "My Library" : null,
                 data?.addedToStudentLibrary ? `${selectedTeacherStudentName}'s Library` : null,
             ].filter(Boolean);
@@ -1240,6 +1269,47 @@ export default function AddBookPage() {
         async function loadStatuses() {
             const nextStatuses: Record<string, Partial<Record<AddBookDestinationKey, boolean>>> = {};
 
+            async function isAlreadyCurrentlyTeachingDestination(bookId: string) {
+                const { data: teacherBook, error: teacherBookError } = await supabase
+                    .from("teacher_books")
+                    .select("id, user_book_id, teaching_status")
+                    .eq("teacher_id", currentUserId)
+                    .eq("book_id", bookId)
+                    .maybeSingle();
+
+                if (teacherBookError) {
+                    if (isMissingColumnError(teacherBookError)) {
+                        console.warn(
+                            "Teaching status migration is pending; My Teaching Books cannot be pre-confirmed yet.",
+                            teacherBookError
+                        );
+                        return false;
+                    }
+                    throw teacherBookError;
+                }
+
+                if (
+                    !teacherBook?.id ||
+                    teacherBook.teaching_status !== "currently_teaching" ||
+                    !teacherBook.user_book_id
+                ) {
+                    return false;
+                }
+
+                const { data: linkedWorkspace, error: linkedWorkspaceError } = await supabase
+                    .from("user_books")
+                    .select("id, user_id, book_id")
+                    .eq("id", teacherBook.user_book_id)
+                    .maybeSingle();
+
+                if (linkedWorkspaceError) throw linkedWorkspaceError;
+
+                return (
+                    linkedWorkspace?.user_id === currentUserId &&
+                    linkedWorkspace?.book_id === bookId
+                );
+            }
+
             for (const [actionKey, bookId] of pairs) {
                 const status: Partial<Record<AddBookDestinationKey, boolean>> = {
                     catalog: true,
@@ -1255,13 +1325,7 @@ export default function AddBookPage() {
                     status.my = Boolean(myBook?.id);
 
                     if (canChooseTeacherDestinations) {
-                        const { data: teacherBook } = await supabase
-                            .from("teacher_books")
-                            .select("id")
-                            .eq("teacher_id", currentUserId)
-                            .eq("book_id", bookId)
-                            .maybeSingle();
-                        status.teaching = Boolean(teacherBook?.id);
+                        status.teaching = await isAlreadyCurrentlyTeachingDestination(bookId);
                     }
 
                     if (selectedTeacherStudentId) {
@@ -1324,8 +1388,6 @@ export default function AddBookPage() {
         : "manual";
     const isbnButtonState = addButtonState(isbnActionKey);
     const manualButtonState = addButtonState(manualActionKey);
-    const manualSatisfiedLabels = satisfiedDestinationLabels(manualActionKey);
-
     return (
         <main className="mx-auto max-w-4xl px-4 py-8">
             <Link
@@ -1739,10 +1801,10 @@ export default function AddBookPage() {
                             onAdd={() => void handleAddToLibrary(isbnActionKey)}
                             onCancel={() => router.push(targetLibraryHref)}
                         />
-                        {satisfiedDestinationLabels(isbnActionKey).length > 0 ? (
+                        {satisfiedDestinationMessages(isbnActionKey).length > 0 ? (
                             <div className="mt-3 space-y-1 text-xs font-bold text-emerald-800">
-                                {satisfiedDestinationLabels(isbnActionKey).map((label) => (
-                                    <p key={label}>✓ Already in {label}</p>
+                                {satisfiedDestinationMessages(isbnActionKey).map((message) => (
+                                    <p key={message}>✓ {message}</p>
                                 ))}
                             </div>
                         ) : null}
@@ -1826,10 +1888,10 @@ export default function AddBookPage() {
                     />
                 ) : null}
 
-                {manualAddMode && manualSatisfiedLabels.length > 0 ? (
+                {manualAddMode && satisfiedDestinationMessages(manualActionKey).length > 0 ? (
                     <div className="mt-3 space-y-1 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-800">
-                        {manualSatisfiedLabels.map((label) => (
-                            <p key={label}>✓ Already in {label}</p>
+                        {satisfiedDestinationMessages(manualActionKey).map((message) => (
+                            <p key={message}>✓ {message}</p>
                         ))}
                     </div>
                 ) : null}
@@ -1846,7 +1908,7 @@ export default function AddBookPage() {
                             const missingFields = missingGlobalBookFields(result);
                             const resultActionKey = `book:${result.id}`;
                             const resultButtonState = addButtonState(resultActionKey);
-                            const resultSatisfiedLabels = satisfiedDestinationLabels(resultActionKey);
+                            const resultSatisfiedMessages = satisfiedDestinationMessages(resultActionKey);
 
                             return (
                                 <div key={result.id}>
@@ -1860,10 +1922,10 @@ export default function AddBookPage() {
                                         onAdd={() => void handleAddExistingBook(result.id, resultActionKey)}
                                         onRequestReview={() => void handleRequestBookDetails(result)}
                                     />
-                                    {resultSatisfiedLabels.length > 0 ? (
+                                    {resultSatisfiedMessages.length > 0 ? (
                                         <div className="mt-2 space-y-1 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-800">
-                                            {resultSatisfiedLabels.map((label) => (
-                                                <p key={label}>✓ Already in {label}</p>
+                                            {resultSatisfiedMessages.map((message) => (
+                                                <p key={message}>✓ {message}</p>
                                             ))}
                                         </div>
                                     ) : null}
