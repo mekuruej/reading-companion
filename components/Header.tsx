@@ -20,12 +20,10 @@ export default function Header() {
   const [pendingJapaneseLearningRequestCount, setPendingJapaneseLearningRequestCount] = useState(0);
   const [headerRefreshToken, setHeaderRefreshToken] = useState(0);
   const [showLibraryMenu, setShowLibraryMenu] = useState(false);
-  const [showDiscoveryMenu, setShowDiscoveryMenu] = useState(false);
   const [showStudyMenu, setShowStudyMenu] = useState(false);
   const [showTeacherMenu, setShowTeacherMenu] = useState(false);
   const pathname = usePathname();
   const libraryMenuRef = useRef<HTMLDivElement | null>(null);
-  const discoveryMenuRef = useRef<HTMLDivElement | null>(null);
   const studyMenuRef = useRef<HTMLDivElement | null>(null);
   const teacherMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -158,10 +156,6 @@ export default function Header() {
         setShowLibraryMenu(false);
       }
 
-      if (discoveryMenuRef.current && !discoveryMenuRef.current.contains(target)) {
-        setShowDiscoveryMenu(false);
-      }
-
       if (studyMenuRef.current && !studyMenuRef.current.contains(target)) {
         setShowStudyMenu(false);
       }
@@ -185,10 +179,11 @@ export default function Header() {
     pathname === "/books/add" ||
     /^\/users\/[^/]+\/books$/.test(pathname) ||
     pathname === "/vocab";
-  const discoverySectionActive = pathname.startsWith("/discovery");
+  const dictionaryActive = pathname === "/discovery/dictionary";
   const studySectionActive =
     pathname.startsWith("/library-study") ||
-    pathname.startsWith("/kanji-reading-study");
+    pathname.startsWith("/kanji-reading-study") ||
+    pathname === "/discovery/find-books";
   const teacherSectionActive = pathname.startsWith("/teacher");
   const teacherStudentsActive = pathname === "/teacher/students" || pathname.startsWith("/teacher/students/");
   const teacherTeachingBooksActive =
@@ -236,30 +231,28 @@ export default function Header() {
             <div className="relative" ref={libraryMenuRef}>
               <Link
                 href="/library"
-                className={`rounded-full border px-3 py-1.5 transition md:hidden ${librarySectionActive
-                  ? "border-stone-900 bg-stone-900 text-white"
-                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                  }`}
-                onClick={() => {
-                  setShowLibraryMenu(false);
-                  setShowDiscoveryMenu(false);
-                  setShowStudyMenu(false);
-                }}
-              >
+	                className={`rounded-full border px-3 py-1.5 transition md:hidden ${librarySectionActive
+	                  ? "border-stone-900 bg-stone-900 text-white"
+	                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+	                  }`}
+	                onClick={() => {
+	                  setShowLibraryMenu(false);
+	                  setShowStudyMenu(false);
+	                }}
+	              >
                 Library
               </Link>
 
               <button
                 type="button"
-                onClick={() => {
-                  setShowLibraryMenu((prev) => !prev);
-                  setShowDiscoveryMenu(false);
-                  setShowStudyMenu(false);
-                }}
-                className={`hidden rounded-full border px-3 py-1.5 transition md:inline-flex ${librarySectionActive
-                  ? "border-stone-900 bg-stone-900 text-white"
-                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                  }`}
+	                onClick={() => {
+	                  setShowLibraryMenu((prev) => !prev);
+	                  setShowStudyMenu(false);
+	                }}
+	                className={`hidden rounded-full border px-3 py-1.5 transition md:inline-flex ${librarySectionActive
+	                  ? "border-stone-900 bg-stone-900 text-white"
+	                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+	                  }`}
               >
                 Library
               </button>
@@ -297,11 +290,11 @@ export default function Header() {
                       }`}
                     onClick={() => setShowLibraryMenu(false)}
                   >
-                    Book Hubs
-                  </Link>
+	                    Book Hubs
+	                  </Link>
 
-                  <Link
-                    href="/community/profile"
+	                  <Link
+	                    href="/community/profile"
                     className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community/profile" ||
                       pathname.startsWith("/community/profile/")
                       ? "bg-stone-100 font-medium text-stone-900"
@@ -323,29 +316,27 @@ export default function Header() {
                   ? "border-stone-900 bg-stone-900 text-white"
                   : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
                   }`}
-                onClick={() => {
-                  setShowStudyMenu(false);
-                  setShowLibraryMenu(false);
-                  setShowDiscoveryMenu(false);
-                }}
-              >
-                Study
-              </Link>
+	                onClick={() => {
+	                  setShowStudyMenu(false);
+	                  setShowLibraryMenu(false);
+	                }}
+	              >
+	                Japanese Study
+	              </Link>
 
               <button
                 type="button"
-                onClick={() => {
-                  setShowStudyMenu((prev) => !prev);
-                  setShowLibraryMenu(false);
-                  setShowDiscoveryMenu(false);
-                }}
+	                onClick={() => {
+	                  setShowStudyMenu((prev) => !prev);
+	                  setShowLibraryMenu(false);
+	                }}
                 className={`hidden rounded-full border px-3 py-1.5 transition md:inline-flex ${studySectionActive
                   ? "border-stone-900 bg-stone-900 text-white"
                   : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
                   }`}
               >
-                Study
-              </button>
+	                Japanese Study
+	              </button>
 
               {showStudyMenu ? (
                 <div className="absolute right-0 z-50 mt-2 hidden min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg md:block">
@@ -407,103 +398,49 @@ export default function Header() {
                         }`}
                       onClick={() => setShowStudyMenu(false)}
                     >
-                      Advanced Study
-                    </Link>
-                  ) : (
+	                    Advanced Study
+	                  </Link>
+	                  ) : (
                     <div className="block cursor-default rounded-xl px-3 py-2 text-sm leading-tight text-stone-400">
                       {isTrialAccess ? "Advanced Study forming" : "Advanced Study 🔒"}
                       <span className="block text-xs text-stone-500">
                         Japanese Learning 🔒
                       </span>
-                    </div>
-                  )}
-                </div>
-              ) : null}
-              </div>
-            ) : null}
+	                    </div>
+	                  )}
 
-            {showFullAccessNavigation ? (
-              <div className="relative" ref={discoveryMenuRef}>
-                <Link
-                  href="/discovery"
-                  className={`rounded-full border px-3 py-1.5 transition md:hidden ${discoverySectionActive
-                    ? "border-stone-900 bg-stone-900 text-white"
-                    : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                    }`}
-                  onClick={() => {
-                    setShowDiscoveryMenu(false);
-                    setShowLibraryMenu(false);
-                    setShowStudyMenu(false);
-                  }}
-                >
-                  Discovery
-                </Link>
+	                  {showFullAccessNavigation ? (
+	                    <Link
+	                      href="/discovery/find-books"
+	                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery/find-books"
+	                        ? "bg-stone-100 font-medium text-stone-900"
+	                        : "text-stone-700 hover:bg-stone-50"
+	                        }`}
+	                      onClick={() => setShowStudyMenu(false)}
+	                    >
+	                      Find Your Next Book
+	                    </Link>
+	                  ) : null}
+	                </div>
+	              ) : null}
+	              </div>
+	            ) : null}
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowDiscoveryMenu((prev) => !prev);
-                    setShowLibraryMenu(false);
-                    setShowStudyMenu(false);
-                  }}
-                  className={`hidden rounded-full border px-3 py-1.5 transition md:inline-flex ${discoverySectionActive
-                    ? "border-stone-900 bg-stone-900 text-white"
-                    : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-                    }`}
-                >
-                  Discovery
-                </button>
-
-                {showDiscoveryMenu ? (
-                  <div className="absolute right-0 z-50 mt-2 hidden min-w-[220px] rounded-2xl border border-stone-200 bg-white p-2 shadow-lg md:block">
-                    <Link
-                      href="/discovery"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                        }`}
-                      onClick={() => setShowDiscoveryMenu(false)}
-                    >
-                      Discovery Hub
-                    </Link>
-
-                    <Link
-                      href="/discovery/find-books"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery/find-books"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                        }`}
-                      onClick={() => setShowDiscoveryMenu(false)}
-                    >
-                      Find Your Next Book
-                    </Link>
-
-                    <Link
-                      href="/discovery/dictionary"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery/dictionary"
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                        }`}
-                      onClick={() => setShowDiscoveryMenu(false)}
-                    >
-                      Dictionary/Word History
-                    </Link>
-
-                    <Link
-                      href="/community/stats"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/community/stats" || pathname.startsWith("/community/stats/")
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                        }`}
-                      onClick={() => setShowDiscoveryMenu(false)}
-                    >
-                      Stats
-                    </Link>
-
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+	            {showFullAccessNavigation ? (
+	              <Link
+	                href="/discovery/dictionary"
+	                className={`rounded-full border px-3 py-1.5 transition ${dictionaryActive
+	                  ? "border-stone-900 bg-stone-900 text-white"
+	                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+	                  }`}
+	                onClick={() => {
+	                  setShowLibraryMenu(false);
+	                  setShowStudyMenu(false);
+	                }}
+	              >
+	                Dictionary
+	              </Link>
+	            ) : null}
 
             {showTeacherLink ? (
               <div
@@ -516,24 +453,22 @@ export default function Header() {
                     ? "border-stone-900 bg-stone-900 text-white"
                     : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
                     }`}
-                  onClick={() => {
-                    setShowLibraryMenu(false);
-                    setShowDiscoveryMenu(false);
-                    setShowStudyMenu(false);
-                    setShowTeacherMenu(false);
-                  }}
+	                  onClick={() => {
+	                    setShowLibraryMenu(false);
+	                    setShowStudyMenu(false);
+	                    setShowTeacherMenu(false);
+	                  }}
                 >
                   Teacher Hub
                 </Link>
 
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowTeacherMenu((prev) => !prev);
-                    setShowLibraryMenu(false);
-                    setShowDiscoveryMenu(false);
-                    setShowStudyMenu(false);
-                  }}
+	                  onClick={() => {
+	                    setShowTeacherMenu((prev) => !prev);
+	                    setShowLibraryMenu(false);
+	                    setShowStudyMenu(false);
+	                  }}
                   className={`hidden rounded-full border px-3 py-1.5 transition md:inline-flex ${teacherSectionActive
                     ? "border-stone-900 bg-stone-900 text-white"
                     : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"

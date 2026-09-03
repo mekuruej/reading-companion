@@ -5569,7 +5569,10 @@ export default function BookHubPage() {
     isTeacherContext && !!row.user_id && !!userId && row.user_id !== userId;
   const canRemoveFromMyLibrary = !!userId && row.user_id === userId;
   const canUseBookHubTeachingMode =
-    isOwnBookHub && (isTeacherContext || isAdmin || isSuperTeacher) && canUseWideTeachingMode;
+    isOwnBookHub &&
+    isJapaneseLearningBook(book.language_code ?? null) &&
+    (isTeacherContext || isAdmin || isSuperTeacher) &&
+    canUseWideTeachingMode;
   const requestedBookHubMode = searchParams.get("mode");
   const bookHubMode: BookHubMode =
     canUseBookHubTeachingMode && requestedBookHubMode === "teaching"

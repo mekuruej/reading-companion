@@ -4,6 +4,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
@@ -268,6 +269,13 @@ export default function ListeningPage() {
               : "max-w-4xl",
         ].join(" ")}
       >
+        <Link
+          href={`/books/${encodeURIComponent(userBookId)}`}
+          className="inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
+        >
+          ← Back to Book Hub
+        </Link>
+
         {canUseReadingJournal ? (
           <div className="hidden justify-end lg:flex">
             <div className="inline-flex rounded-2xl border border-stone-200 bg-white p-1 shadow-sm">
