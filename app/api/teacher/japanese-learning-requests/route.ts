@@ -17,6 +17,8 @@ type ProfileRow = {
   app_access_expires_at?: string | null;
 };
 
+const GUIDED_TRIAL_DAYS = 28;
+
 function isSuperTeacherFlag(value: unknown) {
   return value === true || value === "true";
 }
@@ -42,6 +44,10 @@ function isActiveNonTrialFullAccess(profile: ProfileRow | null) {
   if (!profile) return false;
   const access = getAppAccessStatus(profile);
   return access.hasFullAccess && access.reason !== "trial" && access.reason !== "staff";
+}
+
+function hasExistingTrial(profile: ProfileRow | null) {
+  return (profile?.app_access_type ?? "").trim().toLowerCase() === "trial";
 }
 
 function cleanText(value: unknown) {
@@ -200,9 +206,12 @@ export async function PATCH(request: Request) {
     const action = cleanText(body?.action);
     const reviewNote = cleanText(body?.reviewNote).slice(0, 600) || null;
 
-    if (!requestId || (action !== "approve" && action !== "decline")) {
+    if (
+      !requestId ||
+      (action !== "approve" && action !== "decline" && action !== "start_trial")
+    ) {
       return NextResponse.json(
-        { error: "requestId and action=approve|decline are required." },
+        { error: "requestId and action=approve|decline|start_trial are required." },
         { status: 400 }
       );
     }
@@ -219,6 +228,74 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Request not found." }, { status: 404 });
     }
 
+    if (action === "start_trial") {
+      if (existingRequest.status !== "approved") {
+        return NextResponse.json(
+          { error: "Only approved Guided Trial requests can be activated." },
+          { status: 409 }
+        );
+      }
+
+      const targetProfile = await getProfile(existingRequest.user_id);
+
+      if (!targetProfile) {
+        return NextResponse.json(
+          { error: "The requesting user does not have a profile." },
+          { status: 404 }
+        );
+      }
+
+      if (isTeacherOrElevatedProfile(targetProfile) || isActiveNonTrialFullAccess(targetProfile)) {
+        return NextResponse.json(
+          { error: "That user already has full access." },
+          { status: 409 }
+        );
+      }
+
+      if (hasExistingTrial(targetProfile)) {
+        return NextResponse.json(
+          { error: "That user already has or had trial access." },
+          { status: 409 }
+        );
+      }
+
+      const now = new Date();
+      const trialEndsAt = new Date(now.getTime() + GUIDED_TRIAL_DAYS * 24 * 60 * 60 * 1000);
+      const trialStartedAt = now.toISOString();
+
+      const { error: profileUpdateError } = await supabaseAdmin
+        .from("profiles")
+        .update({
+          app_access_type: "trial",
+          trial_started_at: trialStartedAt,
+          app_access_expires_at: trialEndsAt.toISOString(),
+        })
+        .eq("id", existingRequest.user_id);
+
+      if (profileUpdateError) throw profileUpdateError;
+
+      let notificationError: string | null = null;
+      try {
+        await createTrialStartedAlert({
+          userId: existingRequest.user_id,
+          trialStartedAt,
+          trialEndsAt: trialEndsAt.toISOString(),
+        });
+      } catch (error: any) {
+        notificationError =
+          error?.message ?? "Could not create Japanese Learning trial notification.";
+        console.error("Error creating Japanese Learning trial notification:", error);
+      }
+
+      return NextResponse.json({
+        ok: true,
+        requestId,
+        trialStartedAt,
+        trialEndsAt: trialEndsAt.toISOString(),
+        notificationError,
+      });
+    }
+
     if (existingRequest.status !== "pending") {
       return NextResponse.json({
         ok: true,
@@ -229,40 +306,6 @@ export async function PATCH(request: Request) {
     }
 
     const now = new Date();
-    let trialEndsAt: string | null = null;
-    let trialStartedAt: string | null = null;
-    let grantedTrial = false;
-
-    if (action === "approve") {
-      const targetProfile = await getProfile(existingRequest.user_id);
-
-      if (!targetProfile) {
-        return NextResponse.json(
-          { error: "The requesting user does not have a profile." },
-          { status: 404 }
-        );
-      }
-
-      if (!isTeacherOrElevatedProfile(targetProfile) && !isActiveNonTrialFullAccess(targetProfile)) {
-        const endsAt = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000);
-        trialStartedAt = now.toISOString();
-        trialEndsAt = endsAt.toISOString();
-
-        const { error: profileUpdateError } = await supabaseAdmin
-          .from("profiles")
-          .update({
-            japanese_learning_enabled: true,
-            target_language: "Japanese",
-            app_access_type: "trial",
-            trial_started_at: trialStartedAt,
-            app_access_expires_at: trialEndsAt,
-          })
-          .eq("id", existingRequest.user_id);
-
-        if (profileUpdateError) throw profileUpdateError;
-        grantedTrial = true;
-      }
-    }
 
     const { data: updatedRequest, error: updateError } = await supabaseAdmin
       .from("japanese_learning_access_requests")
@@ -278,28 +321,9 @@ export async function PATCH(request: Request) {
 
     if (updateError) throw updateError;
 
-    let notificationError: string | null = null;
-
-    if (action === "approve" && grantedTrial && trialStartedAt && trialEndsAt) {
-      try {
-        await createTrialStartedAlert({
-          userId: existingRequest.user_id,
-          trialStartedAt,
-          trialEndsAt,
-        });
-      } catch (error: any) {
-        notificationError =
-          error?.message ?? "Could not create Japanese Learning trial notification.";
-        console.error("Error creating Japanese Learning trial notification:", error);
-      }
-    }
-
     return NextResponse.json({
       ok: true,
       request: updatedRequest,
-      trialStartedAt,
-      trialEndsAt,
-      notificationError,
     });
   } catch (error: any) {
     console.error("Error reviewing Japanese Learning request:", error);

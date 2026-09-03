@@ -176,9 +176,9 @@ export default function TeacherTrialsPage() {
             day: "numeric",
             year: "numeric",
           }).format(new Date(payload.trialEndsAt))
-        : "21 days from now";
+        : "28 days from now";
 
-      setGrantMessage(`21-day full-access trial granted through ${trialEndsAt}.`);
+      setGrantMessage(`28-day Guided Trial started through ${trialEndsAt}.`);
       setGrantEmail("");
     } catch (err: any) {
       console.error("Error granting trial access:", err);
@@ -230,11 +230,11 @@ export default function TeacherTrialsPage() {
         <div className="mt-2 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
           <div>
             <h2 className="text-xl font-black text-violet-950">
-              Grant a 21-day full-access trial
+              Start a 28-day Guided Trial
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-violet-900/80">
-              Use this for beta readers or book-club students who have already signed up.
-              Their library and reading records remain safe when the trial expires.
+              Use this after the first 30-minute reading/setup lesson for a reader
+              with an approved Guided Trial request.
             </p>
           </div>
 
@@ -252,7 +252,7 @@ export default function TeacherTrialsPage() {
               disabled={grantingTrial}
               className="rounded-2xl bg-violet-700 px-4 py-2 text-sm font-black text-white shadow-sm hover:bg-violet-800 disabled:cursor-not-allowed disabled:bg-violet-300"
             >
-              {grantingTrial ? "Granting..." : "Grant Trial"}
+              {grantingTrial ? "Starting..." : "Start 28-Day Trial"}
             </button>
           </div>
         </div>

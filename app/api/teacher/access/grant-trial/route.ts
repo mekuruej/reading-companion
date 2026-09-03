@@ -15,16 +15,26 @@ type ProfileRow = {
   app_access_expires_at?: string | null;
 };
 
+const GUIDED_TRIAL_DAYS = 28;
+
 function isSuperTeacherFlag(value: unknown) {
   return value === true || value === "true";
 }
 
-function canGrantTrial(profile: ProfileRow | null) {
+function canActivateGuidedTrial(profile: ProfileRow | null) {
   return (
-    profile?.role === "teacher" ||
     profile?.role === "super_teacher" ||
     profile?.role === "admin" ||
     isSuperTeacherFlag(profile?.is_super_teacher)
+  );
+}
+
+function isTeacherOrElevatedProfile(profile: ProfileRow | null) {
+  return Boolean(
+    profile?.role === "teacher" ||
+      profile?.role === "super_teacher" ||
+      profile?.role === "admin" ||
+      isSuperTeacherFlag(profile?.is_super_teacher)
   );
 }
 
@@ -62,6 +72,10 @@ function isActiveNonTrialFullAccess(profile: ProfileRow) {
   return access.hasFullAccess && access.reason !== "trial" && access.reason !== "staff";
 }
 
+function hasExistingTrial(profile: ProfileRow) {
+  return (profile.app_access_type ?? "").trim().toLowerCase() === "trial";
+}
+
 async function findUserIdByEmail(email: string) {
   let page = 1;
 
@@ -87,6 +101,18 @@ async function findUserIdByEmail(email: string) {
   return null;
 }
 
+async function hasApprovedGuidedTrialRequest(userId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("japanese_learning_access_requests")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("status", "approved")
+    .limit(1);
+
+  if (error) throw error;
+  return (data ?? []).length > 0;
+}
+
 export async function POST(request: Request) {
   const auth = await getAuthenticatedUser(request);
   if ("error" in auth) {
@@ -95,9 +121,9 @@ export async function POST(request: Request) {
 
   const actorProfile = await getProfile(auth.user.id);
 
-  if (!canGrantTrial(actorProfile)) {
+  if (!canActivateGuidedTrial(actorProfile)) {
     return NextResponse.json(
-      { error: "Teacher access is required to grant a trial." },
+      { error: "Super teacher access is required to start a Guided Trial." },
       { status: 403 }
     );
   }
@@ -130,15 +156,30 @@ export async function POST(request: Request) {
     );
   }
 
-  if (canGrantTrial(targetProfile) || isActiveNonTrialFullAccess(targetProfile)) {
+  if (isTeacherOrElevatedProfile(targetProfile) || isActiveNonTrialFullAccess(targetProfile)) {
     return NextResponse.json(
       { error: "That user already has an active full-access grant." },
       { status: 409 }
     );
   }
 
+  if (hasExistingTrial(targetProfile)) {
+    return NextResponse.json(
+      { error: "That user already has or had trial access." },
+      { status: 409 }
+    );
+  }
+
+  const hasApprovedRequest = await hasApprovedGuidedTrialRequest(targetUserId);
+  if (!hasApprovedRequest) {
+    return NextResponse.json(
+      { error: "Start a trial from an approved Guided Trial request." },
+      { status: 409 }
+    );
+  }
+
   const now = new Date();
-  const trialEndsAt = new Date(now.getTime() + 21 * 24 * 60 * 60 * 1000);
+  const trialEndsAt = new Date(now.getTime() + GUIDED_TRIAL_DAYS * 24 * 60 * 60 * 1000);
 
   const { data, error } = await supabaseAdmin
     .from("profiles")

@@ -82,6 +82,7 @@ function jlptLevelLabel(value: string | null | undefined) {
 export default function JapaneseLearningRequestsPage() {
   const [loading, setLoading] = useState(true);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [activatingId, setActivatingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [requests, setRequests] = useState<JapaneseLearningRequest[]>([]);
 
@@ -111,7 +112,7 @@ export default function JapaneseLearningRequestsPage() {
 
     try {
       const response = await fetchWithSession(
-        "/api/teacher/japanese-learning-requests?status=pending"
+        "/api/teacher/japanese-learning-requests?status=all"
       );
       const payload = await response.json().catch(() => null);
 
@@ -131,7 +132,7 @@ export default function JapaneseLearningRequestsPage() {
   async function reviewRequest(requestId: string, action: "approve" | "decline") {
     const confirmed = window.confirm(
       action === "approve"
-        ? "Approve this request and start the 21-day Japanese Learning trial now?"
+        ? "Accept this reader for the Guided Trial process? This will not start Japanese Learning access yet."
         : "Decline this request? No access will change."
     );
 
@@ -152,12 +153,7 @@ export default function JapaneseLearningRequestsPage() {
       }
 
       if (action === "approve") {
-        const endsAt = payload?.trialEndsAt ? formatDate(payload.trialEndsAt) : "21 days from now";
-        setMessage(
-          payload?.notificationError
-            ? `Request approved. Trial access runs through ${endsAt}. Notification could not be logged: ${payload.notificationError}`
-            : `Request approved. Trial access runs through ${endsAt}.`
-        );
+        setMessage("Request accepted for Guided Trial. Access has not started yet.");
       } else {
         setMessage("Request declined.");
       }
@@ -167,6 +163,42 @@ export default function JapaneseLearningRequestsPage() {
       setMessage(error?.message ?? "Could not review this request.");
     } finally {
       setReviewingId(null);
+    }
+  }
+
+  async function startTrial(request: JapaneseLearningRequest) {
+    const confirmed = window.confirm(
+      `Start a 28-day Japanese Learning trial for ${displayRequester(request)}?\n\nUse this after the first 30-minute reading/setup lesson.`
+    );
+
+    if (!confirmed) return;
+
+    setActivatingId(request.id);
+    setMessage("");
+
+    try {
+      const response = await fetchWithSession("/api/teacher/japanese-learning-requests", {
+        method: "PATCH",
+        body: JSON.stringify({ requestId: request.id, action: "start_trial" }),
+      });
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Could not start this trial.");
+      }
+
+      const endsAt = payload?.trialEndsAt ? formatDate(payload.trialEndsAt) : "28 days from now";
+      setMessage(
+        payload?.notificationError
+          ? `28-day trial started through ${endsAt}. Notification could not be logged: ${payload.notificationError}`
+          : `28-day trial started through ${endsAt}.`
+      );
+
+      await loadRequests();
+    } catch (error: any) {
+      setMessage(error?.message ?? "Could not start this trial.");
+    } finally {
+      setActivatingId(null);
     }
   }
 
@@ -185,10 +217,11 @@ export default function JapaneseLearningRequestsPage() {
           Japanese Learning Requests
         </p>
         <h1 className="mt-2 text-3xl font-black text-stone-900">
-          {requests.length} pending request{requests.length === 1 ? "" : "s"}
+          {requests.length} Guided Trial request{requests.length === 1 ? "" : "s"}
         </h1>
         <p className="mt-2 text-sm leading-6 text-stone-600">
-          Review invitation requests for the manually managed Japanese Learning pilot.
+          Accept readers for the guided process first. Start trial access separately after
+          the first 30-minute reading/setup lesson.
         </p>
       </section>
 
@@ -197,7 +230,7 @@ export default function JapaneseLearningRequestsPage() {
 
       {!loading && requests.length === 0 ? (
         <div className="mt-6 rounded-3xl border border-stone-200 bg-white p-6 text-sm text-stone-500">
-          No pending Japanese Learning requests right now.
+          No Japanese Learning requests right now.
         </div>
       ) : null}
 
@@ -228,22 +261,44 @@ export default function JapaneseLearningRequestsPage() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => void reviewRequest(request.id, "approve")}
-                  disabled={reviewingId === request.id}
-                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-800 hover:bg-emerald-100 disabled:opacity-60"
-                >
-                  Approve Trial
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void reviewRequest(request.id, "decline")}
-                  disabled={reviewingId === request.id}
-                  className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-black text-rose-700 hover:bg-rose-50 disabled:opacity-60"
-                >
-                  Decline
-                </button>
+                {request.status === "pending" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void reviewRequest(request.id, "approve")}
+                      disabled={reviewingId === request.id}
+                      className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-800 hover:bg-emerald-100 disabled:opacity-60"
+                    >
+                      Accept for Guided Trial
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void reviewRequest(request.id, "decline")}
+                      disabled={reviewingId === request.id}
+                      className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-black text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                    >
+                      Decline
+                    </button>
+                  </>
+                ) : null}
+
+                {request.status === "approved" && request.appAccessType !== "trial" ? (
+                  <button
+                    type="button"
+                    onClick={() => void startTrial(request)}
+                    disabled={activatingId === request.id}
+                    className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-black text-violet-800 hover:bg-violet-100 disabled:opacity-60"
+                    title="Use after the first 30-minute reading/setup lesson."
+                  >
+                    {activatingId === request.id ? "Starting..." : "Start 28-Day Trial"}
+                  </button>
+                ) : null}
+
+                {request.status === "approved" && request.appAccessType === "trial" ? (
+                  <span className="rounded-xl border border-violet-100 bg-violet-50 px-3 py-2 text-sm font-black text-violet-800">
+                    Trial started
+                  </span>
+                ) : null}
               </div>
             </div>
           </div>

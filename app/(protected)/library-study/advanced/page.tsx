@@ -93,21 +93,21 @@ const advancedTools = [
         href: "/library-study/practice",
         eyebrow: "Across books",
         description: "Study words from all your books using useful filters.",
-        className: "border-sky-200 bg-sky-50 text-sky-950",
+        className: "border-emerald-200 bg-emerald-50 text-emerald-950",
+    },
+    {
+        title: "Purple Review",
+        href: "/library-study/practice?color=purple",
+        eyebrow: "Mastered words",
+        description: "Review purple words so they stay familiar in real reading.",
+        className: "border-violet-200 bg-violet-50 text-violet-950",
     },
     {
         title: "Word Sky",
         href: "/library-study/word-sky",
         eyebrow: "Word growth",
         description: "Move up words that you already know.",
-        className: "border-violet-200 bg-violet-50 text-violet-950",
-    },
-    {
-        title: "Ability Check",
-        href: "/library-study/check",
-        eyebrow: "Confirm knowledge",
-        description: "Turn words you recognize into words you can use.",
-        className: "border-emerald-200 bg-emerald-50 text-emerald-950",
+        className: "border-sky-200 bg-sky-50 text-sky-950",
     },
 ];
 
@@ -452,8 +452,9 @@ export default function AdvancedStudyPage() {
                             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                 {advancedTools.filter((tool) => {
                                     if (isStaffAccess) return true;
-                                    if (tool.title === "Ability Check") return abilityCheckAvailable;
-                                    if (tool.title === "Library Review") return libraryReviewAvailable;
+                                    if (tool.title === "Library Review" || tool.title === "Purple Review") {
+                                        return libraryReviewAvailable;
+                                    }
                                     return true;
                                 }).map((tool) => (
                                     <Link

@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  ensureStudentLessonBook,
+  StudentLessonBookError,
+} from "@/lib/teacher/studentLessonBooks";
 
 const MAX_RESUME_AT_LENGTH = 500;
 
@@ -115,6 +119,7 @@ async function authorizeOwnTeachingBook(actorId: string, userBookId: string) {
   return {
     ok: true as const,
     bookId: (userBook as any).book_id as string,
+    profile: profile as ProfileRow | null,
   };
 }
 
@@ -127,6 +132,54 @@ async function loadActiveStudentLinks(teacherId: string) {
 
   if (error) throw error;
   return new Set((data ?? []).map((row: any) => row.student_id as string));
+}
+
+async function ensureStudentBook(studentId: string, userBookId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("user_books")
+    .select("id, user_id")
+    .eq("id", userBookId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return Boolean(data && (data as any).user_id === studentId);
+}
+
+async function findOrCreateStudentBook(studentId: string, bookId: string) {
+  const { data: book, error: bookError } = await supabaseAdmin
+    .from("books")
+    .select("id")
+    .eq("id", bookId)
+    .maybeSingle();
+
+  if (bookError) throw bookError;
+  if (!book) {
+    return { error: "Book could not be found.", status: 404 as const };
+  }
+
+  const { data: existingUserBook, error: existingUserBookError } = await supabaseAdmin
+    .from("user_books")
+    .select("id")
+    .eq("user_id", studentId)
+    .eq("book_id", bookId)
+    .maybeSingle();
+
+  if (existingUserBookError) throw existingUserBookError;
+  if (existingUserBook?.id) {
+    return { userBookId: existingUserBook.id as string, createdUserBook: false };
+  }
+
+  const { data: insertedUserBook, error: insertUserBookError } = await supabaseAdmin
+    .from("user_books")
+    .insert({
+      user_id: studentId,
+      book_id: bookId,
+    })
+    .select("id")
+    .single();
+
+  if (insertUserBookError) throw insertUserBookError;
+  return { userBookId: insertedUserBook.id as string, createdUserBook: true };
 }
 
 async function loadLessonRows(teacherId: string) {
@@ -257,30 +310,43 @@ export async function GET(
       bookId: access.bookId,
       teacherId: auth.user.id,
     });
-    const namesByStudentId = await loadStudentNames([
-      ...new Set(rows.map((row) => row.student_id)),
-    ]);
+    const activeStudentIdList = [...activeStudentIds].sort();
+    const namesByStudentId = await loadStudentNames(activeStudentIdList);
 
     const duplicateCounts = new Map<string, number>();
     for (const row of rows) {
       const key = `${row.teacher_id}|${row.student_id}|${access.bookId}`;
       duplicateCounts.set(key, (duplicateCounts.get(key) ?? 0) + 1);
     }
+    const activeRowsByStudentId = new Map<string, LessonBookRow>();
+    for (const row of rows) {
+      if (!activeRowsByStudentId.has(row.student_id)) {
+        activeRowsByStudentId.set(row.student_id, row);
+      }
+    }
+
+    const students = activeStudentIdList
+      .map((studentId) => {
+        const row = activeRowsByStudentId.get(studentId);
+        const duplicateKey = `${auth.user.id}|${studentId}|${access.bookId}`;
+        return {
+          lessonBookId: row?.id ?? null,
+          studentId,
+          studentName: namesByStudentId.get(studentId) ?? "Student",
+          userBookId: row?.user_book_id ?? null,
+          isAttached: Boolean(row),
+          resumeAtText: row?.resume_at_text ?? null,
+          resumeUpdatedAt: row?.resume_updated_at ?? null,
+          hasDuplicateActiveBook: (duplicateCounts.get(duplicateKey) ?? 0) > 1,
+        };
+      })
+      .sort((a, b) => {
+        if (a.isAttached !== b.isAttached) return a.isAttached ? -1 : 1;
+        return a.studentName.localeCompare(b.studentName);
+      });
 
     return NextResponse.json({
-      students: rows.map((row) => {
-        const duplicateKey = `${row.teacher_id}|${row.student_id}|${access.bookId}`;
-        return {
-          lessonBookId: row.id,
-          studentId: row.student_id,
-          studentName: namesByStudentId.get(row.student_id) ?? "Student",
-          userBookId: row.user_book_id,
-          resumeAtText: row.resume_at_text ?? null,
-          resumeUpdatedAt: row.resume_updated_at ?? null,
-          hasDuplicateActiveBook:
-            (duplicateCounts.get(duplicateKey) ?? 0) > 1,
-        };
-      }),
+      students,
       migrationRequired: false,
     });
   } catch (error: any) {
@@ -288,6 +354,68 @@ export async function GET(
     return NextResponse.json(
       { error: error?.message ?? "Could not load Students' Progress." },
       { status: 500 }
+    );
+  }
+}
+
+export async function POST(
+  req: Request,
+  context: { params: Promise<{ userBookId: string }> }
+) {
+  try {
+    const { userBookId } = await context.params;
+    const auth = await getAuthenticatedUser(req);
+
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
+    const access = await authorizeOwnTeachingBook(auth.user.id, userBookId);
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error },
+        { status: access.status }
+      );
+    }
+
+    const body = await req.json().catch(() => null);
+    const studentId =
+      typeof body?.studentId === "string" ? body.studentId.trim() : "";
+
+    if (!studentId) {
+      return NextResponse.json(
+        { error: "studentId is required." },
+        { status: 400 }
+      );
+    }
+
+    const studentBook = await findOrCreateStudentBook(studentId, access.bookId);
+    if ("error" in studentBook) {
+      return NextResponse.json(
+        { error: studentBook.error },
+        { status: studentBook.status }
+      );
+    }
+
+    const lessonBook = await ensureStudentLessonBook({
+      supabase: supabaseAdmin,
+      teacherId: auth.user.id,
+      studentId,
+      userBookId: studentBook.userBookId,
+      teacherProfile: access.profile,
+    });
+
+    return NextResponse.json({
+      ok: true,
+      lessonBookId: lessonBook.relationshipId,
+      userBookId: lessonBook.userBookId,
+      createdUserBook: studentBook.createdUserBook,
+    });
+  } catch (error: any) {
+    console.error("Teaching student progress add error:", error);
+    return NextResponse.json(
+      { error: error?.message ?? "Could not add this student book." },
+      { status: error instanceof StudentLessonBookError ? error.status : 500 }
     );
   }
 }
@@ -315,7 +443,50 @@ export async function PATCH(
     const body = await req.json().catch(() => null);
     const lessonBookId =
       typeof body?.lessonBookId === "string" ? body.lessonBookId.trim() : "";
+    const action = typeof body?.action === "string" ? body.action.trim() : "";
+    const studentId = typeof body?.studentId === "string" ? body.studentId.trim() : "";
+    const removeUserBookId =
+      typeof body?.userBookId === "string" ? body.userBookId.trim() : "";
     const resumeAtText = cleanResumeAtText(body?.resumeAtText);
+
+    if (action === "remove") {
+      if (!studentId || !removeUserBookId) {
+        return NextResponse.json(
+          { error: "studentId and userBookId are required." },
+          { status: 400 }
+        );
+      }
+
+      const belongsToStudent = await ensureStudentBook(studentId, removeUserBookId);
+      if (!belongsToStudent) {
+        return NextResponse.json(
+          { error: "This book does not belong to that student." },
+          { status: 403 }
+        );
+      }
+
+      const activeStudentIds = await loadActiveStudentLinks(auth.user.id);
+      if (!activeStudentIds.has(studentId)) {
+        return NextResponse.json(
+          { error: "This student is not actively connected to this teacher." },
+          { status: 403 }
+        );
+      }
+
+      const { error } = await supabaseAdmin
+        .from("teacher_student_lesson_books")
+        .update({
+          status: "removed",
+          removed_at: new Date().toISOString(),
+        })
+        .eq("teacher_id", auth.user.id)
+        .eq("student_id", studentId)
+        .eq("user_book_id", removeUserBookId);
+
+      if (error) throw error;
+
+      return NextResponse.json({ ok: true });
+    }
 
     if (!lessonBookId) {
       return NextResponse.json(

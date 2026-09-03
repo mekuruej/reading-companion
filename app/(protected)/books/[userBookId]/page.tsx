@@ -21,7 +21,6 @@ import {
   canUseFullAccessFeature,
   getFullAccessRequiredCopy,
 } from "@/lib/access/requireFullAccess";
-import BookInfoTab from "./components/tabs/BookInfoTab";
 import RatingTab from "./components/tabs/RatingTab";
 import TeacherPrepAssignBox from "./components/TeacherPrepAssignBox";
 import BookHubActionGrid from "./components/BookHubActionGrid";
@@ -42,17 +41,13 @@ import BookHubLoadingState from "./components/BookHubLoadingState";
 import RemoveFromLibraryDialog from "./components/RemoveFromLibraryDialog";
 import BookHubProgressSummary from "./components/BookHubProgressSummary";
 import BookHubNotices from "./components/BookHubNotices";
-import BookHubTabBar from "./components/BookHubTabBar";
 import BookHubHero from "./components/BookHubHero";
 import BookHubStatusPanel from "./components/BookHubStatusPanel";
 import BookHubModeToggle from "./components/BookHubModeToggle";
 import BookHubTeachingOverview from "./components/BookHubTeachingOverview";
-import BookHubStudentsProgress from "./components/BookHubStudentsProgress";
 import BookHubTeachingTools from "./components/BookHubTeachingTools";
 import BookHubActionPrompt from "./components/BookHubActionPrompt";
 import WordExplorerModal from "./components/WordExplorerModal";
-import Detail from "./components/Detail";
-import PersonRow from "./components/PersonRow";
 import StarRatingField from "./components/StarRatingField";
 import DifficultyField from "./components/DifficultyField";
 import {
@@ -184,10 +179,9 @@ type ReadingSession = {
   session_mode: string | null;
 };
 
-type HubTab = "bookInfo" | "reflection";
 type BookHubMode = "reader" | "teaching";
 type EditingPanel =
-  | HubTab
+  | "reflection"
   | "bookInfoDetails"
   | "bookInfoPeople"
   | "bookInfoLinks"
@@ -725,14 +719,12 @@ export default function BookHubPage() {
   const isTeacher = myRole === "teacher";
   const isAdmin = myRole === "admin";
   const isTeacherContext = isTeacher || isSuperTeacher;
-  const canViewBookInfoTab = isTeacherContext || isAdmin;
   const canEditBookInfo = isSuperTeacher;
   const canCreateSharedRecordsInBookHub = false;
 
   const [editingTab, setEditingTab] = useState<EditingPanel | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<HubTab>("bookInfo");
   const isEnglishBook = row?.books?.language_code === "en";
   const [uniqueLookupCount, setUniqueLookupCount] = useState<number | null>(null);
   const [lastSavedWord, setLastSavedWord] = useState<string>("");
@@ -1036,12 +1028,6 @@ export default function BookHubPage() {
       >
     >
   >({});
-
-  const isEditingThisTab = editingTab === activeTab;
-  const canEditThisTab =
-    activeTab === "bookInfo"
-      ? canEditBookInfo
-      : true; // members can edit everything else
 
   const isBookInfoEditingTab =
     editingTab === "bookInfoDetails" ||
@@ -4175,16 +4161,16 @@ export default function BookHubPage() {
     const params = new URLSearchParams(window.location.search);
     const requestedTab = params.get("tab") ?? window.location.hash.replace(/^#/, "");
     const normalizedTab =
-      requestedTab === "vocab" || requestedTab === "vocabulary"
-        ? "bookInfo"
-        : requestedTab;
+      requestedTab === "vocab" || requestedTab === "vocabulary" ? "words" : requestedTab;
 
     if (normalizedTab === "story") {
       router.replace(`/books/${userBookId}/story`);
     } else if (normalizedTab === "reading") {
       router.replace(`/books/${userBookId}/sessions`);
     } else if (normalizedTab === "bookInfo") {
-      setActiveTab("bookInfo");
+      router.replace(`/books/${userBookId}/about`);
+    } else if (normalizedTab === "words") {
+      router.replace(`/books/${userBookId}/words`);
     } else if (
       normalizedTab === "reflection"
     ) {
@@ -4195,10 +4181,6 @@ export default function BookHubPage() {
       setSessionMode("listening");
     }
   }, [canUseMyReviewNotes, router, userBookId]);
-
-  useEffect(() => {
-    if (!canViewBookInfoTab && activeTab === "bookInfo") return;
-  }, [activeTab, canViewBookInfoTab]);
 
   useEffect(() => {
     if (!isRunning || !startTime) return;
@@ -5583,14 +5565,6 @@ export default function BookHubPage() {
     return <AccessDeniedMessage message="This book could not be found." />;
   }
 
-  const relatedLinksArr = Array.isArray(book.related_links) ? book.related_links : [];
-  const bookHubTabs = isEnglishBook
-    ? [
-      ...(canViewBookInfoTab ? [{ id: "bookInfo" as const, label: "Book Info\nEditing" }] : []),
-    ]
-    : [
-      ...(canViewBookInfoTab ? [{ id: "bookInfo" as const, label: "Book Info\nEditing" }] : []),
-    ];
   const isViewingStudentBookHub =
     isTeacherContext && !!row.user_id && !!userId && row.user_id !== userId;
   const canRemoveFromMyLibrary = !!userId && row.user_id === userId;
@@ -5602,9 +5576,7 @@ export default function BookHubPage() {
       ? "teaching"
       : "reader";
   const teachingModeReturnQuery = "?mode=teaching";
-  const teachingModeVocabularyHref = `/books/${encodeURIComponent(row.id)}/words${teachingModeReturnQuery}`;
   const teachingModeStoryHref = `/books/${encodeURIComponent(row.id)}/story${teachingModeReturnQuery}`;
-  const teachingModeAboutHref = `/books/${encodeURIComponent(row.id)}/about${teachingModeReturnQuery}`;
 
   function changeBookHubMode(nextMode: BookHubMode) {
     const href =
@@ -5681,13 +5653,17 @@ export default function BookHubPage() {
             <div className="grid gap-6 md:grid-cols-[150px_minmax(0,1fr)_380px] md:items-start md:gap-8">
               <BookHubHero
                 book={book}
-                displayedCoverUrl={isEditingThisTab ? coverUrl : book.cover_url}
+                displayedCoverUrl={book.cover_url}
                 bookHubContextLabel={bookHubContextLabel}
                 isViewingStudentBookHub={isViewingStudentBookHub}
-                onAboutBook={() => {
-                  if (!confirmLeaveIfTimerActive()) return;
-                  router.push(`/books/${row.id}/about`);
-                }}
+                onAboutBook={
+                  bookHubMode === "teaching"
+                    ? undefined
+                    : () => {
+                        if (!confirmLeaveIfTimerActive()) return;
+                        router.push(`/books/${row.id}/about`);
+                      }
+                }
               />
 
               <div className={showUpperProgressSummary && bookHubMode !== "teaching" ? "md:row-span-2" : ""}>
@@ -5774,14 +5750,10 @@ export default function BookHubPage() {
 
             {bookHubMode === "teaching" ? (
               <div className="mt-6 space-y-4">
-                <BookHubStudentsProgress userBookId={row.id} />
                 <BookHubTeachingTools
-                  canUseVocabularyList={canUseVocabularyList}
+                  userBookId={row.id}
                   canUseBulkAdd={!isEnglishBook && canUseBulkAdd}
                   canUseStoryNotes
-                  onVocabularyList={() => {
-                    router.push(teachingModeVocabularyHref);
-                  }}
                   onBulkAdd={() => {
                     router.push(
                       `/vocab/bulk?userBookId=${encodeURIComponent(row.id)}&mode=teaching&from=book-hub`
@@ -5793,15 +5765,14 @@ export default function BookHubPage() {
                   onStoryNotes={() => {
                     router.push(teachingModeStoryHref);
                   }}
-                  onAboutBook={() => {
-                    router.push(teachingModeAboutHref);
-                  }}
                   onTeacherSnapshot={() => {
                     router.push(`/books/${row.id}/teacher-snapshot`);
                   }}
-                  onFlagBook={() => {
-                    setBookFlagNote("");
-                    setShowBookFlagModal(true);
+                  onStudentFlashcards={(studentUserBookId) => {
+                    router.push(`/books/${encodeURIComponent(studentUserBookId)}/study`);
+                  }}
+                  onStudentVocabularyList={(studentUserBookId) => {
+                    router.push(`/books/${encodeURIComponent(studentUserBookId)}/words`);
                   }}
                 />
               </div>
@@ -6003,133 +5974,6 @@ export default function BookHubPage() {
                   ) : null}
                 </div>
               </div>
-
-              {bookHubTabs.length > 0 ? (
-                <BookHubTabBar
-                  activeTab={activeTab}
-                  tabs={bookHubTabs}
-                  onTabChange={setActiveTab}
-                />
-              ) : null}
-
-              {canViewBookInfoTab && activeTab === "bookInfo" && (
-                <div className="space-y-4">
-                  <BookInfoTab
-                    userBookId={row.id}
-                    book={book}
-                    canEditBookInfo={canEditBookInfo}
-                    canCreateSharedRecords={canCreateSharedRecordsInBookHub}
-                    isEditingBookInfo={isEditingBookInfoDetails}
-                    isEditingPeople={isEditingBookInfoPeople}
-                    isEditingLinks={isEditingBookInfoLinks}
-                    isEditingMyCopy={isEditingBookInfoCopy}
-                    saving={saving}
-                    errorMessage={isEditingBookInfoPeople ? error : null}
-                    onEditBookInfo={() => {
-                      if (!canEditBookInfo) return;
-                      setEditingTab("bookInfoDetails");
-                    }}
-                    onEditPeople={() => {
-                      if (!canEditBookInfo) return;
-                      setEditingTab("bookInfoPeople");
-                    }}
-                    onEditLinks={() => {
-                      if (!canEditBookInfo) return;
-                      setEditingTab("bookInfoLinks");
-                    }}
-                    onEditMyCopy={() => {
-                      if (!canEditBookInfo) return;
-                      setEditingTab("bookInfoCopy");
-                    }}
-                    onCancel={cancelEdits}
-                    onSave={saveAll}
-                    sharedGenres={sharedGenres}
-                    sharedContentNotes={sharedContentNotes}
-                    genreLabel={genreLabel}
-                    titleReading={titleReading}
-                    setTitleReading={setTitleReading}
-                    bookType={bookType}
-                    setBookType={setBookType}
-                    editionFormat={editionFormat}
-                    setEditionFormat={setEditionFormat}
-                    editionNote={editionNote}
-                    setEditionNote={setEditionNote}
-                    publishedDate={publishedDate}
-                    setPublishedDate={setPublishedDate}
-                    pageCount={pageCount}
-                    setPageCount={setPageCount}
-                    seriesNumber={seriesNumber}
-                    setSeriesNumber={setSeriesNumber}
-                    seriesTotal={seriesTotal}
-                    setSeriesTotal={setSeriesTotal}
-                    isbn={isbn}
-                    setIsbn={setIsbn}
-                    isbn13={isbn13}
-                    setIsbn13={setIsbn13}
-                    asin={asin}
-                    setAsin={setAsin}
-                    authorName={authorName}
-                    authorEnglishName={authorEnglishName}
-                    setAuthorEnglishName={setAuthorEnglishName}
-                    setAuthorName={setAuthorName}
-                    translatorName={translatorName}
-                    translatorEnglishName={translatorEnglishName}
-                    setTranslatorEnglishName={setTranslatorEnglishName}
-                    setTranslatorName={setTranslatorName}
-                    illustratorName={illustratorName}
-                    illustratorEnglishName={illustratorEnglishName}
-                    setIllustratorEnglishName={setIllustratorEnglishName}
-                    setIllustratorName={setIllustratorName}
-                    publisherName={publisherName}
-                    setPublisherName={setPublisherName}
-                    publisherReading={publisherReading}
-                    setPublisherReading={setPublisherReading}
-                    publisherEnglishName={publisherEnglishName}
-                    setPublisherEnglishName={setPublisherEnglishName}
-                    selectedPublisherId={selectedPublisherId}
-                    setSelectedPublisherId={setSelectedPublisherId}
-                    requireSharedPublisherRecord={requireSharedPublisherRecord}
-                    setRequireSharedPublisherRecord={setRequireSharedPublisherRecord}
-                    selectedAuthorId={selectedAuthorId}
-                    setSelectedAuthorId={setSelectedAuthorId}
-                    requireSharedAuthorRecord={requireSharedAuthorRecord}
-                    setRequireSharedAuthorRecord={setRequireSharedAuthorRecord}
-                    selectedTranslatorId={selectedTranslatorId}
-                    setSelectedTranslatorId={setSelectedTranslatorId}
-                    requireSharedTranslatorRecord={requireSharedTranslatorRecord}
-                    setRequireSharedTranslatorRecord={setRequireSharedTranslatorRecord}
-                    selectedIllustratorId={selectedIllustratorId}
-                    setSelectedIllustratorId={setSelectedIllustratorId}
-                    requireSharedIllustratorRecord={requireSharedIllustratorRecord}
-                    setRequireSharedIllustratorRecord={setRequireSharedIllustratorRecord}
-                    coverUrl={coverUrl}
-                    setCoverUrl={setCoverUrl}
-                    authorImg={authorImg}
-                    setAuthorImg={setAuthorImg}
-                    translatorImg={translatorImg}
-                    setTranslatorImg={setTranslatorImg}
-                    illustratorImg={illustratorImg}
-                    setIllustratorImg={setIllustratorImg}
-                    publisherImg={publisherImg}
-                    setPublisherImg={setPublisherImg}
-                    authorReading={authorReading}
-                    setAuthorReading={setAuthorReading}
-                    translatorReading={translatorReading}
-                    setTranslatorReading={setTranslatorReading}
-                    illustratorReading={illustratorReading}
-                    setIllustratorReading={setIllustratorReading}
-                    relatedLinksArr={relatedLinksArr}
-                    linksText={linksText}
-                    setLinksText={setLinksText}
-                    bookTypeLabel={bookTypeLabel}
-                    displayLinkLabel={displayLinkLabel}
-                    displayLinkUrl={displayLinkUrl}
-                    BOOK_TYPE_OPTIONS={BOOK_TYPE_OPTIONS}
-                    Detail={Detail}
-                    PersonRow={PersonRow}
-                  />
-                </div>
-              )}
 
                 </div>
               </>
