@@ -963,7 +963,7 @@ export default function StoryTab({
                             onChange={(e) =>
                               updateSettingItem(item.id, "title", e.target.value)
                             }
-                            placeholder="Title"
+                            placeholder="Location"
                             className="w-full rounded border px-3 py-2 text-sm"
                           />
 
