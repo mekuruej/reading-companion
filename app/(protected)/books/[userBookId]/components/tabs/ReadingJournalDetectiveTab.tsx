@@ -36,11 +36,11 @@ const detectiveFieldLabels: Array<{
   key: "certain_text" | "likely_text" | "possible_text" | "unknown_text";
   label: string;
 }> = [
-  { key: "certain_text", label: "Certain" },
-  { key: "likely_text", label: "Likely" },
-  { key: "possible_text", label: "Possible" },
-  { key: "unknown_text", label: "Unknown" },
-];
+    { key: "certain_text", label: "Certain" },
+    { key: "likely_text", label: "Likely" },
+    { key: "possible_text", label: "Possible" },
+    { key: "unknown_text", label: "Missing Clues" },
+  ];
 
 function normalizeText(value: string | null | undefined) {
   return (value ?? "").trim();
@@ -132,7 +132,14 @@ export default function ReadingJournalDetectiveTab({
     : detectiveEntries;
 
   const detectiveGroups = filteredDetectiveEntries.reduce<DetectiveGroup[]>((groups, entry) => {
-    const groupInfo = detectiveGroupForEntry(entry);
+    const isEditing = editingDetectiveIds.includes(entry.id);
+
+    const groupInfo = isEditing
+      ? {
+        key: `editing:${entry.id}`,
+        label: detectiveLocationLabel(entry) || "Unsorted",
+      }
+      : detectiveGroupForEntry(entry);
     const existingGroup = groups.find((group) => group.key === groupInfo.key);
 
     if (existingGroup) {
@@ -285,7 +292,7 @@ export default function ReadingJournalDetectiveTab({
                                       onChange={(event) =>
                                         updateDetectiveEntry(entry.id, "chapter_label", event.target.value)
                                       }
-                                      placeholder="Chapter reference"
+                                      placeholder="Chapter / Section"
                                       className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-200"
                                     />
                                     <input

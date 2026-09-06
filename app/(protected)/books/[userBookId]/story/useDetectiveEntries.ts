@@ -5,16 +5,20 @@ import { supabase } from "@/lib/supabaseClient";
 import type { DetectiveEntry } from "../components/tabs/readingJournalTypes";
 
 const detectiveSelect =
-  "id, user_id, user_book_id, title, chapter_label, chapter_number, page_number, certain_text, likely_text, possible_text, unknown_text, sort_order, created_at, updated_at";
+  "id, user_id, user_book_id, title, chapter_label, chapter_number, page_number, certain_text, likely_text, possible_text, unknown_text, resolution_text, sort_order, created_at, updated_at";
 
 function hasDetectiveContent(
-  entry: Pick<DetectiveEntry, "certain_text" | "likely_text" | "possible_text" | "unknown_text">
+  entry: Pick<
+    DetectiveEntry,
+    "certain_text" | "likely_text" | "possible_text" | "unknown_text" | "resolution_text"
+  >
 ) {
   return Boolean(
     entry.certain_text?.trim() ||
-      entry.likely_text?.trim() ||
-      entry.possible_text?.trim() ||
-      entry.unknown_text?.trim()
+    entry.likely_text?.trim() ||
+    entry.possible_text?.trim() ||
+    entry.unknown_text?.trim() ||
+    entry.resolution_text?.trim()
   );
 }
 
@@ -73,6 +77,7 @@ export function useDetectiveEntries() {
       likely_text: "",
       possible_text: "",
       unknown_text: "",
+      resolution_text: "",
       sort_order:
         detectiveEntries.length > 0
           ? Math.max(...detectiveEntries.map((entry) => entry.sort_order ?? 0)) + 1
@@ -146,11 +151,12 @@ export function useDetectiveEntries() {
       likely_text: entry.likely_text?.trim() || null,
       possible_text: entry.possible_text?.trim() || null,
       unknown_text: entry.unknown_text?.trim() || null,
+      resolution_text: entry.resolution_text?.trim() || null,
       sort_order: entry.sort_order ?? 0,
     };
 
     if (!hasDetectiveContent(payload)) {
-      alert("Add something to Certain, Likely, Possible, or Unknown before saving.");
+      alert("Add something to Certain, Likely, Possible, Missing Clues, or Resolution before saving.");
       return;
     }
 

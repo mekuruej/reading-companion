@@ -20,6 +20,7 @@ export type DetectiveEntry = {
   likely_text: string | null;
   possible_text: string | null;
   unknown_text: string | null;
+  resolution_text: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
