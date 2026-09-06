@@ -342,6 +342,24 @@ export default function ReadingJournalDetectiveTab({
                                     ))}
                                   </div>
 
+                                  <label className="block">
+                                    <span className="text-xs font-black uppercase tracking-[0.12em] text-violet-800">
+                                      Resolution
+                                    </span>
+                                    <textarea
+                                      value={entry.resolution_text ?? ""}
+                                      onChange={(event) =>
+                                        updateDetectiveEntry(
+                                          entry.id,
+                                          "resolution_text",
+                                          event.target.value
+                                        )
+                                      }
+                                      placeholder="What did the answer ultimately turn out to be?"
+                                      className="mt-1 min-h-[110px] w-full rounded-xl border border-violet-200 bg-violet-50/40 px-3 py-2 text-sm leading-6 outline-none focus:ring-2 focus:ring-violet-200"
+                                    />
+                                  </label>
+
                                   <div className="flex flex-wrap gap-2">
                                     <button
                                       type="button"
