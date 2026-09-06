@@ -101,6 +101,7 @@ function detectiveSearchText(entry: DetectiveEntry) {
     entry.likely_text,
     entry.possible_text,
     entry.unknown_text,
+    entry.resolution_text,
   ]
     .join(" ")
     .toLowerCase();
@@ -399,6 +400,16 @@ export default function ReadingJournalDetectiveTab({
                                       </div>
                                     </div>
                                   ))}
+                                  {normalizeText(entry.resolution_text) ? (
+                                    <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-3">
+                                      <div className="text-xs font-black uppercase tracking-[0.12em] text-violet-700">
+                                        Resolution
+                                      </div>
+                                      <div className="mt-1 whitespace-pre-wrap text-sm leading-6 text-stone-700">
+                                        {entry.resolution_text}
+                                      </div>
+                                    </div>
+                                  ) : null}
                                   {!readOnly ? (
                                     <button
                                       type="button"
