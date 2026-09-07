@@ -158,36 +158,40 @@ export default function MekuruHomepage() {
 
                 <div className="mx-auto mt-12 max-w-3xl px-6">
                     <div className="rounded-2xl border border-stone-200 bg-stone-50 p-6">
-                        <h3 className="text-base font-semibold text-stone-900">Included with Every Lesson</h3>
+                        <h3 className="text-base font-semibold text-stone-900">Included with Japanese Reading Lessons</h3>
                         <p className="mt-2 text-sm text-stone-700">
-                            All students get access to the Mekuru Reading App — a private tool designed to support your reading
-                            outside of lessons.
+                            All Japanese reading students receive access to MEKURU Japanese Learning, including the Reading
+                            Companion tools you can use during and between lessons.
                         </p>
                         {SHOW_READING_COMPANION_CARD ? (
                             <>
                                 <ul className="mt-4 space-y-2 text-sm text-stone-700">
-                                    <li>• Review words saved during your lessons</li>
-                                    <li>• Save your own words while reading (optional)</li>
-                                    <li>• Track your reading progress over time</li>
+                                    <li>• Review vocabulary saved while reading</li>
+                                    <li>• Save your own words and expressions</li>
+                                    <li>• Track your reading progress and reading pace</li>
                                     <li>• Study vocabulary in context</li>
-                                    <li>• Prepare readings between lessons</li>
+                                    <li>• Keep notes about characters, plot, and other details from your books</li>
+                                    <li>• Continue your reading practice between lessons</li>
                                 </ul>
                                 <div className="mt-6">
-                                    <p className="mb-2 text-xs text-stone-500">Inside the Mekuru Reading Companion</p>
+                                    <p className="mb-2 text-xs text-stone-500">Inside the MEKURU Reading Companion</p>
                                     <img
                                         src="/app-preview.png"
                                         alt="Mekuru Reading Companion preview"
                                         className="rounded-xl border border-stone-200 shadow-sm"
                                     />
-                                    <p className="mt-2 text-xs text-stone-500">Track your reading, review vocabulary, and study between lessons.</p>
+                                    <p className="mt-2 text-xs text-stone-500">Track your reading, build your vocabulary, and keep everything you need for your Japanese books in one place.</p>
                                 </div>
                                 <p className="mt-2 text-xs leading-5 text-stone-500">
-                                    Not currently taking lessons? MEKURU app access is still limited while I continue
-                                    developing the system, but independent Japanese readers can join the interest list.
+                                    Not currently taking lessons? MEKURU Japanese Learning is also being tested with independent
+                                    Japanese readers. Join the Interest List if you&apos;d like to be considered for a future
+                                    Guided Japanese Trial.
                                 </p>
 
                                 <Link
-                                    href="/japanese-learning"
+                                    href="https://docs.google.com/forms/d/e/1FAIpQLSd2vKWH_5EMTTAcBHNSX6baymY2-RTDaNvmFYWkfzrVp2k6YA/viewform?usp=dialog"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
                                     className="mt-3 inline-flex rounded-xl border border-stone-300 bg-white px-4 py-2 text-xs font-semibold text-stone-800 shadow-sm transition hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-md"
                                 >
                                     Join the Interest List

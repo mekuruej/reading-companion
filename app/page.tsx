@@ -145,7 +145,9 @@ export default function HomePage() {
                 </p>
 
                 <Link
-                  href="/japanese-learning"
+                  href="https://docs.google.com/forms/d/e/1FAIpQLSd2vKWH_5EMTTAcBHNSX6baymY2-RTDaNvmFYWkfzrVp2k6YA/viewform?usp=dialog"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="mt-4 inline-flex self-start rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-100 hover:shadow-md"
                 >
                   Join the Interest List
