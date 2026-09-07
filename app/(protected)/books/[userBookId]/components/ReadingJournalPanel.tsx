@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   JapaneseLearningJournalArchiveTabs,
-  JapaneseLearningJournalTab,
 } from "@/lib/access/readingCompanion";
 import { supabase } from "@/lib/supabaseClient";
 import StoryTab from "./tabs/StoryTab";
+import { normalizeLanguageCode } from "@/lib/books/englishNativeTracker";
+import { DEFAULT_BOOK_JOURNAL_TAB, getBookJournalTabOrder } from "./tabs/bookJournalConfig";
 import type { StoryTabMode } from "./tabs/readingJournalTypes";
 import {
   emptyFavoriteQuoteInput,
@@ -172,14 +173,6 @@ function chapterSummarySaveErrorMessage(chapterNumber: number | null) {
   return "Could not save chapter summary.";
 }
 
-const baseJournalStartTabs: StoryTabMode[] = ["characters", "plot"];
-const japaneseLearningJournalTabs: JapaneseLearningJournalTab[] = [
-  "detective",
-  "setting",
-  "cultural",
-];
-const baseJournalEndTabs: StoryTabMode[] = ["quotes", "notes"];
-
 function clampRating5(value: number) {
   if (!Number.isFinite(value)) return null;
   return Math.min(5, Math.max(1, Math.round(value * 2) / 2));
@@ -203,28 +196,44 @@ export default function ReadingJournalPanel({
   },
   onFavoriteQuotesChange,
 }: ReadingJournalPanelProps) {
-  const [storyTab, setStoryTab] = useState<StoryTabMode>("characters");
-  const learningTabs = useMemo(
-    () =>
-      canUseJapaneseLearningJournal
-        ? japaneseLearningJournalTabs
-        : japaneseLearningJournalTabs.filter((tab) => japaneseLearningArchiveTabs[tab]),
-    [
-      canUseJapaneseLearningJournal,
-      japaneseLearningArchiveTabs.cultural,
-      japaneseLearningArchiveTabs.detective,
-      japaneseLearningArchiveTabs.setting,
-    ]
+  const [ownerLanguage, setOwnerLanguage] = useState<{
+    ownerId: string;
+    nativeLanguage: string | null;
+  } | null>(null);
+  const tabOrder = useMemo(
+    () => getBookJournalTabOrder(
+      bookLanguageCode,
+      ownerLanguage?.ownerId === ownerUserId ? ownerLanguage.nativeLanguage : null
+    ),
+    [bookLanguageCode, ownerUserId, ownerLanguage]
   );
-  const tabOrder = useMemo<StoryTabMode[]>(
-    () => [
-      ...baseJournalStartTabs,
-      ...learningTabs,
-      ...baseJournalEndTabs,
-      "review",
-    ],
-    [learningTabs]
-  );
+  const tabContext = JSON.stringify([ownerUserId, userBookId, normalizeLanguageCode(bookLanguageCode)]);
+  const [selection, setSelection] = useState({ context: tabContext, tab: DEFAULT_BOOK_JOURNAL_TAB });
+  // Reset on a different book/owner, but not when language metadata finishes loading.
+  if (selection.context !== tabContext) {
+    setSelection({ context: tabContext, tab: DEFAULT_BOOK_JOURNAL_TAB });
+  }
+  const storyTab = selection.context === tabContext && tabOrder.includes(selection.tab)
+    ? selection.tab
+    : DEFAULT_BOOK_JOURNAL_TAB;
+  const setStoryTab = (tab: StoryTabMode) => setSelection({ context: tabContext, tab });
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadOwnerLanguage() {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("native_language")
+        .eq("id", ownerUserId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error) console.error("Error loading journal owner language:", error);
+      setOwnerLanguage({ ownerId: ownerUserId, nativeLanguage: error ? null : data?.native_language ?? null });
+    }
+    void loadOwnerLanguage();
+    return () => { cancelled = true; };
+  }, [ownerUserId]);
+
   const learningArchiveReadOnlyTabs = useMemo(
     () => ({
       detective: !canUseJapaneseLearningJournal && japaneseLearningArchiveTabs.detective,
@@ -342,12 +351,6 @@ export default function ReadingJournalPanel({
       cancelled = true;
     };
   }, [userBookId, ownerUserId]);
-
-  useEffect(() => {
-    if (!tabOrder.includes(storyTab)) {
-      setStoryTab(tabOrder[0] ?? "characters");
-    }
-  }, [storyTab, tabOrder]);
 
   useEffect(() => {
     let cancelled = false;

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 export type NotebookTab =
@@ -19,6 +19,7 @@ type EntryType = NotebookTab;
 type JournalGroup = "book_journal" | "teaching_notes";
 
 type TeacherNotebookPanelProps = {
+  bookJournalContent?: ReactNode;
   teacherBookId?: string | null;
   bookId?: string | null;
   userBookId?: string | null;
@@ -353,6 +354,7 @@ function hasContext(props: TeacherNotebookPanelProps, draft?: EntryDraft) {
 }
 
 export default function TeacherNotebookPanel({
+  bookJournalContent,
   teacherBookId = null,
   bookId = null,
   userBookId = null,
@@ -390,6 +392,8 @@ export default function TeacherNotebookPanel({
   const [locationDraft, setLocationDraft] = useState<LocationDraft>({ page: "", percent: "" });
   const [locationSaving, setLocationSaving] = useState(false);
 
+  const hasExternalBookJournal = bookJournalContent !== undefined;
+  const showExternalBookJournal = hasExternalBookJournal && activeJournalGroup === "book_journal";
   const wordCaptureEnabled = enableWordCapture && Boolean(studentId && userBookId);
   const isLessonMode = mode === "lesson";
   const activeEntryType = activeTab;
@@ -427,7 +431,7 @@ export default function TeacherNotebookPanel({
 
   useEffect(() => {
     void loadNotebook();
-  }, [teacherBookId, bookId, userBookId, studentId, lessonDate, wordCaptureEnabled]);
+  }, [teacherBookId, bookId, userBookId, studentId, lessonDate, wordCaptureEnabled, hasExternalBookJournal]);
 
   useEffect(() => {
     if (initialTab && tabs.some((tab) => tab.id === initialTab)) {
@@ -552,7 +556,7 @@ export default function TeacherNotebookPanel({
   }
 
   async function loadEntries(nextTeacherId: string) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("teacher_notebook_entries")
       .select(
         `
@@ -573,6 +577,10 @@ export default function TeacherNotebookPanel({
       .eq("teacher_id", nextTeacherId)
       .order("updated_at", { ascending: false });
 
+    if (hasExternalBookJournal) {
+      query = query.in("entry_type", teachingNoteTabs.map((tab) => tab.id));
+    }
+    const { data, error } = await query;
     if (error) throw error;
     return (data ?? []) as NotebookEntry[];
   }
@@ -1142,7 +1150,9 @@ export default function TeacherNotebookPanel({
           </p>
           <h2 className="mt-1 text-2xl font-black text-stone-950">Book knowledge and teaching notes</h2>
           <p className="mt-1 text-xs leading-5 text-stone-500">
-            Teacher-owned entries. Book Journal notes are shared book knowledge; Teaching Notes stay private to teaching.
+            {hasExternalBookJournal
+              ? "Book Journal uses your personal Reading Journal for this book. Teaching Notes stay private to teaching."
+              : "Teacher-owned entries. Book Journal notes are shared book knowledge; Teaching Notes stay private to teaching."}
           </p>
         </div>
 
@@ -1174,6 +1184,7 @@ export default function TeacherNotebookPanel({
           ))}
         </div>
 
+        {!showExternalBookJournal && (
         <div className="mt-3 flex gap-1 overflow-x-auto rounded-2xl border border-stone-200 bg-stone-50 p-1">
           {visibleTabs.map((tab) => (
             <button
@@ -1196,6 +1207,8 @@ export default function TeacherNotebookPanel({
           ))}
         </div>
 
+        )}
+
         {message ? (
           <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-900">
             {message}
@@ -1204,7 +1217,7 @@ export default function TeacherNotebookPanel({
       </div>
 
       <div className={isLessonMode ? "mt-4" : "mt-4 min-h-0 flex-1 overflow-y-auto pr-1"}>
-        {activeEntryType && activeEntryLabels ? (
+        {showExternalBookJournal ? bookJournalContent : activeEntryType && activeEntryLabels ? (
           <div className="space-y-4">
             <label className="block">
               <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-400">

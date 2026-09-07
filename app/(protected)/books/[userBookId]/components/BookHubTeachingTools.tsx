@@ -436,9 +436,8 @@ export default function BookHubTeachingTools({
           />
           {canUseStoryNotes ? (
             <TeachingToolButton
-              title="Book Journal"
-              subtitle="Notes"
-              description="Use shared characters, plot, quotes, and book notes."
+              title="Teacher Journal"
+              description="Your book knowledge and private teaching prep: Book Journal and Teaching Notes."
               className="bg-blue-50 hover:bg-blue-100"
               size="primary"
               onClick={onStoryNotes}
