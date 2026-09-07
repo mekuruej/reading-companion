@@ -138,8 +138,11 @@ export default function MekuruPrivateLessonsPage() {
                 rel="noopener noreferrer"
                 className="inline-block rounded-full border border-stone-900 bg-white px-5 py-3 text-base font-semibold text-stone-950 shadow-sm hover:bg-emerald-50 hover:shadow-md"
               >
-                Book a Free Introductory Session
+                Trial Lesson — ¥2,000 / 30 minutes
               </a>
+              <p className="mt-3 text-sm leading-6 text-[#4f473d]">
+                The trial is a 30-minute private lesson where we&apos;ll read Japanese together, talk about your reading goals, and get a sense of your current reading level. It&apos;s a chance to experience what lessons are like and decide whether they&apos;re a good fit for you.
+              </p>
             </div>
           </div>
         </section>

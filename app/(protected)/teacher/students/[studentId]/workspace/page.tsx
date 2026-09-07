@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { getLearnerAccessDisplay } from "@/lib/access/learnerDisplayLabels";
 import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 import TeacherLearningTaskModal from "../../components/TeacherLearningTaskModal";
 
@@ -286,6 +287,12 @@ export default function StudentWorkspacePage() {
     () => ({ [studentId]: taskBooks }),
     [studentId, taskBooks]
   );
+  const studentAccess = data
+    ? getLearnerAccessDisplay({
+        app_access_type: data.student.app_access_type,
+        app_access_expires_at: data.student.app_access_expires_at,
+      })
+    : null;
 
   async function apiFetch(method = "GET", body?: Record<string, unknown>) {
     const { data: sessionData } = await supabase.auth.getSession();
@@ -785,7 +792,26 @@ export default function StudentWorkspacePage() {
               </div>
             </div>
 
-            <div className="mt-5 grid gap-3 md:grid-cols-3">
+            <div className="mt-5 grid gap-3 md:grid-cols-4">
+              <div className="rounded-2xl border border-stone-100 bg-stone-50 px-4 py-3">
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-stone-400">
+                  Access
+                </p>
+                <p className="mt-1 text-lg font-black text-stone-950">
+                  {studentAccess?.label ?? "Learner"}
+                </p>
+                {studentAccess?.detail ? (
+                  <p className="mt-1 text-xs font-semibold text-stone-500">
+                    {studentAccess.detail}
+                  </p>
+                ) : null}
+                {studentAccess?.effectiveAccessLabel ? (
+                  <p className="mt-1 text-xs font-semibold text-stone-500">
+                    {studentAccess.effectiveAccessLabel}
+                  </p>
+                ) : null}
+              </div>
+
               <div className="rounded-2xl border border-stone-100 bg-stone-50 px-4 py-3">
                 <p className="text-[11px] font-black uppercase tracking-[0.16em] text-stone-400">
                   Lesson Day

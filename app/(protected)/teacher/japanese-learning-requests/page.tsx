@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { getLearnerAccessDisplay } from "@/lib/access/learnerDisplayLabels";
 import { supabase } from "@/lib/supabaseClient";
 
 type JapaneseLearningRequest = {
@@ -236,74 +237,108 @@ export default function JapaneseLearningRequestsPage() {
 
       <div className="mt-6 space-y-3">
         {requests.map((request) => (
-          <div key={request.id} className="rounded-3xl border border-violet-100 bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 className="text-lg font-black text-stone-900">
-                  {displayRequester(request)}
-                </h2>
-                <div className="mt-2 grid gap-1 text-sm text-stone-600 sm:grid-cols-2">
-                  <p><span className="font-semibold text-stone-800">Username:</span> {request.username || "—"}</p>
-                  <p><span className="font-semibold text-stone-800">Email:</span> {request.email || "—"}</p>
-                  <p><span className="font-semibold text-stone-800">Requested:</span> {formatDate(request.requestedAt)}</p>
-                  <p><span className="font-semibold text-stone-800">Status:</span> {request.status || "—"}</p>
-                  <p><span className="font-semibold text-stone-800">Source:</span> {request.source || "—"}</p>
-                  <p><span className="font-semibold text-stone-800">Reading experience:</span> {readingExperienceLabel(request.readingExperience)}</p>
-                  <p><span className="font-semibold text-stone-800">JLPT:</span> {jlptLevelLabel(request.jlptLevel)}</p>
-                  <p><span className="font-semibold text-stone-800">Current access:</span> {request.appAccessType || "—"}</p>
-                  <p><span className="font-semibold text-stone-800">Access expires:</span> {formatDate(request.appAccessExpiresAt)}</p>
-                </div>
-                {request.note ? (
-                  <p className="mt-3 rounded-2xl bg-stone-50 px-3 py-2 text-sm leading-6 text-stone-700">
-                    {request.note}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {request.status === "pending" ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => void reviewRequest(request.id, "approve")}
-                      disabled={reviewingId === request.id}
-                      className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-800 hover:bg-emerald-100 disabled:opacity-60"
-                    >
-                      Accept for Guided Trial
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void reviewRequest(request.id, "decline")}
-                      disabled={reviewingId === request.id}
-                      className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-black text-rose-700 hover:bg-rose-50 disabled:opacity-60"
-                    >
-                      Decline
-                    </button>
-                  </>
-                ) : null}
-
-                {request.status === "approved" && request.appAccessType !== "trial" ? (
-                  <button
-                    type="button"
-                    onClick={() => void startTrial(request)}
-                    disabled={activatingId === request.id}
-                    className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-black text-violet-800 hover:bg-violet-100 disabled:opacity-60"
-                    title="Use after the first 30-minute reading/setup lesson."
-                  >
-                    {activatingId === request.id ? "Starting..." : "Start 28-Day Trial"}
-                  </button>
-                ) : null}
-
-                {request.status === "approved" && request.appAccessType === "trial" ? (
-                  <span className="rounded-xl border border-violet-100 bg-violet-50 px-3 py-2 text-sm font-black text-violet-800">
-                    Trial started
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          </div>
+          <RequestCard
+            key={request.id}
+            request={request}
+            reviewingId={reviewingId}
+            activatingId={activatingId}
+            onReview={reviewRequest}
+            onStartTrial={startTrial}
+          />
         ))}
       </div>
     </main>
+  );
+}
+
+function RequestCard({
+  request,
+  reviewingId,
+  activatingId,
+  onReview,
+  onStartTrial,
+}: {
+  request: JapaneseLearningRequest;
+  reviewingId: string | null;
+  activatingId: string | null;
+  onReview: (requestId: string, action: "approve" | "decline") => void | Promise<void>;
+  onStartTrial: (request: JapaneseLearningRequest) => void | Promise<void>;
+}) {
+  const accessDisplay = getLearnerAccessDisplay({
+    app_access_type: request.appAccessType,
+    app_access_expires_at: request.appAccessExpiresAt,
+  });
+
+  return (
+    <div className="rounded-3xl border border-violet-100 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-lg font-black text-stone-900">
+            {displayRequester(request)}
+          </h2>
+          <div className="mt-2 grid gap-1 text-sm text-stone-600 sm:grid-cols-2">
+            <p><span className="font-semibold text-stone-800">Username:</span> {request.username || "—"}</p>
+            <p><span className="font-semibold text-stone-800">Email:</span> {request.email || "—"}</p>
+            <p><span className="font-semibold text-stone-800">Requested:</span> {formatDate(request.requestedAt)}</p>
+            <p><span className="font-semibold text-stone-800">Status:</span> {request.status || "—"}</p>
+            <p><span className="font-semibold text-stone-800">Source:</span> {request.source || "—"}</p>
+            <p><span className="font-semibold text-stone-800">Reading experience:</span> {readingExperienceLabel(request.readingExperience)}</p>
+            <p><span className="font-semibold text-stone-800">JLPT:</span> {jlptLevelLabel(request.jlptLevel)}</p>
+            <p><span className="font-semibold text-stone-800">Stored access:</span> {request.appAccessType || "—"}</p>
+            <p><span className="font-semibold text-stone-800">Access display:</span> {accessDisplay.label}</p>
+            <p><span className="font-semibold text-stone-800">Trial/access date:</span> {accessDisplay.detail || formatDate(request.appAccessExpiresAt)}</p>
+            {accessDisplay.effectiveAccessLabel ? (
+              <p><span className="font-semibold text-stone-800">Effective access:</span> Free</p>
+            ) : null}
+          </div>
+          {request.note ? (
+            <p className="mt-3 rounded-2xl bg-stone-50 px-3 py-2 text-sm leading-6 text-stone-700">
+              {request.note}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {request.status === "pending" ? (
+            <>
+              <button
+                type="button"
+                onClick={() => void onReview(request.id, "approve")}
+                disabled={reviewingId === request.id}
+                className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-800 hover:bg-emerald-100 disabled:opacity-60"
+              >
+                Accept for Guided Trial
+              </button>
+              <button
+                type="button"
+                onClick={() => void onReview(request.id, "decline")}
+                disabled={reviewingId === request.id}
+                className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-black text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+              >
+                Decline
+              </button>
+            </>
+          ) : null}
+
+          {request.status === "approved" && request.appAccessType !== "trial" ? (
+            <button
+              type="button"
+              onClick={() => void onStartTrial(request)}
+              disabled={activatingId === request.id}
+              className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-black text-violet-800 hover:bg-violet-100 disabled:opacity-60"
+              title="Use after the first 30-minute reading/setup lesson."
+            >
+              {activatingId === request.id ? "Starting..." : "Start 28-Day Trial"}
+            </button>
+          ) : null}
+
+          {request.status === "approved" && request.appAccessType === "trial" ? (
+            <span className="rounded-xl border border-violet-100 bg-violet-50 px-3 py-2 text-sm font-black text-violet-800">
+              {accessDisplay.label}
+            </span>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
 }

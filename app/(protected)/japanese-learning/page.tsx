@@ -186,16 +186,20 @@ export default function JapaneseLearningPage() {
   const pendingRequest = request?.status === "pending";
   const approvedRequest = request?.status === "approved";
   const declinedRequest = request?.status === "declined";
+  const shouldShowStudyHubBackLink =
+    loading || activeAccess || pendingRequest || approvedRequest || declinedRequest;
 
   return (
     <main className="min-h-screen bg-[#f7f3ee] px-5 py-8 text-stone-950">
       <div className="mx-auto max-w-5xl">
-        <Link
-          href="/library-study"
-          className="text-sm font-black text-stone-500 transition hover:text-stone-900"
-        >
-          ← Back to Study Hub
-        </Link>
+        {shouldShowStudyHubBackLink ? (
+          <Link
+            href="/library-study"
+            className="text-sm font-black text-stone-500 transition hover:text-stone-900"
+          >
+            ← Back to Study Hub
+          </Link>
+        ) : null}
 
         <section className="mt-5 rounded-[2rem] border border-white bg-gradient-to-br from-violet-100 via-white to-amber-50 p-6 shadow-sm md:p-10">
           <p className="text-xs font-black uppercase tracking-[0.22em] text-violet-600">

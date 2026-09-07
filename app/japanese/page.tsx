@@ -105,10 +105,10 @@ export default function MekuruHomepage() {
                             rel="noopener noreferrer"
                             className="inline-block rounded-2xl border border-stone-900 bg-white px-6 py-3 text-base font-semibold text-stone-950 shadow-sm hover:bg-emerald-50 hover:shadow-md"
                         >
-                            Book a Free Introductory Session
+                            Trial Lesson — ¥2,000 / 30 minutes
                         </a>
                         <p className="mt-3 text-sm text-stone-600">
-                            We&apos;ll get to know each other, read together, and discuss the best plan for your Japanese reading goals.
+                            The trial is a 30-minute private lesson where we&apos;ll read Japanese together, talk about your reading goals, and get a sense of your current reading level. It&apos;s a chance to experience what lessons are like and decide whether they&apos;re a good fit for you.
                         </p>
                     </div>
                 </section>
@@ -152,7 +152,7 @@ export default function MekuruHomepage() {
                     </p>
 
                     <p className="text-xs text-stone-500">
-                        Detailed pricing is provided after your free trial session.
+                        Detailed regular lesson pricing is provided after your trial lesson.
                     </p>
                 </section>
 
@@ -183,18 +183,15 @@ export default function MekuruHomepage() {
                                 </div>
                                 <p className="mt-2 text-xs leading-5 text-stone-500">
                                     Not currently taking lessons? MEKURU app access is still limited while I continue
-                                    developing the system, but independent Japanese readers can join the future beta
-                                    waitlist.
+                                    developing the system, but independent Japanese readers can join the interest list.
                                 </p>
 
-                                <a
-                                    href="https://forms.gle/5QLgohvkNvDBzTuH9"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
+                                <Link
+                                    href="/japanese-learning"
                                     className="mt-3 inline-flex rounded-xl border border-stone-300 bg-white px-4 py-2 text-xs font-semibold text-stone-800 shadow-sm transition hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-md"
                                 >
-                                    Join the beta waitlist
-                                </a>
+                                    Join the Interest List
+                                </Link>
                             </>
                         ) : null}
                     </div>
@@ -252,8 +249,11 @@ export default function MekuruHomepage() {
                         rel="noopener noreferrer"
                         className="inline-block rounded-2xl border border-stone-900 bg-white px-6 py-3 text-base font-semibold text-stone-950 shadow-sm hover:bg-emerald-50 hover:shadow-md"
                     >
-                        Book a Free Introductory Session
+                        Trial Lesson — ¥2,000 / 30 minutes
                     </a>
+                    <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-stone-600">
+                        The trial is a 30-minute private lesson where we&apos;ll read Japanese together, talk about your reading goals, and get a sense of your current reading level. It&apos;s a chance to experience what lessons are like and decide whether they&apos;re a good fit for you.
+                    </p>
                 </div>
 
                 <section className="space-y-3">

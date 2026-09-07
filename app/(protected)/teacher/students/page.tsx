@@ -7,7 +7,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { getLearnerAccessLabel } from "@/lib/access/learnerDisplayLabels";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getLearnerAccessDisplay } from "@/lib/access/learnerDisplayLabels";
 import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 import { getTeacherBackLink } from "../components/teacherBackLink";
 import TeacherStudentsAccessState from "./components/TeacherStudentsAccessState";
@@ -180,13 +181,10 @@ function isStudentProfile(profile: StudentProfile) {
 }
 
 function getStudentRelationshipStatus(profile: StudentProfile): StudentRelationshipStatus {
-    const expiresAt = profile.app_access_expires_at
-        ? new Date(profile.app_access_expires_at)
-        : null;
-    const isExpired = expiresAt ? expiresAt.getTime() < Date.now() : false;
+    const accessStatus = getAppAccessStatus(profile);
 
-    if (isExpired) return "past";
-    if (profile.app_access_type === "trial") return "future";
+    if (accessStatus.reason === "expired") return "past";
+    if (accessStatus.isTrialActive) return "future";
 
     return "current";
 }
@@ -387,9 +385,10 @@ function LinkedStudentCard({
 
 function OtherLearnerCard({ student }: { student: StudentCard }) {
     const displayName = student.display_name || student.username || "Unnamed learner";
-    const learnerAccessLabel = getLearnerAccessLabel({
+    const learnerAccess = getLearnerAccessDisplay({
         role: student.role,
         app_access_type: student.app_access_type,
+        app_access_expires_at: student.app_access_expires_at,
         linkedToTeacher: false,
     });
 
@@ -419,10 +418,18 @@ function OtherLearnerCard({ student }: { student: StudentCard }) {
                                     {student.level || "No level"}
                                 </span>
                                 <span className="rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-semibold text-stone-500">
-                                    {learnerAccessLabel}
+                                    {learnerAccess.label}
                                 </span>
                             </div>
                         </div>
+                        {learnerAccess.detail || learnerAccess.effectiveAccessLabel ? (
+                            <div className="mt-2 text-xs font-semibold leading-5 text-stone-500">
+                                {learnerAccess.detail ? <p>{learnerAccess.detail}</p> : null}
+                                {learnerAccess.effectiveAccessLabel ? (
+                                    <p>{learnerAccess.effectiveAccessLabel}</p>
+                                ) : null}
+                            </div>
+                        ) : null}
                     </div>
                 </div>
 
