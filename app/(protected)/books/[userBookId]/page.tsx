@@ -8,6 +8,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { loadJapaneseLearningFreeFeatureFlags } from "@/lib/access/japaneseLearningFreeFeatures";
 import {
   canUseActiveJapaneseLearningActions,
   emptyJapaneseLearningArchivePresence,
@@ -37,6 +38,7 @@ import {
   resolvePersonalTrackingStatus,
 } from "@/lib/personalTracking";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
+import JapaneseLearningPromoCard from "@/components/japanese-learning/JapaneseLearningPromoCard";
 import BookHubLoadingState from "./components/BookHubLoadingState";
 import RemoveFromLibraryDialog from "./components/RemoveFromLibraryDialog";
 import BookHubProgressSummary from "./components/BookHubProgressSummary";
@@ -707,6 +709,7 @@ export default function BookHubPage() {
   const [canUseStudyFlashcards, setCanUseStudyFlashcards] = useState(false);
   const [canUseVocabularyList, setCanUseVocabularyList] = useState(false);
   const [canUseBulkAdd, setCanUseBulkAdd] = useState(false);
+  const [canUseReadingReflection, setCanUseReadingReflection] = useState(false);
   const [canUseJapaneseLearningActions, setCanUseJapaneseLearningActions] = useState(false);
   const [japaneseLearningArchive, setJapaneseLearningArchive] =
     useState<JapaneseLearningArchivePresence>(emptyJapaneseLearningArchivePresence);
@@ -1062,10 +1065,12 @@ export default function BookHubPage() {
         isAdmin)) ||
     isSuperTeacher ||
     isAdmin;
-  const canShowReadingReflection =
+  const isReadingReflectionBook =
     wantsJapaneseStudyTools &&
     isJapaneseLearningBook(book?.language_code ?? null) &&
     !isEnglishNativeTrackerBook;
+  const canShowReadingReflection =
+    canUseReadingReflection && isReadingReflectionBook;
   const canCompleteReadingReflection =
     canShowReadingReflection && !!finishedAt && !dnfAt;
   const hasCompletedReadingReflection =
@@ -3722,6 +3727,7 @@ export default function BookHubPage() {
     setCanUseStudyFlashcards(false);
     setCanUseVocabularyList(false);
     setCanUseBulkAdd(false);
+    setCanUseReadingReflection(false);
     setCanUseJapaneseLearningActions(false);
     setJapaneseLearningArchive(emptyJapaneseLearningArchivePresence);
     setCanSeeVocabularySummary(false);
@@ -3789,12 +3795,15 @@ export default function BookHubPage() {
       })
       : { hasAccess: false, hasFullAccess: false, reason: "missing_profile" };
 
+    const freeFeatureFlags = await loadJapaneseLearningFreeFeatureFlags(supabase);
+
     const featureAccess = getFeatureAccess({
       role: currentProfileIsSuperTeacher ? "super_teacher" : currentProfileRole,
 
       // Book Hub stays free, but these two tabs use full-access saved-vocab/private-note tools.
       hasFullAccess: appAccessStatus.hasFullAccess,
       isTrialActive: appAccessStatus.reason === "trial",
+      freeFeatures: freeFeatureFlags,
     });
 
     setCanUseStoryNotes(canUseFullAccessFeature(featureAccess, "story_notes"));
@@ -3811,6 +3820,7 @@ export default function BookHubPage() {
       canUseFullAccessFeature(featureAccess, "vocabulary_list")
     );
     setCanUseBulkAdd(featureAccess.canUseBulkAdd);
+    setCanUseReadingReflection(featureAccess.canUseReadingReflection);
     setHasFullLearningAccess(featureAccess.hasFullAccess);
     setIsTrialLearningAccess(featureAccess.isTrial);
     const profileWantsJapaneseStudyTools = wantsJapaneseLearning(meProfile);
@@ -4630,6 +4640,11 @@ export default function BookHubPage() {
       return;
     }
 
+    if (!canUseReadingReflection) {
+      setError("Reading Reflections are locked for this account right now.");
+      return;
+    }
+
     setSaving(true);
     setError("");
     setSaveNotice("");
@@ -4805,9 +4820,10 @@ export default function BookHubPage() {
     const st = seriesTotal.trim() ? Number(seriesTotal.trim()) : null;
     const series_total = Number.isFinite(st as any) ? (st as number) : null;
 
-    const ro = ratingOverall.trim() ? clampRating5(Number(ratingOverall.trim())) : null;
+    const canSaveReadingReflection = canUseReadingReflection;
+    const ro = canSaveReadingReflection && ratingOverall.trim() ? clampRating5(Number(ratingOverall.trim())) : null;
     const rr = ratingRecommend.trim() ? clampRating5(Number(ratingRecommend.trim())) : null;
-    const rd = ratingDifficulty.trim() ? clampRating5(Number(ratingDifficulty.trim())) : null;
+    const rd = canSaveReadingReflection && ratingDifficulty.trim() ? clampRating5(Number(ratingDifficulty.trim())) : null;
     const tsur = teacherStudentUseRating.trim()
       ? clampRating5(Number(teacherStudentUseRating.trim()))
       : null;
@@ -4832,14 +4848,18 @@ export default function BookHubPage() {
         would_retry: nextWouldRetry,
         notes: notes || null,
         my_review: myReview || null,
-        reader_advice: readerAdvice.trim().slice(0, 160) || null,
-        rating_overall: ro,
+        reader_advice: canSaveReadingReflection
+          ? readerAdvice.trim().slice(0, 160) || null
+          : row.reader_advice ?? null,
+        rating_overall: canSaveReadingReflection ? ro : row.rating_overall ?? null,
         rating_recommend: rr,
-        rating_difficulty: rd,
+        rating_difficulty: canSaveReadingReflection ? rd : row.rating_difficulty ?? null,
         teacher_student_use_rating: tsur,
         favorite_quotes: favoriteQuotes.trim() || null,
         memorable_words: memorableWords.trim() || null,
-        reader_level: readerLevel || profileLevel || null,
+        reader_level: canSaveReadingReflection
+          ? readerLevel || profileLevel || null
+          : row.reader_level ?? null,
         recommended_level: recommendedLevel || null,
         format_type: formatType || null,
         progress_mode: progressMode || null,
@@ -4918,16 +4938,18 @@ export default function BookHubPage() {
       return;
     }
 
-    await syncBookRecommendationSignal({
-      userBookId: row.id,
-      bookId: row.books.id,
-      ownerUserId: row.user_id,
-      readerLevel: readerLevel || profileLevel || null,
-      bookType: bookType || row.books.book_type || null,
-      entertainmentRating: ro,
-      difficultyRating: rd,
-      readerAdvice: readerAdvice.trim().slice(0, 160) || null,
-    });
+    if (canSaveReadingReflection) {
+      await syncBookRecommendationSignal({
+        userBookId: row.id,
+        bookId: row.books.id,
+        ownerUserId: row.user_id,
+        readerLevel: readerLevel || profileLevel || null,
+        bookType: bookType || row.books.book_type || null,
+        entertainmentRating: ro,
+        difficultyRating: rd,
+        readerAdvice: readerAdvice.trim().slice(0, 160) || null,
+      });
+    }
 
     const contributorSyncs = [
       {
@@ -5947,6 +5969,13 @@ export default function BookHubPage() {
                     />
                   ) : null}
                 </section>
+              ) : isReadingReflectionBook && !canUseReadingReflection ? (
+                <JapaneseLearningPromoCard
+                  title="Reading Reflections are locked"
+                  description="Reading Reflections are available with full Japanese Learning, or when this free feature is enabled."
+                  source="book_hub"
+                  compact
+                />
               ) : null}
 
               <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-4 text-center">

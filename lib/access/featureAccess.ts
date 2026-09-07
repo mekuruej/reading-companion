@@ -31,7 +31,14 @@ export type FeatureAccessInput = {
   isTrialActive?: boolean;
   isPaidActive?: boolean;
   isBookClubAccessActive?: boolean;
+
+  // Admin-controlled free Japanese Learning feature flags.
+  freeFeatures?: Partial<Record<JapaneseLearningFreeFeature, boolean>>;
 };
+
+export type JapaneseLearningFreeFeature =
+  | "reading_reflections"
+  | "find_next_book";
 
 export type FeatureAccess = {
   accessLevel: FeatureAccessLevel;
@@ -112,6 +119,10 @@ export function getFeatureAccess(input: FeatureAccessInput): FeatureAccess {
     hasPaidAccess;
   const canUseReadingAccessStep1 = isTeacher || isTrial || hasPaidAccess;
   const canUseAdvancedStudyStep2 = hasPaidAccess;
+  const canUseFreeReadingReflections =
+    hasFullAccess || input.freeFeatures?.reading_reflections === true;
+  const canUseFreeFindNextBook =
+    hasFullAccess || input.freeFeatures?.find_next_book === true;
 
   const accessReason: FeatureAccessReason = isAdmin
     ? "admin"
@@ -149,7 +160,7 @@ export function getFeatureAccess(input: FeatureAccessInput): FeatureAccess {
     canTrackBooks: true,
     canUseBookHubIndex: true,
     canUseBookInfo: true,
-    canUseReadingReflection: true,
+    canUseReadingReflection: canUseFreeReadingReflections,
     canUseJustReadingTimer: true,
     canUseListeningTimer: true,
     canUseBookStatsSnapshots: true,
@@ -175,7 +186,7 @@ export function getFeatureAccess(input: FeatureAccessInput): FeatureAccess {
     // Find Your Next Book should stay true only if/when it reads from a safe
     // anonymous shared signal source rather than private user_books rows.
     canUseDiscoveryHub: true,
-    canUseFindNextBook: true,
+    canUseFindNextBook: canUseFreeFindNextBook,
 
     // Full-access vocabulary/study features.
     canUseCuriosityReading: canUseReadingAccessStep1,

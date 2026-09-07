@@ -7,6 +7,9 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { loadJapaneseLearningFreeFeatureFlags } from "@/lib/access/japaneseLearningFreeFeatures";
 import { getBookIdentity } from "@/lib/books/bookIdentity";
 import { bookTypeLabel } from "@/lib/books/bookTypes";
 import { supabase } from "@/lib/supabaseClient";
@@ -404,6 +407,7 @@ export default function AboutBookPage() {
   const [publisherImageUrl, setPublisherImageUrl] = useState<string | null>(null);
   const [publisherEnglishName, setPublisherEnglishName] = useState<string | null>(null);
   const [ratingAverages, setRatingAverages] = useState<BookRatingAverages | null>(null);
+  const [canUseReadingReflection, setCanUseReadingReflection] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -411,6 +415,7 @@ export default function AboutBookPage() {
     async function load() {
       setLoading(true);
       setError(null);
+      setCanUseReadingReflection(false);
 
       try {
         const {
@@ -436,6 +441,16 @@ export default function AboutBookPage() {
         const role = profile?.role ?? "member";
         const isStaff = role === "admin" || role === "super_teacher" || isSuperTeacherFlag(profile?.is_super_teacher);
         const isTeacher = role === "teacher";
+        const appAccessStatus = profile
+          ? getAppAccessStatus(profile)
+          : { hasFullAccess: false, reason: "missing_profile" };
+        const freeFeatureFlags = await loadJapaneseLearningFreeFeatureFlags(supabase);
+        const featureAccess = getFeatureAccess({
+          role: isStaff ? "super_teacher" : role,
+          hasFullAccess: appAccessStatus.hasFullAccess,
+          isTrialActive: appAccessStatus.reason === "trial",
+          freeFeatures: freeFeatureFlags,
+        });
 
         const selectClause = `
           id,
@@ -572,7 +587,7 @@ export default function AboutBookPage() {
         }
 
         let nextRatingAverages: BookRatingAverages | null = null;
-        if (book?.id) {
+        if (book?.id && featureAccess.canUseReadingReflection) {
           const { data: ratingSignals, error: ratingSignalsError } = await supabase
             .from("public_book_recommendation_signals")
             .select("difficulty_rating, entertainment_rating")
@@ -608,6 +623,7 @@ export default function AboutBookPage() {
           setPublisherImageUrl(nextPublisherImage);
           setPublisherEnglishName(nextPublisherEnglishName);
           setRatingAverages(nextRatingAverages);
+          setCanUseReadingReflection(featureAccess.canUseReadingReflection);
           setLoading(false);
         }
       } catch (err) {
@@ -762,7 +778,7 @@ export default function AboutBookPage() {
           />
         </section>
 
-        {ratingAverages && ratingAverages.signalCount > 0 ? (
+        {canUseReadingReflection && ratingAverages && ratingAverages.signalCount > 0 ? (
           <ProfileSection
             eyebrow="Reader Averages"
             title="How Readers Rated This Book"

@@ -7,6 +7,8 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { loadJapaneseLearningFreeFeatureFlags } from "@/lib/access/japaneseLearningFreeFeatures";
 import { shouldShowJapaneseStudyNavigation } from "@/lib/access/japaneseLearningIntent";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -17,6 +19,7 @@ export default function Header() {
   const [showJapaneseStudyNavigation, setShowJapaneseStudyNavigation] = useState(false);
   const [hasFullAccess, setHasFullAccess] = useState(false);
   const [isTrialAccess, setIsTrialAccess] = useState(false);
+  const [canUseFindNextBook, setCanUseFindNextBook] = useState(false);
   const [pendingJapaneseLearningRequestCount, setPendingJapaneseLearningRequestCount] = useState(0);
   const [headerRefreshToken, setHeaderRefreshToken] = useState(0);
   const [showLibraryMenu, setShowLibraryMenu] = useState(false);
@@ -45,6 +48,7 @@ export default function Header() {
           setShowJapaneseStudyNavigation(false);
           setHasFullAccess(false);
           setIsTrialAccess(false);
+          setCanUseFindNextBook(false);
           setPendingJapaneseLearningRequestCount(0);
           return;
         }
@@ -77,6 +81,7 @@ export default function Header() {
           setShowJapaneseStudyNavigation(false);
           setHasFullAccess(false);
           setIsTrialAccess(false);
+          setCanUseFindNextBook(false);
           setPendingJapaneseLearningRequestCount(0);
           return;
         }
@@ -88,6 +93,18 @@ export default function Header() {
         const accessStatus = profile ? getAppAccessStatus(profile) : null;
         setHasFullAccess(accessStatus?.hasFullAccess ?? false);
         setIsTrialAccess(accessStatus?.reason === "trial");
+        const freeFeatureFlags = await loadJapaneseLearningFreeFeatureFlags(supabase);
+        if (cancelled) return;
+        const featureAccess = getFeatureAccess({
+          role:
+            profile?.is_super_teacher === true || profile?.is_super_teacher === "true"
+              ? "super_teacher"
+              : profile?.role ?? null,
+          hasFullAccess: accessStatus?.hasFullAccess ?? false,
+          isTrialActive: accessStatus?.reason === "trial",
+          freeFeatures: freeFeatureFlags,
+        });
+        setCanUseFindNextBook(featureAccess.canUseFindNextBook);
 
         const canReviewJapaneseLearningRequests =
           profile?.role === "super_teacher" ||
@@ -118,6 +135,7 @@ export default function Header() {
           setShowJapaneseStudyNavigation(false);
           setHasFullAccess(false);
           setIsTrialAccess(false);
+          setCanUseFindNextBook(false);
           setPendingJapaneseLearningRequestCount(0);
         }
       }
@@ -409,7 +427,7 @@ export default function Header() {
 	                    </div>
 	                  )}
 
-	                  {showFullAccessNavigation ? (
+                  {canUseFindNextBook ? (
 	                    <Link
 	                      href="/discovery/find-books"
 	                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/discovery/find-books"
@@ -420,7 +438,14 @@ export default function Header() {
 	                    >
 	                      Find Your Next Book
 	                    </Link>
-	                  ) : null}
+	                  ) : (
+                    <div className="block cursor-default rounded-xl px-3 py-2 text-sm leading-tight text-stone-400">
+                      Find Your Next Book 🔒
+                      <span className="block text-xs text-stone-500">
+                        Japanese Learning 🔒
+                      </span>
+                    </div>
+                  )}
 	                </div>
 	              ) : null}
 	              </div>

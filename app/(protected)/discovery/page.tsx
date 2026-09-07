@@ -2,10 +2,13 @@
 //
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { loadJapaneseLearningFreeFeatureFlags } from "@/lib/access/japaneseLearningFreeFeatures";
 import { BOOK_TYPE_OPTIONS, bookTypeTitleLabel } from "@/lib/books/bookTypes";
+import JapaneseLearningPromoCard from "@/components/japanese-learning/JapaneseLearningPromoCard";
 import DiscoveryHubHeader from "./components/DiscoveryHubHeader";
 import DiscoveryErrorBanner from "./components/DiscoveryErrorBanner";
 import DiscoveryCardGrid from "./components/DiscoveryCardGrid";
@@ -223,6 +226,8 @@ function HubDifficultyRating({
 
 export default function DiscoveryHubPage() {
   const [loading, setLoading] = useState(true);
+  const [accessLoading, setAccessLoading] = useState(true);
+  const [canUseFindNextBook, setCanUseFindNextBook] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [ratingRows, setRatingRows] = useState<UserBookRatingRow[]>([]);
   const [sortMode, setSortMode] = useState<SortMode>("recent");
@@ -238,6 +243,53 @@ export default function DiscoveryHubPage() {
       setErrorMsg(null);
 
       try {
+        setAccessLoading(true);
+
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+          setCanUseFindNextBook(false);
+          return;
+        }
+
+        const [profileResult, freeFeatureFlags] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select("role, is_super_teacher, app_access_type, app_access_expires_at")
+            .eq("id", user.id)
+            .maybeSingle(),
+          loadJapaneseLearningFreeFeatureFlags(supabase),
+        ]);
+
+        if (profileResult.error) throw profileResult.error;
+
+        const profile = profileResult.data;
+        const appAccessStatus = profile
+          ? getAppAccessStatus(profile)
+          : { hasFullAccess: false, reason: "missing_profile" };
+        const featureAccess = getFeatureAccess({
+          role:
+            profile?.is_super_teacher === true || profile?.is_super_teacher === "true"
+              ? "super_teacher"
+              : profile?.role ?? null,
+          hasFullAccess: appAccessStatus.hasFullAccess,
+          isTrialActive: appAccessStatus.reason === "trial",
+          freeFeatures: freeFeatureFlags,
+        });
+
+        if (!alive) return;
+        setCanUseFindNextBook(featureAccess.canUseFindNextBook);
+        setAccessLoading(false);
+
+        if (!featureAccess.canUseFindNextBook) {
+          setRatingRows([]);
+          setProfileLevelsByUserId({});
+          return;
+        }
+
         const { data, error } = await supabase
           .from("public_book_recommendation_signals")
           .select(
@@ -287,7 +339,10 @@ export default function DiscoveryHubPage() {
         if (!alive) return;
         setErrorMsg(error?.message ?? "Could not load rated books yet.");
       } finally {
-        if (alive) setLoading(false);
+        if (alive) {
+          setAccessLoading(false);
+          setLoading(false);
+        }
       }
     }
 
@@ -412,40 +467,61 @@ export default function DiscoveryHubPage() {
 
         <DiscoveryErrorBanner message={errorMsg} />
 
-        <DiscoveryCardGrid cards={discoveryCards} />
+        <DiscoveryCardGrid
+          cards={
+            canUseFindNextBook
+              ? discoveryCards
+              : discoveryCards.filter((card) => card.href !== "/discovery/find-books")
+          }
+        />
 
-        <DiscoveryPreviewSection>
-          {loading ? (
+        {accessLoading ? (
+          <DiscoveryPreviewSection>
             <DiscoveryPreviewState type="loading" />
-          ) : ratedBookGroups.length === 0 ? (
-            <DiscoveryPreviewState type="empty" />
-          ) : (
-            ratedBookGroups.slice(0, 4).map((book) => {
-              const latestSignal = book.signals[0] ?? null;
+          </DiscoveryPreviewSection>
+        ) : canUseFindNextBook ? (
+          <DiscoveryPreviewSection>
+            {loading ? (
+              <DiscoveryPreviewState type="loading" />
+            ) : ratedBookGroups.length === 0 ? (
+              <DiscoveryPreviewState type="empty" />
+            ) : (
+              ratedBookGroups.slice(0, 4).map((book) => {
+                const latestSignal = book.signals[0] ?? null;
 
-              return (
-                <DiscoveryPreviewBookCard
-                  key={book.bookId}
-                  bookId={book.bookId}
-                  title={book.title}
-                  author={book.author}
-                  bookType={book.bookType}
-                  coverUrl={book.coverUrl}
-                  latestReaderLevel={latestSignal?.readerLevel}
-                  bookTypeLabel={bookTypeLabel}
-                  formatReaderLevel={formatReaderLevel}
-                >
-                  {latestSignal ? (
-                    <HubDifficultyRating
-                      signal={latestSignal}
-                      bookType={book.bookType}
-                    />
-                  ) : null}
-                </DiscoveryPreviewBookCard>
-              );
-            })
-          )}
-        </DiscoveryPreviewSection>
+                return (
+                  <DiscoveryPreviewBookCard
+                    key={book.bookId}
+                    bookId={book.bookId}
+                    title={book.title}
+                    author={book.author}
+                    bookType={book.bookType}
+                    coverUrl={book.coverUrl}
+                    latestReaderLevel={latestSignal?.readerLevel}
+                    bookTypeLabel={bookTypeLabel}
+                    formatReaderLevel={formatReaderLevel}
+                  >
+                    {latestSignal ? (
+                      <HubDifficultyRating
+                        signal={latestSignal}
+                        bookType={book.bookType}
+                      />
+                    ) : null}
+                  </DiscoveryPreviewBookCard>
+                );
+              })
+            )}
+          </DiscoveryPreviewSection>
+        ) : (
+          <div className="mt-5">
+            <JapaneseLearningPromoCard
+              title="Find Your Next Book is locked"
+              description="Find reader-fit Japanese books with full Japanese Learning, or when this free feature is enabled."
+              source="japanese_learning_page"
+              compact
+            />
+          </div>
+        )}
       </div >
     </main >
   );

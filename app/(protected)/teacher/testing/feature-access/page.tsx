@@ -11,6 +11,11 @@ import Link from "next/link";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
 import {
+    JAPANESE_LEARNING_FREE_FEATURES,
+    loadJapaneseLearningFreeFeatureFlags,
+    type JapaneseLearningFreeFeatureFlags,
+} from "@/lib/access/japaneseLearningFreeFeatures";
+import {
     canUseFullAccessFeature,
     getFullAccessFeatureLabel,
     type FullAccessFeature,
@@ -160,6 +165,9 @@ export default function FeatureAccessTestPage() {
     const [loading, setLoading] = useState(true);
     const [currentUser, setCurrentUser] = useState<CurrentUserInfo | null>(null);
     const [profile, setProfile] = useState<ProfileRow | null>(null);
+    const [freeFeatureFlags, setFreeFeatureFlags] =
+        useState<JapaneseLearningFreeFeatureFlags | null>(null);
+    const [savingFreeFeatureKey, setSavingFreeFeatureKey] = useState<string | null>(null);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     useEffect(() => {
@@ -199,6 +207,9 @@ export default function FeatureAccessTestPage() {
             }
 
             setProfile(data ?? null);
+
+            const flags = await loadJapaneseLearningFreeFeatureFlags(supabase);
+            setFreeFeatureFlags(flags);
             setLoading(false);
         }
 
@@ -230,8 +241,43 @@ export default function FeatureAccessTestPage() {
         return getFeatureAccess({
             role: roleForAccess,
             hasFullAccess: appAccessStatus.hasFullAccess,
+            isTrialActive: appAccessStatus.reason === "trial",
+            freeFeatures: freeFeatureFlags ?? undefined,
         });
-    }, [appAccessStatus, roleForAccess]);
+    }, [appAccessStatus, freeFeatureFlags, roleForAccess]);
+
+    async function toggleFreeFeature(
+        featureKey: keyof JapaneseLearningFreeFeatureFlags
+    ) {
+        if (!freeFeatureFlags || !currentUser) return;
+
+        const nextValue = !freeFeatureFlags[featureKey];
+        setSavingFreeFeatureKey(featureKey);
+        setErrorMsg(null);
+
+        const { error } = await supabase
+            .from("japanese_learning_free_features")
+            .update({
+                is_enabled: nextValue,
+                updated_at: new Date().toISOString(),
+                updated_by: currentUser.id,
+            })
+            .eq("feature_key", featureKey);
+
+        if (error) {
+            setErrorMsg(
+                `${error.message} Run sql/20260907_japanese_learning_free_feature_keys.sql if the free feature table is not installed yet.`
+            );
+            setSavingFreeFeatureKey(null);
+            return;
+        }
+
+        setFreeFeatureFlags({
+            ...freeFeatureFlags,
+            [featureKey]: nextValue,
+        });
+        setSavingFreeFeatureKey(null);
+    }
 
     if (loading) {
         return (
@@ -344,6 +390,55 @@ export default function FeatureAccessTestPage() {
 
                 <section className="mt-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                     <h2 className="text-xl font-black text-slate-950">
+                        Japanese Learning free-feature toggles
+                    </h2>
+
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                        These switches control which Japanese Learning features free accounts can use.
+                        Trial, paid, teacher, super-teacher, and admin access remains open.
+                    </p>
+
+                    <div className="mt-5 grid gap-3">
+                        {JAPANESE_LEARNING_FREE_FEATURES.map((feature) => {
+                            const enabled = freeFeatureFlags?.[feature.key] === true;
+                            const saving = savingFreeFeatureKey === feature.key;
+
+                            return (
+                                <div
+                                    key={feature.key}
+                                    className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+                                >
+                                    <div>
+                                        <div className="text-sm font-black text-slate-950">
+                                            {feature.label}
+                                        </div>
+                                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                                            {feature.description}
+                                        </p>
+                                        <p className="mt-1 text-xs text-slate-400">
+                                            key: {feature.key}
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleFreeFeature(feature.key)}
+                                        disabled={!freeFeatureFlags || saving}
+                                        className={`inline-flex min-w-28 justify-center rounded-full px-4 py-2 text-sm font-black transition disabled:cursor-wait disabled:opacity-60 ${enabled
+                                            ? "bg-emerald-700 text-white hover:bg-emerald-800"
+                                            : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                                            }`}
+                                    >
+                                        {saving ? "Saving..." : enabled ? "Enabled" : "Disabled"}
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </section>
+
+                <section className="mt-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h2 className="text-xl font-black text-slate-950">
                         Full-access feature results
                     </h2>
 
@@ -353,6 +448,34 @@ export default function FeatureAccessTestPage() {
                     </p>
 
                     <div className="mt-5 grid gap-3">
+                        {featureAccess ? (
+                            <>
+                                <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
+                                        <div className="text-sm font-black text-slate-950">
+                                            Reading Reflections
+                                        </div>
+                                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                                            Viewing and submitting public Japanese-book reflections.
+                                        </p>
+                                    </div>
+                                    <StatusPill allowed={featureAccess.canUseReadingReflection} />
+                                </div>
+
+                                <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
+                                        <div className="text-sm font-black text-slate-950">
+                                            Find Your Next Book
+                                        </div>
+                                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                                            Complete reader-fit discovery experience.
+                                        </p>
+                                    </div>
+                                    <StatusPill allowed={featureAccess.canUseFindNextBook} />
+                                </div>
+                            </>
+                        ) : null}
+
                         {FULL_ACCESS_FEATURES.map((feature) => {
                             const allowed = featureAccess
                                 ? canUseFullAccessFeature(featureAccess, feature.key)
@@ -397,6 +520,7 @@ export default function FeatureAccessTestPage() {
                             const simulatedFeatureAccess = getFeatureAccess({
                                 role: scenario.role,
                                 hasFullAccess: scenario.hasFullAccess,
+                                freeFeatures: freeFeatureFlags ?? undefined,
                             });
 
                             return (
@@ -420,6 +544,24 @@ export default function FeatureAccessTestPage() {
                                     </div>
 
                                     <div className="mt-4 grid gap-2 md:grid-cols-2">
+                                        <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                                            <span className="text-sm font-semibold text-slate-800">
+                                                Reading Reflections
+                                            </span>
+                                            <StatusPill
+                                                allowed={simulatedFeatureAccess.canUseReadingReflection}
+                                            />
+                                        </div>
+
+                                        <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                                            <span className="text-sm font-semibold text-slate-800">
+                                                Find Your Next Book
+                                            </span>
+                                            <StatusPill
+                                                allowed={simulatedFeatureAccess.canUseFindNextBook}
+                                            />
+                                        </div>
+
                                         {FULL_ACCESS_FEATURES.map((feature) => {
                                             const allowed = canUseFullAccessFeature(
                                                 simulatedFeatureAccess,

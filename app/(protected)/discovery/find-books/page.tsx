@@ -2,10 +2,13 @@
 //
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { loadJapaneseLearningFreeFeatureFlags } from "@/lib/access/japaneseLearningFreeFeatures";
 import { BOOK_TYPE_OPTIONS, bookTypeTitleLabel } from "@/lib/books/bookTypes";
+import JapaneseLearningPromoCard from "@/components/japanese-learning/JapaneseLearningPromoCard";
 import FindBooksPageHeader from "./components/FindBooksPageHeader";
 import FindBooksErrorBanner from "./components/FindBooksErrorBanner";
 import FindBooksResultsState from "./components/FindBooksResultsState";
@@ -126,6 +129,8 @@ function formatReaderLevel(value: string | null | undefined) {
 
 export default function FindBooksPage() {
   const [loading, setLoading] = useState(true);
+  const [accessLoading, setAccessLoading] = useState(true);
+  const [canUseFindNextBook, setCanUseFindNextBook] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [ratingRows, setRatingRows] = useState<RecommendationSignalRow[]>([]);
   const [sortMode, setSortMode] = useState<SortMode>("recent");
@@ -141,6 +146,53 @@ export default function FindBooksPage() {
       setErrorMsg(null);
 
       try {
+        setAccessLoading(true);
+
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+          setCanUseFindNextBook(false);
+          return;
+        }
+
+        const [profileResult, freeFeatureFlags] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select("role, is_super_teacher, app_access_type, app_access_expires_at")
+            .eq("id", user.id)
+            .maybeSingle(),
+          loadJapaneseLearningFreeFeatureFlags(supabase),
+        ]);
+
+        if (profileResult.error) throw profileResult.error;
+
+        const profile = profileResult.data;
+        const appAccessStatus = profile
+          ? getAppAccessStatus(profile)
+          : { hasFullAccess: false, reason: "missing_profile" };
+        const featureAccess = getFeatureAccess({
+          role:
+            profile?.is_super_teacher === true || profile?.is_super_teacher === "true"
+              ? "super_teacher"
+              : profile?.role ?? null,
+          hasFullAccess: appAccessStatus.hasFullAccess,
+          isTrialActive: appAccessStatus.reason === "trial",
+          freeFeatures: freeFeatureFlags,
+        });
+
+        if (!alive) return;
+        setCanUseFindNextBook(featureAccess.canUseFindNextBook);
+        setAccessLoading(false);
+
+        if (!featureAccess.canUseFindNextBook) {
+          setRatingRows([]);
+          setUserBookIdsByBookId({});
+          return;
+        }
+
         const { data, error } = await supabase
           .from("public_book_recommendation_signals")
           .select(
@@ -167,16 +219,6 @@ export default function FindBooksPage() {
 
         const rows = (data ?? []) as RecommendationSignalRow[];
         setRatingRows(rows);
-
-        const {
-          data: { user },
-          error: authError,
-        } = await supabase.auth.getUser();
-
-        if (authError || !user) {
-          setUserBookIdsByBookId({});
-          return;
-        }
 
         const bookIds = Array.from(
           new Set(
@@ -219,7 +261,10 @@ export default function FindBooksPage() {
         if (!alive) return;
         setErrorMsg(error?.message ?? "Could not load book recommendations yet.");
       } finally {
-        if (alive) setLoading(false);
+        if (alive) {
+          setAccessLoading(false);
+          setLoading(false);
+        }
       }
     }
 
@@ -338,45 +383,61 @@ export default function FindBooksPage() {
 
         <FindBooksErrorBanner message={errorMsg} />
 
-        <FindBooksFilterPanel
-          readerLevelFilter={readerLevelFilter}
-          bookTypeFilter={bookTypeFilter}
-          sortMode={sortMode}
-          readerLevelOptions={readerLevelOptions}
-          bookTypeOptions={bookTypeOptions}
-          formatReaderLevel={formatReaderLevel}
-          bookTypeLabel={bookTypeLabel}
-          onReaderLevelChange={setReaderLevelFilter}
-          onBookTypeChange={setBookTypeFilter}
-          onSortModeChange={setSortMode}
-        />
-
-        <section className="mt-5 grid gap-4">
-          {loading ? (
+        {accessLoading ? (
+          <section className="mt-5">
             <FindBooksResultsState type="loading" />
-          ) : ratedBookGroups.length === 0 ? (
-            <FindBooksResultsState type="empty" />
-          ) : (
-            ratedBookGroups.map((book) => {
-              const shouldShowAverageRatings = book.signals.length >= 2;
-              const readerCountLabel = `${book.signals.length} reader${book.signals.length === 1 ? "" : "s"}`;
-              const userBookId = userBookIdsByBookId[book.bookId];
+          </section>
+        ) : canUseFindNextBook ? (
+          <>
+            <FindBooksFilterPanel
+              readerLevelFilter={readerLevelFilter}
+              bookTypeFilter={bookTypeFilter}
+              sortMode={sortMode}
+              readerLevelOptions={readerLevelOptions}
+              bookTypeOptions={bookTypeOptions}
+              formatReaderLevel={formatReaderLevel}
+              bookTypeLabel={bookTypeLabel}
+              onReaderLevelChange={setReaderLevelFilter}
+              onBookTypeChange={setBookTypeFilter}
+              onSortModeChange={setSortMode}
+            />
 
-              return (
-                <BookRecommendationCard
-                  key={book.bookId}
-                  book={book}
-                  userBookId={userBookId}
-                  showAverageRatings={shouldShowAverageRatings}
-                  readerCountLabel={readerCountLabel}
-                  bookTypeLabel={bookTypeLabel}
-                  formatReaderLevel={formatReaderLevel}
-                  formatValue={formatAverage}
-                />
-              );
-            })
-          )}
-        </section>
+            <section className="mt-5 grid gap-4">
+              {loading ? (
+                <FindBooksResultsState type="loading" />
+              ) : ratedBookGroups.length === 0 ? (
+                <FindBooksResultsState type="empty" />
+              ) : (
+                ratedBookGroups.map((book) => {
+                  const shouldShowAverageRatings = book.signals.length >= 2;
+                  const readerCountLabel = `${book.signals.length} reader${book.signals.length === 1 ? "" : "s"}`;
+                  const userBookId = userBookIdsByBookId[book.bookId];
+
+                  return (
+                    <BookRecommendationCard
+                      key={book.bookId}
+                      book={book}
+                      userBookId={userBookId}
+                      showAverageRatings={shouldShowAverageRatings}
+                      readerCountLabel={readerCountLabel}
+                      bookTypeLabel={bookTypeLabel}
+                      formatReaderLevel={formatReaderLevel}
+                      formatValue={formatAverage}
+                    />
+                  );
+                })
+              )}
+            </section>
+          </>
+        ) : (
+          <div className="mt-5">
+            <JapaneseLearningPromoCard
+              title="Find Your Next Book is locked"
+              description="Find reader-fit Japanese books with full Japanese Learning, or when this free feature is enabled."
+              source="japanese_learning_page"
+            />
+          </div>
+        )}
       </div>
     </main>
   );
