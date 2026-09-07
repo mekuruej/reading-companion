@@ -91,8 +91,8 @@ export default function HomePage() {
                   Read real Japanese with support
                 </h3>
                 <p className="mt-3 text-sm leading-6 text-slate-600">
-                  Private reading lessons, vocabulary support, book clubs, and
-                  real-text reading practice for Japanese learners.
+                  Private reading lessons, vocabulary support, and real-text
+                  reading practice for Japanese learners.
                 </p>
               </div>
 

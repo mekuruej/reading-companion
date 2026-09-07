@@ -212,7 +212,7 @@ export default function MekuruHomepage() {
                         <br />
                         <p className="text-base leading-7 text-[#4f473d]">
                             I grew up in Denver, Colorado, and eventually found my way to the countryside of Hokuto in Yamanashi, Japan.
-                            I&apos;ve now been in Japan for over 16 years.
+                            I&apos;ve now been in Japan for over 17 years.
                         </p>
                         <p className="text-base leading-7 text-[#4f473d]">
                             I didn't start learning Japanese until I was an adult. I came to it later, and for the most part, I had to
@@ -282,7 +282,7 @@ export default function MekuruHomepage() {
                 </section>
                 <section className="mt-12 rounded-3xl border border-stone-200 bg-white/80 p-5 text-center shadow-sm">
                     <p className="text-sm font-semibold text-stone-900">
-                        Questions about lessons, book clubs, or MEKURU?
+                        Questions about lessons, Japanese Learning, or MEKURU?
                     </p>
                     <p className="mt-2 text-sm text-stone-600">
                         Contact:{" "}
