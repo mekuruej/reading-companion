@@ -2,7 +2,7 @@
 //
 // Teacher-facing cockpit for one linked student and one student-owned book.
 // Student work stays anchored to the student's user_books row; teacher support
-// is discovered by shared book_id when the teacher already has a Teacher Book.
+// resolves the teacher’s own Library row using the shared catalog book_id.
 
 "use client";
 
@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { ensureTeacherBookSupport } from "@/lib/teacher/ensureTeacherBookSupport";
 import { getBookIdentity } from "@/lib/books/bookIdentity";
 import { bookTypeTitleLabel } from "@/lib/books/bookTypes";
 import { TeacherFollowAlongPanel } from "../../../../../library/[teacherBookId]/follow/components/TeacherFollowAlongPanel";
@@ -175,47 +176,6 @@ function ActionCardLink({ action }: { action: ActionCard }) {
   );
 }
 
-async function ensureTeacherBookSupport(teacherId: string, bookId: string) {
-  const { data: existingTeacherBook, error: existingTeacherBookError } = await supabase
-    .from("teacher_books")
-    .select("id, teacher_use_status, teacher_use_note, user_book_id")
-    .eq("teacher_id", teacherId)
-    .eq("book_id", bookId)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (existingTeacherBookError) throw existingTeacherBookError;
-  if (existingTeacherBook?.id) return existingTeacherBook as TeacherBookSupport;
-
-  const { data: teacherBook, error: teacherBookError } = await supabase
-    .from("teacher_books")
-    .insert({
-      teacher_id: teacherId,
-      book_id: bookId,
-      teacher_use_status: null,
-    })
-    .select("id, teacher_use_status, teacher_use_note, user_book_id")
-    .single();
-
-  if (teacherBookError) {
-    const { data: racedTeacherBook, error: racedLookupError } = await supabase
-      .from("teacher_books")
-      .select("id, teacher_use_status, teacher_use_note, user_book_id")
-      .eq("teacher_id", teacherId)
-      .eq("book_id", bookId)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (racedTeacherBook?.id) return racedTeacherBook as TeacherBookSupport;
-    if (racedLookupError) throw racedLookupError;
-    throw teacherBookError;
-  }
-
-  return teacherBook as TeacherBookSupport;
-}
-
 export default function StudentBookWorkspacePage() {
   const params = useParams<{ studentId: string; userBookId: string }>();
   const studentId = params.studentId ?? "";
@@ -342,22 +302,10 @@ export default function StudentBookWorkspacePage() {
 
       if (studentProfileError) throw studentProfileError;
 
-      const { data: teacherBookRow, error: teacherBookError } = await supabase
-        .from("teacher_books")
-        .select("id, teacher_use_status, teacher_use_note, user_book_id")
-        .eq("teacher_id", currentUser.id)
-        .eq("book_id", loadedStudentBook.book_id)
-        .limit(1)
-        .maybeSingle();
-
-      if (teacherBookError) throw teacherBookError;
-
       setStudent((studentProfile ?? null) as StudentProfile | null);
       setStudentBook(loadedStudentBook);
       setTeacherBook(
-        teacherBookRow
-          ? ((teacherBookRow ?? null) as TeacherBookSupport | null)
-          : await ensureTeacherBookSupport(currentUser.id, loadedStudentBook.book_id)
+        await ensureTeacherBookSupport(supabase, currentUser.id, loadedStudentBook.book_id)
       );
     } catch (error: any) {
       console.error("Error loading Student Book Workspace:", error);
