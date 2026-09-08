@@ -1526,9 +1526,10 @@ export default function LibraryStudyPage() {
   const [selectedJlptLevels, setSelectedJlptLevels] = useState<string[]>([]);
   const [practiceColorFilters, setPracticeColorFilters] = useState<PracticeColorFilter[]>([]);
   const [multiBookOnly, setMultiBookOnly] = useState(false);
-  const effectivePracticeColorFilters: PracticeColorFilter[] = lockedMasteredWordsMode
-    ? ["purple"]
-    : practiceColorFilters;
+  const effectivePracticeColorFilters = useMemo<PracticeColorFilter[]>(
+    () => (lockedMasteredWordsMode ? ["purple"] : practiceColorFilters),
+    [lockedMasteredWordsMode, practiceColorFilters]
+  );
   const [, setNotice] = useState<string | null>(null);
   const [meaningReviewItems, setMeaningReviewItems] = useState<MeaningReviewItem[]>([]);
   const [showPracticeMeaningReview, setShowPracticeMeaningReview] = useState(false);
