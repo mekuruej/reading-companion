@@ -93,7 +93,7 @@ function firstBook(row: RecommendationSignalRow): BookMeta | null {
 
 function cleanReaderAdvice(value: string | null | undefined) {
   const cleaned = (value ?? "").trim();
-  return cleaned ? cleaned.slice(0, 120) : null;
+  return cleaned ? cleaned.slice(0, 200) : null;
 }
 
 function bookTypeLabel(value: string | null | undefined) {

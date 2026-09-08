@@ -77,7 +77,7 @@ type RatingTabProps = {
   }>;
 };
 
-const READER_ADVICE_MAX_LENGTH = 120;
+const READER_ADVICE_MAX_LENGTH = 200;
 
 function ReflectionUseNote({
   label,

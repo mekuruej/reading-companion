@@ -4661,7 +4661,7 @@ export default function BookHubPage() {
       const { error: userBookError } = await supabase
         .from("user_books")
         .update({
-          reader_advice: readerAdvice.trim().slice(0, 160) || null,
+          reader_advice: readerAdvice.trim().slice(0, 200) || null,
           rating_overall: ro,
           rating_difficulty: rd,
           reader_level: reflectionReaderLevel,
@@ -4678,7 +4678,7 @@ export default function BookHubPage() {
         bookType: bookType || row.books?.book_type || null,
         entertainmentRating: ro,
         difficultyRating: rd,
-        readerAdvice: readerAdvice.trim().slice(0, 160) || null,
+        readerAdvice: readerAdvice.trim().slice(0, 200) || null,
       });
 
       if (row.books?.id) {
@@ -4849,7 +4849,7 @@ export default function BookHubPage() {
         notes: notes || null,
         my_review: myReview || null,
         reader_advice: canSaveReadingReflection
-          ? readerAdvice.trim().slice(0, 160) || null
+          ? readerAdvice.trim().slice(0, 200) || null
           : row.reader_advice ?? null,
         rating_overall: canSaveReadingReflection ? ro : row.rating_overall ?? null,
         rating_recommend: rr,
@@ -4947,7 +4947,7 @@ export default function BookHubPage() {
         bookType: bookType || row.books.book_type || null,
         entertainmentRating: ro,
         difficultyRating: rd,
-        readerAdvice: readerAdvice.trim().slice(0, 160) || null,
+        readerAdvice: readerAdvice.trim().slice(0, 200) || null,
       });
     }
 
