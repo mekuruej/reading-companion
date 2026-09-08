@@ -3,14 +3,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import { findMekuruReadingLevel } from "@/components/profile/MekuruReadingLevelGuide";
-import TeacherSnapshotActions, {
-  type TeacherSnapshotAction,
-} from "./components/TeacherSnapshotActions";
+
 import TeacherSnapshotHeader from "./components/TeacherSnapshotHeader";
 import TeacherSnapshotSection from "./components/TeacherSnapshotSection";
 import TeacherSnapshotShell from "./components/TeacherSnapshotShell";
@@ -593,27 +590,6 @@ export default function TeacherReadingSnapshotPage() {
 
   const activeTeacherBook =
     teacherBook?.teacher_use_status === "do_not_use" ? null : teacherBook;
-  const teacherBookId = activeTeacherBook?.id ?? null;
-  const primaryAction: TeacherSnapshotAction | null = teacherBookId
-    ? {
-      label: "Open Teacher Workspace",
-      href: `/teacher/library/${teacherBookId}/book-workspace`,
-    }
-    : null;
-  const teacherActions: TeacherSnapshotAction[] = teacherBookId
-    ? [
-      {
-        label: "Teacher Follow-Along",
-        href: `/teacher/library/${teacherBookId}/follow`,
-      },
-      {
-        label: "Teaching Prep",
-        href: `/teacher/library/${teacherBookId}`,
-      },
-    ]
-    : [];
-  const hasTeacherActions = Boolean(primaryAction) || teacherActions.length > 0;
-
   if (loading || !accessChecked) {
     return (
       <TeacherSnapshotShell>
@@ -636,14 +612,8 @@ export default function TeacherReadingSnapshotPage() {
 
   return (
     <TeacherSnapshotShell>
-      <Link
-        href={`/books/${userBookId}`}
-        className="inline-flex w-fit text-sm font-semibold text-slate-500 hover:text-slate-900"
-      >
-        ← Back to Book Hub
-      </Link>
-
       <TeacherSnapshotHeader
+        bookHubHref={`/books/${userBookId}?mode=teaching`}
         title={book?.title || "Untitled book"}
         author={book?.author ?? null}
         coverUrl={book?.cover_url ?? null}
@@ -660,14 +630,12 @@ export default function TeacherReadingSnapshotPage() {
         </div>
       ) : null}
 
-      {hasTeacherActions ? (
-        <TeacherSnapshotSection title="Teaching Workflow">
-          <TeacherSnapshotActions
-            primaryAction={primaryAction}
-            teacherActions={teacherActions}
-          />
-        </TeacherSnapshotSection>
-      ) : null}
+      <TeacherSnapshotSection
+        title="My Progress"
+        description="Your own reader history for this book, with listening time included in total time."
+      >
+        <TeacherSnapshotStatGrid stats={progressStats} />
+      </TeacherSnapshotSection>
 
       <TeacherSnapshotSection
         title="Community Fit"
@@ -693,12 +661,6 @@ export default function TeacherReadingSnapshotPage() {
         />
       </TeacherSnapshotSection>
 
-      <TeacherSnapshotSection
-        title="My Progress"
-        description="Your own reader history for this book, with listening time included in total time."
-      >
-        <TeacherSnapshotStatGrid stats={progressStats} compact />
-      </TeacherSnapshotSection>
 
       <TeacherSnapshotSection
         title="Student Progress"

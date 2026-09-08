@@ -1,3 +1,5 @@
+import StatCard from "../../stats/components/StatCard";
+
 export type TeacherSnapshotStudentSummary = {
   total: number;
   reading: number;
@@ -21,24 +23,16 @@ export default function TeacherSnapshotStudentProgress({
 
   if (summary.total === 0) {
     return (
-      <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4 text-sm leading-6 text-stone-500">
+      <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm text-sm leading-6 text-stone-500">
         No linked students are reading this book yet.
       </div>
     );
   }
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {items.map((item) => (
-        <div
-          key={item.label}
-          className="rounded-2xl border border-stone-200 bg-stone-50 p-4"
-        >
-          <div className="text-xs font-bold uppercase tracking-[0.12em] text-stone-400">
-            {item.label}
-          </div>
-          <div className="mt-2 text-2xl font-black text-stone-950">{item.value}</div>
-        </div>
+        <StatCard key={item.label} label={item.label} value={item.value} />
       ))}
     </div>
   );

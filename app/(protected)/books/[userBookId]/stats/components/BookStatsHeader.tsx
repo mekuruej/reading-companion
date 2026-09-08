@@ -11,6 +11,7 @@ type BookStatsHeaderProps = {
   formatLabel?: string | null;
   bookHubHref: string;
   description?: string;
+  pageLabel?: string;
 };
 
 export default function BookStatsHeader({
@@ -24,6 +25,7 @@ export default function BookStatsHeader({
   formatLabel,
   bookHubHref,
   description = "Reading history, time, pace, and difficulty.",
+  pageLabel = "Book Stats",
 }: BookStatsHeaderProps) {
   const displayTitle = bookTitle ?? "Untitled book";
   const metadataPills = [statusLabel, languageLabel, formatLabel].filter(
@@ -63,7 +65,7 @@ export default function BookStatsHeader({
             <div className="min-w-0">
               <div className="mb-5 flex flex-wrap gap-2">
                 <span className="rounded-full bg-white/80 px-4 py-1.5 text-xs font-black uppercase tracking-[0.22em] text-stone-600 shadow-sm">
-                  Book Stats
+                  {pageLabel}
                 </span>
                 <span className="rounded-full bg-stone-950 px-4 py-1.5 text-xs font-black text-white shadow-sm">
                   Private View

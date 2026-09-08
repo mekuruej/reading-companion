@@ -14,35 +14,35 @@ export default function TeacherSnapshotTeachingFit({
   hasTeacherBook,
 }: TeacherSnapshotTeachingFitProps) {
   return (
-    <div className="grid gap-2 lg:grid-cols-[1fr_1fr_2fr]">
-      <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
-        <div className="text-xs font-bold uppercase tracking-[0.12em] text-stone-400">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
+        <div className="text-xs font-semibold uppercase tracking-wide text-stone-500">
           Status
         </div>
-        <div className="mt-1 text-lg font-black text-stone-950">{statusLabel}</div>
+        <div className="mt-2 text-2xl font-black text-stone-950">{statusLabel}</div>
         {!hasTeacherBook ? (
-          <p className="mt-1 text-xs leading-5 text-stone-500">
+          <p className="mt-2 text-sm leading-6 text-stone-500">
             Not added to teaching yet.
           </p>
         ) : null}
       </div>
 
-      <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
-        <div className="text-xs font-bold uppercase tracking-[0.12em] text-stone-400">
+      <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
+        <div className="text-xs font-semibold uppercase tracking-wide text-stone-500">
           Level
         </div>
-        <div className="mt-1 text-lg font-black text-stone-950">
+        <div className="mt-2 text-2xl font-black text-stone-950">
           {recommendedLevel || "Not set"}
         </div>
         {recommendedLevelDescription ? (
-          <p className="mt-1 line-clamp-2 text-xs leading-5 text-stone-600">
+          <p className="mt-2 text-sm leading-6 text-stone-600">
             {recommendedLevelDescription}
           </p>
         ) : null}
       </div>
 
-      <div className="rounded-xl border border-stone-200 bg-white px-3 py-2">
-        <div className="text-xs font-bold uppercase tracking-[0.12em] text-stone-400">
+      <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
+        <div className="text-xs font-semibold uppercase tracking-wide text-stone-500">
           Teaching Note
         </div>
         <p className="mt-1 text-sm leading-6 text-stone-700">

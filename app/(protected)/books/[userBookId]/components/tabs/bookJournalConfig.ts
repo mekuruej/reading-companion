@@ -10,10 +10,10 @@ const mainTabOrders: Record<"native" | "target", StoryTabMode[]> = {
 const personalTabs: StoryTabMode[] = ["notes", "review"];
 
 export function getBookJournalTabOrder(
-  bookLanguageCode: string | null | undefined,
+  languageCode: string | null | undefined,
   ownerNativeLanguage: string | null | undefined
 ): StoryTabMode[] {
-  const mode = isNativeLanguageBook({ bookLanguageCode, ownerNativeLanguage })
+  const mode = isNativeLanguageBook({ bookLanguageCode: languageCode, ownerNativeLanguage })
     ? "native"
     : "target";
   return [...mainTabOrders[mode], ...personalTabs];
