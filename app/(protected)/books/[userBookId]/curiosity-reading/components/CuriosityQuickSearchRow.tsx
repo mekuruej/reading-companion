@@ -41,7 +41,7 @@ export default function CuriosityQuickSearchRow({
             onChange={(event) => onSurfaceChange(event.target.value)}
             onKeyDown={onSearchKeyDown}
             placeholder="Search or edit a word..."
-            className="min-h-12 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-base text-stone-900 outline-none focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
+            className="min-h-10 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-base text-stone-900 outline-none focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
           />
 
           <button
@@ -56,7 +56,7 @@ export default function CuriosityQuickSearchRow({
       </div>
 
       {surface.trim() && reading.trim() ? (
-        <div className="flex min-h-12 items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-500">
+        <div className="flex min-h-10 items-center gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-500">
           <span>Current library status:</span>
           {quickPreviewLibraryColorInfo ? (
             <LibraryColorBadge

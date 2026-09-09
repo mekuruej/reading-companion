@@ -680,6 +680,8 @@ export default function BookHubPage() {
   const [showBookFlagModal, setShowBookFlagModal] = useState(false);
   const [bookFlagNote, setBookFlagNote] = useState("");
   const [isSavingBookFlag, setIsSavingBookFlag] = useState(false);
+  const [retainedForTeaching, setRetainedForTeaching] = useState(false);
+  useEffect(() => { setRetainedForTeaching(false); }, [userBookId]);
   const [showRemoveLibraryConfirm, setShowRemoveLibraryConfirm] = useState(false);
   const [isRemovingFromLibrary, setIsRemovingFromLibrary] = useState(false);
   const [removeLibraryError, setRemoveLibraryError] = useState<string | null>(null);
@@ -5208,6 +5210,19 @@ export default function BookHubPage() {
         throw new Error(data?.error ?? "Could not remove this book from your library yet.");
       }
 
+      if (data?.outcome === "retained_as_teaching_only") {
+        setPersonalTrackingStatus("not_tracking");
+        setRow((prev) => prev ? { ...prev, personal_tracking_status: "not_tracking" } : prev);
+        setRetainedForTeaching(true);
+        setShowRemoveLibraryConfirm(false);
+        setSaveNoticeTone("success");
+        setSaveNotice("Personal tracking stopped. This book remains in My Library under Teaching Only. Your reading history, journal, and teaching work are preserved.");
+        return;
+      }
+      if (data?.outcome !== "removed") {
+        throw new Error("Unexpected response. Please reload to check this book's status.");
+      }
+
       router.push("/books");
     } catch (err: any) {
       setRemoveLibraryError(
@@ -5589,6 +5604,8 @@ export default function BookHubPage() {
 
   const isViewingStudentBookHub =
     isTeacherContext && !!row.user_id && !!userId && row.user_id !== userId;
+  const retainForTeaching = Boolean(teacherBookRelationship?.id) || retainedForTeaching;
+  const alreadyTeachingOnly = retainForTeaching && personalTrackingStatus === "not_tracking";
   const canRemoveFromMyLibrary = !!userId && row.user_id === userId;
   const canUseBookHubTeachingMode =
     isOwnBookHub &&
@@ -5641,6 +5658,7 @@ export default function BookHubPage() {
 
       {showRemoveLibraryConfirm ? (
         <RemoveFromLibraryDialog
+          retainForTeaching={retainForTeaching}
           error={removeLibraryError}
           isRemoving={isRemovingFromLibrary}
           onCancel={() => {
@@ -5991,7 +6009,11 @@ export default function BookHubPage() {
                     Flag a problem
                   </button>
 
-                  {canRemoveFromMyLibrary ? (
+                  {canRemoveFromMyLibrary && alreadyTeachingOnly ? (
+                    <p className="px-4 py-2 text-sm font-semibold text-stone-600">
+                      Teaching Only · Personal tracking is off. Your data is preserved.
+                    </p>
+                  ) : canRemoveFromMyLibrary ? (
                     <button
                       type="button"
                       onClick={() => {
@@ -6001,7 +6023,7 @@ export default function BookHubPage() {
                       }}
                       className="rounded-full border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50"
                     >
-                      Remove from My Mekuru Library
+                      {retainForTeaching ? "Stop Personal Tracking" : "Remove from My Mekuru Library"}
                     </button>
                   ) : null}
                 </div>

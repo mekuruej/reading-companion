@@ -11,7 +11,7 @@ export default function CuriosityAddEditWordFormShell({
 }: CuriosityAddEditWordFormShellProps) {
   return (
     <div
-      className={`space-y-4 rounded-xl border p-4 ${
+      className={`space-y-3 rounded-xl border p-3 ${
         editingSurface
           ? "border-amber-200 bg-amber-50"
           : "border-stone-200 bg-stone-50"

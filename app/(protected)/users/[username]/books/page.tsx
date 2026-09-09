@@ -5,6 +5,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { normalizeLanguageCode } from "@/lib/books/englishNativeTracker";
 import {
   getLibraryStudyEncounterStageCounts,
 } from "@/lib/libraryStudyColor";
@@ -1680,7 +1681,7 @@ export default function BooksPage() {
   }
 
   function renderTeachingControls(row: UserBookRow, variant: "card" | "row") {
-    if (!canSeeOwnTeachingLibraryContext) return null;
+    if (!canSeeOwnTeachingLibraryContext || normalizeLanguageCode(row.books?.language_code) !== "ja") return null;
 
     const draft = teachingDraftByUserBookId[row.id] ?? createTeachingDraft(row);
     const savedStatus = row.teaching_status ?? "";

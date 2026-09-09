@@ -64,6 +64,7 @@ type QuickPreview = {
   isCustomMeaning: boolean;
   useAlternateSurface: boolean;
   alternateSurface: string;
+  percent?: string;
   page: string;
   chapterNumber: string;
   chapterName: string;
@@ -75,6 +76,7 @@ type QuickSessionWord = {
   surface: string;
   reading: string;
   meaning: string;
+  percent?: string;
   page: string;
   chapterNumber: string;
   chapterName: string;
@@ -102,6 +104,7 @@ type QuickLookupCandidate = {
 
 type LastSavedWordContext = {
   surface: string;
+  percent?: string;
   page: string;
 };
 
@@ -113,7 +116,7 @@ export type CuriosityReadingJournalContext = {
   selectedChapterNumber: number | null;
 };
 
-function makeBlankQuickPreview(meta = { page: "", chapterNumber: "", chapterName: "" }): QuickPreview {
+function makeBlankQuickPreview(meta: { page: string; percent?: string; chapterNumber: string; chapterName: string } = { page: "", chapterNumber: "", chapterName: "" }): QuickPreview {
   return {
     id: null,
     surface: "",
@@ -126,6 +129,7 @@ function makeBlankQuickPreview(meta = { page: "", chapterNumber: "", chapterName
     useAlternateSurface: false,
     alternateSurface: "",
     page: meta.page,
+    percent: meta.percent ?? "",
     chapterNumber: meta.chapterNumber,
     chapterName: meta.chapterName,
     pageOrder: null,
@@ -638,17 +642,18 @@ export function CuriosityReadingExperience({
 
     const meta = {
       page: quickPreview.page,
+      percent: quickPreview.percent ?? "",
       chapterNumber: quickPreview.chapterNumber,
       chapterName: quickPreview.chapterName,
     };
 
     const hasAnyLocation =
-      meta.page.trim() || meta.chapterNumber.trim() || meta.chapterName.trim();
+      meta.page.trim() || meta.percent.trim() || meta.chapterNumber.trim() || meta.chapterName.trim();
 
     if (!hasAnyLocation) return;
 
     saveQuickMeta(meta);
-  }, [quickPreview?.page, quickPreview?.chapterNumber, quickPreview?.chapterName]);
+  }, [quickPreview?.page, quickPreview?.percent, quickPreview?.chapterNumber, quickPreview?.chapterName]);
 
   useEffect(() => {
     onReadingJournalContextChange?.({
@@ -967,12 +972,9 @@ export function CuriosityReadingExperience({
       const input = quickWordInputRef.current;
       if (!input) return;
 
-      if (isSmallViewport()) {
-        input.focus({ preventScroll: true });
-        return;
-      }
-
-      input.focus();
+      input.focus({ preventScroll: true });
+      const top = window.scrollY + input.getBoundingClientRect().top - 20;
+      window.scrollTo({ top: Math.max(0, top), behavior: "auto" });
     }, 0);
   }
 
@@ -991,27 +993,28 @@ export function CuriosityReadingExperience({
 
   function getSavedQuickMeta() {
     if (typeof window === "undefined") {
-      return { page: "", chapterNumber: "", chapterName: "" };
+      return { page: "", percent: "", chapterNumber: "", chapterName: "" };
     }
 
     try {
       const raw = window.localStorage.getItem(quickMetaStorageKey);
       if (!raw) {
-        return { page: "", chapterNumber: "", chapterName: "" };
+        return { page: "", percent: "", chapterNumber: "", chapterName: "" };
       }
 
       const parsed = JSON.parse(raw);
       return {
-        page: typeof parsed.page === "string" ? parsed.page : "",
+        page: typeof parsed.page === "string" && !parsed.page.includes("%") ? parsed.page : "",
+        percent: typeof parsed.percent === "string" ? parsed.percent : typeof parsed.page === "string" && parsed.page.endsWith("%") ? parsed.page.slice(0, -1) : "",
         chapterNumber: typeof parsed.chapterNumber === "string" ? parsed.chapterNumber : "",
         chapterName: typeof parsed.chapterName === "string" ? parsed.chapterName : "",
       };
     } catch {
-      return { page: "", chapterNumber: "", chapterName: "" };
+      return { page: "", percent: "", chapterNumber: "", chapterName: "" };
     }
   }
 
-  function saveQuickMeta(meta: { page: string; chapterNumber: string; chapterName: string }) {
+  function saveQuickMeta(meta: { percent?: string; page: string; chapterNumber: string; chapterName: string }) {
     if (typeof window === "undefined") return;
 
     try {
@@ -1053,6 +1056,7 @@ export function CuriosityReadingExperience({
   function clearQuickWordFields(options: { preserveSavedNotice?: boolean } = {}) {
     const meta = {
       page: quickPreview.page,
+      percent: quickPreview.percent ?? "",
       chapterNumber: quickPreview.chapterNumber,
       chapterName: quickPreview.chapterName,
     };
@@ -1066,7 +1070,7 @@ export function CuriosityReadingExperience({
     if (!options.preserveSavedNotice) {
       setSavedQuickNotice("");
     }
-    window.setTimeout(() => quickWordInputRef.current?.focus({ preventScroll: true }), 0);
+    prepareForNextQuickWord();
   }
 
   async function getNextPageOrder(
@@ -1110,6 +1114,7 @@ export function CuriosityReadingExperience({
       useAlternateSurface: item.useAlternateSurface,
       alternateSurface: item.alternateSurface,
       page: item.page,
+      percent: item.percent ?? "",
       chapterNumber: item.chapterNumber,
       chapterName: item.chapterName,
       pageOrder: item.pageOrder,
@@ -1184,6 +1189,7 @@ export function CuriosityReadingExperience({
         useAlternateSurface: false,
         alternateSurface: "",
         page: savedMeta.page,
+        percent: savedMeta.percent ?? "",
         chapterNumber: savedMeta.chapterNumber,
         chapterName: savedMeta.chapterName,
         pageOrder: null,
@@ -1251,7 +1257,13 @@ export function CuriosityReadingExperience({
     const isManualEntry = quickPreview.isCustomMeaning && quickPreview.meanings.length === 0;
 
     const chapterNum = quickPreview.chapterNumber ? Number(quickPreview.chapterNumber) : null;
-    const parsedPage = parseOptionalPageLocationInput(quickPreview.page, bookPageCount);
+    const percentText = quickPreview.percent?.trim() ?? "";
+    const percentLocation = percentText ? Number(percentText) : null;
+    if (percentLocation != null && (!Number.isFinite(percentLocation) || percentLocation < 0 || percentLocation > 100)) {
+      setQuickError("Percentage must be between 0 and 100.");
+      return;
+    }
+    const parsedPage = parseOptionalPageLocationInput(quickPreview.page, null);
     if (parsedPage.error) {
       setQuickError(parsedPage.error);
       return;
@@ -1313,6 +1325,7 @@ export function CuriosityReadingExperience({
         ? null
         : quickPreview.selectedMeaningIndex,
       page_number: pageNum,
+      percent_location: percentLocation,
       chapter_number: chapterNum,
       chapter_name: chapterNameTrimmed,
       hide_kanji_in_reading_support: hideKanjiInReadingSupport,
@@ -1333,7 +1346,7 @@ export function CuriosityReadingExperience({
         .from("user_book_words")
         .insert(payload)
         .select(
-          "id, surface, reading, meaning, meaning_choices, meaning_choice_index, page_number, page_order, chapter_number, chapter_name, hide_kanji_in_reading_support"
+          "id, surface, reading, meaning, meaning_choices, meaning_choice_index, percent_location, page_number, page_order, chapter_number, chapter_name, hide_kanji_in_reading_support"
         )
         .single();
 
@@ -1349,6 +1362,7 @@ export function CuriosityReadingExperience({
         reading: data.reading ?? "",
         meaning: data.meaning ?? "",
         page: data.page_number != null ? String(data.page_number) : "",
+        percent: data.percent_location != null ? String(data.percent_location) : "",
         chapterNumber: data.chapter_number != null ? String(data.chapter_number) : "",
         chapterName: data.chapter_name ?? "",
         meanings: data.meaning_choices ?? quickPreview.meanings,
@@ -1383,7 +1397,7 @@ export function CuriosityReadingExperience({
         .eq("id", editingExisting.id)
         .eq("user_book_id", userBookId)
         .select(
-          "id, surface, reading, meaning, meaning_choices, meaning_choice_index, page_number, page_order, chapter_number, chapter_name, hide_kanji_in_reading_support"
+          "id, surface, reading, meaning, meaning_choices, meaning_choice_index, percent_location, page_number, page_order, chapter_number, chapter_name, hide_kanji_in_reading_support"
         )
         .single();
 
@@ -1399,6 +1413,7 @@ export function CuriosityReadingExperience({
         reading: data.reading ?? "",
         meaning: data.meaning ?? "",
         page: data.page_number != null ? String(data.page_number) : "",
+        percent: data.percent_location != null ? String(data.percent_location) : "",
         chapterNumber: data.chapter_number != null ? String(data.chapter_number) : "",
         chapterName: data.chapter_name ?? "",
         meanings: data.meaning_choices ?? quickPreview.meanings,
@@ -1433,7 +1448,6 @@ export function CuriosityReadingExperience({
     }
 
     clearQuickWordFields({ preserveSavedNotice: true });
-    prepareForNextQuickWord();
   }
 
   async function saveEnglishQuickWord() {
@@ -1459,7 +1473,13 @@ export function CuriosityReadingExperience({
     }
 
     const chapterNum = quickPreview.chapterNumber ? Number(quickPreview.chapterNumber) : null;
-    const parsedPage = parseOptionalPageLocationInput(quickPreview.page, bookPageCount);
+    const percentText = quickPreview.percent?.trim() ?? "";
+    const percentLocation = percentText ? Number(percentText) : null;
+    if (percentLocation != null && (!Number.isFinite(percentLocation) || percentLocation < 0 || percentLocation > 100)) {
+      setQuickError("Percentage must be between 0 and 100.");
+      return;
+    }
+    const parsedPage = parseOptionalPageLocationInput(quickPreview.page, null);
     if (parsedPage.error) {
       setQuickError(parsedPage.error);
       return;
@@ -1490,6 +1510,7 @@ export function CuriosityReadingExperience({
       jlpt: null,
       is_common: null,
       page_number: pageNum,
+      percent_location: percentLocation,
       chapter_number: chapterNum,
       chapter_name: chapterNameTrimmed,
       hide_kanji_in_reading_support: false,
@@ -1507,7 +1528,7 @@ export function CuriosityReadingExperience({
         .from("user_book_words")
         .insert(payload)
         .select(
-          "id, surface, reading, meaning, page_number, page_order, chapter_number, chapter_name, item_type"
+          "id, surface, reading, meaning, percent_location, page_number, page_order, chapter_number, chapter_name, item_type"
         )
         .single();
 
@@ -1524,6 +1545,7 @@ export function CuriosityReadingExperience({
         reading: data.reading ?? "",
         meaning: data.meaning ?? cleanSupport,
         page: data.page_number != null ? String(data.page_number) : "",
+        percent: data.percent_location != null ? String(data.percent_location) : "",
         chapterNumber: data.chapter_number != null ? String(data.chapter_number) : "",
         chapterName: data.chapter_name ?? "",
         meanings: [],
@@ -1558,7 +1580,7 @@ export function CuriosityReadingExperience({
         .eq("id", editingExisting.id)
         .eq("user_book_id", userBookId)
         .select(
-          "id, surface, reading, meaning, page_number, page_order, chapter_number, chapter_name, item_type"
+          "id, surface, reading, meaning, percent_location, page_number, page_order, chapter_number, chapter_name, item_type"
         )
         .single();
 
@@ -1575,6 +1597,7 @@ export function CuriosityReadingExperience({
         reading: data.reading ?? "",
         meaning: data.meaning ?? cleanSupport,
         page: data.page_number != null ? String(data.page_number) : "",
+        percent: data.percent_location != null ? String(data.percent_location) : "",
         chapterNumber: data.chapter_number != null ? String(data.chapter_number) : "",
         chapterName: data.chapter_name ?? "",
         meanings: [],
@@ -1605,7 +1628,6 @@ export function CuriosityReadingExperience({
     }
 
     clearQuickWordFields({ preserveSavedNotice: true });
-    prepareForNextQuickWord();
   }
 
   async function deleteQuickWordById(id: string) {
@@ -2376,10 +2398,9 @@ export function CuriosityReadingExperience({
               onHideKanjiChange={setHideKanjiInReadingSupport}
               onSaveWord={() => void saveQuickWord()}
               onClearWordFields={() => clearQuickWordFields()}
-              locationLabel={isListeningMode ? "Page or %" : "Page"}
-              locationPlaceholder={isListeningMode ? "p. 42 or 37%" : "Page"}
-              locationHelpText="Use a page or percent. Percent converts to a page when this book has a page count."
-              allowPercentLocation={isListeningMode}
+              locationLabel="Page"
+              locationHelpText="Optional. Use the actual page for pace."
+              onPercentChange={(value) => setQuickPreview((prev) => ({ ...prev, percent: value }))}
               saveAreaWarning={
                 isRunning || isPaused
                   ? "Timer is active. If you leave or refresh the page, you may lose your session."

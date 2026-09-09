@@ -9,6 +9,7 @@ type CuriosityWordDetailPreview = {
   selectedMeaningIndex: number;
   meaning: string;
   isCustomMeaning: boolean;
+  percent?: string;
   page: string;
   chapterNumber: string;
   chapterName: string;
@@ -25,6 +26,7 @@ type CuriosityWordDetailFieldsProps = {
   onAlternateSurfaceChange: (value: string) => void;
   onMeaningChoiceChange: (index: number, meaning: string) => void;
   onCustomMeaningChange: (value: string) => void;
+  onPercentChange?: (value: string) => void;
   onPageChange: (value: string) => void;
   onChapterNumberChange: (value: string) => void;
   onChapterNameChange: (value: string) => void;
@@ -32,9 +34,7 @@ type CuriosityWordDetailFieldsProps = {
   onSaveWord: () => void;
   onClearWordFields: () => void;
   locationLabel?: string;
-  locationPlaceholder?: string;
   locationHelpText?: string;
-  allowPercentLocation?: boolean;
   saveAreaWarning?: string;
 };
 
@@ -49,6 +49,7 @@ export default function CuriosityWordDetailFields({
   onAlternateSurfaceChange,
   onMeaningChoiceChange,
   onCustomMeaningChange,
+  onPercentChange,
   onPageChange,
   onChapterNumberChange,
   onChapterNameChange,
@@ -56,15 +57,13 @@ export default function CuriosityWordDetailFields({
   onSaveWord,
   onClearWordFields,
   locationLabel = "Page",
-  locationPlaceholder = "Page",
   locationHelpText,
-  allowPercentLocation = false,
   saveAreaWarning,
 }: CuriosityWordDetailFieldsProps) {
   return (
     <>
       <div ref={quickWordFieldsRef} className="space-y-3">
-        <div className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-600">
+        <div className="text-xs leading-5 text-stone-500">
           <span className="font-semibold text-stone-900">Manual entry:</span>{" "}
           1. Type the word. 2. Add the reading. 3. Add the meaning. 4. Save.
         </div>
@@ -123,24 +122,27 @@ export default function CuriosityWordDetailFields({
         ) : null}
 
         <textarea
+          rows={2}
           value={quickPreview.isCustomMeaning ? quickPreview.meaning : ""}
           onChange={(event) => onCustomMeaningChange(event.target.value)}
           placeholder="Type your meaning"
-          className="min-h-[80px] w-full rounded border bg-white px-3 py-2 text-sm"
+          className="min-h-[60px] w-full rounded border bg-white px-3 py-2 text-sm"
         />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-stone-700">
             {locationLabel}
           </span>
           <input
-            type="text"
-            inputMode="decimal"
+            type="number"
+            min={1}
+            step={1}
+            inputMode="numeric"
             value={quickPreview.page}
             onChange={(event) => onPageChange(event.target.value)}
-            placeholder={allowPercentLocation ? locationPlaceholder : "p. 42 or 18%"}
+            placeholder="Page"
             className="w-full rounded border bg-white px-3 py-2 text-sm"
           />
           {locationHelpText ? (
@@ -149,6 +151,18 @@ export default function CuriosityWordDetailFields({
             </span>
           ) : null}
         </label>
+
+        {onPercentChange ? (
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium text-stone-700">Percent</span>
+            <input type="number" min={0} max={100} step="any" inputMode="decimal"
+              value={quickPreview.percent ?? ""}
+              onChange={(event) => onPercentChange(event.target.value)}
+              placeholder="0–100%"
+              className="w-full rounded border bg-white px-3 py-2 text-sm" />
+            <span className="mt-1 block text-xs leading-5 text-stone-500">Optional. Saved separately from page.</span>
+          </label>
+        ) : null}
 
         <ChapterNameCombobox
           value={quickPreview.chapterName}

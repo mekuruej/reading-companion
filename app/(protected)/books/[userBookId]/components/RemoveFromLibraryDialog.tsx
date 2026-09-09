@@ -1,4 +1,5 @@
 type RemoveFromLibraryDialogProps = {
+  retainForTeaching?: boolean;
   error: string | null;
   isRemoving: boolean;
   onCancel: () => void;
@@ -6,6 +7,7 @@ type RemoveFromLibraryDialogProps = {
 };
 
 export default function RemoveFromLibraryDialog({
+  retainForTeaching = false,
   error,
   isRemoving,
   onCancel,
@@ -19,13 +21,13 @@ export default function RemoveFromLibraryDialog({
         </div>
 
         <h2 className="mt-2 text-2xl font-bold text-stone-950">
-          Are you sure you want to remove this book?
+          {retainForTeaching ? "Stop personal tracking for this book?" : "Are you sure you want to remove this book?"}
         </h2>
 
         <p className="mt-3 text-sm leading-6 text-stone-700">
-          This will remove the book from your Mekuru library, including your saved
-          words, reading sessions, and stats for this book. The shared book record
-          will stay in Mekuru.
+          {retainForTeaching
+            ? "This book will remain in My Library under Teaching Only. Your reading history, journal, vocabulary, and other personal data will be preserved, along with all teaching work."
+            : "This will remove the book from your Mekuru library, including your saved words, reading sessions, and stats for this book. The shared book record will stay in Mekuru."}
         </p>
 
         {error ? (
@@ -50,7 +52,7 @@ export default function RemoveFromLibraryDialog({
             disabled={isRemoving}
             className="rounded-full bg-rose-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-800 disabled:cursor-wait disabled:bg-rose-500 disabled:opacity-90"
           >
-            {isRemoving ? "Removing..." : "Remove from My Library"}
+            {isRemoving ? "Saving..." : retainForTeaching ? "Stop Personal Tracking" : "Remove from My Library"}
           </button>
         </div>
       </div>

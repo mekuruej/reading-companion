@@ -22,7 +22,7 @@ export default function LibraryGuidePanel({
         <button
           type="button"
           onClick={() => onNavigate("/books/add")}
-          className="rounded-2xl border border-sky-100 bg-sky-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-sky-100"
+          className="rounded-2xl border border-sky-100 bg-sky-50/70 px-3 py-2.5 text-left shadow-md shadow-slate-900/15 transition hover:-translate-y-0.5 hover:bg-sky-100 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
         >
           <div className="text-sm font-black text-slate-950">Add Book</div>
           <p className="mt-1 text-xs leading-5 text-slate-600">
@@ -38,7 +38,7 @@ export default function LibraryGuidePanel({
           <button
             type="button"
             onClick={() => onNavigate("/books/add")}
-            className="rounded-2xl border border-sky-100 bg-sky-50/70 px-3 py-2.5 text-left transition hover:-translate-y-0.5 hover:bg-sky-100"
+            className="rounded-2xl border border-sky-100 bg-sky-50/70 px-3 py-2.5 text-left shadow-md shadow-slate-900/15 transition hover:-translate-y-0.5 hover:bg-sky-100 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
           >
             <div className="text-sm font-black text-slate-950">Add Book</div>
             <p className="mt-1 text-xs leading-5 text-slate-600">
@@ -113,7 +113,7 @@ export default function LibraryGuidePanel({
       <button
         type="button"
         onClick={() => onNavigate("/library/japanese-books")}
-        className="mt-3 rounded-2xl border border-violet-200 bg-white px-3 py-2.5 text-left text-sm font-black text-violet-950 shadow-sm transition hover:-translate-y-0.5 hover:bg-violet-50"
+        className="mt-3 rounded-2xl border border-violet-200 bg-white px-3 py-2.5 text-left text-sm font-black text-violet-950 shadow-md shadow-slate-900/15 transition hover:-translate-y-0.5 hover:bg-violet-50 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2"
       >
         Open Japanese Books
       </button>

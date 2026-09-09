@@ -1,3 +1,4 @@
+import { requiresTeachingRetention } from "@/lib/teacher/teachingRetention";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -49,7 +50,7 @@ export async function POST(
 
   const { data: userBook, error: userBookError } = await supabaseAdmin
     .from("user_books")
-    .select("id, user_id")
+    .select("id, user_id, book_id")
     .eq("id", userBookId)
     .maybeSingle();
 
@@ -72,6 +73,28 @@ export async function POST(
     return NextResponse.json(
       { error: "You can only remove books from your own library." },
       { status: 403 }
+    );
+  }
+
+  // No destructive work is allowed until dependency checking has succeeded.
+  try {
+    if (await requiresTeachingRetention(supabaseAdmin, auth.user.id, userBook.book_id, userBookId)) {
+      const { data: retained, error } = await supabaseAdmin
+        .from("user_books")
+        .update({ personal_tracking_status: "not_tracking" })
+        .eq("id", userBookId)
+        .eq("user_id", auth.user.id)
+        .eq("book_id", userBook.book_id)
+        .select("id")
+        .single();
+      if (error || !retained) throw error ?? new Error("Workspace no longer exists.");
+      return NextResponse.json({ success: true, outcome: "retained_as_teaching_only" });
+    }
+  } catch (error) {
+    console.error("Could not safely resolve teaching retention:", error);
+    return NextResponse.json(
+      { error: "Could not safely update this library book. Nothing was removed." },
+      { status: 500 }
     );
   }
 
@@ -113,5 +136,5 @@ export async function POST(
     );
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, outcome: "removed" });
 }

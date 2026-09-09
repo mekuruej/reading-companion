@@ -6,6 +6,7 @@ type CuriosityRecentSessionWord = {
   surface: string;
   reading: string;
   meaning: string;
+  percent?: string;
   page: string;
   chapterNumber: string;
   chapterName: string;
@@ -50,6 +51,7 @@ export default function CuriosityRecentSessionWordCard({
             <div className="mt-1 text-xs text-stone-500">
               Page {word.page || "—"} · Ch {word.chapterNumber || "—"} ·{" "}
               {word.chapterName || "—"}
+              {word.percent ? ` · ${word.percent}%` : ""}
             </div>
           ) : null}
         </div>
