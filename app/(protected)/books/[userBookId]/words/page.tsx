@@ -2,6 +2,7 @@
 //
 "use client";
 
+import { isReadyForFlashcards } from "@/lib/wordSupportEligibility";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
@@ -155,22 +156,6 @@ function normalizeJlpt(val: string | null | undefined) {
   return "NON-JLPT";
 }
 
-function isReadyForFlashcards(word: {
-  surface?: string | null;
-  reading?: string | null;
-  meaning?: string | null;
-  target_language_code?: string | null;
-}) {
-  const surface = (word.surface ?? "").trim();
-  const reading = (word.reading ?? "").trim();
-  const meaning = (word.meaning ?? "").trim();
-  const targetLanguageCode = (word.target_language_code ?? "").trim();
-
-  if (!surface || !meaning) return false;
-  if (targetLanguageCode === "en") return true;
-  return Boolean(reading);
-}
-
 function chapterDisplayParts(w: WordRow) {
   const num = w.chapter_number;
   const name = (w.chapter_name ?? "").trim();
@@ -240,7 +225,6 @@ function studyIdentityKey(surface: string | null | undefined, reading: string | 
   if (!normalizedSurface) return "";
   return `${normalizedSurface}||${normalizedReading}`;
 }
-
 
 function csvCell(value: unknown) {
   const text = value == null ? "" : String(value).replace(/\s*\r?\n\s*/g, " ");

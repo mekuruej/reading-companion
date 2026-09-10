@@ -268,7 +268,6 @@ function sharedVocabularyToFollowAlongItem(word: SharedTeacherVocabularyWord): T
 function shouldShowInLessonDisplay(word: SharedTeacherVocabularyWord) {
   if (word.hiddenFromMyLibrary || word.hiddenFromTeaching) return false;
   if (!word.surface.trim() && !word.meaning?.trim()) return false;
-  if (!word.meaning?.trim()) return false;
 
   if (!word.teacherVocabularyId) return Boolean(word.personalWordId);
   return word.includedInFollowAlong;
@@ -285,7 +284,7 @@ function isMissingTeachingVocabularyTable(error: any) {
 }
 
 function hasUsefulReaderVocabSupport(word: ReaderVocabWord) {
-  return Boolean(word.meaning?.trim());
+  return Boolean(word.surface?.trim() || word.meaning?.trim());
 }
 
 function teacherSupportToFollowAlongItem(item: TeacherBookItem): TeacherFollowAlongItem {

@@ -555,6 +555,13 @@ export default function ProfileHubPage() {
                   Your long-term reading profile: books read, books listened to, logged time, and reading level.
                 </p>
 
+                <Link
+                  href="/community/stats"
+                  className="mt-5 inline-flex items-center gap-2 rounded-xl bg-stone-950 px-5 py-3 text-sm font-bold text-white shadow-md transition hover:-translate-y-0.5 hover:bg-stone-800 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-700 focus-visible:ring-offset-2"
+                >
+                  View Detailed Reading Stats <span aria-hidden="true">→</span>
+                </Link>
+
                 {heroFacts.length > 0 ? (
                   <div className="mt-5 flex flex-wrap gap-2">
                     {heroFacts.map((fact) => (

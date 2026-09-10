@@ -21,7 +21,7 @@ export default function RemoveFromLibraryDialog({
         </div>
 
         <h2 className="mt-2 text-2xl font-bold text-stone-950">
-          {retainForTeaching ? "Stop personal tracking for this book?" : "Are you sure you want to remove this book?"}
+          Remove this book from My Library?
         </h2>
 
         <p className="mt-3 text-sm leading-6 text-stone-700">
@@ -52,7 +52,7 @@ export default function RemoveFromLibraryDialog({
             disabled={isRemoving}
             className="rounded-full bg-rose-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-800 disabled:cursor-wait disabled:bg-rose-500 disabled:opacity-90"
           >
-            {isRemoving ? "Saving..." : retainForTeaching ? "Stop Personal Tracking" : "Remove from My Library"}
+            {isRemoving ? "Saving..." : "Remove from My Library"}
           </button>
         </div>
       </div>

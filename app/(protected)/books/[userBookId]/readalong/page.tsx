@@ -3,6 +3,7 @@
 
 "use client";
 
+import { isReadyForFlashcards } from "@/lib/wordSupportEligibility";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -157,8 +158,8 @@ function chapterContextFromKey(chapterKey: string) {
     };
 }
 
-function hasUsefulSupportMeaning(word: Pick<ReadAlongWord, "meaning">) {
-    return Boolean(word.meaning?.trim());
+function hasUsefulSupport(word: Pick<ReadAlongWord, "surface" | "meaning">) {
+    return Boolean(word.surface?.trim() || word.meaning?.trim());
 }
 
 function normalizeJlpt(val: string): string {
@@ -246,18 +247,6 @@ function buildJishoCandidates(entries: any[], fallbackWord: string): JishoCandid
 
 function hasKanji(text: string) {
     return /[\p{Script=Han}]/u.test(text);
-}
-
-function isReadyForFlashcards(word: {
-    surface?: string | null;
-    reading?: string | null;
-    meaning?: string | null;
-}) {
-    const surface = (word.surface ?? "").trim();
-    const reading = (word.reading ?? "").trim();
-    const meaning = (word.meaning ?? "").trim();
-
-    return Boolean(surface && reading && meaning);
 }
 
 function sameWordOrderGroup(
@@ -595,7 +584,7 @@ export default function ReadAlongPage() {
                 return;
             }
 
-            setWords(((data as ReadAlongWord[]) ?? []).filter(hasUsefulSupportMeaning));
+            setWords(((data as ReadAlongWord[]) ?? []).filter(hasUsefulSupport));
             setLoading(false);
         }
 

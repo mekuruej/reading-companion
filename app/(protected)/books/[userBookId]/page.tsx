@@ -5216,7 +5216,7 @@ export default function BookHubPage() {
         setRetainedForTeaching(true);
         setShowRemoveLibraryConfirm(false);
         setSaveNoticeTone("success");
-        setSaveNotice("Personal tracking stopped. This book remains in My Library under Teaching Only. Your reading history, journal, and teaching work are preserved.");
+        setSaveNotice("Removed from your personal reading list. This book remains available under Teaching Only. Your reading history, journal, and teaching work are preserved.");
         return;
       }
       if (data?.outcome !== "removed") {
@@ -6011,7 +6011,7 @@ export default function BookHubPage() {
 
                   {canRemoveFromMyLibrary && alreadyTeachingOnly ? (
                     <p className="px-4 py-2 text-sm font-semibold text-stone-600">
-                      Teaching Only · Personal tracking is off. Your data is preserved.
+                      Teaching Only · Retained for teaching. Your data is preserved.
                     </p>
                   ) : canRemoveFromMyLibrary ? (
                     <button
@@ -6023,7 +6023,7 @@ export default function BookHubPage() {
                       }}
                       className="rounded-full border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50"
                     >
-                      {retainForTeaching ? "Stop Personal Tracking" : "Remove from My Mekuru Library"}
+                      Remove from My Library
                     </button>
                   ) : null}
                 </div>

@@ -271,9 +271,9 @@ export function TeacherFollowAlongPrepItemCard({
             ) : null}
           </div>
 
-          {(supportMode === "full" || supportMode === "meaning") ? (
+          {item.meaning?.trim() && (supportMode === "full" || supportMode === "meaning") ? (
             <div className="mt-2 text-sm leading-6 text-stone-700 sm:text-base">
-              {item.meaning || "—"}
+              {item.meaning}
             </div>
           ) : null}
         </div>

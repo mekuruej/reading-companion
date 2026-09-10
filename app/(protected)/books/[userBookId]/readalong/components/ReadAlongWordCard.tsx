@@ -153,7 +153,7 @@ export default function ReadAlongWordCard({
           )}
         </div>
 
-        {(supportMode === "full" || supportMode === "meaning") && (
+        {word.meaning?.trim() && (supportMode === "full" || supportMode === "meaning") && (
           <div className="mt-2 text-sm leading-6 text-stone-700 sm:text-base">
             {word.meaning || "—"}
           </div>

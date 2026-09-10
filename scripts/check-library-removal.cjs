@@ -65,7 +65,7 @@ async function invoke() { return POST({ headers: { get: () => 'Bearer test' } },
   const React=require('react'), {renderToStaticMarkup}=require('react-dom/server');
   const Dialog=load('app/(protected)/books/[userBookId]/components/RemoveFromLibraryDialog.tsx').default;
   const html=renderToStaticMarkup(React.createElement(Dialog,{retainForTeaching:true,error:null,isRemoving:false,onCancel(){},onConfirm(){}}));
-  assert(html.includes('Stop Personal Tracking'));assert(html.includes('Teaching Only'));assert(!html.includes('Remove from My Library'));
+  assert(html.includes('Remove from My Library'));assert(html.includes('Teaching Only'));assert(!html.includes('Stop Personal Tracking'));
   // Exercise the actual Book Hub handler with a stale page and server outcomes.
   const pageSource=fs.readFileSync(path.join(root,'app/(protected)/books/[userBookId]/page.tsx'),'utf8');
   const handlerStart=pageSource.indexOf('  async function removeFromMyLibrary()');

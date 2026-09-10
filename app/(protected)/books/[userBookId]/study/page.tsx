@@ -1,7 +1,8 @@
 // Vocab Flashcards
-// 
+//
 "use client";
 
+import { canLoadJapaneseFlashcard, canStudyWord } from "@/lib/wordSupportEligibility";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
@@ -853,7 +854,6 @@ export default function BookFlashcardsPage() {
               )
               .in("user_book_id", ownedBookIds)
               .or("target_language_code.is.null,target_language_code.eq.ja")
-              .eq("excluded_from_flashcards", false)
               .eq("hidden", false)
               .order("page_number", { ascending: true })
               .order("created_at", { ascending: true });
@@ -873,7 +873,7 @@ export default function BookFlashcardsPage() {
               libraryRepeatCounts.set(key, (libraryRepeatCounts.get(key) ?? 0) + 1);
             }
 
-            const normalizedLibrary: Flashcard[] = ((libraryWords ?? []) as WordRow[]).map((w) => {
+            const normalizedLibrary: Flashcard[] = ((libraryWords ?? []) as WordRow[]).filter(canLoadJapaneseFlashcard).map((w) => {
               const ch = chapterInfoFromRow(w);
               const meaningChoices = asStringArray(w.meaning_choices);
 
@@ -885,8 +885,6 @@ export default function BookFlashcardsPage() {
                   : 0;
 
               const savedMeaning = (w.meaning ?? "").trim();
-              const chosenMeaning =
-                savedMeaning || (meaningChoices.length > 0 ? meaningChoices[safeIdx] : "");
 
               const repeatKey = normalizeRepeatKey(w.surface);
               const repeatCount = repeatKey ? (libraryRepeatCounts.get(repeatKey) ?? 1) : 1;
@@ -895,7 +893,7 @@ export default function BookFlashcardsPage() {
                 id: w.id,
                 word: w.surface,
                 reading: w.reading ?? null,
-                meaning: chosenMeaning ?? w.meaning ?? null,
+                meaning: savedMeaning || null,
                 jlpt: normalizeJlpt(w.jlpt),
                 chapterLabel: ch.label,
                 chapterDisplay: ch.display,
@@ -962,7 +960,7 @@ export default function BookFlashcardsPage() {
           .eq("user_book_id", userBookId)
           .or("target_language_code.is.null,target_language_code.eq.ja")
           .eq("hidden", false)
-          .eq("excluded_from_flashcards", false)
+
           .or(`skipped_on.is.null,skipped_on.neq.${today}`)
           .order("page_number", { ascending: true })
           .order("created_at", { ascending: true });
@@ -976,7 +974,7 @@ export default function BookFlashcardsPage() {
           repeatCounts.set(key, (repeatCounts.get(key) ?? 0) + 1);
         }
 
-        const normalized: Flashcard[] = ((words ?? []) as WordRow[]).map((w) => {
+        const normalized: Flashcard[] = ((words ?? []) as WordRow[]).filter(canLoadJapaneseFlashcard).map((w) => {
           const ch = chapterInfoFromRow(w);
           const meaningChoices = asStringArray(w.meaning_choices);
 
@@ -988,8 +986,6 @@ export default function BookFlashcardsPage() {
               : 0;
 
           const savedMeaning = (w.meaning ?? "").trim();
-          const chosenMeaning =
-            savedMeaning || (meaningChoices.length > 0 ? meaningChoices[safeIdx] : "");
 
           const repeatKey = normalizeRepeatKey(w.surface);
           const repeatCount = repeatKey ? (repeatCounts.get(repeatKey) ?? 1) : 1;
@@ -998,7 +994,7 @@ export default function BookFlashcardsPage() {
             id: w.id,
             word: w.surface,
             reading: w.reading ?? null,
-            meaning: chosenMeaning ?? w.meaning ?? null,
+            meaning: savedMeaning || null,
             jlpt: normalizeJlpt(w.jlpt),
             chapterLabel: ch.label,
             chapterDisplay: ch.display,
@@ -1159,6 +1155,7 @@ export default function BookFlashcardsPage() {
       result = result.filter((c) => hasKanji(c.word));
     }
 
+    result = result.filter((entry) => canStudyWord(entry, studySet));
     setFilteredCards(result);
     setStepIndex(0);
     setTypedInput("");

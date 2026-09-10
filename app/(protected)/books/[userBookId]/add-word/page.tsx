@@ -2,6 +2,7 @@
 // 
 "use client";
 
+import { isReadyForFlashcards } from "@/lib/wordSupportEligibility";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -183,21 +184,7 @@ function hasKanji(text: string) {
   return /[\p{Script=Han}]/u.test(text);
 }
 
-function isReadyForFlashcards(word: {
-  surface?: string | null;
-  reading?: string | null;
-  meaning?: string | null;
-  target_language_code?: string | null;
-}) {
-  const surface = (word.surface ?? "").trim();
-  const reading = (word.reading ?? "").trim();
-  const meaning = (word.meaning ?? "").trim();
-  const targetLanguageCode = (word.target_language_code ?? "").trim();
 
-  if (!surface || !meaning) return false;
-  if (targetLanguageCode === "en") return true;
-  return Boolean(reading);
-}
 
 async function generateVocabularyKanjiMap(vocabularyCacheId: number) {
   const {

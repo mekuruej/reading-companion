@@ -3,6 +3,7 @@
 
 "use client";
 
+import { isReadyForFlashcards } from "@/lib/wordSupportEligibility";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
@@ -180,22 +181,6 @@ function buildJishoCandidates(entries: any[], fallbackWord: string): JishoCandid
   return candidates;
 }
 
-function isReadyForFlashcards(word: {
-  surface?: string | null;
-  reading?: string | null;
-  meaning?: string | null;
-  target_language_code?: string | null;
-}) {
-  const surface = (word.surface ?? "").trim();
-  const reading = (word.reading ?? "").trim();
-  const meaning = (word.meaning ?? "").trim();
-  const targetLanguageCode = (word.target_language_code ?? "").trim();
-
-  if (!surface || !meaning) return false;
-  if (targetLanguageCode === "en") return true;
-  return Boolean(reading);
-}
-
 function chapterDisplay(chNum: number | null, chName: string | null) {
   const name = (chName ?? "").trim();
   const num = chNum;
@@ -205,8 +190,6 @@ function chapterDisplay(chNum: number | null, chName: string | null) {
   if (name) return name;
   return "";
 }
-
-
 
 function sortWordNeighbors(words: WordNeighbor[]) {
   return [...words].sort((a, b) => {
