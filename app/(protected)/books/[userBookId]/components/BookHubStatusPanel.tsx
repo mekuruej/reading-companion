@@ -100,6 +100,17 @@ export default function BookHubStatusPanel({
   onFillBeginningPages,
   onFillEndingPages,
 }: BookHubStatusPanelProps) {
+  const shouldNudgeFinishBook =
+    !finishedAt &&
+    !dnfAt &&
+    personalTrackingStatus !== "finished" &&
+    personalTrackingStatus !== "dnf" &&
+    personalTrackingStatus !== "not_tracking" &&
+    pageCount != null &&
+    pageCount > 0 &&
+    furthestTrackedPage != null &&
+    furthestTrackedPage >= pageCount;
+
   return (
     <div className="rounded-2xl border border-violet-100 bg-violet-50/60 p-4">
       <div className="mb-3 text-sm font-semibold text-stone-900">
@@ -142,6 +153,22 @@ export default function BookHubStatusPanel({
           <span className="font-medium">DNF:</span> {dnfAt || "—"}
         </div>
       </div>
+
+      {shouldNudgeFinishBook ? (
+        <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+          <p className="text-sm font-semibold text-emerald-950">
+            You’ve logged the last page! Mark the book as finished to complete it.
+          </p>
+          <button
+            type="button"
+            onClick={() => onPersonalTrackingStatusChange("finished")}
+            disabled={isSavingStatus}
+            className="mt-3 rounded-2xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 motion-safe:animate-pulse disabled:animate-none disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSavingStatus ? "Saving..." : "Finish book"}
+          </button>
+        </div>
+      ) : null}
 
       {dnfAt && (dnfReason || dnfNote || wouldRetry) ? (
         <div className="mt-3 rounded-2xl border border-violet-100 bg-white/70 p-3 text-sm text-stone-700">

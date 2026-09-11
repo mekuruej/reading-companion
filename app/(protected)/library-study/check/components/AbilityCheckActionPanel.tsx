@@ -43,7 +43,7 @@ export default function AbilityCheckActionPanel({
           onClick={onRestartCurrentCard}
           className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
         >
-          Restart check
+          Send back to Red.
         </button>
       ) : null}
 

@@ -80,6 +80,7 @@ type ReadingJournalPanelProps = {
   currentPageNumber?: number | null;
   selectedChapterLabel?: string | null;
   selectedChapterNumber?: number | null;
+  initialTab?: StoryTabMode;
   compact?: boolean;
   vocabListHref?: string;
   canUseJapaneseLearningJournal?: boolean;
@@ -187,6 +188,7 @@ export default function ReadingJournalPanel({
   currentPageNumber,
   selectedChapterLabel,
   selectedChapterNumber,
+  initialTab = DEFAULT_BOOK_JOURNAL_TAB,
   compact = false,
   canUseJapaneseLearningJournal = false,
   japaneseLearningArchiveTabs = {
@@ -207,11 +209,11 @@ export default function ReadingJournalPanel({
     ),
     [bookLanguageCode, ownerUserId, ownerLanguage]
   );
-  const tabContext = JSON.stringify([ownerUserId, userBookId, normalizeLanguageCode(bookLanguageCode)]);
-  const [selection, setSelection] = useState({ context: tabContext, tab: DEFAULT_BOOK_JOURNAL_TAB });
+  const tabContext = JSON.stringify([ownerUserId, userBookId, normalizeLanguageCode(bookLanguageCode), initialTab]);
+  const [selection, setSelection] = useState({ context: tabContext, tab: initialTab });
   // Reset on a different book/owner, but not when language metadata finishes loading.
   if (selection.context !== tabContext) {
-    setSelection({ context: tabContext, tab: DEFAULT_BOOK_JOURNAL_TAB });
+    setSelection({ context: tabContext, tab: initialTab });
   }
   const storyTab = selection.context === tabContext && tabOrder.includes(selection.tab)
     ? selection.tab

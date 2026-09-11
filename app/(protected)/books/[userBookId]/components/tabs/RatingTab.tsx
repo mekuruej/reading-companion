@@ -3,7 +3,6 @@
 "use client";
 
 import type { ComponentType } from "react";
-import CommunityTab from "./CommunityTab";
 
 type Option = {
   value: string;
@@ -380,53 +379,7 @@ export default function RatingTab({
       </section>
       ) : null}
 
-      {showReadingReflection ? (
-      <section className="space-y-3">
-        <ReflectionUseNote label="Helps Mekuru">
-          These notes help future readers know what to expect before starting this book.
-        </ReflectionUseNote>
-
-        <div className="space-y-3 rounded-3xl border border-stone-300 bg-white p-4 shadow-sm">
-          <div className="flex justify-end">
-            <ReflectionControls
-              editing={isEditingReflection}
-              saving={saving}
-              onEdit={onEditReflection}
-              onCancel={onCancel}
-              onSave={onSaveReflection}
-            />
-          </div>
-
-          <div className={isEditingReflection ? "rounded-2xl border border-stone-200 bg-stone-50 p-4" : "rounded-2xl bg-stone-50 p-4"}>
-            <div className="mb-4 text-sm font-semibold text-stone-900">
-              Help Mekuru
-            </div>
-
-            <CommunityTab
-              singleEditMode
-              showIntro={false}
-              showGenres={false}
-              editing={isEditingReflection}
-              isEditingGenres={false}
-              isEditingContentNotes={false}
-              saving={saving}
-              onEditGenres={onEditReflection}
-              onEditContentNotes={onEditReflection}
-              onCancel={onCancel}
-              onSave={onSaveReflection}
-              genre={genre}
-              setGenre={setGenre}
-              triggerWarnings={triggerWarnings}
-              setTriggerWarnings={setTriggerWarnings}
-              sharedGenres={sharedGenres}
-              sharedContentNotes={sharedContentNotes}
-              genreLabel={genreLabel}
-              GENRE_OPTIONS={GENRE_OPTIONS}
-            />
-          </div>
-        </div>
-      </section>
-      ) : null}
+      {/* Content notes are hidden until they have a book-discovery destination. */}
     </div>
   );
 }

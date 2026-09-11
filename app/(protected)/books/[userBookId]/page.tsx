@@ -933,6 +933,7 @@ export default function BookHubPage() {
 
   const [userId, setUserId] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const [savedReflectionBookId, setSavedReflectionBookId] = useState<string | null>(null);
   const [saveNoticeTone, setSaveNoticeTone] = useState<"success" | "warning">("success");
 
   const [chapterSummaries, setChapterSummaries] = useState<ChapterSummary[]>([]);
@@ -4647,6 +4648,7 @@ export default function BookHubPage() {
       return;
     }
 
+    setSavedReflectionBookId(null);
     setSaving(true);
     setError("");
     setSaveNotice("");
@@ -4691,6 +4693,7 @@ export default function BookHubPage() {
       setSaveNotice("Saved.");
       setEditingTab(null);
       await load();
+      setSavedReflectionBookId(row.id);
     } catch (saveError: any) {
       console.error("Error saving reading reflection fields:", {
         message: saveError?.message,
@@ -5985,6 +5988,22 @@ export default function BookHubPage() {
                       StarRatingField={StarRatingField}
                       DifficultyField={DifficultyField}
                     />
+                  ) : null}
+                  {isOwnBookHub && savedReflectionBookId === row.id && !isEditingReflection ? (
+                    <div className="mt-5 rounded-2xl border border-violet-200 bg-white/90 p-4">
+                      <p role="status" className="text-sm font-semibold text-violet-950">
+                        Reflection saved. Want to write more for yourself?
+                      </p>
+                      <Link
+                        href={`/books/${encodeURIComponent(row.id)}/story?tab=review`}
+                        onClick={(event) => {
+                          if (!confirmLeaveIfTimerActive()) event.preventDefault();
+                        }}
+                        className="mt-3 inline-flex rounded-full bg-violet-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-800"
+                      >
+                        Open my private review
+                      </Link>
+                    </div>
                   ) : null}
                 </section>
               ) : isReadingReflectionBook && !canUseReadingReflection ? (

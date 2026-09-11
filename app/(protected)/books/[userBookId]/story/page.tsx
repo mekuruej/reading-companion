@@ -461,6 +461,7 @@ export default function StoryNotesPage() {
 
         <ReadingJournalPanel
           userBookId={row.id}
+          initialTab={searchParams.get("tab") === "review" ? "review" : undefined}
           ownerUserId={row.user_id}
           favoriteQuotes={row.favorite_quotes}
           bookLanguageCode={book?.language_code ?? null}

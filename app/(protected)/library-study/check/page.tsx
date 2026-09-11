@@ -220,6 +220,8 @@ const DAILY_CHECK_COLOR_TARGETS = [
   ["green", 4],
   ["blue", 4],
 ] as const;
+const READING_LANGUAGE_WARNING =
+  "This is a READING question. Please type the reading in kana or Hepburn romaji.";
 const MEANING_LANGUAGE_WARNING =
   "This is a MEANING question. Please type your answers in English.";
 
@@ -3126,6 +3128,18 @@ export default function LibraryStudyPage() {
 
     if (activeStudyMode === "meaning_typing" && containsJapaneseText(typingInput)) {
       setTypingInstructionOverride(MEANING_LANGUAGE_WARNING);
+      window.requestAnimationFrame(() => typingInputRef.current?.focus());
+      return;
+    }
+
+    // A correct romaji reading takes priority when it also matches an English meaning.
+    if (
+      activeStudyMode === "reading_typing" &&
+      !containsJapaneseText(typingInput) &&
+      normalizeKana(typingInput) !== normalizeKana(currentCard.reading) &&
+      matchesAnyMeaning(typingInput, currentCard.meaning)
+    ) {
+      setTypingInstructionOverride(READING_LANGUAGE_WARNING);
       window.requestAnimationFrame(() => typingInputRef.current?.focus());
       return;
     }
