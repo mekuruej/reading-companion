@@ -11,6 +11,7 @@ import {
   type LibraryStudyGateStatus,
   type LibraryStudyColorStatus,
 } from "@/lib/libraryStudyColor";
+import { hasAbilityCheckRestDays } from "@/lib/abilityCheckSpacing";
 import { normalizeKanaReading } from "@/lib/kanaInput";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
@@ -580,6 +581,7 @@ function makeClaimStudyCard(
 
   const colorStatus = computeLibraryStudyColorStatus({
     encounterCount: 0,
+    claimedGreen: claim.claimed_color === "green",
     settings: colorSettings,
     readingGate: progress?.reading_gate_status ?? "not_started",
     meaningGate: progress?.meaning_gate_status ?? "not_started",
@@ -864,8 +866,10 @@ function isCardAvailableForLibraryCheck(
     return false;
   }
 
+  if (!hasAbilityCheckRestDays(card.progress?.last_studied_at)) return false;
+
   // Used by "Check Again Today" so the button really means:
-  // "give me cards even if I already checked them today / they are not due yet."
+  // "give me cards outside their usual schedule, after the minimum rest period."
   if (options.ignoreTiming) return true;
 
   const notSeenToday = !isCardSeenToday(card, seenTodayIds);
@@ -2045,6 +2049,7 @@ export default function LibraryStudyPage() {
 
               const colorStatus = computeLibraryStudyColorStatus({
                 encounterCount,
+                claimedGreen: claimByKey.get(summary.study_identity_key)?.claimed_color === "green",
                 settings: colorSettings,
                 readingGate: progress?.reading_gate_status ?? "not_started",
                 meaningGate: progress?.meaning_gate_status ?? "not_started",
@@ -2104,6 +2109,7 @@ export default function LibraryStudyPage() {
               const encounterCount = summary.total_encounter_count ?? 0;
               const status = computeLibraryStudyColorStatus({
                 encounterCount,
+                claimedGreen: claimByKey.get(summary.study_identity_key)?.claimed_color === "green",
                 settings: colorSettings,
                 readingGate: progress?.reading_gate_status ?? "not_started",
                 meaningGate: progress?.meaning_gate_status ?? "not_started",
@@ -2184,6 +2190,7 @@ export default function LibraryStudyPage() {
 
             const colorStatus = computeLibraryStudyColorStatus({
               encounterCount: group.length,
+              claimedGreen: claimByKey.get(key)?.claimed_color === "green",
               settings: colorSettings,
               readingGate: progress?.reading_gate_status ?? "not_started",
               meaningGate: progress?.meaning_gate_status ?? "not_started",
@@ -2242,6 +2249,7 @@ export default function LibraryStudyPage() {
               );
               const status = computeLibraryStudyColorStatus({
                 encounterCount: group.length,
+                claimedGreen: claimByKey.get(key)?.claimed_color === "green",
                 settings: colorSettings,
                 readingGate: progress?.reading_gate_status ?? "not_started",
                 meaningGate: progress?.meaning_gate_status ?? "not_started",
@@ -2301,7 +2309,8 @@ export default function LibraryStudyPage() {
     const nextDeckSource = planCardIds
       .map((id) => cardById.get(id))
       .filter((card): card is StudyCard => Boolean(card))
-      .filter((card) => !isCardSeenToday(card, seenTodayIds));
+      .filter((card) => !isCardSeenToday(card, seenTodayIds))
+      .filter((card) => hasAbilityCheckRestDays(card.progress?.last_studied_at));
 
     const planNeedsSave =
       !dailyCheckPlan.cardIds ||

@@ -1,3 +1,4 @@
+import { canTeachTargetUser } from "@/lib/teacher/targetUserAccess";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type TeacherProfileForLessonBook = {
@@ -43,19 +44,8 @@ export async function canTeacherAccessStudent({
   studentId: string;
   teacherProfile: TeacherProfileForLessonBook;
 }) {
-  if (isSuperTeacher(teacherProfile)) return true;
-  if (teacherProfile?.role !== "teacher") return false;
-
-  const { data, error } = await supabase
-    .from("teacher_students")
-    .select("teacher_id")
-    .eq("teacher_id", teacherId)
-    .eq("student_id", studentId)
-    .is("archived_at", null)
-    .maybeSingle();
-
-  if (error) throw error;
-  return Boolean(data);
+  return canTeachTargetUser({ supabase, actorId: teacherId, targetUserId: studentId,
+    actorProfile: teacherProfile, allowAdmin: true, allowSelf: false });
 }
 
 export async function ensureStudentLessonBook({

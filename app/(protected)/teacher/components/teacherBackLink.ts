@@ -4,6 +4,10 @@ export type TeacherBackLink = {
 };
 
 export function getTeacherBackLink(source: string | null | undefined): TeacherBackLink {
+  if (source === "admin-hub") {
+    return { href: "/teacher/admin", label: "← Back to Admin Hub" };
+  }
+
   if (source === "lesson-prep") {
     return { href: "/teacher/lesson-prep", label: "← Back to Lesson Prep" };
   }

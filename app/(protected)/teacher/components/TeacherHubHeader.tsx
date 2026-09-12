@@ -10,7 +10,7 @@ export function TeacherHubHeader() {
       </h1>
 
       <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
-        Start with teaching work, then keep catalog and site maintenance in one place.
+        Work with your students and the books you teach.
       </p>
     </section>
   );

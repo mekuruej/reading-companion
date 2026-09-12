@@ -94,30 +94,7 @@ const teachingCards: TeacherHubCard[] = [
     description:
       "Search your professional teaching collection, assess lesson fit, and open book workspaces.",
   },
-  {
-    title: "English Readers Prep",
-    href: "/teacher/english-readers",
-    eyebrow: "Early scaffold",
-    description:
-      "Prepare English books with Japanese support for adult learners. Coming soon.",
-  },
-];
 
-const catalogCards: TeacherHubCard[] = [
-  {
-    title: "Needs Attention",
-    href: "/teacher/needs-attention",
-    eyebrow: "Review",
-    description:
-      "Review book requests, kanji reports, missing book info, and other cleanup queues.",
-  },
-  {
-    title: "Site Upkeep",
-    href: "/teacher/general-upkeep",
-    eyebrow: "Maintain",
-    description:
-      "Open global cleanup tools and admin maintenance areas that do not belong to learner follow-up.",
-  },
 ];
 
 function isSuperTeacherFlag(value: unknown) {
@@ -316,124 +293,7 @@ export default function TeacherHubPage() {
             hasToday: teacherRatingItems.some((item) => isTodayDate(item.finished_at)),
             sortDate: oldestDate(teacherRatingItems.map((item) => item.finished_at)),
           },
-          {
-            title: "Lesson Vocabulary Reminder",
-            count: 0,
-            description: "Future alert for entering words after a student's scheduled lesson day.",
-            badgeLabel: "Student",
-            placeholder: true,
-          },
-          {
-            title: "Assignment Follow-up",
-            count: 0,
-            description: "Future alert for assignments that are pending, completed, or waiting on feedback.",
-            badgeLabel: "Student",
-            placeholder: true,
-          },
         ];
-
-        if (hasSuperTeacherAccess) {
-          const [
-            { data: pendingBookRequests },
-            { data: pendingJapaneseLearningRequests },
-            { data: manualBookFlags },
-            { data: globalBooks },
-            { data: vocabularyFlags },
-            { data: flaggedKanjiMapRows },
-          ] = await Promise.all([
-            supabase
-              .from("book_requests")
-              .select("created_at")
-              .or("status.eq.pending,status.is.null"),
-            supabase
-              .from("japanese_learning_access_requests")
-              .select("requested_at")
-              .eq("status", "pending"),
-            supabase
-              .from("user_alerts")
-              .select("created_at")
-              .eq("user_id", user.id)
-              .eq("type", "book_flag"),
-            supabase
-              .from("books")
-              .select(
-                "title, isbn13, asin, cover_url, book_type, author, publisher, published_date, page_count, created_at, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at"
-              ),
-            supabase
-              .from("user_book_words")
-              .select("created_at")
-              .eq("flagged_for_review", true),
-            supabase
-              .from("vocabulary_kanji_map")
-              .select("vocabulary_cache_id, flagged_at")
-              .eq("flagged_for_review", true)
-              .gte("flagged_at", recentKanjiQueueCutoff()),
-          ]);
-
-          const missingBookInfoItems = ((globalBooks ?? []) as GlobalBookRow[]).filter(
-            (book) => missingGlobalBookFields(book).length > 0
-          );
-          const pendingBookRequestRows = (pendingBookRequests ?? []) as CreatedAtRow[];
-          const pendingJapaneseLearningRequestRows = ((pendingJapaneseLearningRequests ?? []) as any[]).map(
-            (row) => ({ created_at: row.requested_at ?? null })
-          ) as CreatedAtRow[];
-          const manualBookFlagRows = (manualBookFlags ?? []) as CreatedAtRow[];
-          const vocabularyFlagRows = (vocabularyFlags ?? []) as CreatedAtRow[];
-          const flaggedKanjiRows = (flaggedKanjiMapRows ?? []) as FlaggedKanjiMapCountRow[];
-          const flaggedKanjiCount = new Set(
-            flaggedKanjiRows
-              .map((row) => (row.vocabulary_cache_id == null ? null : Number(row.vocabulary_cache_id)))
-              .filter((id): id is number => Number.isFinite(id))
-          ).size;
-
-          const bookFlagAndMissingDates = [
-            ...manualBookFlagRows.map((row) => row.created_at),
-            ...missingBookInfoItems.map((book) => book.created_at),
-          ];
-
-          nextTeacherAlerts.push(
-            {
-              title: "Japanese Learning Requests",
-              href: "/teacher/japanese-learning-requests",
-              count: pendingJapaneseLearningRequestRows.length,
-              description: "Invitation requests waiting for pilot review.",
-              hasToday: pendingJapaneseLearningRequestRows.some((row) => isTodayDate(row.created_at)),
-              sortDate: oldestDate(pendingJapaneseLearningRequestRows.map((row) => row.created_at)),
-            },
-            {
-              title: "Pending Book Requests",
-              href: "/teacher/books",
-              count: pendingBookRequestRows.length,
-              description: "Reader book requests waiting for catalog book entry.",
-              hasToday: pendingBookRequestRows.some((row) => isTodayDate(row.created_at)),
-              sortDate: oldestDate(pendingBookRequestRows.map((row) => row.created_at)),
-            },
-            {
-              title: "Book Flags / Missing Info",
-              href: "/teacher/books",
-              count: manualBookFlagRows.length + missingBookInfoItems.length,
-              description: "Manual book flags and catalog books missing core details.",
-              hasToday: bookFlagAndMissingDates.some((date) => isTodayDate(date)),
-              sortDate: oldestDate(bookFlagAndMissingDates),
-            },
-            {
-              title: "Kanji Flags",
-              href: "/teacher/kanji?from=needs-attention&status=flagged_review",
-              count: flaggedKanjiCount,
-              description: "User-flagged kanji readings waiting for review.",
-              hasToday: flaggedKanjiRows.some((row) => isTodayDate(row.flagged_at)),
-              sortDate: oldestDate(flaggedKanjiRows.map((row) => row.flagged_at)),
-            },
-            {
-              title: "Vocabulary Flags",
-              href: "/teacher/words",
-              count: vocabularyFlagRows.length,
-              description: "Flagged saved-word input that needs super-teacher/admin review.",
-              hasToday: vocabularyFlagRows.some((row) => isTodayDate(row.created_at)),
-              sortDate: oldestDate(vocabularyFlagRows.map((row) => row.created_at)),
-            },
-          );
-        }
 
         if (!cancelled) {
           setTeacherAlerts(sortTeacherAlerts(nextTeacherAlerts));
@@ -492,18 +352,6 @@ export default function TeacherHubPage() {
           </h2>
         </div>
         <TeacherHubCardGrid cards={teachingCards} />
-      </section>
-
-      <section className="mt-8">
-        <div className="mb-3">
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-700">
-            Catalog
-          </p>
-          <h2 className="mt-1 text-2xl font-black text-stone-950">
-            Attention queues and site upkeep
-          </h2>
-        </div>
-        <TeacherHubCardGrid cards={catalogCards} />
       </section>
 
       <TeacherHubTodaySection

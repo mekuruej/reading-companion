@@ -218,12 +218,13 @@ export default function TeacherReadingFitPage() {
               rating_difficulty,
               rating_overall,
               teacher_review_cleared_at,
-              books (
+              books!inner (
                 title,
                 cover_url,
                 book_type
               )
             `)
+            .eq("books.language_code", "ja")
             .in("user_id", studentIds)
             .not("finished_at", "is", null)
             .is("dnf_at", null)

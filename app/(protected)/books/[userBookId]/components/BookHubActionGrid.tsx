@@ -224,7 +224,7 @@ export default function BookHubActionGrid({
       {showJapaneseLearningSection ? (
         <ActionSection
           title="Japanese Learning"
-          description="ページをめくって、話しまくろう！"
+          description="ページをめくって、日本語を深めよう。"
         >
           <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
             {canUseSavedWordReading ? (

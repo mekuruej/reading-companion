@@ -209,8 +209,8 @@ export default function JapaneseLearningRequestsPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
-      <Link href="/teacher" className="text-sm font-semibold text-stone-500 hover:text-stone-900">
-        ← Teacher Hub
+      <Link href="/teacher/admin" className="text-sm font-semibold text-stone-500 hover:text-stone-900">
+        ← Admin Hub
       </Link>
 
       <section className="mt-4 rounded-3xl border border-violet-200 bg-violet-50 p-6 shadow-sm">

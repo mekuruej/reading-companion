@@ -14,7 +14,6 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import ReadingColorsHeader from "./components/ReadingColorsHeader";
 import ReadingColorsErrorBanner from "./components/ReadingColorsErrorBanner";
-import ColorDeltaPill from "./components/ColorDeltaPill";
 import ColorGuideGroupLabel from "./components/ColorGuideGroupLabel";
 import ColorGuideStepCard from "./components/ColorGuideStepCard";
 import ReadingColorsGuide from "./components/ReadingColorsGuide";
@@ -28,39 +27,6 @@ import ColorMovementInfoSection from "./components/ColorMovementInfoSection";
 
 type ColorKey = "red" | "orange" | "yellow" | "green" | "blue" | "purple";
 type MainStage = ColorKey | "grey";
-
-function ymdLocal(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function previousMonthComparisonEndDate() {
-  const now = new Date();
-  const previousStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const previousMonthDays = new Date(
-    previousStart.getFullYear(),
-    previousStart.getMonth() + 1,
-    0
-  ).getDate();
-
-  const comparisonDays = Math.min(now.getDate(), previousMonthDays);
-
-  return new Date(
-    previousStart.getFullYear(),
-    previousStart.getMonth(),
-    comparisonDays + 1
-  );
-}
-
-function previousMonthComparisonDateLabel() {
-  const before = previousMonthComparisonEndDate();
-  const end = new Date(before);
-  end.setDate(before.getDate() - 1);
-
-  return ymdLocal(end);
-}
 
 function colorValue(totals: LibraryStudyColorTotals, key: ColorKey) {
   return totals[key] ?? 0;
@@ -94,14 +60,10 @@ function stagePill(stage: MainStage) {
 export default function ReadingColorsPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
-  const [previousTotals, setPreviousTotals] =
-    useState<LibraryStudyColorTotals | null>(null);
   const [allTimeTotals, setAllTimeTotals] = useState<LibraryStudyColorTotals>(
     emptyLibraryStudyColorTotals()
   );
 
-  const [previousLimboTotals, setPreviousLimboTotals] =
-    useState<LibraryStudyLimboTotals | null>(null);
   const [allTimeLimboTotals, setAllTimeLimboTotals] =
     useState<LibraryStudyLimboTotals>(emptyLibraryStudyLimboTotals());
 
@@ -121,30 +83,19 @@ export default function ReadingColorsPage() {
 
         if (!user) {
           if (!isMounted) return;
-          setPreviousTotals(null);
+
           setAllTimeTotals(emptyLibraryStudyColorTotals());
 
-          setPreviousLimboTotals(null);
           setAllTimeLimboTotals(emptyLibraryStudyLimboTotals());
           return;
         }
 
-        const previousBefore = previousMonthComparisonEndDate();
-
-        const [previousBreakdown, allTimeBreakdown] =
-          await Promise.all([
-            fetchLibraryStudyColorBreakdown(user.id, null, {
-              before: previousBefore,
-            }),
-            fetchLibraryStudyColorBreakdown(user.id, null, {}),
-          ]);
-
+        const allTimeBreakdown = await fetchLibraryStudyColorBreakdown(user.id);
         if (!isMounted) return;
 
-        setPreviousTotals(previousBreakdown.colorTotals);
-        setAllTimeTotals(allTimeBreakdown.colorTotals);
 
-        setPreviousLimboTotals(previousBreakdown.limboTotals);
+
+        setAllTimeTotals(allTimeBreakdown.colorTotals);
         setAllTimeLimboTotals(allTimeBreakdown.limboTotals);
       } catch (error: any) {
         console.error("Error loading reading colors:", error);
@@ -152,10 +103,9 @@ export default function ReadingColorsPage() {
         if (!isMounted) return;
 
         setErrorMsg(error?.message ?? "Could not load reading colors.");
-        setPreviousTotals(null);
+
         setAllTimeTotals(emptyLibraryStudyColorTotals());
 
-        setPreviousLimboTotals(null);
         setAllTimeLimboTotals(emptyLibraryStudyLimboTotals());
       } finally {
         if (isMounted) setLoading(false);
@@ -176,7 +126,7 @@ export default function ReadingColorsPage() {
         label: "Purple",
         shortMeaning: "Mastered",
         cardClasses: "border-purple-200 bg-white text-purple-700",
-        deltaClass: "bg-purple-50 text-purple-800 ring-1 ring-purple-200",
+
         dotClass: "bg-purple-500",
         valueClass: "text-purple-900",
       },
@@ -185,7 +135,7 @@ export default function ReadingColorsPage() {
         label: "Blue",
         shortMeaning: "Meaning Gate",
         cardClasses: "border-blue-200 bg-white text-blue-700",
-        deltaClass: "bg-blue-50 text-blue-800 ring-1 ring-blue-200",
+
         dotClass: "bg-blue-500",
         valueClass: "text-blue-900",
       },
@@ -194,7 +144,7 @@ export default function ReadingColorsPage() {
         label: "Green",
         shortMeaning: "Reading Gate",
         cardClasses: "border-green-200 bg-white text-green-700",
-        deltaClass: "bg-green-50 text-green-800 ring-1 ring-green-200",
+
         dotClass: "bg-green-500",
         valueClass: "text-green-900",
       },
@@ -203,7 +153,7 @@ export default function ReadingColorsPage() {
         label: "Yellow",
         shortMeaning: "Readiness checkpoint",
         cardClasses: "border-yellow-200 bg-white text-yellow-700",
-        deltaClass: "bg-yellow-50 text-yellow-900 ring-1 ring-yellow-200",
+
         dotClass: "bg-yellow-400",
         valueClass: "text-yellow-900",
       },
@@ -212,7 +162,7 @@ export default function ReadingColorsPage() {
         label: "Orange",
         shortMeaning: "Starting to repeat",
         cardClasses: "border-orange-200 bg-white text-orange-700",
-        deltaClass: "bg-orange-50 text-orange-800 ring-1 ring-orange-200",
+
         dotClass: "bg-orange-500",
         valueClass: "text-orange-900",
       },
@@ -221,7 +171,7 @@ export default function ReadingColorsPage() {
         label: "Red",
         shortMeaning: "New / needs support",
         cardClasses: "border-red-200 bg-white text-red-700",
-        deltaClass: "bg-red-50 text-red-800 ring-1 ring-red-200",
+
         dotClass: "bg-red-500",
         valueClass: "text-red-900",
       },
@@ -232,11 +182,7 @@ export default function ReadingColorsPage() {
   const colorTotalRows: ReadingColorTotalRow[] = useMemo(
     () =>
       colorItems.map((item) => {
-        const previousValue =
-          previousTotals == null ? null : colorValue(previousTotals, item.key);
         const allTimeValue = colorValue(allTimeTotals, item.key);
-        const delta =
-          previousValue == null ? null : allTimeValue - previousValue;
 
         return {
           key: item.key,
@@ -244,16 +190,15 @@ export default function ReadingColorsPage() {
           shortMeaning: item.shortMeaning,
           cardClasses: item.cardClasses,
           dotClass: item.dotClass,
-          deltaClass: item.deltaClass,
+
           valueClass: item.valueClass,
-          previousValue,
+
           allTimeValue,
-          delta,
+
         };
       }),
-    [allTimeTotals, colorItems, previousTotals]
+    [allTimeTotals, colorItems]
   );
-  const comparisonDateLabel = previousMonthComparisonDateLabel();
   const limboItems = useMemo(
     () => [
       {
@@ -263,7 +208,7 @@ export default function ReadingColorsPage() {
         detail:
           "Words that reached the Reading Gate from Green, missed the reading check, and need support before moving toward Blue.",
         cardClasses: "border-slate-300 bg-white text-slate-800",
-        deltaClass: "bg-slate-100 text-slate-800 ring-1 ring-slate-300",
+
         dotClass: "bg-slate-500",
         valueClass: "text-slate-900",
       },
@@ -274,7 +219,7 @@ export default function ReadingColorsPage() {
         detail:
           "Words that reached the Meaning Gate from Blue, missed the meaning check, and need support before moving toward Purple.",
         cardClasses: "border-slate-400 bg-white text-slate-900",
-        deltaClass: "bg-slate-200 text-slate-950 ring-1 ring-slate-400",
+
         dotClass: "bg-slate-700",
         valueClass: "text-slate-950",
       },
@@ -292,19 +237,13 @@ export default function ReadingColorsPage() {
       <ReadingColorTotalsGrid
         rows={colorTotalRows}
         loading={loading}
-        comparisonDateLabel={comparisonDateLabel}
+
       />
       <ReadingColorSupportSection>
         <SupportLoopCard />
 
         {limboItems.map((item) => {
-          const previousValue =
-            previousLimboTotals == null
-              ? null
-              : limboValue(previousLimboTotals, item.key);
           const allTimeValue = limboValue(allTimeLimboTotals, item.key);
-          const delta =
-            previousValue == null ? null : allTimeValue - previousValue;
 
           return (
             <LimboSupportCard
@@ -314,13 +253,13 @@ export default function ReadingColorsPage() {
               detail={item.detail}
               cardClasses={item.cardClasses}
               dotClass={item.dotClass}
-              deltaClass={item.deltaClass}
+
               valueClass={item.valueClass}
               loading={loading}
-              previousValue={previousValue}
+
               allTimeValue={allTimeValue}
-              delta={delta}
-              comparisonDateLabel={comparisonDateLabel}
+
+
             />
           );
         })}

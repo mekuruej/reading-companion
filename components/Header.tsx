@@ -88,7 +88,7 @@ export default function Header() {
 
         setUsername(profile?.username ?? null);
         setProfileRole(profile?.role ?? null);
-        setProfileIsSuperTeacher(!!profile?.is_super_teacher);
+        setProfileIsSuperTeacher(profile?.is_super_teacher === true || profile?.is_super_teacher === "true");
         setShowJapaneseStudyNavigation(shouldShowJapaneseStudyNavigation(profile));
         const accessStatus = profile ? getAppAccessStatus(profile) : null;
         setHasFullAccess(accessStatus?.hasFullAccess ?? false);
@@ -537,38 +537,9 @@ export default function Header() {
                       Teaching Books
                     </Link>
 
-                    <Link
-                      href="/teacher/needs-attention"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${teacherNeedsAttentionActive
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                        }`}
-                      onClick={() => setShowTeacherMenu(false)}
-                    >
-                      Needs Attention
-                    </Link>
-
-                    <Link
-                      href="/teacher/general-upkeep"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${teacherSiteUpkeepActive
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                        }`}
-                      onClick={() => setShowTeacherMenu(false)}
-                    >
-                      Site Upkeep
-                    </Link>
-
-                    {pendingJapaneseLearningRequestCount > 0 ? (
-                      <Link
-                        href="/teacher/japanese-learning-requests"
-                        className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/teacher/japanese-learning-requests"
-                          ? "bg-violet-100 font-medium text-violet-950"
-                          : "bg-violet-50 font-semibold text-violet-900 hover:bg-violet-100"
-                          }`}
-                        onClick={() => setShowTeacherMenu(false)}
-                      >
-                        Japanese Learning Requests ({pendingJapaneseLearningRequestCount})
+                    {getFeatureAccess({ role: profileRole, isSuperTeacher: profileIsSuperTeacher }).isAdmin ? (
+                      <Link href="/teacher/admin" onClick={() => setShowTeacherMenu(false)} className="block rounded-xl px-3 py-2 text-sm text-stone-700 hover:bg-stone-50">
+                        Admin Hub
                       </Link>
                     ) : null}
                   </div>

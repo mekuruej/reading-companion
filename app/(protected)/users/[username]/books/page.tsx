@@ -1409,12 +1409,12 @@ export default function BooksPage() {
         setViewingUserId(user.id);
       }
 
-      if (role !== "teacher") {
+      if (role !== "teacher" && role !== "super_teacher" && !superTeacherFlag) {
         setStudents([]);
         return;
       }
 
-      if (superTeacherFlag) {
+      if (role === "super_teacher" || superTeacherFlag) {
         const { data: profs, error: profErr } = await supabase
           .from("profiles")
           .select("id, display_name, username, level, role")
@@ -1900,32 +1900,26 @@ export default function BooksPage() {
         <MobileVersionNotice />
 
         {trialBanner ? (
-          <section className="mb-5 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-center shadow-sm">
-            <p className="text-sm font-black text-amber-950">
-              {trialBanner.daysRemaining == null
-                ? "Trial access: less than 1 day left"
-                : `Trial access: ${trialBanner.daysRemaining} ${trialBanner.daysRemaining === 1 ? "day" : "days"} left`}
-            </p>
-            <p className="mt-1 text-xs font-semibold text-amber-800">
-              Your trial ends on {trialBanner.formattedDate}.
-            </p>
-
-            <div className="mx-auto mt-4 max-w-xl rounded-2xl border border-amber-100 bg-white/70 px-4 py-3 text-left shadow-sm">
-              <p className="text-sm font-black text-stone-950">Enjoying MEKURU?</p>
-              <p className="mt-1 text-xs leading-5 text-stone-700">
-                Keep Japanese Learning after your trial for ¥500/month. Save vocabulary,
-                practice flashcards, use Follow-Along, and keep tracking your reading.
+          <section aria-label="Trial access" className="mb-4 rounded-xl border border-slate-200 bg-white/60 px-4 py-3 text-sm text-slate-600">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <p>
+                <span className="font-medium text-slate-700">
+                  {trialBanner.daysRemaining == null
+                    ? "Your trial has less than 1 day left"
+                    : `Your trial has ${trialBanner.daysRemaining} ${trialBanner.daysRemaining === 1 ? "day" : "days"} left`}
+                </span>
+                <span className="ml-2 text-xs">Ends {trialBanner.formattedDate}.</span>
               </p>
-              <p className="mt-2 text-xs leading-5 text-stone-500">
-                After you join on Ko-fi, your MEKURU access will be updated manually.
-              </p>
-              <button
-                type="button"
-                onClick={() => router.push("/reading-access")}
-                className="mt-3 inline-flex rounded-xl bg-amber-900 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-amber-950"
-              >
-                See Japanese Learning 🔒
-              </button>
+              <details className="text-xs">
+                <summary className="cursor-pointer rounded text-slate-600 underline decoration-slate-300 underline-offset-4 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">
+                  After your trial
+                </summary>
+                <div className="mt-2 max-w-md leading-5">
+                  <p>Continue Japanese Learning for ¥500/month, including vocabulary, flashcards, Follow-Along, and reading tracking.</p>
+                  <p className="mt-1">After you join on Ko-fi, your MEKURU access will be updated manually.</p>
+                  <button type="button" onClick={() => router.push("/reading-access")} className="mt-2 font-medium text-slate-700 underline underline-offset-4 hover:text-slate-950">Explore Japanese Learning</button>
+                </div>
+              </details>
             </div>
           </section>
         ) : null}

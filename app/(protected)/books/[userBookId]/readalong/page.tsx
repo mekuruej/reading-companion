@@ -332,6 +332,34 @@ export default function ReadAlongPage() {
     const [loading, setLoading] = useState(true);
     const [supportMode, setSupportMode] = useState<SupportMode>("full");
     const [viewMode, setViewMode] = useState<FollowAlongViewMode>("follow-along");
+    const [hasWorkspaceWidth, setHasWorkspaceWidth] = useState(false);
+    const [mobileJournalOpen, setMobileJournalOpen] = useState(false);
+    const [hasOpenedMobileJournal, setHasOpenedMobileJournal] = useState(false);
+    const mobileJournalRef = useRef<HTMLDialogElement | null>(null);
+
+    useEffect(() => {
+        const query = window.matchMedia("(min-width: 1280px)");
+        const update = () => {
+            setHasWorkspaceWidth(query.matches);
+            if (query.matches) setMobileJournalOpen(false);
+        };
+        update();
+        query.addEventListener("change", update);
+        return () => query.removeEventListener("change", update);
+    }, []);
+
+    useEffect(() => {
+        const dialog = mobileJournalRef.current;
+        if (!mobileJournalOpen || hasWorkspaceWidth || !dialog) return;
+        dialog.showModal();
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+            dialog.close();
+            document.body.style.overflow = previousOverflow;
+        };
+    }, [mobileJournalOpen, hasWorkspaceWidth]);
+
     const [activeAddAfterWordId, setActiveAddAfterWordId] = useState<string | null>(null);
     const [activeAddPlacement, setActiveAddPlacement] = useState<AddWordPlacement>("after");
     const [addAfterDraft, setAddAfterDraft] = useState<AddAfterDraft>(() =>
@@ -1134,7 +1162,7 @@ export default function ReadAlongPage() {
                 tag === "select" ||
                 target?.isContentEditable;
 
-            if (isTyping) return;
+            if (isTyping || target?.closest("[data-reading-journal]")) return;
 
             if (e.key === "ArrowLeft") {
                 e.preventDefault();
@@ -2118,7 +2146,7 @@ export default function ReadAlongPage() {
         );
     }
 
-    const showReadingWorkspace = viewMode === "workspace" && canUseReadingJournal;
+    const showReadingWorkspace = hasWorkspaceWidth && viewMode === "workspace" && canUseReadingJournal;
     const readerShell = (
         <ReadAlongReaderShell
             scrollAreaRef={scrollAreaRef}
@@ -2212,7 +2240,7 @@ export default function ReadAlongPage() {
                 <ReadAlongPageHeader />
 
                 {canUseReadingJournal ? (
-                    <div className="hidden justify-end lg:flex">
+                    <div className="hidden justify-end xl:flex">
                         <div className="inline-flex rounded-2xl border border-stone-200 bg-white p-1 shadow-sm">
                             <button
                                 type="button"
@@ -2234,10 +2262,16 @@ export default function ReadAlongPage() {
                                         : "text-stone-600 hover:bg-violet-50"
                                 }`}
                             >
-                                Reading Journal
+                                Reading Workspace
                             </button>
                         </div>
                     </div>
+                ) : null}
+
+                {canUseReadingJournal && learnerUserId ? (
+                    <button type="button" onClick={() => { setHasOpenedMobileJournal(true); setMobileJournalOpen(true); }} className="rounded-xl bg-violet-700 px-4 py-2 text-sm font-bold text-white xl:hidden">
+                        Open Reading Journal
+                    </button>
                 ) : null}
 
                 {bookTitle ? (
@@ -2285,10 +2319,10 @@ export default function ReadAlongPage() {
                     compact={showReadingWorkspace && Boolean(learnerUserId)}
                 />
 
-                {showReadingWorkspace && learnerUserId ? (
-                    <div className="space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0">
-                        <div className="min-w-0">{readerShell}</div>
-                        <div className="hidden min-w-0 lg:block">
+                <div className={showReadingWorkspace ? "grid min-w-0 grid-cols-2 items-start gap-4" : "min-w-0"}>
+                    <div className="min-w-0">{readerShell}</div>
+                    {canUseReadingJournal && learnerUserId && hasWorkspaceWidth ? (
+                        <aside data-reading-journal className={showReadingWorkspace ? "min-w-0 overflow-x-auto" : "hidden"} aria-label="Reading Journal">
                             <ReadingJournalPanel
                                 userBookId={userBookId}
                                 ownerUserId={learnerUserId}
@@ -2298,15 +2332,44 @@ export default function ReadAlongPage() {
                                 currentPageNumber={currentPageNumber}
                                 selectedChapterLabel={currentPageChapterLabel}
                                 selectedChapterNumber={currentPageChapterNumber}
+                                canUseJapaneseLearningJournal={canUseSavedWordReading}
                                 compact
                                 vocabListHref={`/books/${encodeURIComponent(userBookId)}/words${contextSuffix}`}
                                 onFavoriteQuotesChange={setFavoriteQuotes}
                             />
-                        </div>
-                    </div>
-                ) : (
-                    readerShell
-                )}
+                        </aside>
+                    ) : null}
+                </div>
+                {canUseReadingJournal && learnerUserId && !hasWorkspaceWidth ? (
+                    <dialog
+                        ref={mobileJournalRef}
+                        data-reading-journal
+                        aria-label="Reading Journal"
+                        onCancel={() => setMobileJournalOpen(false)}
+                        onClose={() => setMobileJournalOpen(false)}
+                        className="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none overflow-y-auto bg-stone-50 p-4 backdrop:bg-black/40"
+                    >
+                        <button type="button" autoFocus onClick={() => setMobileJournalOpen(false)} className="mb-4 rounded-xl bg-stone-900 px-4 py-2 font-bold text-white">
+                            Back to Follow-Along
+                        </button>
+                        {hasOpenedMobileJournal ? (
+                            <ReadingJournalPanel
+                                userBookId={userBookId}
+                                ownerUserId={learnerUserId}
+                                favoriteQuotes={favoriteQuotes}
+                                bookLanguageCode={bookLanguageCode}
+                                pageCount={bookPageCount}
+                                currentPageNumber={currentPageNumber}
+                                selectedChapterLabel={currentPageChapterLabel}
+                                selectedChapterNumber={currentPageChapterNumber}
+                                canUseJapaneseLearningJournal={canUseSavedWordReading}
+                                compact
+                                vocabListHref={`/books/${encodeURIComponent(userBookId)}/words${contextSuffix}`}
+                                onFavoriteQuotesChange={setFavoriteQuotes}
+                            />
+                        ) : null}
+                    </dialog>
+                ) : null}
             </div>
         </main>
     );

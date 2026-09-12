@@ -341,7 +341,7 @@ function teacherBookSelect(includeAssessmentFields: boolean) {
           teacher_use_note,
 ${assessmentFields}          created_at,
           updated_at,
-          books:book_id (
+          books:book_id!inner (
             id,
             title,
             author,
@@ -514,7 +514,7 @@ export default function TeacherLibraryPage() {
           dnf_reason,
           dnf_note,
           would_retry,
-          books:book_id (
+          books:book_id!inner (
             id,
             title,
             author,
@@ -527,6 +527,7 @@ export default function TeacherLibraryPage() {
         `
         )
         .eq("user_id", user.id)
+        .eq("books.language_code", "ja")
         .order("created_at", { ascending: false });
 
       if (userBooksError) throw userBooksError;
@@ -535,6 +536,7 @@ export default function TeacherLibraryPage() {
       const { data: teacherRows, error: teacherRowsError } = await supabase
         .from("teacher_books")
         .select(teacherBookSelect(true))
+        .eq("books.language_code", "ja")
         .eq("teacher_id", user.id)
         .order("created_at", { ascending: false });
 
@@ -542,6 +544,7 @@ export default function TeacherLibraryPage() {
         const { data: fallbackRows, error: fallbackError } = await supabase
           .from("teacher_books")
           .select(teacherBookSelect(false))
+          .eq("books.language_code", "ja")
           .eq("teacher_id", user.id)
           .order("created_at", { ascending: false });
 

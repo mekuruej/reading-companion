@@ -84,6 +84,7 @@ type TeacherStudentOption = {
     id: string;
     display_name: string | null;
     username: string | null;
+    email?: string | null;
 };
 
 const EDITION_FORMAT_OPTIONS = [
@@ -328,6 +329,23 @@ export default function AddBookPage() {
                     return;
                 }
 
+                if (currentUserRole === "super_teacher" || currentUserRole === "admin" || currentUserIsSuperTeacher) {
+                    const query = teacherStudentSearch.trim();
+                    if (query.length < 2) return;
+                    const { data: sessionData } = await supabase.auth.getSession();
+                    const response = await fetch(`/api/teacher/users/search?q=${encodeURIComponent(query)}`, {
+                        headers: { Authorization: `Bearer ${sessionData.session?.access_token ?? ""}` },
+                    });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.error ?? "Could not search users");
+                    if (alive) setTeacherStudents(previous => {
+                        const selected = previous.find(user => user.id === selectedTeacherStudentId);
+                        const users = (result.users ?? []).map((user: any) => ({ id: user.id, display_name: user.displayName, username: user.username, email: user.email }));
+                        return selected && !users.some((user: TeacherStudentOption) => user.id === selected.id) ? [selected, ...users] : users;
+                    });
+                    return;
+                }
+
                 const { data: links, error: linkError } = await supabase
                     .from("teacher_students")
                     .select("student_id")
@@ -362,12 +380,9 @@ export default function AddBookPage() {
             }
         }
 
-        void loadTeacherStudents();
-
-        return () => {
-            alive = false;
-        };
-    }, [canChooseTeacherDestinations, currentUserId, currentUserIsSuperTeacher, currentUserRole]);
+        const timeout = window.setTimeout(() => void loadTeacherStudents(), 250);
+        return () => { alive = false; window.clearTimeout(timeout); };
+    }, [canChooseTeacherDestinations, currentUserId, currentUserIsSuperTeacher, currentUserRole, teacherStudentSearch, selectedTeacherStudentId]);
 
     const selectedTeacherStudent = teacherStudents.find(
         (student) => student.id === selectedTeacherStudentId
@@ -376,7 +391,7 @@ export default function AddBookPage() {
         selectedTeacherStudent?.display_name ||
         selectedTeacherStudent?.username ||
         targetDisplayName ||
-        "this student";
+        (canUseCatalogOnly ? "this user" : "this student");
     const teacherDestinationSummary = [
         addToCatalogOnly ? "MEKURU Catalog" : null,
         addToTeachingBooks ? "My Teaching Books" : null,
@@ -456,6 +471,14 @@ export default function AddBookPage() {
             setAddToTeachingBooks(false);
             setAddToMyLibrary(false);
             setAddToStudentLibrary(false);
+        }
+    }
+
+    function handleTeachingBooksChange(checked: boolean) {
+        setAddToTeachingBooks(checked);
+        if (checked) {
+            setAddToCatalogOnly(false);
+            setAddToMyLibrary(false);
         }
     }
 
@@ -1239,14 +1262,14 @@ export default function AddBookPage() {
             book.source === "open_library");
     const filteredTeacherStudents = useMemo(() => {
         const query = teacherStudentSearch.trim().toLowerCase();
-        if (!query) return teacherStudents;
+        if (!query || canUseCatalogOnly) return teacherStudents;
 
         return teacherStudents.filter((student) => {
             const displayName = student.display_name ?? "";
             const username = student.username ?? "";
             return `${displayName} ${username}`.toLowerCase().includes(query);
         });
-    }, [teacherStudentSearch, teacherStudents]);
+    }, [teacherStudentSearch, teacherStudents, canUseCatalogOnly]);
 
     useEffect(() => {
         if (!currentUserId) return;
@@ -1708,13 +1731,14 @@ export default function AddBookPage() {
                         </p>
                         <AddBookTeacherDestinationOptions
                             canUseCatalogOnly={canUseCatalogOnly}
+                            canTargetAllUsers={canUseCatalogOnly}
                             addToCatalogOnly={addToCatalogOnly}
                             addToTeachingBooks={addToTeachingBooks}
                             addToMyLibrary={addToMyLibrary}
                             addToStudentLibrary={addToStudentLibrary}
                             onCatalogOnlyChange={handleCatalogOnlyChange}
                             onTeachingBooksChange={(checked) =>
-                                handleRelationshipDestinationChange(setAddToTeachingBooks, checked)
+                                handleTeachingBooksChange(checked)
                             }
                             onMyLibraryChange={(checked) =>
                                 handleRelationshipDestinationChange(setAddToMyLibrary, checked)
@@ -1726,12 +1750,12 @@ export default function AddBookPage() {
                         {addToStudentLibrary && !addToCatalogOnly ? (
                             <div className="mt-4">
                                 <label className="block text-sm font-black text-stone-900">
-                                    Student
+                                    {canUseCatalogOnly ? "User" : "Student"}
                                 </label>
                                 <input
                                     value={teacherStudentSearch}
                                     onChange={(event) => setTeacherStudentSearch(event.target.value)}
-                                    placeholder="Search linked students"
+                                    placeholder={canUseCatalogOnly ? "Search users by name, username or email (2+ characters)" : "Search linked students"}
                                     className="mt-2 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
                                 />
                                 <select
@@ -1740,7 +1764,7 @@ export default function AddBookPage() {
                                     className="mt-3 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
                                 >
                                     <option value="">
-                                        {teacherStudentLoading ? "Loading linked students..." : "Choose a linked student"}
+                                        {teacherStudentLoading ? "Loading..." : canUseCatalogOnly ? "Choose a user" : "Choose a linked student"}
                                     </option>
                                     {selectedTeacherStudentId &&
                                     !filteredTeacherStudents.some((student) => student.id === selectedTeacherStudentId) ? (
@@ -1750,8 +1774,9 @@ export default function AddBookPage() {
                                     ) : null}
                                     {filteredTeacherStudents.map((student) => (
                                         <option key={student.id} value={student.id}>
-                                            {student.display_name || student.username || "Unnamed student"}
+                                            {student.display_name || student.username || "Unnamed user"}
                                             {student.username ? ` (@${student.username})` : ""}
+                                            {student.email ? ` · ${student.email}` : ""}
                                         </option>
                                     ))}
                                 </select>

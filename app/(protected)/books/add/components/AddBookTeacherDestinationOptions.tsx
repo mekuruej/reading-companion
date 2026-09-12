@@ -1,5 +1,6 @@
 type AddBookTeacherDestinationOptionsProps = {
   canUseCatalogOnly: boolean;
+  canTargetAllUsers?: boolean;
   addToCatalogOnly: boolean;
   addToTeachingBooks: boolean;
   addToMyLibrary: boolean;
@@ -19,12 +20,12 @@ const TEACHER_DESTINATION_OPTIONS = [
   {
     key: "teachingBooks",
     title: "My Teaching Books",
-    helper: "Create or reuse the teaching workspace and mark it Currently Teaching.",
+    helper: "Add under Teaching Only and mark it Currently Teaching. Select My Library too if you also want to read it personally.",
   },
   {
     key: "myLibrary",
     title: "My Library",
-    helper: "Save this edition to your personal reading Library.",
+    helper: "Add to Want to Read in your personal Library. Existing reading progress is kept.",
   },
   {
     key: "studentLibrary",
@@ -35,6 +36,7 @@ const TEACHER_DESTINATION_OPTIONS = [
 
 export default function AddBookTeacherDestinationOptions({
   canUseCatalogOnly,
+  canTargetAllUsers = false,
   addToCatalogOnly,
   addToTeachingBooks,
   addToMyLibrary,
@@ -85,10 +87,10 @@ export default function AddBookTeacherDestinationOptions({
             />
             <span>
               <span className="block text-sm font-black text-stone-950">
-                {option.title}
+                {option.key === "studentLibrary" && canTargetAllUsers ? "User’s Library" : option.title}
               </span>
               <span className="mt-1 block text-xs leading-5 text-stone-600">
-                {option.helper}
+                {option.key === "studentLibrary" && canTargetAllUsers ? "Choose a user by name, username or email." : option.helper}
               </span>
             </span>
           </label>

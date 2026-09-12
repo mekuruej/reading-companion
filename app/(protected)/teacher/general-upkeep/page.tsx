@@ -187,8 +187,8 @@ export default function TeacherGeneralUpkeepPage() {
     <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
       <div className="mx-auto max-w-6xl">
         <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
-          <Link href="/teacher" className="text-sm font-semibold text-stone-500 hover:text-stone-900">
-            ← Teacher Hub
+          <Link href="/teacher/admin" className="text-sm font-semibold text-stone-500 hover:text-stone-900">
+            ← Admin Hub
           </Link>
           <p className="mt-5 text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">
             Maintenance workspace

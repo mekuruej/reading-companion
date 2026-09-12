@@ -1,3 +1,4 @@
+import { canTeachTargetUser } from "@/lib/teacher/targetUserAccess";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -69,34 +70,7 @@ async function canAddToTargetUser({
   targetUserId: string;
   actorProfile: { role?: string | null; is_super_teacher?: boolean | string | null } | null;
 }) {
-  if (actorId === targetUserId) return true;
-
-  const isSuperTeacher =
-    actorProfile?.role === "super_teacher" ||
-    isSuperTeacherFlag(actorProfile?.is_super_teacher);
-
-  if (isSuperTeacher) {
-    const { data, error } = await supabaseAdmin
-      .from("profiles")
-      .select("id")
-      .eq("id", targetUserId)
-      .maybeSingle();
-
-    if (error) throw error;
-    return Boolean(data);
-  }
-  if (actorProfile?.role !== "teacher") return false;
-
-  const { data, error } = await supabaseAdmin
-    .from("teacher_students")
-    .select("teacher_id")
-    .eq("teacher_id", actorId)
-    .eq("student_id", targetUserId)
-    .is("archived_at", null)
-    .maybeSingle();
-
-  if (error) throw error;
-  return Boolean(data);
+  return canTeachTargetUser({ supabase: supabaseAdmin, actorId, targetUserId, actorProfile });
 }
 
 async function addBookToLibrary({

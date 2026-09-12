@@ -31,6 +31,7 @@ export type LibraryStudyColorSettings = {
 
 export type ComputeLibraryStudyColorInput = {
   encounterCount: number;
+  claimedGreen?: boolean;
   settings?: LibraryStudyColorSettings | null;
   readingGate?: LibraryStudyGateStatus | null;
   meaningGate?: LibraryStudyGateStatus | null;
@@ -256,7 +257,10 @@ export function computeLibraryStudyColorStatus(
     };
   }
 
-  if (hasEnoughEncounters && input.readyForReadingGate) {
+  if (
+    (hasEnoughEncounters && input.readyForReadingGate) ||
+    (input.claimedGreen && !input.heldBeforeReadingGate && !input.heldBeforeMeaningGate)
+  ) {
     return {
       ...encounter,
       color: "green",

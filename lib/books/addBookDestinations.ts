@@ -1,3 +1,4 @@
+import { canTeachTargetUser } from "@/lib/teacher/targetUserAccess";
 import { getOrCreateUserBook, hasValidTeacherOwnedWorkspace } from "@/lib/books/userBookWorkspace";
 function isMissingColumnError(error: any) {
   return error?.code === "42703" || error?.code === "PGRST204";
@@ -59,31 +60,7 @@ async function canAddToTargetUser({
   targetUserId: string;
   actorProfile: AddBookActorProfile;
 }) {
-  if (actorId === targetUserId) return true;
-
-  if (isElevatedCatalogUser(actorProfile)) {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("id", targetUserId)
-      .maybeSingle();
-
-    if (error) throw error;
-    return Boolean(data);
-  }
-
-  if (actorProfile?.role !== "teacher") return false;
-
-  const { data, error } = await supabase
-    .from("teacher_students")
-    .select("teacher_id")
-    .eq("teacher_id", actorId)
-    .eq("student_id", targetUserId)
-    .is("archived_at", null)
-    .maybeSingle();
-
-  if (error) throw error;
-  return Boolean(data);
+  return canTeachTargetUser({ supabase, actorId, targetUserId, actorProfile, allowAdmin: true });
 }
 
 async function getOrCreateTeacherBook({

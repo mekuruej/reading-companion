@@ -1,3 +1,4 @@
+import { isAllUserTeacher } from "@/lib/teacher/targetUserAccess";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -21,8 +22,7 @@ function isSuperTeacherFlag(value: unknown) {
 function canSearchAllUsers(profile: ProfileRow | null) {
   return (
     profile?.role === "admin" ||
-    profile?.role === "super_teacher" ||
-    isSuperTeacherFlag(profile?.is_super_teacher)
+    isAllUserTeacher(profile)
   );
 }
 

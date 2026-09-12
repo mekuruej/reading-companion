@@ -666,7 +666,7 @@ export default function TeacherStudentsPage() {
                 if (allProfilesError) throw allProfilesError;
 
                 studentProfiles = ((allProfiles ?? []) as StudentProfile[]).filter(
-                    (profile) => profile.id !== user.id && isStudentProfile(profile)
+                    (profile) => profile.id !== user.id
                 );
             } else {
                 const { data: links, error: linksError } = await supabase

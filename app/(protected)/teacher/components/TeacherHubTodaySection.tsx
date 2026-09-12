@@ -26,7 +26,7 @@ export function TeacherHubTodaySection({
   return (
     <section className="mt-8">
       <div className="mb-3">
-        <h2 className="text-lg font-black text-stone-900">Today</h2>
+        <h2 className="text-lg font-black text-stone-900">Student Alerts</h2>
         <p className="mt-1 text-sm text-stone-500">
           Alerts show the kind of work waiting and how many items need attention.
         </p>
@@ -42,14 +42,8 @@ export function TeacherHubTodaySection({
           </p>
         ) : (
           <>
-            {!isSuperTeacher ? (
-              <p className="mt-2 text-sm leading-6 text-stone-600">
-                Site upkeep alerts are only shown for super teachers. Student-facing follow-up stays here when it is available.
-              </p>
-            ) : null}
-
             <TeacherAlertList
-              alerts={alerts}
+              alerts={alerts.filter((alert) => !alert.placeholder && alert.count > 0)}
               emptyText="No teacher alerts are waiting right now."
             />
           </>

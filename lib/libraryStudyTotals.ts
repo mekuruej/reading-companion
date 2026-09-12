@@ -22,6 +22,7 @@ type SummaryRow = {
 };
 
 type ProgressRow = {
+  id: string;
   study_identity_key: string;
   reading_gate_status: LibraryStudyGateStatus | null;
   meaning_gate_status: LibraryStudyGateStatus | null;
@@ -68,10 +69,6 @@ export function emptyLibraryStudyLimboTotals(): LibraryStudyLimboTotals {
   };
 }
 
-function shouldClaimUpgradeColor(color: LibraryStudyColor) {
-  return color === "none" || color === "red" || color === "orange" || color === "yellow" || color === "grey";
-}
-
 function preReadingSupportCycle(progress: ProgressRow | null | undefined) {
   if (!progress?.held_before_reading_gate) return null;
   return Math.max(2, (progress.reading_gate_attempts ?? 0) + 1);
@@ -93,59 +90,47 @@ async function loadColorSettings(userId: string): Promise<LibraryStudyColorSetti
   };
 }
 
+// Use small ordered pages: requesting a large limit does not bypass the API row cap.
+async function loadAllRows<T>(queryPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>) {
+  const rows: T[] = [];
+  const pageSize = 500;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await queryPage(from, from + pageSize - 1);
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if (!data || data.length < pageSize) return rows;
+  }
+}
+
 export async function fetchLibraryStudyColorBreakdown(
   userId: string,
-  settings?: LibraryStudyColorSettings | null,
-  options?: { since?: Date | null; before?: Date | null }
+  settings?: LibraryStudyColorSettings | null
 ) {
   const colorSettings = settings ?? (await loadColorSettings(userId));
-  const sinceIso = options?.since ? options.since.toISOString() : null;
-  const beforeIso = options?.before ? options.before.toISOString() : null;
-  let summaryQuery = supabase
-    .from("user_library_word_summaries")
-    .select("study_identity_key, total_encounter_count, last_seen_at")
-    .eq("user_id", userId)
-    .limit(20000);
-
-  if (sinceIso) {
-    summaryQuery = summaryQuery.gte("last_seen_at", sinceIso);
-  }
-
-  if (beforeIso) {
-    summaryQuery = summaryQuery.lt("last_seen_at", beforeIso);
-  }
-
-  let claimQuery = supabase
-    .from("user_library_word_claims")
-    .select("study_identity_key, claimed_color, created_at")
-    .eq("user_id", userId)
-    .limit(20000);
-
-  if (sinceIso) {
-    claimQuery = claimQuery.gte("created_at", sinceIso);
-  }
-
-  if (beforeIso) {
-    claimQuery = claimQuery.lt("created_at", beforeIso);
-  }
-
-  const [{ data: summaryRows, error: summaryErr }, { data: progressRows, error: progressErr }, { data: claimRows, error: claimErr }] =
-    await Promise.all([
-      summaryQuery.returns<SummaryRow[]>(),
-      supabase
-        .from("user_library_word_progress")
-        .select(
-          "study_identity_key, reading_gate_status, meaning_gate_status, held_before_reading_gate, held_before_meaning_gate, reading_gate_attempts, mastered"
-        )
-        .eq("user_id", userId)
-        .limit(20000)
-        .returns<ProgressRow[]>(),
-      claimQuery.returns<ClaimRow[]>(),
-    ]);
-
-  if (summaryErr) throw summaryErr;
-  if (progressErr) throw progressErr;
-  if (claimErr) throw claimErr;
+  const [summaryRows, progressRows, claimRows] = await Promise.all([
+    loadAllRows<SummaryRow>((from, to) => supabase
+      .from("user_library_word_summaries")
+      .select("study_identity_key, total_encounter_count, last_seen_at")
+      .eq("user_id", userId)
+      .order("study_identity_key")
+      .range(from, to)
+      .returns<SummaryRow[]>()),
+    loadAllRows<ProgressRow>((from, to) => supabase
+      .from("user_library_word_progress")
+      .select("id, study_identity_key, reading_gate_status, meaning_gate_status, held_before_reading_gate, held_before_meaning_gate, reading_gate_attempts, mastered")
+      .eq("user_id", userId)
+      .eq("definition_key", "")
+      .order("study_identity_key")
+      .range(from, to)
+      .returns<ProgressRow[]>()),
+    loadAllRows<ClaimRow>((from, to) => supabase
+      .from("user_library_word_claims")
+      .select("study_identity_key, claimed_color, created_at")
+      .eq("user_id", userId)
+      .order("study_identity_key")
+      .range(from, to)
+      .returns<ClaimRow[]>()),
+  ]);
 
   const progressByKey = new Map<string, ProgressRow>();
   for (const row of progressRows ?? []) {
@@ -163,45 +148,40 @@ export async function fetchLibraryStudyColorBreakdown(
   const limboTotals = emptyLibraryStudyLimboTotals();
   const countedKeys = new Set<string>();
 
-  for (const row of summaryRows ?? []) {
-    const key = row.study_identity_key;
-    if (!key) continue;
-
+  function countWord(key: string, encounterCount: number) {
+    if (!key || countedKeys.has(key)) return;
     const progress = progressByKey.get(key);
     const status = computeLibraryStudyColorStatus({
-      encounterCount: row.total_encounter_count ?? 0,
+      encounterCount,
+      claimedGreen: claimedKeys.has(key),
       settings: colorSettings,
       readingGate: progress?.reading_gate_status ?? "not_started",
       meaningGate: progress?.meaning_gate_status ?? "not_started",
       heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
       heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+      readyForReadingGate: Boolean(progress?.id &&
+        progress.reading_gate_status === "not_started" &&
+        progress.meaning_gate_status === "not_started" &&
+        !progress.held_before_reading_gate && !progress.held_before_meaning_gate &&
+        !progress.mastered),
       preReadingSupportCycle: preReadingSupportCycle(progress),
       mastered: progress?.mastered ?? false,
     });
-
-    const color =
-      claimedKeys.has(key) && shouldClaimUpgradeColor(status.color) ? "green" : status.color;
-
-    totals[color] += 1;
-    if (color === "grey" && status.greyReason) {
-      limboTotals[status.greyReason] += 1;
-    }
+    totals[status.color] += 1;
+    if (status.color === "grey" && status.greyReason) limboTotals[status.greyReason] += 1;
     countedKeys.add(key);
   }
 
-  for (const key of claimedKeys) {
-    if (countedKeys.has(key)) continue;
-    totals.green += 1;
-  }
+  for (const row of summaryRows) countWord(row.study_identity_key, row.total_encounter_count ?? 0);
+  for (const key of claimedKeys) countWord(key, 0);
 
   return { colorTotals: totals, limboTotals };
 }
 
 export async function fetchLibraryStudyColorTotals(
   userId: string,
-  settings?: LibraryStudyColorSettings | null,
-  options?: { since?: Date | null; before?: Date | null }
+  settings?: LibraryStudyColorSettings | null
 ) {
-  const { colorTotals } = await fetchLibraryStudyColorBreakdown(userId, settings, options);
+  const { colorTotals } = await fetchLibraryStudyColorBreakdown(userId, settings);
   return colorTotals;
 }

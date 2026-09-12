@@ -1,3 +1,4 @@
+import { hasAbilityCheckRestDays } from "@/lib/abilityCheckSpacing";
 import { computeLibraryStudyColorStatus } from "@/lib/libraryStudyColor";
 import { ymdInTimeZone } from "./helpers";
 
@@ -205,7 +206,10 @@ export function isAbilityCheckCardInDailyPool(
     claim
   );
 
+  if (!hasAbilityCheckRestDays(effectiveProgress?.last_studied_at, now)) return false;
+
   const colorStatus = computeLibraryStudyColorStatus({
+    claimedGreen: claim?.claimed_color === "green",
     encounterCount: summary.total_encounter_count ?? 0,
     settings,
     readingGate: effectiveProgress?.reading_gate_status ?? "not_started",
@@ -309,7 +313,10 @@ export function isAbilityCheckClaimInDailyPool(
     claim
   );
 
+  if (!hasAbilityCheckRestDays(effectiveProgress?.last_studied_at, now)) return false;
+
   const colorStatus = computeLibraryStudyColorStatus({
+    claimedGreen: claim?.claimed_color === "green",
     encounterCount: 0,
     settings,
     readingGate: effectiveProgress?.reading_gate_status ?? "not_started",
