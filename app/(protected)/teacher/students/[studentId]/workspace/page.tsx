@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { getLearnerAccessDisplay } from "@/lib/access/learnerDisplayLabels";
 import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
@@ -73,6 +73,8 @@ type WorkspacePayload = {
   relationship: {
     relationship_status?: string | null;
   } | null;
+  managedRelationships: { teacher_id: string; teacherName: string; archived_at: string | null; archive_reason: string | null }[];
+  canAccessAllUsers: boolean;
   lastEngagedAt: string | null;
   activeLessonBooks: LessonBook[];
   eligibleBooks: EligibleBook[];
@@ -160,7 +162,7 @@ function formatDate(value: string | null) {
 }
 
 function relationshipLabel(relationship: WorkspacePayload["relationship"]) {
-  return relationship?.relationship_status || "Current student";
+  return relationship?.relationship_status || "No active teaching relationship";
 }
 
 function normalizeLessonDayForStorage(value: string | null | undefined) {
@@ -202,6 +204,9 @@ function workspaceContext(studentId: string) {
 export default function StudentWorkspacePage() {
   const params = useParams<{ studentId: string }>();
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const assignmentOpened = useRef(false);
+  const [managingRelationship, setManagingRelationship] = useState<string | null>(null);
   const studentId = params?.studentId ?? "";
 
   const [data, setData] = useState<WorkspacePayload | null>(null);
@@ -348,6 +353,7 @@ export default function StudentWorkspacePage() {
 
   useEffect(() => {
     setTaskLearnerId(studentId);
+    assignmentOpened.current = false;
   }, [studentId]);
 
   useEffect(() => {
@@ -391,6 +397,35 @@ export default function StudentWorkspacePage() {
     if (!studentId) return;
     void loadActiveLearningTasks();
   }, [studentId]);
+
+  useEffect(() => {
+    if (data?.student.id === studentId && searchParams.get("assignTask") === "1" && !assignmentOpened.current) {
+      assignmentOpened.current = true;
+      openTaskModal();
+    }
+  }, [data, searchParams, studentId]);
+
+  async function manageRelationship(teacherId: string, teacherName: string, archived: boolean) {
+    const action = archived ? "restore-relationship" : "archive-relationship";
+    const confirmed = window.confirm(archived
+      ? `Restore ${studentName}'s teaching relationship with ${teacherName}?`
+      : `Move ${studentName} to Past Student for ${teacherName}? Their account, Library, reading history, vocabulary, and assignments will be preserved.`);
+    if (!confirmed) return;
+    const reason = archived ? "" : window.prompt("Optional note", "Student quit");
+    if (reason === null) return;
+    setManagingRelationship(teacherId);
+    setMessage("");
+    try {
+      await apiFetch("PATCH", { studentId, teacherId, action, reason });
+      if (!archived && !data?.canAccessAllUsers) {
+        router.push("/teacher/students");
+        return;
+      }
+      await loadWorkspace();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not update this relationship.");
+    } finally { setManagingRelationship(null); }
+  }
 
   async function removeLessonBook(book: LessonBook) {
     const ok = window.confirm(
@@ -1160,6 +1195,25 @@ export default function StudentWorkspacePage() {
             </p>
           ) : null}
         </section>
+
+        {data.managedRelationships?.length ? (
+          <details className="rounded-2xl border border-stone-200 bg-white p-4 text-sm">
+            <summary className="cursor-pointer font-semibold text-stone-700">Student management</summary>
+            <p className="mt-2 text-xs text-stone-500">Manage teaching relationships. The reader’s account and learning history are preserved.</p>
+            <div className="mt-3 space-y-3">
+              {data.managedRelationships.map(link => (
+                <div key={link.teacher_id} className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 pt-3">
+                  <div><p className="font-medium">{link.teacherName}</p><p className="text-xs text-stone-500">{link.archived_at ? "Past student relationship" : "Active teaching relationship"}</p></div>
+                  <button type="button" disabled={managingRelationship !== null}
+                    onClick={() => void manageRelationship(link.teacher_id, link.teacherName, Boolean(link.archived_at))}
+                    className="rounded-lg border border-stone-300 px-3 py-2 text-stone-600 hover:bg-stone-50 disabled:opacity-50">
+                    {managingRelationship === link.teacher_id ? "Updating…" : link.archived_at ? "Restore student relationship" : "Move to Past Student"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </details>
+        ) : null}
 
         {taskModalOpen ? (
           <TeacherLearningTaskModal

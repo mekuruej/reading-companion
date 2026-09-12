@@ -164,6 +164,7 @@ export default function TeacherHubPage() {
   const [accessChecked, setAccessChecked] = useState(false);
   const [canAccessTeacherHub, setCanAccessTeacherHub] = useState(false);
   const [isSuperTeacher, setIsSuperTeacher] = useState(false);
+  const [canAccessStudents, setCanAccessStudents] = useState(false);
   const [alertsLoading, setAlertsLoading] = useState(true);
   const [teacherAlerts, setTeacherAlerts] = useState<TeacherAlertSummary[]>([]);
 
@@ -203,6 +204,7 @@ export default function TeacherHubPage() {
       const hasTeacherAccess =
         hasSuperTeacherAccess || profile?.role === "teacher";
 
+      setCanAccessStudents(profile?.role === "teacher" || profile?.role === "super_teacher" || isSuperTeacherFlag(profile?.is_super_teacher));
       setIsSuperTeacher(hasSuperTeacherAccess);
       setCanAccessTeacherHub(hasTeacherAccess);
       setAccessChecked(true);
@@ -351,7 +353,7 @@ export default function TeacherHubPage() {
             Students, lessons, and teaching books
           </h2>
         </div>
-        <TeacherHubCardGrid cards={teachingCards} />
+        <TeacherHubCardGrid cards={teachingCards.filter(card => card.href !== "/teacher/students" || canAccessStudents)} />
       </section>
 
       <TeacherHubTodaySection

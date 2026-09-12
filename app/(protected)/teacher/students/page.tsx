@@ -1,1527 +1,202 @@
-// Teacher Students
-//
-
 "use client";
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getLearnerAccessDisplay } from "@/lib/access/learnerDisplayLabels";
-import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
+import type { StudentsCategory } from "@/lib/teacher/studentsIndex";
 import { getTeacherBackLink } from "../components/teacherBackLink";
-import TeacherStudentsAccessState from "./components/TeacherStudentsAccessState";
-import TeacherStudentsErrorBanner from "./components/TeacherStudentsErrorBanner";
 import TeacherStudentsHeader from "./components/TeacherStudentsHeader";
-import TeacherStudentsLoadingState from "./components/TeacherStudentsLoadingState";
-import TeacherStudentsSummaryCards from "./components/TeacherStudentsSummaryCards";
-import TeacherStudentsEmptyState from "./components/TeacherStudentsEmptyState";
-import TeacherStudentsFuturePanels from "./components/TeacherStudentsFuturePanels";
-import TeacherStudentsSearchPanel from "./components/TeacherStudentsSearchPanel";
-import TeacherStudentGroupsPanel from "./components/TeacherStudentGroupsPanel";
-import TeacherStudentsListHeader from "./components/TeacherStudentsListHeader";
-import TeacherLearningTaskModal from "./components/TeacherLearningTaskModal";
 
-type ProfileRole = "teacher" | "super_teacher" | "admin" | "member" | string | null;
-type StudentRelationshipStatus = "future" | "current" | "past";
-type StudentGroupKey = StudentRelationshipStatus;
-
-type StudentProfile = {
-    id: string;
-    display_name: string | null;
-    username: string | null;
-    level: string | null;
-    role: ProfileRole;
-    lesson_day: string | null;
-    app_access_type: string | null;
-    app_access_expires_at: string | null;
+type Student = {
+  id: string;
+  display_name: string | null;
+  username: string | null;
+  level: string | null;
+  role: string | null;
+  is_super_teacher?: boolean | string | null;
+  app_access_type: string | null;
+  app_access_expires_at: string | null;
+  isCurrentStudent: boolean;
+  lastEngagedAt: string | null;
+  archivedTeacherId: string | null;
 };
 
-type TeacherStudentLink = {
-    teacher_id?: string | null;
-    student_id?: string | null;
-    relationship_status?: string | null;
-    archived_at?: string | null;
-    archived_by?: string | null;
-    archive_reason?: string | null;
-};
-
-type UserBookRow = {
-    id: string;
-    user_id: string;
-    started_at: string | null;
-    finished_at: string | null;
-    dnf_at: string | null;
-    assigned_from_prep_at: string | null;
-    source_user_book_id: string | null;
-    books:
-    | {
-        id: string;
-        title: string | null;
-        cover_url: string | null;
-        book_type: string | null;
-        page_count: number | null;
-    }
-    | {
-        id: string;
-        title: string | null;
-        cover_url: string | null;
-        book_type: string | null;
-        page_count: number | null;
-    }[]
-    | null;
-};
-
-type StudentCard = StudentProfile & {
-    relationshipStatus: StudentRelationshipStatus;
-    teacherStudentTeacherId: string | null;
-    archivedAt: string | null;
-    archiveReason: string | null;
-    currentBookTitle: string | null;
-    currentBookCoverUrl: string | null;
-    currentBookId: string | null;
-    totalBooks: number;
-    assignedPrepCount: number;
-    lastEngagedAt: string | null;
-};
-
-type TaskBookOption = {
-    id: string;
-    userId: string;
-    title: string;
-    pageCount: number | null;
-};
-
-type ActiveLearningTask = {
-    id: string;
-    learner_id: string;
-    user_book_id: string | null;
-    task_type: string;
-    title: string;
-    instructions: string | null;
-    due_on: string | null;
-    created_at: string;
-};
-
-type LearningTaskType =
-    | "reread_pages"
-    | "review_book_words"
-    | "kanji_reading_practice"
-    | "study_kana"
-    | "foundations_vocabulary"
-    | "listening";
-
-type RereadTaskMode =
-    | "reader_choice"
-    | "fluid_reading_saved_words"
-    | "curiosity_reading"
-    | "just_reading";
-
-type BookFlashcardFilter = "whole_book" | "chapter" | "page_range" | "saved_date_range";
-
-const DEFAULT_TASK_COPY: Record<LearningTaskType, { title: string; instructions: string }> = {
-    reread_pages: {
-        title: "Reread today’s lesson pages",
-        instructions: "Reread using Fluid Reading with Saved Word Support.",
-    },
-    review_book_words: {
-        title: "Study book flashcards",
-        instructions: "Review the selected words from this book.",
-    },
-    kanji_reading_practice: {
-        title: "Do Kanji Reading practice",
-        instructions: "Practice a short set of global Kanji Reading cards.",
-    },
-    study_kana: {
-        title: "Study Kana",
-        instructions: "Practice hiragana and katakana.",
-    },
-    foundations_vocabulary: {
-        title: "Study Foundations Vocabulary",
-        instructions: "Review the Foundations Vocabulary cards.",
-    },
-    listening: {
-        title: "Listen to today’s section",
-        instructions: "Listen to the audiobook, log any words you hear, and time your session.",
-    },
-};
-
-function getBook(bookRow: UserBookRow["books"]) {
-    if (Array.isArray(bookRow)) return bookRow[0] ?? null;
-    return bookRow ?? null;
-}
-
-function formatLessonDay(value: string | null) {
-    if (!value) return "No lesson day";
-    return value;
-}
-
-function formatRelativeDate(dateStr: string | null) {
-    if (!dateStr) return "No recent activity";
-
-    const d = new Date(dateStr);
-    const now = new Date();
-
-    if (Number.isNaN(d.getTime())) return "No recent activity";
-
-    const diffMs = now.getTime() - d.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffDays <= 0) return "today";
-    if (diffDays === 1) return "yesterday";
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-
-    return d.toLocaleDateString();
-}
-
-function isStudentProfile(profile: StudentProfile) {
-    return profile.role === "member";
-}
-
-function getStudentRelationshipStatus(profile: StudentProfile): StudentRelationshipStatus {
-    const accessStatus = getAppAccessStatus(profile);
-
-    if (accessStatus.reason === "expired") return "past";
-    if (accessStatus.isTrialActive) return "future";
-
-    return "current";
-}
-
-function normalizeRelationshipStatus(value: string | null | undefined): StudentRelationshipStatus | null {
-    const normalized = (value ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
-
-    if (
-        normalized === "future" ||
-        normalized === "prospective" ||
-        normalized === "trial" ||
-        normalized === "invited" ||
-        normalized === "upcoming"
-    ) {
-        return "future";
-    }
-
-    if (
-        normalized === "past" ||
-        normalized === "former" ||
-        normalized === "archived" ||
-        normalized === "inactive" ||
-        normalized === "complete" ||
-        normalized === "completed"
-    ) {
-        return "past";
-    }
-
-    if (normalized === "current" || normalized === "active") {
-        return "current";
-    }
-
-    return null;
-}
-
-function getLinkRelationshipStatus(link: TeacherStudentLink | null | undefined) {
-    return normalizeRelationshipStatus(link?.relationship_status);
-}
-
-function relationshipLabel(status: StudentRelationshipStatus) {
-    if (status === "future") return "Future";
-    if (status === "past") return "Past";
-    return "Current";
-}
-
-function relationshipClasses(status: StudentRelationshipStatus) {
-    if (status === "future") return "border-sky-200 bg-sky-50 text-sky-800";
-    if (status === "past") return "border-rose-200 bg-rose-50 text-rose-800";
-    return "border-emerald-200 bg-emerald-50 text-emerald-800";
-}
-
-function learningTaskTypeLabel(taskType: string) {
-    if (taskType === "reread_pages") return "Reread pages";
-    if (taskType === "review_book_words") return "Book flashcards";
-    if (taskType === "kanji_reading_practice") return "Kanji Reading";
-    if (taskType === "study_kana") return "Study Kana";
-    if (taskType === "foundations_vocabulary") return "Foundations Vocabulary";
-    if (taskType === "listening") return "Listening";
-    return "Learning task";
-}
-
-function LinkedStudentCard({
-    student,
-    onCreateTask,
-    onArchive,
-    onRestore,
-    isUpdatingArchive,
-}: {
-    student: StudentCard;
-    onCreateTask: (student: StudentCard) => void;
-    onArchive: (student: StudentCard) => void;
-    onRestore: (student: StudentCard) => void;
-    isUpdatingArchive: boolean;
-}) {
-    const displayName = student.display_name || student.username || "Unnamed student";
-    const isPast = student.relationshipStatus === "past";
-
-    return (
-        <article className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-col gap-4">
-                <div className="flex items-start gap-3">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-2xl font-black text-stone-500">
-                        {displayName.charAt(0).toUpperCase()}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div className="min-w-0">
-                                <h3 className="text-xl font-black leading-tight text-stone-900">
-                                    {displayName}
-                                </h3>
-
-                                {student.username ? (
-                                    <p className="mt-1 text-sm text-stone-500">
-                                        @{student.username}
-                                    </p>
-                                ) : null}
-                            </div>
-
-                            <div className="flex flex-wrap gap-2">
-                                <span
-                                    className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${relationshipClasses(
-                                        student.relationshipStatus
-                                    )}`}
-                                >
-                                    {relationshipLabel(student.relationshipStatus)}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="grid gap-3 text-sm text-stone-600 sm:grid-cols-2">
-                    <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
-                            Lesson
-                        </p>
-                        <p className="mt-1 font-semibold text-stone-700">
-                            {formatLessonDay(student.lesson_day)}
-                        </p>
-                    </div>
-
-                    <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
-                            Last engaged
-                        </p>
-                        <p className="mt-1 font-semibold text-stone-700">
-                            {formatRelativeDate(student.lastEngagedAt)}
-                        </p>
-                    </div>
-                </div>
-
-                {student.archivedAt ? (
-                    <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-                        <p className="font-semibold">Past student</p>
-                        <p className="mt-1">
-                            {student.archiveReason || "Hidden from active teacher lists and alerts."}
-                        </p>
-                        <p className="mt-1 text-xs text-rose-600">
-                            Moved to Past {new Date(student.archivedAt).toLocaleDateString()}
-                        </p>
-                    </div>
-                ) : null}
-
-                <div className="space-y-3">
-                    {isPast ? (
-                        <button
-                            type="button"
-                            disabled
-                            className="w-full rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-base font-semibold text-stone-400"
-                        >
-                            Student Space
-                        </button>
-                    ) : (
-                        <Link
-                            href={`/teacher/students/${encodeURIComponent(student.id)}/workspace`}
-                            className="block w-full rounded-2xl border border-stone-900 bg-stone-900 px-4 py-3 text-center text-base font-semibold text-white hover:bg-black"
-                        >
-                            Open Student Space
-                        </Link>
-                    )}
-
-                    <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm">
-                        <button
-                            type="button"
-                            onClick={() => onCreateTask(student)}
-                            disabled={isPast}
-                            className="font-semibold text-sky-700 hover:text-sky-900 disabled:text-stone-400"
-                        >
-                            Assign Task
-                        </button>
-
-                        {isPast ? (
-                            <button
-                                type="button"
-                                onClick={() => onRestore(student)}
-                                disabled={isUpdatingArchive || !student.teacherStudentTeacherId}
-                                className="font-semibold text-emerald-700 hover:text-emerald-900 disabled:text-stone-400"
-                            >
-                                {isUpdatingArchive ? "Restoring..." : "Restore"}
-                            </button>
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={() => onArchive(student)}
-                                disabled={isUpdatingArchive || !student.teacherStudentTeacherId}
-                                className="font-semibold text-stone-500 hover:text-rose-700 disabled:text-stone-300"
-                            >
-                                {isUpdatingArchive ? "Moving..." : "Move to Past"}
-                            </button>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </article>
-    );
-}
-
-function OtherLearnerCard({ student }: { student: StudentCard }) {
-    const displayName = student.display_name || student.username || "Unnamed learner";
-    const learnerAccess = getLearnerAccessDisplay({
-        role: student.role,
-        app_access_type: student.app_access_type,
-        app_access_expires_at: student.app_access_expires_at,
-        linkedToTeacher: false,
-    });
-
-    return (
-        <article className="rounded-2xl border border-stone-200 bg-stone-50 p-4 shadow-sm">
-            <div className="flex flex-col gap-4">
-                <div className="flex items-start gap-3">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-xl font-black text-stone-500">
-                        {displayName.charAt(0).toUpperCase()}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div className="min-w-0">
-                                <h3 className="text-lg font-black leading-tight text-stone-900">
-                                    {displayName}
-                                </h3>
-                                {student.username ? (
-                                    <p className="mt-1 text-sm text-stone-500">
-                                        @{student.username}
-                                    </p>
-                                ) : null}
-                            </div>
-
-                            <div className="flex flex-wrap gap-2">
-                                <span className="rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-semibold text-stone-500">
-                                    {student.level || "No level"}
-                                </span>
-                                <span className="rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-semibold text-stone-500">
-                                    {learnerAccess.label}
-                                </span>
-                            </div>
-                        </div>
-                        {learnerAccess.detail || learnerAccess.effectiveAccessLabel ? (
-                            <div className="mt-2 text-xs font-semibold leading-5 text-stone-500">
-                                {learnerAccess.detail ? <p>{learnerAccess.detail}</p> : null}
-                                {learnerAccess.effectiveAccessLabel ? (
-                                    <p>{learnerAccess.effectiveAccessLabel}</p>
-                                ) : null}
-                            </div>
-                        ) : null}
-                    </div>
-                </div>
-
-                <div className="rounded-xl border border-stone-200 bg-white p-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">
-                        Library context
-                    </p>
-                    {student.currentBookTitle ? (
-                        <div className="mt-2 flex items-center gap-3">
-                            {student.currentBookCoverUrl ? (
-                                <img
-                                    src={student.currentBookCoverUrl}
-                                    alt=""
-                                    className="h-16 w-11 rounded object-cover"
-                                />
-                            ) : (
-                                <div className="h-16 w-11 rounded bg-stone-100" />
-                            )}
-                            <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-stone-800">
-                                    {student.currentBookTitle}
-                                </p>
-                                <p className="mt-1 text-xs text-stone-500">
-                                    {student.totalBooks} library{" "}
-                                    {student.totalBooks === 1 ? "book" : "books"}
-                                </p>
-                            </div>
-                        </div>
-                    ) : (
-                        <p className="mt-2 text-sm text-stone-500">
-                            {student.totalBooks} library {student.totalBooks === 1 ? "book" : "books"}
-                        </p>
-                    )}
-                </div>
-
-                <div className="grid gap-2 sm:grid-cols-2">
-                    {student.username ? (
-                        <Link
-                            href={`/users/${student.username}/books`}
-                            className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-center text-sm font-semibold text-stone-700 hover:bg-stone-50"
-                        >
-                            View Library
-                        </Link>
-                    ) : (
-                        <button
-                            type="button"
-                            disabled
-                            className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-stone-400"
-                        >
-                            No username
-                        </button>
-                    )}
-
-                    <Link
-                        href={`/books/add?destination=student&targetUserId=${student.id}`}
-                        className="rounded-xl border border-stone-900 bg-stone-900 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-black"
-                    >
-                        Add Book
-                    </Link>
-                </div>
-            </div>
-        </article>
-    );
+function formatLastEngaged(value: string | null) {
+  if (!value) return "No recent activity";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "No recent activity";
+  const days = Math.floor((Date.now() - date.getTime()) / 86400000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days} days ago`;
+  return date.toLocaleDateString();
 }
 
 export default function TeacherStudentsPage() {
-    const searchParams = useSearchParams();
-    const backLink = getTeacherBackLink(searchParams.get("from"));
-
-    const [loading, setLoading] = useState(true);
-    const [canAccess, setCanAccess] = useState(false);
-    const [viewerIsSuperTeacher, setViewerIsSuperTeacher] = useState(false);
-    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-    const [students, setStudents] = useState<StudentCard[]>([]);
-    const [studentSearch, setStudentSearch] = useState("");
-    const [myStudentsOpen, setMyStudentsOpen] = useState(true);
-    const [otherUsersOpen, setOtherUsersOpen] = useState(false);
-    const [myOpenGroups, setMyOpenGroups] = useState<Record<StudentGroupKey, boolean>>({
-        current: true,
-        future: false,
-        past: false,
-    });
-    const [taskBooksByStudentId, setTaskBooksByStudentId] = useState<
-        Record<string, TaskBookOption[]>
-    >({});
-    const [error, setError] = useState<string | null>(null);
-    const [taskLearnerId, setTaskLearnerId] = useState("");
-    const [taskUserBookId, setTaskUserBookId] = useState("");
-    const [taskType, setTaskType] = useState<LearningTaskType>("reread_pages");
-    const [taskTitle, setTaskTitle] = useState(DEFAULT_TASK_COPY.reread_pages.title);
-    const [taskInstructions, setTaskInstructions] = useState(
-        DEFAULT_TASK_COPY.reread_pages.instructions
-    );
-    const [taskPageStart, setTaskPageStart] = useState("");
-    const [taskPageEnd, setTaskPageEnd] = useState("");
-    const [taskReadingMode, setTaskReadingMode] =
-        useState<RereadTaskMode>("fluid_reading_saved_words");
-    const [taskFlashcardFilter, setTaskFlashcardFilter] =
-        useState<BookFlashcardFilter>("whole_book");
-    const [taskChapterNumber, setTaskChapterNumber] = useState("");
-    const [taskSavedFrom, setTaskSavedFrom] = useState("");
-    const [taskSavedTo, setTaskSavedTo] = useState("");
-    const [taskKanjiCardCount, setTaskKanjiCardCount] = useState("10");
-    const [taskSaving, setTaskSaving] = useState(false);
-    const [taskMessage, setTaskMessage] = useState<string | null>(null);
-    const [taskModalStudent, setTaskModalStudent] = useState<StudentCard | null>(null);
-    const [activeLearningTasks, setActiveLearningTasks] = useState<ActiveLearningTask[]>([]);
-    const [cancellingTaskId, setCancellingTaskId] = useState<string | null>(null);
-    const [updatingArchiveStudentId, setUpdatingArchiveStudentId] = useState<string | null>(null);
-
-    async function loadActiveLearningTasks(teacherId: string, learnerIds: string[]) {
-        if (learnerIds.length === 0) {
-            setActiveLearningTasks([]);
-            return;
-        }
-
-        const { data, error } = await supabase
-            .from("learning_tasks")
-            .select("id, learner_id, user_book_id, task_type, title, instructions, due_on, created_at")
-            .eq("created_by", teacherId)
-            .eq("status", "assigned")
-            .is("cancelled_at", null)
-            .in("learner_id", learnerIds)
-            .order("created_at", { ascending: false });
-
-        if (error) {
-            console.error("Error loading active learning tasks:", error);
-            setActiveLearningTasks([]);
-            return;
-        }
-
-        setActiveLearningTasks((data ?? []) as ActiveLearningTask[]);
-    }
-
-    async function loadStudents() {
-        setLoading(true);
-        setError(null);
-
-        try {
-            const {
-                data: { user },
-                error: userError,
-            } = await supabase.auth.getUser();
-
-            if (userError) throw userError;
-
-            if (!user) {
-                setCanAccess(false);
-                setViewerIsSuperTeacher(false);
-                setCurrentUserId(null);
-                setStudents([]);
-                setError("Please sign in.");
-                return;
-            }
-
-            setCurrentUserId(user.id);
-
-            const { data: meProfile, error: meProfileError } = await supabase
-                .from("profiles")
-                .select("id, display_name, username, level, role, lesson_day, is_super_teacher")
-                .eq("id", user.id)
-                .maybeSingle();
-
-            if (meProfileError) throw meProfileError;
-
-            const isTeacher =
-                meProfile?.role === "teacher" ||
-                meProfile?.role === "admin" ||
-                meProfile?.role === "super_teacher" ||
-                !!meProfile?.is_super_teacher;
-            const isSuperTeacher =
-                meProfile?.role === "admin" ||
-                meProfile?.role === "super_teacher" ||
-                !!meProfile?.is_super_teacher;
-
-            setCanAccess(isTeacher);
-            setViewerIsSuperTeacher(isSuperTeacher);
-
-            if (!isTeacher) {
-                setStudents([]);
-                return;
-            }
-
-            let studentProfiles: StudentProfile[] = [];
-            const relationshipStatusByStudentId = new Map<string, StudentRelationshipStatus>();
-            const relationshipTeacherIdByStudentId = new Map<string, string>();
-            const archivedAtByStudentId = new Map<string, string>();
-            const archiveReasonByStudentId = new Map<string, string>();
-            const studentsWithActiveTeacherLink = new Set<string>();
-
-            if (isSuperTeacher) {
-                const { data: links, error: linksError } = await supabase
-                    .from("teacher_students")
-                    .select("*");
-
-                if (linksError) throw linksError;
-
-                const studentIds = Array.from(
-                    new Set(
-                        ((links ?? []) as TeacherStudentLink[])
-                            .map((row) => row.student_id)
-                            .filter(Boolean) as string[]
-                    )
-                );
-
-                for (const link of (links ?? []) as TeacherStudentLink[]) {
-                    const studentId = link.student_id;
-                    if (!studentId) continue;
-                    if (link.teacher_id && !relationshipTeacherIdByStudentId.has(studentId)) {
-                        relationshipTeacherIdByStudentId.set(studentId, link.teacher_id);
-                    }
-
-                    if (link.archived_at) {
-                        if (!archivedAtByStudentId.has(studentId)) {
-                            archivedAtByStudentId.set(studentId, link.archived_at);
-                            archiveReasonByStudentId.set(studentId, link.archive_reason ?? "");
-                        }
-                        continue;
-                    }
-
-                    studentsWithActiveTeacherLink.add(studentId);
-
-                    const status = getLinkRelationshipStatus(link);
-                    if (status && !relationshipStatusByStudentId.has(studentId)) {
-                        relationshipStatusByStudentId.set(studentId, status);
-                    }
-                }
-
-                const { data: allProfiles, error: allProfilesError } = await supabase
-                    .from("profiles")
-                    .select("id, display_name, username, level, role, lesson_day, app_access_type, app_access_expires_at")
-                    .order("display_name", { ascending: true });
-
-                if (allProfilesError) throw allProfilesError;
-
-                studentProfiles = ((allProfiles ?? []) as StudentProfile[]).filter(
-                    (profile) => profile.id !== user.id
-                );
-            } else {
-                const { data: links, error: linksError } = await supabase
-                    .from("teacher_students")
-                    .select("*")
-                    .eq("teacher_id", user.id);
-
-                if (linksError) throw linksError;
-
-                const studentIds = Array.from(
-                    new Set(
-                        ((links ?? []) as TeacherStudentLink[])
-                            .map((row) => row.student_id)
-                            .filter(Boolean) as string[]
-                    )
-                );
-
-                for (const link of (links ?? []) as TeacherStudentLink[]) {
-                    const studentId = link.student_id;
-                    if (!studentId) continue;
-                    if (link.teacher_id) {
-                        relationshipTeacherIdByStudentId.set(studentId, link.teacher_id);
-                    }
-
-                    if (link.archived_at) {
-                        archivedAtByStudentId.set(studentId, link.archived_at);
-                        archiveReasonByStudentId.set(studentId, link.archive_reason ?? "");
-                        continue;
-                    }
-
-                    studentsWithActiveTeacherLink.add(studentId);
-
-                    const status = getLinkRelationshipStatus(link);
-                    if (status) relationshipStatusByStudentId.set(studentId, status);
-                }
-
-                if (studentIds.length > 0) {
-                    const { data: linkedProfiles, error: linkedProfilesError } = await supabase
-                        .from("profiles")
-                        .select("id, display_name, username, level, role, lesson_day, app_access_type, app_access_expires_at")
-                        .in("id", studentIds)
-                        .order("display_name", { ascending: true });
-
-                    if (linkedProfilesError) throw linkedProfilesError;
-
-                    studentProfiles = ((linkedProfiles ?? []) as StudentProfile[]).filter(
-                        (profile) => isStudentProfile(profile)
-                    );
-                }
-            }
-
-            if (studentProfiles.length === 0) {
-                setStudents([]);
-                setActiveLearningTasks([]);
-                return;
-            }
-
-            const studentIds = studentProfiles.map((student) => student.id);
-
-            const { data: userBooks, error: userBooksError } = await supabase
-                .from("user_books")
-                .select(
-                    `
-          id,
-          user_id,
-          started_at,
-          finished_at,
-          dnf_at,
-          assigned_from_prep_at,
-          source_user_book_id,
-          books:book_id (
-            id,
-            title,
-            cover_url,
-            book_type,
-            page_count
-          )
-        `
-                )
-                .in("user_id", studentIds)
-                .order("created_at", { ascending: false });
-
-            if (userBooksError) throw userBooksError;
-
-            const booksByStudentId = new Map<string, UserBookRow[]>();
-            const nextTaskBookOptions: Record<string, TaskBookOption[]> = {};
-
-            for (const row of (userBooks ?? []) as UserBookRow[]) {
-                const existing = booksByStudentId.get(row.user_id) ?? [];
-                existing.push(row);
-                booksByStudentId.set(row.user_id, existing);
-
-                const book = getBook(row.books);
-                if (book?.title) {
-                    const options = nextTaskBookOptions[row.user_id] ?? [];
-                    options.push({
-                        id: row.id,
-                        userId: row.user_id,
-                        title: book.title,
-                        pageCount: book.page_count ?? null,
-                    });
-                    nextTaskBookOptions[row.user_id] = options;
-                }
-            }
-
-            setTaskBooksByStudentId(nextTaskBookOptions);
-
-            const userBookIds = ((userBooks ?? []) as UserBookRow[]).map((row) => row.id);
-
-            const lastEngagedByUserBookId = new Map<string, string>();
-
-            if (userBookIds.length > 0) {
-                const { data: sessions, error: sessionsError } = await supabase
-                    .from("user_book_reading_sessions")
-                    .select("user_book_id, read_on")
-                    .in("user_book_id", userBookIds)
-                    .order("read_on", { ascending: false });
-
-                if (sessionsError) {
-                    console.error("Error loading student reading sessions:", sessionsError);
-                }
-
-                for (const session of sessions ?? []) {
-                    const userBookId = (session as any).user_book_id as string;
-                    const readOn = (session as any).read_on as string | null;
-                    if (!userBookId || !readOn) continue;
-
-                    if (!lastEngagedByUserBookId.has(userBookId)) {
-                        lastEngagedByUserBookId.set(userBookId, readOn);
-                    }
-                }
-            }
-
-            const nextCards: StudentCard[] = studentProfiles.map((student) => {
-                const books = booksByStudentId.get(student.id) ?? [];
-
-                const currentBook =
-                    books.find((row) => row.started_at && !row.finished_at && !row.dnf_at) ??
-                    books[0] ??
-                    null;
-
-                const currentBookData = currentBook ? getBook(currentBook.books) : null;
-
-                const lastEngagedAt = books
-                    .map((row) => lastEngagedByUserBookId.get(row.id) ?? null)
-                    .filter(Boolean)
-                    .sort((a, b) => String(b).localeCompare(String(a)))[0] ?? null;
-                const archivedAt = studentsWithActiveTeacherLink.has(student.id)
-                    ? null
-                    : archivedAtByStudentId.get(student.id) ?? null;
-
-                return {
-                    ...student,
-                    relationshipStatus:
-                        archivedAt
-                            ? "past"
-                            : relationshipStatusByStudentId.get(student.id) ??
-                            getStudentRelationshipStatus(student),
-                    teacherStudentTeacherId: relationshipTeacherIdByStudentId.get(student.id) ?? null,
-                    archivedAt,
-                    archiveReason: archivedAt ? archiveReasonByStudentId.get(student.id) ?? null : null,
-                    currentBookTitle: currentBookData?.title ?? null,
-                    currentBookCoverUrl: currentBookData?.cover_url ?? null,
-                    currentBookId: currentBook?.id ?? null,
-                    totalBooks: books.length,
-                    assignedPrepCount: books.filter((row) => !!row.assigned_from_prep_at).length,
-                    lastEngagedAt,
-                };
-            });
-
-            nextCards.sort((a, b) => {
-                const aName = a.display_name || a.username || "";
-                const bName = b.display_name || b.username || "";
-                return aName.localeCompare(bName);
-            });
-
-            setStudents(nextCards);
-            const activeStudentIds = nextCards
-                .filter((student) => student.relationshipStatus !== "past")
-                .map((student) => student.id);
-            await loadActiveLearningTasks(user.id, activeStudentIds);
-        } catch (err: any) {
-            console.error("Error loading teacher students:", err);
-            setError(err?.message ?? "Could not load students.");
-            setStudents([]);
-            setTaskBooksByStudentId({});
-            setActiveLearningTasks([]);
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    useEffect(() => {
-        void loadStudents();
-    }, []);
-
-    useEffect(() => {
-        if (students.length === 0) return;
-        const activeStudents = students.filter((student) => student.relationshipStatus !== "past");
-        if (
-            taskLearnerId &&
-            activeStudents.some((student) => student.id === taskLearnerId)
-        ) {
-            return;
-        }
-
-        const firstCurrentStudent =
-            activeStudents.find((student) => student.relationshipStatus === "current") ??
-            activeStudents[0];
-
-        setTaskLearnerId(firstCurrentStudent?.id ?? "");
-        setTaskUserBookId(firstCurrentStudent?.currentBookId ?? "");
-    }, [students, taskLearnerId]);
-
-    useEffect(() => {
-        if (!taskLearnerId) {
-            setTaskUserBookId("");
-            return;
-        }
-
-        const options = taskBooksByStudentId[taskLearnerId] ?? [];
-        if (!taskUserBookId || !options.some((book) => book.id === taskUserBookId)) {
-            setTaskUserBookId(options[0]?.id ?? "");
-        }
-    }, [taskBooksByStudentId, taskLearnerId, taskUserBookId]);
-
-    function updateTaskType(nextType: LearningTaskType) {
-        setTaskType(nextType);
-        setTaskTitle(DEFAULT_TASK_COPY[nextType].title);
-        setTaskInstructions(DEFAULT_TASK_COPY[nextType].instructions);
-        setTaskPageStart("");
-        setTaskPageEnd("");
-        setTaskChapterNumber("");
-        setTaskSavedFrom("");
-        setTaskSavedTo("");
-        setTaskMessage(null);
-    }
-
-    function openTaskModal(student: StudentCard) {
-        setTaskModalStudent(student);
-        setTaskLearnerId(student.id);
-        setTaskUserBookId(student.currentBookId ?? taskBooksByStudentId[student.id]?.[0]?.id ?? "");
-        setTaskMessage(null);
-    }
-
-    function closeTaskModal() {
-        if (taskSaving) return;
-        setTaskModalStudent(null);
-        setTaskMessage(null);
-    }
-
-    async function cancelLearningTask(taskId: string) {
-        if (!currentUserId) {
-            setTaskMessage("Please sign in again.");
-            return;
-        }
-
-        const ok = window.confirm("Cancel this task for the learner?");
-        if (!ok) return;
-
-        setCancellingTaskId(taskId);
-        setTaskMessage(null);
-
-        try {
-            const { error: updateError } = await supabase
-                .from("learning_tasks")
-                .update({
-                    status: "cancelled",
-                    cancelled_at: new Date().toISOString(),
-                })
-                .eq("id", taskId)
-                .eq("created_by", currentUserId)
-                .eq("status", "assigned");
-
-            if (updateError) throw updateError;
-
-            setActiveLearningTasks((prev) => prev.filter((task) => task.id !== taskId));
-            setTaskMessage("Task cancelled.");
-        } catch (err: any) {
-            console.error("Error cancelling learning task:", err);
-            setTaskMessage(err?.message ?? "Could not cancel this task.");
-        } finally {
-            setCancellingTaskId(null);
-        }
-    }
-
-    async function archiveStudent(student: StudentCard) {
-        if (!currentUserId || !student.teacherStudentTeacherId) {
-            setError("This student relationship could not be moved to Past.");
-            return;
-        }
-
-        const displayName = student.display_name || student.username || "this student";
-        const ok = window.confirm(
-            `Move ${displayName} to Past Students? They will leave your active student list, but their data will stay in Mekuru.`
-        );
-        if (!ok) return;
-
-        const reason = window.prompt("Optional note", "Student quit");
-
-        setUpdatingArchiveStudentId(student.id);
-        setError(null);
-
-        try {
-            const { error: updateError } = await supabase
-                .from("teacher_students")
-                .update({
-                    relationship_status: "past",
-                    archived_at: new Date().toISOString(),
-                    archived_by: currentUserId,
-                    archive_reason: reason?.trim() || null,
-                })
-                .eq("teacher_id", student.teacherStudentTeacherId)
-                .eq("student_id", student.id)
-                .is("archived_at", null);
-
-            if (updateError) throw updateError;
-
-            await loadStudents();
-        } catch (err: any) {
-            console.error("Error moving student to Past:", err);
-            setError(err?.message ?? "Could not move this student to Past.");
-        } finally {
-            setUpdatingArchiveStudentId(null);
-        }
-    }
-
-    async function restoreStudent(student: StudentCard) {
-        if (!currentUserId || !student.teacherStudentTeacherId) {
-            setError("This student relationship could not be restored.");
-            return;
-        }
-
-        const displayName = student.display_name || student.username || "this student";
-        const ok = window.confirm(`Restore ${displayName} to Current Students?`);
-        if (!ok) return;
-
-        setUpdatingArchiveStudentId(student.id);
-        setError(null);
-
-        try {
-            const { error: updateError } = await supabase
-                .from("teacher_students")
-                .update({
-                    relationship_status: "current",
-                    archived_at: null,
-                    archived_by: null,
-                    archive_reason: null,
-                })
-                .eq("teacher_id", student.teacherStudentTeacherId)
-                .eq("student_id", student.id);
-
-            if (updateError) throw updateError;
-
-            await loadStudents();
-        } catch (err: any) {
-            console.error("Error restoring student:", err);
-            setError(err?.message ?? "Could not restore this student.");
-        } finally {
-            setUpdatingArchiveStudentId(null);
-        }
-    }
-
-    async function createLearningTask() {
-        setTaskMessage(null);
-
-        if (!currentUserId) {
-            setTaskMessage("Please sign in again.");
-            return;
-        }
-
-        if (!taskLearnerId) {
-            setTaskMessage("Choose a learner.");
-            return;
-        }
-
-        const activeTaskLearner = students.find(
-            (student) =>
-                student.id === taskLearnerId &&
-                student.relationshipStatus !== "past"
-        );
-        if (!activeTaskLearner) {
-            setTaskMessage("Choose a learner from your active student list.");
-            return;
-        }
-
-        const cleanTitle = taskTitle.trim();
-        if (!cleanTitle) {
-            setTaskMessage("Add a task title.");
-            return;
-        }
-
-        const cleanInstructions = taskInstructions.trim();
-        const chapterNumber =
-            taskChapterNumber.trim() === "" ? null : Number(taskChapterNumber.trim());
-        const kanjiCardCount =
-            taskKanjiCardCount.trim() === "" ? null : Number(taskKanjiCardCount.trim());
-
-        const needsBook =
-            taskType === "reread_pages" ||
-            taskType === "review_book_words" ||
-            taskType === "listening";
-
-        if (needsBook && !taskUserBookId) {
-            setTaskMessage("Choose a linked book for this task.");
-            return;
-        }
-
-        const learnerBookOptions = taskBooksByStudentId[taskLearnerId] ?? [];
-        if (
-            needsBook &&
-            !learnerBookOptions.some((book) => book.id === taskUserBookId)
-        ) {
-            setTaskMessage("Choose a linked book from this learner's library.");
-            return;
-        }
-
-        const selectedTaskBook = learnerBookOptions.find((book) => book.id === taskUserBookId);
-        const parsedPageStart = parseOptionalPageLocationInput(
-            taskPageStart,
-            selectedTaskBook?.pageCount ?? null
-        );
-        const parsedPageEnd = parseOptionalPageLocationInput(
-            taskPageEnd,
-            selectedTaskBook?.pageCount ?? null
-        );
-        const pageStart = parsedPageStart.value;
-        const pageEnd = parsedPageEnd.value;
-
-        if (
-            parsedPageStart.error ||
-            parsedPageEnd.error ||
-            (pageStart != null && (!Number.isFinite(pageStart) || pageStart <= 0)) ||
-            (pageEnd != null && (!Number.isFinite(pageEnd) || pageEnd <= 0))
-        ) {
-            setTaskMessage(
-                parsedPageStart.error ||
-                    parsedPageEnd.error ||
-                    "Page numbers should be positive numbers."
-            );
-            return;
-        }
-
-        if ((pageStart == null) !== (pageEnd == null)) {
-            setTaskMessage("Use both page fields, or leave both blank.");
-            return;
-        }
-
-        if (pageStart != null && pageEnd != null && pageEnd < pageStart) {
-            setTaskMessage("End page cannot be before start page.");
-            return;
-        }
-
-        if (
-            taskType === "review_book_words" &&
-            taskFlashcardFilter === "chapter" &&
-            (chapterNumber == null || !Number.isFinite(chapterNumber) || chapterNumber <= 0)
-        ) {
-            setTaskMessage("Add a positive chapter number.");
-            return;
-        }
-
-        if (
-            taskType === "kanji_reading_practice" &&
-            (kanjiCardCount == null || !Number.isFinite(kanjiCardCount) || kanjiCardCount <= 0)
-        ) {
-            setTaskMessage("Add a positive number of Kanji Reading cards.");
-            return;
-        }
-
-        if (
-            taskType === "review_book_words" &&
-            taskFlashcardFilter === "saved_date_range" &&
-            ((taskSavedFrom && taskSavedTo && taskSavedTo < taskSavedFrom) ||
-                (!taskSavedFrom && !taskSavedTo))
-        ) {
-            setTaskMessage("Add a saved date range, or choose a different flashcard filter.");
-            return;
-        }
-
-        const taskPayload: Record<string, unknown> = {};
-
-        if (taskType === "reread_pages") {
-            taskPayload.mode = taskReadingMode;
-        }
-
-        if (taskType === "review_book_words") {
-            taskPayload.mode = "book_flashcards";
-            taskPayload.filter_type = taskFlashcardFilter;
-
-            if (taskFlashcardFilter === "chapter" && chapterNumber != null) {
-                taskPayload.chapter_number = chapterNumber;
-            }
-
-            if (taskFlashcardFilter === "saved_date_range") {
-                if (taskSavedFrom) taskPayload.saved_from = taskSavedFrom;
-                if (taskSavedTo) taskPayload.saved_to = taskSavedTo;
-            }
-        }
-
-        if (taskType === "kanji_reading_practice") {
-            taskPayload.mode = "kanji_reading_practice";
-            taskPayload.card_count = kanjiCardCount ?? 10;
-        }
-
-        if (taskType === "study_kana") {
-            taskPayload.mode = "study_kana";
-        }
-
-        if (taskType === "foundations_vocabulary") {
-            taskPayload.mode = "foundations_vocabulary";
-        }
-
-        if (taskType === "listening") {
-            taskPayload.mode = "listening";
-        }
-
-        const shouldIncludePageRange =
-            taskType === "reread_pages" ||
-            taskType === "listening" ||
-            (taskType === "review_book_words" && taskFlashcardFilter === "page_range");
-
-        if (shouldIncludePageRange && pageStart != null && pageEnd != null) {
-            taskPayload.page_start = pageStart;
-            taskPayload.page_end = pageEnd;
-        }
-
-        setTaskSaving(true);
-
-        try {
-            const { data: insertedTask, error: insertError } = await supabase
-                .from("learning_tasks")
-                .insert({
-                    created_by: currentUserId,
-                    learner_id: taskLearnerId,
-                    user_book_id: taskUserBookId || null,
-                    task_type: taskType,
-                    title: cleanTitle,
-                    instructions: cleanInstructions || null,
-                    task_payload: taskPayload,
-                    status: "assigned",
-                })
-                .select("id, learner_id, user_book_id, task_type, title, instructions, due_on, created_at")
-                .single();
-
-            if (insertError) throw insertError;
-
-            if (insertedTask) {
-                setActiveLearningTasks((prev) => [insertedTask as ActiveLearningTask, ...prev]);
-            }
-            setTaskMessage("Learning task created.");
-            setTaskPageStart("");
-            setTaskPageEnd("");
-            setTaskChapterNumber("");
-            setTaskSavedFrom("");
-            setTaskSavedTo("");
-        } catch (err: any) {
-            console.error("Error creating learning task:", err);
-            setTaskMessage(err?.message ?? "Could not create learning task.");
-        } finally {
-            setTaskSaving(false);
-        }
-    }
-
-    const summary = useMemo(() => {
-        const linkedStudents = students.filter((student) => Boolean(student.teacherStudentTeacherId));
-        const activeStudents = linkedStudents.filter((student) => student.relationshipStatus !== "past");
-
-        return {
-            totalUsers: students.length,
-            totalStudents: activeStudents.length,
-            currentStudents: activeStudents.filter((student) => student.relationshipStatus === "current").length,
-            pastStudents: linkedStudents.filter((student) => student.relationshipStatus === "past").length,
-            activeReaders: activeStudents.filter((student) => !!student.currentBookId).length,
-            withRecentActivity: activeStudents.filter((student) => !!student.lastEngagedAt).length,
-        };
-    }, [students]);
-
-    const filteredStudents = useMemo(() => {
-        const q = studentSearch.trim().toLowerCase();
-        if (!q) return students;
-
-        return students.filter((student) => {
-            const searchable = [
-                student.display_name,
-                student.username,
-                student.level,
-                student.lesson_day,
-                relationshipLabel(student.relationshipStatus),
-                student.currentBookTitle,
-            ]
-                .filter(Boolean)
-                .join(" ")
-                .toLowerCase();
-
-            return searchable.includes(q);
+  const searchParams = useSearchParams();
+  const backLink = getTeacherBackLink(searchParams.get("from"));
+  const [category, setCategory] = useState<StudentsCategory>("current");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const [users, setUsers] = useState<Student[]>([]);
+  const [total, setTotal] = useState(0);
+  const [pageSize, setPageSize] = useState(24);
+  const [elevated, setElevated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [denied, setDenied] = useState(false);
+  const [error, setError] = useState("");
+  const [revision, setRevision] = useState(0);
+  const [restoring, setRestoring] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError("");
+    const timer = window.setTimeout(async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (controller.signal.aborted) return;
+        const token = data.session?.access_token;
+        if (!token) { setDenied(true); return; }
+        const params = new URLSearchParams({ category, q: search, page: String(page) });
+        const response = await fetch(`/api/teacher/students-index?${params}`, {
+          headers: { Authorization: `Bearer ${token}` }, signal: controller.signal,
         });
-    }, [studentSearch, students]);
+        const payload = await response.json();
+        if (controller.signal.aborted) return;
+        setDenied(response.status === 401 || response.status === 403);
+        if (!response.ok) throw new Error(payload.error ?? "Could not load students.");
+        setUsers(payload.users);
+        setTotal(payload.total);
+        setElevated(payload.elevated);
+        setPageSize(payload.pageSize);
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          setUsers([]);
+          setError(err instanceof Error ? err.message : "Could not load students.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }, search ? 250 : 0);
+    return () => { controller.abort(); window.clearTimeout(timer); };
+  }, [category, search, page, revision]);
 
-    const myFilteredStudents = useMemo(() => {
-        return filteredStudents.filter((student) => Boolean(student.teacherStudentTeacherId));
-    }, [filteredStudents]);
+  function chooseCategory(value: StudentsCategory) {
+    setCategory(value);
+    setPage(0);
+  }
 
-    const otherFilteredUsers = useMemo(() => {
-        return filteredStudents.filter((student) => !student.teacherStudentTeacherId);
-    }, [filteredStudents]);
+  async function restoreStudent(student: Student) {
+    if (!student.archivedTeacherId || !window.confirm(`Restore ${student.display_name || student.username || "this learner"} to Current Students?`)) return;
+    setRestoring(student.id);
+    try {
+      // Retain the existing relationship-only restoration, subject to the same RLS rules.
+      const { data: changed, error } = await supabase.from("teacher_students")
+        .update({ relationship_status: "current", archived_at: null, archived_by: null, archive_reason: null })
+        .eq("teacher_id", student.archivedTeacherId).eq("student_id", student.id)
+        .not("archived_at", "is", null).select("teacher_id");
+      if (error) throw error;
+      if (!changed?.length) throw new Error("This relationship could not be restored. Refresh and try again.");
+      setRevision(value => value + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not restore this relationship.");
+    } finally { setRestoring(null); }
+  }
 
-    const groupedStudents = useMemo(() => {
-        return {
-            future: myFilteredStudents.filter((student) => student.relationshipStatus === "future"),
-            current: myFilteredStudents.filter((student) => student.relationshipStatus === "current"),
-            past: myFilteredStudents.filter((student) => student.relationshipStatus === "past"),
-        };
-    }, [myFilteredStudents]);
-
-    function toggleMyGroup(group: StudentGroupKey) {
-        setMyOpenGroups((current) => ({
-            ...current,
-            [group]: !current[group],
-        }));
-    }
-
-    const searchSingularNounLabel = viewerIsSuperTeacher ? "learner" : "student";
-    const searchPluralNounLabel = viewerIsSuperTeacher ? "learners" : "students";
-
-    const activeTasksForModalStudent = useMemo(() => {
-        if (!taskModalStudent) return [];
-        return activeLearningTasks.filter((task) => task.learner_id === taskModalStudent.id);
-    }, [activeLearningTasks, taskModalStudent]);
-
-    return (
-        <main className="mx-auto max-w-6xl px-4 py-8">
-            <nav className="mb-3">
-                <Link
-                    href={backLink.href}
-                    className="inline-flex text-sm font-semibold text-stone-500 hover:text-stone-900"
-                >
-                    {backLink.label}
-                </Link>
+  return (
+    <main className="mx-auto max-w-6xl px-4 py-8">
+      <Link href={backLink.href} className="mb-3 inline-block text-sm font-semibold text-stone-500 hover:text-stone-900">{backLink.label}</Link>
+      <TeacherStudentsHeader />
+      {denied ? <p className="mt-6 text-stone-600">Students is available to teachers and accounts with super-teacher access.</p> : (
+        <section className="mt-5 space-y-4">
+          {elevated ? (
+            <nav aria-label="Students categories" className="flex flex-wrap gap-2">
+              {([["trial", "Trial"], ["current", "Current Students"], ["all", "All Users"]] as const).map(([value, label]) => (
+                <button key={value} type="button" aria-pressed={category === value} onClick={() => chooseCategory(value)}
+                  className={`rounded-xl border px-4 py-2 text-sm font-semibold ${category === value ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-white text-stone-600"}`}>{label}</button>
+              ))}
             </nav>
-
-            <TeacherStudentsHeader />
-
-            {loading ? (
-                <TeacherStudentsLoadingState />
-            ) : !canAccess ? (
-                <TeacherStudentsAccessState />
-            ) : (
-                <>
-                    <TeacherStudentsErrorBanner message={error} />
-
-                    <TeacherStudentsSummaryCards
-                        summary={summary}
-                        showTotalUsers={viewerIsSuperTeacher}
-                    />
-
-                    {taskModalStudent ? (
-                        <TeacherLearningTaskModal
-                            student={taskModalStudent}
-                            taskType={taskType}
-                            onTaskTypeChange={(value) => updateTaskType(value as LearningTaskType)}
-                            taskUserBookId={taskUserBookId}
-                            onTaskUserBookIdChange={setTaskUserBookId}
-                            taskLearnerId={taskLearnerId}
-                            taskBooks={taskBooksByStudentId[taskLearnerId] ?? []}
-                            taskReadingMode={taskReadingMode}
-                            onTaskReadingModeChange={(value) => setTaskReadingMode(value as RereadTaskMode)}
-                            taskFlashcardFilter={taskFlashcardFilter}
-                            onTaskFlashcardFilterChange={(value) =>
-                                setTaskFlashcardFilter(value as BookFlashcardFilter)
-                            }
-                            taskChapterNumber={taskChapterNumber}
-                            onTaskChapterNumberChange={setTaskChapterNumber}
-                            taskSavedFrom={taskSavedFrom}
-                            onTaskSavedFromChange={setTaskSavedFrom}
-                            taskSavedTo={taskSavedTo}
-                            onTaskSavedToChange={setTaskSavedTo}
-                            taskKanjiCardCount={taskKanjiCardCount}
-                            onTaskKanjiCardCountChange={setTaskKanjiCardCount}
-                            taskTitle={taskTitle}
-                            onTaskTitleChange={setTaskTitle}
-                            taskInstructions={taskInstructions}
-                            onTaskInstructionsChange={setTaskInstructions}
-                            taskPageStart={taskPageStart}
-                            onTaskPageStartChange={setTaskPageStart}
-                            taskPageEnd={taskPageEnd}
-                            onTaskPageEndChange={setTaskPageEnd}
-                            taskSaving={taskSaving}
-                            taskMessage={taskMessage}
-                            activeTasks={activeTasksForModalStudent}
-                            taskBooksByStudentId={taskBooksByStudentId}
-                            cancellingTaskId={cancellingTaskId}
-                            learningTaskTypeLabel={learningTaskTypeLabel}
-                            onClose={closeTaskModal}
-                            onCreateTask={() => void createLearningTask()}
-                            onCancelTask={(taskId) => void cancelLearningTask(taskId)}
-                        />
-                    ) : null}
-
-                    <section className="mt-8">
-                        <TeacherStudentsListHeader />
-
-                        {students.length === 0 ? (
-                            <TeacherStudentsEmptyState
-                                title="No linked students yet."
-                                description="People linked to your teacher account will appear here."
-                            />
-                        ) : (
-                            <div className="space-y-8">
-                                <TeacherStudentsSearchPanel
-                                    value={studentSearch}
-                                    onChange={setStudentSearch}
-                                    filteredCount={filteredStudents.length}
-                                    totalCount={students.length}
-                                    singularNounLabel={searchSingularNounLabel}
-                                    pluralNounLabel={searchPluralNounLabel}
-                                />
-
-                                {filteredStudents.length === 0 ? (
-                                    <TeacherStudentsEmptyState
-                                        title={`No ${searchPluralNounLabel} match that search.`}
-                                        actionLabel="Clear search"
-                                        onAction={() => setStudentSearch("")}
-                                    />
-                                ) : null}
-
-                                {filteredStudents.length > 0 ? (
-                                    <div className="space-y-10">
-                                        {myFilteredStudents.length > 0 ? (
-                                            <section className="space-y-4">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setMyStudentsOpen((current) => !current)}
-                                                    className="flex w-full flex-col gap-2 rounded-3xl border border-stone-200 bg-white p-4 text-left shadow-sm transition hover:bg-stone-50 sm:flex-row sm:items-center sm:justify-between"
-                                                    aria-expanded={myStudentsOpen}
-                                                >
-                                                    <div>
-                                                        <h2 className="text-2xl font-black text-stone-900">
-                                                            <span className="mr-2 text-stone-400">
-                                                                {myStudentsOpen ? "▾" : "▸"}
-                                                            </span>
-                                                            My students
-                                                        </h2>
-                                                        <p className="mt-1 text-sm text-stone-600">
-                                                            People linked to your teacher account.
-                                                        </p>
-                                                    </div>
-
-                                                    <span className="text-sm font-semibold text-stone-400">
-                                                        {myFilteredStudents.length} student{myFilteredStudents.length === 1 ? "" : "s"}
-                                                    </span>
-                                                </button>
-
-                                                {myStudentsOpen ? (
-                                                    <TeacherStudentGroupsPanel
-                                                        groupedStudents={groupedStudents}
-                                                        openGroups={myOpenGroups}
-                                                        hiddenGroups={["future"]}
-                                                        onToggleGroup={toggleMyGroup}
-                                                        renderStudent={(student) => (
-                                                            <LinkedStudentCard
-                                                                key={student.id}
-                                                                student={student}
-                                                                onCreateTask={openTaskModal}
-                                                                onArchive={archiveStudent}
-                                                                onRestore={restoreStudent}
-                                                                isUpdatingArchive={updatingArchiveStudentId === student.id}
-                                                            />
-                                                        )}
-                                                    />
-                                                ) : null}
-                                            </section>
-                                        ) : null}
-
-                                        {otherFilteredUsers.length > 0 ? (
-                                            <section className="space-y-4">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setOtherUsersOpen((current) => !current)}
-                                                    className="flex w-full flex-col gap-2 rounded-3xl border border-stone-200 bg-white p-4 text-left shadow-sm transition hover:bg-stone-50 sm:flex-row sm:items-center sm:justify-between"
-                                                    aria-expanded={otherUsersOpen}
-                                                >
-                                                    <div>
-                                                        <h2 className="text-2xl font-black text-stone-900">
-                                                            <span className="mr-2 text-stone-400">
-                                                                {otherUsersOpen ? "▾" : "▸"}
-                                                            </span>
-                                                            Other learners
-                                                        </h2>
-                                                        <p className="mt-1 text-sm text-stone-600">
-                                                            Learners visible to super teachers, but not linked to your student list.
-                                                        </p>
-                                                    </div>
-
-                                                    <span className="text-sm font-semibold text-stone-400">
-                                                        {otherFilteredUsers.length} learner{otherFilteredUsers.length === 1 ? "" : "s"}
-                                                    </span>
-                                                </button>
-
-                                                {otherUsersOpen ? (
-                                                    <div className="space-y-6">
-                                                        <div className="grid gap-3 md:grid-cols-2">
-                                                            <div className="rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-3">
-                                                                <p className="text-sm font-bold text-stone-700">Blocked users</p>
-                                                                <p className="mt-1 text-xs leading-5 text-stone-500">
-                                                                    Placeholder for future account access controls.
-                                                                </p>
-                                                            </div>
-
-                                                            <div className="rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-4 py-3">
-                                                                <p className="text-sm font-bold text-stone-700">Privacy requests</p>
-                                                                <p className="mt-1 text-xs leading-5 text-stone-500">
-                                                                    Placeholder for future email or account removal workflows.
-                                                                </p>
-                                                            </div>
-                                                        </div>
-
-                                                        <div>
-                                                            <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-                                                                <div>
-                                                                    <h3 className="text-base font-black text-stone-900">
-                                                                        Other learners
-                                                                    </h3>
-                                                                    <p className="text-sm text-stone-500">
-                                                                        Learners visible to super teachers, but not linked to your student list.
-                                                                    </p>
-                                                                </div>
-
-                                                                <span className="text-sm font-semibold text-stone-400">
-                                                                    {otherFilteredUsers.length} learner{otherFilteredUsers.length === 1 ? "" : "s"}
-                                                                </span>
-                                                            </div>
-
-                                                            <div className="grid gap-4">
-                                                                {otherFilteredUsers.map((student) => (
-                                                                    <OtherLearnerCard
-                                                                        key={student.id}
-                                                                        student={student}
-                                                                    />
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ) : null}
-                                            </section>
-                                        ) : null}
-                                    </div>
-                                ) : null}
-                            </div>
-                        )}
-                    </section>
-
-                    <TeacherStudentsFuturePanels />
-                </>
-            )}
-        </main>
-    );
+          ) : <h2 className="text-lg font-bold">{category === "past" ? "Past student relationships" : "Students"}</h2>}
+          <label className="block text-sm font-medium text-stone-600">
+            Search {category === "trial" ? "trial users" : category === "all" ? "all users" : "students"}
+            <input type="search" value={search} onChange={event => { setSearch(event.target.value); setPage(0); }}
+              placeholder="Name, username, level, lesson day, or book title"
+              className="mt-1 block w-full rounded-xl border border-stone-300 bg-white px-3 py-2 font-normal" />
+          </label>
+          {error ? <p role="alert" className="text-sm text-rose-700">{error}</p> : null}
+          {loading ? <p role="status" className="text-sm text-stone-500">Loading…</p> : (
+            <>
+              <p className="text-xs text-stone-500" role="status">{total} {total === 1 ? "person" : "people"}{search ? " match this search" : " in this category"}</p>
+              {users.length === 0 ? <p className="text-sm text-stone-500">No people found in this category.</p> : null}
+              <div className="grid gap-3">
+                {users.map(student => {
+                  const name = student.display_name || student.username || "Unnamed user";
+                  const access = getLearnerAccessDisplay({ role: student.role, app_access_type: student.app_access_type,
+                    app_access_expires_at: student.app_access_expires_at, linkedToTeacher: student.isCurrentStudent });
+                  const trialAccess = student.app_access_type?.trim().toLowerCase() === "trial"
+                    ? getLearnerAccessDisplay({ role: student.role, app_access_type: student.app_access_type,
+                        app_access_expires_at: student.app_access_expires_at })
+                    : null;
+                  const productAccess = getAppAccessStatus(student);
+                  const productAccessLabel = productAccess.reason === "expired" && student.app_access_type?.trim().toLowerCase() === "trial"
+                    ? `Free · Trial ended ${new Date(student.app_access_expires_at!).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                    : `${student.app_access_type || "Not set"}${productAccess.reason === "expired" ? " · expired" : ""}`;
+                  const relationshipInfo = student.isCurrentStudent
+                    ? student.archivedTeacherId ? "Active + archived relationships" : "Active relationship"
+                    : student.archivedTeacherId ? "Archived relationship" : "No relationship";
+                  const workspace = `/teacher/students/${encodeURIComponent(student.id)}/workspace`;
+                  const canOpen = elevated || student.isCurrentStudent;
+                  return (
+                    <article key={student.id} className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex min-w-0 flex-1 items-start gap-3">
+                        <div aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-lg font-bold text-stone-500">{name.charAt(0).toUpperCase()}</div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="break-words font-bold text-stone-900">{name}</h3>
+                          {student.username ? <p className="break-words text-xs text-stone-500">@{student.username}</p> : null}
+                          <div className="mt-1 flex flex-wrap gap-1 text-xs text-stone-600">
+                            {student.level ? <span className="rounded bg-stone-100 px-2 py-0.5">{student.level}</span> : null}
+                            <span className="rounded bg-stone-100 px-2 py-0.5">{access.label}</span>
+                          </div>
+                          {elevated ? (
+                            <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-600">
+                              <div className="flex gap-1"><dt className="font-medium" title="profiles.role">Role:</dt><dd>{student.role || "Not set"}{student.role !== "super_teacher" && (student.is_super_teacher === true || student.is_super_teacher === "true") ? " · super-teacher enabled" : ""}</dd></div>
+                              <div className="flex gap-1"><dt className="font-medium" title="teacher_students">Teaching:</dt><dd>{relationshipInfo}</dd></div>
+                              <div className="flex gap-1"><dt className="font-medium" title="profiles.app_access_type">Product access:</dt><dd>{productAccessLabel}</dd></div>
+                            </dl>
+                          ) : null}
+                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-stone-500">
+                            <p>Last engaged: {formatLastEngaged(student.lastEngagedAt)}</p>
+                            {trialAccess?.detail ? <p className="text-emerald-800">Trial: {trialAccess.detail}</p> : null}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap items-center gap-3 text-sm sm:justify-end">
+                        {canOpen ? <Link href={workspace} className="rounded-lg bg-stone-900 px-3 py-2 font-semibold text-white hover:bg-black">{student.isCurrentStudent ? "Open Student Space" : "Open User Space"}</Link> : null}
+                        {student.isCurrentStudent ? <Link href={`${workspace}?assignTask=1`} className="font-semibold text-sky-700 hover:text-sky-900">Assign a Task</Link> : null}
+                        {!canOpen && student.archivedTeacherId ? <button type="button" disabled={restoring === student.id} onClick={() => void restoreStudent(student)} className="font-semibold text-emerald-700 disabled:opacity-50">{restoring === student.id ? "Restoring…" : "Restore student relationship"}</button> : null}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+              {total > pageSize ? <div className="flex items-center gap-4 text-sm">
+                <button type="button" disabled={page === 0} onClick={() => setPage(value => value - 1)} className="disabled:opacity-40">Previous</button>
+                <span>Page {page + 1} of {Math.ceil(total / pageSize)}</span>
+                <button type="button" disabled={(page + 1) * pageSize >= total} onClick={() => setPage(value => value + 1)} className="disabled:opacity-40">Next</button>
+              </div> : null}
+            </>
+          )}
+          {!elevated ? <details className="pt-3 text-xs text-stone-500">
+            <summary className="cursor-pointer">Past student relationships</summary>
+            <p className="mt-2">Archived relationships can be restored here. Their reading workspace remains unavailable until restored.</p>
+            <button type="button" onClick={() => chooseCategory(category === "past" ? "current" : "past")} className="mt-2 underline">{category === "past" ? "Return to Students" : "View archived relationships"}</button>
+          </details> : null}
+        </section>
+      )}
+    </main>
+  );
 }

@@ -515,6 +515,7 @@ export default function Header() {
                       Teacher Hub
                     </Link>
 
+                    {(profileRole === "teacher" || profileRole === "super_teacher" || profileIsSuperTeacher) ? (
                     <Link
                       href="/teacher/students"
                       className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${teacherStudentsActive
@@ -525,6 +526,7 @@ export default function Header() {
                     >
                       Students
                     </Link>
+                    ) : null}
 
                     <Link
                       href="/teacher/library"

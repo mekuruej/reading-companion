@@ -8,14 +8,12 @@ export default function TeacherStudentsHeader() {
           </p>
 
           <h1 className="mt-1 text-2xl font-black tracking-tight text-stone-900">
-            My students
+            Students
           </h1>
         </div>
 
         <p className="max-w-2xl text-sm leading-5 text-stone-600 md:justify-self-end">
-          Choose a learner, open their library, check assigned books, and
-          eventually keep lesson notes and student-specific reading stats in
-          one place.
+          Find a learner, check their recent activity, and open their workspace.
         </p>
       </div>
     </section>

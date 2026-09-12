@@ -23,7 +23,6 @@ function isSuperTeacherFlag(value: unknown) {
 
 function isSuperTeacher(profile: ProfileRow | null) {
   return (
-    profile?.role === "admin" ||
     profile?.role === "super_teacher" ||
     isSuperTeacherFlag(profile?.is_super_teacher)
   );
@@ -260,15 +259,24 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Student could not be found." }, { status: 404 });
     }
 
-    const { data: relationship, error: relationshipError } = await supabaseAdmin
-      .from("teacher_students")
-      .select("relationship_status, archived_at")
-      .eq("student_id", studentId)
-      .is("archived_at", null)
-      .limit(1)
-      .maybeSingle();
-
+    let relationshipsQuery = supabaseAdmin.from("teacher_students")
+      .select("teacher_id, relationship_status, archived_at, archive_reason")
+      .eq("student_id", studentId).order("teacher_id");
+    if (!isSuperTeacher(authorization.profile)) {
+      relationshipsQuery = relationshipsQuery.eq("teacher_id", auth.user.id);
+    }
+    const { data: relationships, error: relationshipError } = await relationshipsQuery;
     if (relationshipError) throw relationshipError;
+    const relationship = relationships?.find(link => !link.archived_at) ?? null;
+    const teacherIds = [...new Set((relationships ?? []).map(link => link.teacher_id))];
+    const { data: teachers, error: teachersError } = teacherIds.length
+      ? await supabaseAdmin.from("profiles").select("id, display_name, username").in("id", teacherIds)
+      : { data: [], error: null };
+    if (teachersError) throw teachersError;
+    const managedRelationships = (relationships ?? []).map(link => {
+      const teacher = teachers?.find(profile => profile.id === link.teacher_id);
+      return { ...link, teacherName: teacher?.display_name || teacher?.username || "Teacher" };
+    });
 
     const { data: lessonRows, error: lessonError } = await supabaseAdmin
       .from("teacher_student_lesson_books")
@@ -493,6 +501,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       student,
       relationship: relationship ?? null,
+      managedRelationships,
+      canAccessAllUsers: isSuperTeacher(authorization.profile),
       lastEngagedAt,
       activeLessonBooks,
       eligibleBooks,
@@ -608,6 +618,27 @@ export async function PATCH(request: Request) {
         { error: authorization.error },
         { status: authorization.status }
       );
+    }
+
+    if (action === "archive-relationship" || action === "restore-relationship") {
+      const teacherId = typeof body?.teacherId === "string" ? body.teacherId.trim() : "";
+      if (!teacherId || (teacherId !== auth.user.id && !isSuperTeacher(authorization.profile))) {
+        return NextResponse.json({ error: "You cannot manage this teaching relationship." }, { status: 403 });
+      }
+      const archive = action === "archive-relationship";
+      let update = supabaseAdmin.from("teacher_students").update(archive ? {
+        relationship_status: "past",
+        archived_at: new Date().toISOString(),
+        archived_by: auth.user.id,
+        archive_reason: typeof body?.reason === "string" ? body.reason.trim().slice(0, 1000) || null : null,
+      } : {
+        relationship_status: "current", archived_at: null, archived_by: null, archive_reason: null,
+      }).eq("teacher_id", teacherId).eq("student_id", studentId);
+      update = archive ? update.is("archived_at", null) : update.not("archived_at", "is", null);
+      const { data: changed, error: changeError } = await update.select("teacher_id");
+      if (changeError) throw changeError;
+      if (!changed?.length) return NextResponse.json({ error: "This relationship has already changed. Refresh the workspace." }, { status: 409 });
+      return NextResponse.json({ ok: true });
     }
 
     if (action === "update-lesson-day") {
