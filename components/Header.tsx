@@ -451,7 +451,7 @@ export default function Header() {
 	              </div>
 	            ) : null}
 
-	            {showFullAccessNavigation ? (
+	            {canUseLearningStudy ? (
 	              <Link
 	                href="/discovery/dictionary"
 	                className={`rounded-full border px-3 py-1.5 transition ${dictionaryActive

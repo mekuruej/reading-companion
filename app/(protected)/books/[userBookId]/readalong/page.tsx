@@ -572,7 +572,10 @@ export default function ReadAlongPage() {
 
             setCanUseSavedWordReading(canUseSavedWordReadingNow);
             setCanUseReadingJournal(
-                Boolean(featureAccess.canUseStoryNotes && book?.language_code !== "en")
+                Boolean(
+                    (featureAccess.canUseStoryNotes || featureAccess.isTrial) &&
+                    book?.language_code !== "en"
+                )
             );
 
             if (!canUseSavedWordReadingNow) {

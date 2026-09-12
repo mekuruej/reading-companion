@@ -101,10 +101,10 @@ function TrialCountdownBanner() {
   if (!trialBanner) return null;
 
   return (
-    <section aria-label="Trial access" className="mb-4 rounded-xl border border-slate-200 bg-white/60 px-4 py-3 text-sm text-slate-600">
+    <section aria-label="Trial access" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p>
-          <span className="font-medium text-slate-700">
+          <span className="font-medium text-emerald-900">
             {trialBanner.daysRemaining == null
               ? "Your trial has less than 1 day left"
               : `Your trial has ${trialBanner.daysRemaining} ${trialBanner.daysRemaining === 1 ? "day" : "days"} left`}
@@ -112,13 +112,13 @@ function TrialCountdownBanner() {
           <span className="ml-2 text-xs">Ends {trialBanner.formattedDate}.</span>
         </p>
         <details className="text-xs">
-          <summary className="cursor-pointer rounded text-slate-600 underline decoration-slate-300 underline-offset-4 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">
+          <summary className="cursor-pointer rounded text-emerald-800 underline decoration-emerald-300 underline-offset-4 hover:text-emerald-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">
             After your trial
           </summary>
           <div className="mt-2 max-w-md leading-5">
             <p>Continue Japanese Learning for ¥500/month, including vocabulary, flashcards, Follow-Along, and reading tracking.</p>
             <p className="mt-1">After you join on Ko-fi, your MEKURU access will be updated manually.</p>
-            <Link href="/reading-access" className="mt-2 inline-block font-medium text-slate-700 underline underline-offset-4 hover:text-slate-950">Explore Japanese Learning</Link>
+            <Link href="/reading-access" className="mt-2 inline-block font-medium text-emerald-900 underline underline-offset-4 hover:text-emerald-950">Explore Japanese Learning</Link>
           </div>
         </details>
       </div>
