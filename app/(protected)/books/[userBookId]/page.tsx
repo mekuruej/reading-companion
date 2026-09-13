@@ -3358,9 +3358,9 @@ export default function BookHubPage() {
     if (!row?.id || savingBookStatus) return;
     if (nextStatus === personalTrackingStatus) return;
 
-    const canUseNotTracking = isOwnBookHub && (isTeacherContext || isAdmin || isSuperTeacher);
+    const canUseNotTracking = isOwnBookHub && isTeacherContext;
     if (nextStatus === "not_tracking" && !canUseNotTracking) {
-      setBookStatusError("Not Personally Tracking is only available on your own teacher Book Hub.");
+      setBookStatusError("Teaching Only is only available on your own teacher Book Hub.");
       return;
     }
 
@@ -3398,7 +3398,7 @@ export default function BookHubPage() {
     if (!row?.id || !userId || teachingOverviewSaving) return;
 
     const canSaveTeachingOverview =
-      isOwnBookHub && (isTeacherContext || isAdmin || isSuperTeacher);
+      isOwnBookHub && isTeacherContext;
     if (!canSaveTeachingOverview) {
       setTeachingOverviewError("Teaching access is required.");
       return;
@@ -5737,7 +5737,7 @@ export default function BookHubPage() {
                   <BookHubStatusPanel
                     personalTrackingStatus={personalTrackingStatus}
                     showNotTrackingOption={
-                      isOwnBookHub && (isTeacherContext || isAdmin || isSuperTeacher)
+                      isOwnBookHub && isTeacherContext
                     }
                     isSavingStatus={savingBookStatus}
                     statusError={bookStatusError}

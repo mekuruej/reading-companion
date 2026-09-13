@@ -128,13 +128,18 @@ export default function BookHubStatusPanel({
             disabled={isSavingStatus}
             className="w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm font-semibold text-stone-800 shadow-sm"
           >
-            {PERSONAL_TRACKING_STATUSES.filter(
-              (status) => showNotTrackingOption || status !== "not_tracking"
-            ).map((status) => (
-              <option key={status} value={status}>
-                {personalTrackingStatusLabel(status)}
-              </option>
+            {showNotTrackingOption ? (
+            <optgroup label={personalTrackingStatus === "not_tracking" ? "Move to My Library (track personal stats)" : "My Library (track personal stats)"}>
+              {PERSONAL_TRACKING_STATUSES.filter(status => status !== "not_tracking").map(status => (
+                <option key={status} value={status}>{personalTrackingStatusLabel(status)}</option>
+              ))}
+            </optgroup>
+            ) : PERSONAL_TRACKING_STATUSES.filter(status => status !== "not_tracking").map(status => (
+              <option key={status} value={status}>{personalTrackingStatusLabel(status)}</option>
             ))}
+            {showNotTrackingOption ? (
+              <option value="not_tracking">Teaching Only (no personal stats)</option>
+            ) : null}
           </select>
           {isSavingStatus ? (
             <span className="mt-1 block text-xs font-semibold text-violet-700">Saving...</span>

@@ -1,9 +1,9 @@
 export const PERSONAL_TRACKING_STATUSES = [
-  "not_tracking",
   "want_to_read",
   "reading",
   "finished",
   "dnf",
+  "not_tracking",
 ] as const;
 
 export type PersonalTrackingStatus = (typeof PERSONAL_TRACKING_STATUSES)[number];
@@ -41,7 +41,7 @@ export function resolvePersonalTrackingStatus(
 export function personalTrackingStatusLabel(status: PersonalTrackingStatus) {
   switch (status) {
     case "not_tracking":
-      return "Not Personally Tracking";
+      return "Teaching Only (no personal stats)";
     case "want_to_read":
       return "Want to Read";
     case "reading":

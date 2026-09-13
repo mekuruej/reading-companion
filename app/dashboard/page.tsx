@@ -424,6 +424,7 @@ export default function DashboardPage() {
             <DashboardLoadingCard />
           </section>
         ) : isLoggedIn ? (
+          <>
           <SignedInDashboardCard
             showWarmup={canUseDashboardWarmup}
             warmupEnabled={dashboardWarmupEnabled}
@@ -447,6 +448,8 @@ export default function DashboardPage() {
               )
             ) : null}
           </SignedInDashboardCard>
+          <ReaderRolesSection />
+          </>
         ) : (
           <>
             <SignedOutLoginSection>
@@ -469,8 +472,6 @@ export default function DashboardPage() {
                 </Link>
               </div>
             </SignedOutLoginSection>
-
-            <ReaderRolesSection />
           </>
         )}
       </div>

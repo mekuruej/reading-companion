@@ -20,7 +20,7 @@ const TEACHER_DESTINATION_OPTIONS = [
   {
     key: "teachingBooks",
     title: "My Teaching Books",
-    helper: "Add under Teaching Only and mark it Currently Teaching. Select My Library too if you also want to read it personally.",
+    helper: "New books go to Teaching Only (no personal stats). Select My Library too to track personal reading. Books already in My Library keep their tracking.",
   },
   {
     key: "myLibrary",
