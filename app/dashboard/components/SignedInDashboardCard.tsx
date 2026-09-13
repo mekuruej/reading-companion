@@ -29,11 +29,11 @@ export default function SignedInDashboardCard({
             <div className="flex flex-col gap-3 text-left sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">
-                  Word warm-up
+                  Optional word warm-up
                 </p>
 
                 <p className="mt-1 text-sm leading-6 text-slate-600">
-                  This helps move words you can read toward Ability Check, which can open more study options.
+                  Only tap words you already feel comfortable reading. If none are familiar, that’s okay—skip this and go straight to My Library.
                 </p>
               </div>
 

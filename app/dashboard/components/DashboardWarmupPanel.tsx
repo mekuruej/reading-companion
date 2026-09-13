@@ -57,8 +57,8 @@ export default function DashboardWarmupPanel({
       </div>
 
       <p className="mt-3 text-xs leading-5 text-slate-500">
-        Tapped words move to your Reading Gate in Ability Check. Find more words
-        in Word Sky later.
+        Tapping a word moves it to Green for a future Ability Check. You don’t need
+        to move any words to Green before using your Library.
       </p>
     </>
   );

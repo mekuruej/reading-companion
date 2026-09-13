@@ -47,6 +47,9 @@ type DictionaryResultCardProps = {
   fallbackWord: string;
   showBadge: boolean;
   colorStatus: ComponentProps<typeof LibraryColorBadge>["colorStatus"];
+  colorMessage: string;
+  promotedThroughWordSky?: boolean;
+  showBadgeNumbers: boolean;
   jlptLabel: string;
   isKanjiLoading: boolean;
   kanjiMeta: KanjiMetaItem[];
@@ -60,6 +63,9 @@ export default function DictionaryResultCard({
   fallbackWord,
   showBadge,
   colorStatus,
+  colorMessage,
+  promotedThroughWordSky = false,
+  showBadgeNumbers,
   jlptLabel,
   isKanjiLoading,
   kanjiMeta,
@@ -76,9 +82,7 @@ export default function DictionaryResultCard({
           {entry.word || "—"}
         </div>
 
-        {showBadge ? (
-          <LibraryColorBadge colorStatus={colorStatus} size="md" />
-        ) : null}
+
       </div>
 
       <div className="mt-1 text-base text-stone-500">
@@ -106,6 +110,12 @@ export default function DictionaryResultCard({
           <DictionaryRelatedKanjiWordsPanel groups={kanjiGroups} />
         </div>
 
+        <div className="space-y-3">
+          <section aria-label="Your vocabulary status" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3">
+            <h3 className="text-sm font-bold text-stone-900">Your vocabulary status</h3>
+            {showBadge ? <LibraryColorBadge colorStatus={colorStatus} stageLabel={showBadgeNumbers && (colorStatus?.stageCount ?? 1) > 1 ? colorStatus?.stageNumber : null} size="md" /> : <p className="text-xs text-stone-500">{colorMessage}</p>}
+            {promotedThroughWordSky ? <p className="w-full text-xs leading-5 text-stone-600">This word was promoted to Green via Word Sky.</p> : null}
+          </section>
         <section className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -162,6 +172,7 @@ export default function DictionaryResultCard({
             </p>
           )}
         </section>
+        </div>
       </div>
     </div>
   );

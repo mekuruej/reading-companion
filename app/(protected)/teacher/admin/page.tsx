@@ -9,6 +9,9 @@ import { TeacherHubCardGrid } from "../components/TeacherHubCardGrid";
 
 type Tool = { title: string; route: string; description: string; superOnly?: boolean };
 const sections: { title: string; tools: Tool[] }[] = [
+  { title: "Accounts & Access", tools: [
+    { title: "Japanese Learning Requests", route: "/teacher/japanese-learning-requests", description: "Review requests for Japanese Learning access." },
+  ] },
   { title: "Catalog & Books", tools: [
     { title: "Books & Catalog", route: "/teacher/books", description: "Review shared catalog issues and book requests." },
     { title: "Book Requests", route: "/teacher/books/requests", description: "Review requested books.", superOnly: true },
@@ -23,9 +26,6 @@ const sections: { title: string; tools: Tool[] }[] = [
     { title: "Kanji Fast Pass", route: "/teacher/kanji/fast-pass", description: "Complete kanji maps for existing vocabulary.", superOnly: true },
     { title: "Radicals & Components", route: "/teacher/kanji/radicals", description: "Maintain radicals and component data.", superOnly: true },
     { title: "Grammar DB", route: "/teacher/needs-attention/grammar", description: "Maintain shared grammar content.", superOnly: true },
-  ] },
-  { title: "Accounts & Access", tools: [
-    { title: "Japanese Learning Requests", route: "/teacher/japanese-learning-requests", description: "Review requests for Japanese Learning access." },
   ] },
   { title: "Diagnostics & Maintenance", tools: [
     { title: "Needs Attention", route: "/teacher/needs-attention", description: "Open global review and cleanup queues.", superOnly: true },

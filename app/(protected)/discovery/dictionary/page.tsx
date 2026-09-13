@@ -4,9 +4,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { computeLibraryStudyColorStatus } from "@/lib/libraryStudyColor";
+import { computeLibraryStudyColorStatus, type LibraryStudyColorStatus } from "@/lib/libraryStudyColor";
 import { supabase } from "@/lib/supabaseClient";
 import DictionaryHeader from "./components/DictionaryHeader";
 import DictionaryErrorMessage from "./components/DictionaryErrorMessage";
@@ -117,9 +117,11 @@ export default function DictionaryPage() {
   const [extraLoadingWord, setExtraLoadingWord] = useState<string | null>(null);
   const [kanjiMetaByWord, setKanjiMetaByWord] = useState<Record<string, KanjiMeta[]>>({});
   const [kanjiGroupsByWord, setKanjiGroupsByWord] = useState<Record<string, KanjiGroup[]>>({});
-  const [learningSettings, setLearningSettings] =
-    useState<LearningSettingsRow>(DEFAULT_LEARNING_SETTINGS);
-  const [summaryCountsByKey, setSummaryCountsByKey] = useState<Record<string, number>>({});
+  const [wordSkyKeys, setWordSkyKeys] = useState<Set<string>>(new Set());
+  const [colorsByKey, setColorsByKey] = useState<Record<string, LibraryStudyColorStatus>>({});
+  const [showBadgeNumbers, setShowBadgeNumbers] = useState(true);
+  const [colorLoadState, setColorLoadState] = useState("loading");
+  const searchVersion = useRef(0);
   const [personalHistoryByKey, setPersonalHistoryByKey] =
     useState<Record<string, DictionaryPersonalHistoryItem[]>>({});
 
@@ -211,7 +213,10 @@ export default function DictionaryPage() {
     setLoading(true);
     setErrorMsg(null);
     setResults([]);
-    setSummaryCountsByKey({});
+    const version = ++searchVersion.current;
+    setColorsByKey({});
+    setWordSkyKeys(new Set());
+    setColorLoadState("loading");
     setPersonalHistoryByKey({});
 
     try {
@@ -261,8 +266,9 @@ export default function DictionaryPage() {
         };
       });
 
+      if (version !== searchVersion.current) return;
       setResults(mapped);
-      void loadLibraryStatuses(mapped);
+      void loadLibraryStatuses(mapped, version);
       const uniqueSurfaces = Array.from(
         new Set(mapped.map((entry) => entry.word).filter(Boolean))
       );
@@ -283,7 +289,7 @@ export default function DictionaryPage() {
     }
   }
 
-  async function loadLibraryStatuses(entries: DictionaryEntry[]) {
+  async function loadLibraryStatuses(entries: DictionaryEntry[], version: number) {
     const keys = Array.from(
       new Set(entries.map((entry) => studyIdentityKey(entry.word, entry.reading)).filter(Boolean))
     );
@@ -293,33 +299,57 @@ export default function DictionaryPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        if (version === searchVersion.current) setColorLoadState("signed-out");
+        return;
+      }
 
-      const { data: settings } = await supabase
+      const { data: settings, error: settingsError } = await supabase
         .from("user_learning_settings")
         .select("red_stages, orange_stages, yellow_stages, show_badge_numbers")
         .eq("user_id", user.id)
         .maybeSingle<LearningSettingsRow>();
 
-      setLearningSettings({
-        ...DEFAULT_LEARNING_SETTINGS,
-        ...(settings ?? {}),
-      });
-
-      const { data, error } = await supabase
-        .from("user_library_word_summaries")
-        .select("study_identity_key, total_encounter_count")
-        .eq("user_id", user.id)
-        .in("study_identity_key", keys)
-        .returns<LibraryWordSummaryRow[]>();
-
-      if (error) throw error;
-
-      const next: Record<string, number> = {};
-      for (const row of data ?? []) {
-        next[row.study_identity_key] = row.total_encounter_count ?? 0;
+      if (settingsError) throw settingsError;
+      const [summaries, progressResult, claims] = await Promise.all([
+        supabase.from("user_library_word_summaries")
+          .select("study_identity_key, total_encounter_count").eq("user_id", user.id)
+          .in("study_identity_key", keys).returns<LibraryWordSummaryRow[]>(),
+        supabase.from("user_library_word_progress")
+          .select("id, study_identity_key, reading_gate_status, meaning_gate_status, held_before_reading_gate, held_before_meaning_gate, reading_gate_attempts, mastered")
+          .eq("user_id", user.id).eq("definition_key", "").in("study_identity_key", keys),
+        supabase.from("user_library_word_claims").select("study_identity_key, claimed_color, source")
+          .eq("user_id", user.id).eq("claimed_color", "green").in("study_identity_key", keys),
+      ]);
+      for (const result of [summaries, progressResult, claims]) {
+        if (result.error) throw result.error;
       }
-      setSummaryCountsByKey(next);
+      if (version !== searchVersion.current) return;
+      const counts = new Map((summaries.data ?? []).map(row => [row.study_identity_key, row.total_encounter_count ?? 0]));
+      const progressByKey = new Map((progressResult.data ?? []).map(row => [row.study_identity_key, row]));
+      const claimedKeys = new Set((claims.data ?? []).map(row => row.study_identity_key));
+      const next: Record<string, LibraryStudyColorStatus> = {};
+      for (const key of keys) {
+        const progress = progressByKey.get(key);
+        next[key] = computeLibraryStudyColorStatus({
+          encounterCount: counts.get(key) ?? 0,
+          claimedGreen: claimedKeys.has(key),
+          settings: { ...DEFAULT_LEARNING_SETTINGS, ...(settings ?? {}) },
+          readingGate: progress?.reading_gate_status ?? "not_started",
+          meaningGate: progress?.meaning_gate_status ?? "not_started",
+          heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
+          heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
+          readyForReadingGate: Boolean(progress?.id && progress.reading_gate_status === "not_started" &&
+            progress.meaning_gate_status === "not_started" && !progress.held_before_reading_gate &&
+            !progress.held_before_meaning_gate && !progress.mastered),
+          preReadingSupportCycle: progress?.held_before_reading_gate ? Math.max(2, (progress.reading_gate_attempts ?? 0) + 1) : null,
+          mastered: progress?.mastered ?? false,
+        });
+      }
+      setShowBadgeNumbers(settings?.show_badge_numbers !== false);
+      setWordSkyKeys(new Set((claims.data ?? []).filter(row => row.source === "word_sky").map(row => row.study_identity_key)));
+      setColorsByKey(next);
+      setColorLoadState("ready");
 
       const surfaces = Array.from(
         new Set(entries.map((entry) => entry.word).filter(Boolean))
@@ -382,9 +412,10 @@ export default function DictionaryPage() {
         nextHistory[key] = [...(nextHistory[key] ?? []), historyItem];
       }
 
-      setPersonalHistoryByKey(nextHistory);
+      if (version === searchVersion.current) setPersonalHistoryByKey(nextHistory);
     } catch (error) {
       console.warn("Could not load dictionary library statuses:", error);
+      if (version === searchVersion.current) setColorLoadState("error");
     }
   }
 
@@ -414,12 +445,12 @@ export default function DictionaryPage() {
       <div className="space-y-3">
         {results.map((entry, idx) => {
           const key = studyIdentityKey(entry.word, entry.reading);
-          const encounterCount = summaryCountsByKey[key] ?? 0;
-          const status = computeLibraryStudyColorStatus({
-            encounterCount,
-            settings: learningSettings,
-          });
-          const showBadge = encounterCount > 0;
+          const status = colorsByKey[key];
+          const showBadge = colorLoadState === "ready" && Boolean(status && status.color !== "none");
+          const colorMessage = colorLoadState === "loading" ? "Loading your color…"
+            : colorLoadState === "error" ? "Your vocabulary color could not be loaded."
+            : colorLoadState === "signed-out" ? "Sign in to see your vocabulary color."
+            : "Not in your vocabulary world yet.";
 
           return (
             <DictionaryResultCard
@@ -428,6 +459,9 @@ export default function DictionaryPage() {
               fallbackWord={query}
               showBadge={showBadge}
               colorStatus={status}
+              colorMessage={colorMessage}
+              promotedThroughWordSky={wordSkyKeys.has(key)}
+              showBadgeNumbers={showBadgeNumbers}
               jlptLabel={normalizeJlpt(entry.jlpt)}
               isKanjiLoading={extraLoadingWord === entry.word}
               kanjiMeta={kanjiMetaByWord[entry.word] ?? []}
