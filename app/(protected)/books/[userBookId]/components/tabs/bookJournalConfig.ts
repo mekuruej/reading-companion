@@ -1,20 +1,15 @@
-import { isNativeLanguageBook } from "@/lib/books/englishNativeTracker";
 import type { StoryTabMode } from "./readingJournalTypes";
 
 export const DEFAULT_BOOK_JOURNAL_TAB: StoryTabMode = "characters";
 
-const mainTabOrders: Record<"native" | "target", StoryTabMode[]> = {
-  native: ["characters", "plot", "quotes", "setting", "cultural", "detective"],
-  target: ["characters", "plot", "detective", "setting", "cultural", "quotes"],
-};
-const personalTabs: StoryTabMode[] = ["notes", "review"];
+const BOOK_JOURNAL_TABS: StoryTabMode[] = [
+  "characters", "plot", "cultural", "detective", "quotes", "notes", "review",
+];
 
+// All books share the same journal navigation, regardless of language.
 export function getBookJournalTabOrder(
-  languageCode: string | null | undefined,
-  ownerNativeLanguage: string | null | undefined
+  _languageCode: string | null | undefined,
+  _ownerNativeLanguage: string | null | undefined
 ): StoryTabMode[] {
-  const mode = isNativeLanguageBook({ bookLanguageCode: languageCode, ownerNativeLanguage })
-    ? "native"
-    : "target";
-  return [...mainTabOrders[mode], ...personalTabs];
+  return [...BOOK_JOURNAL_TABS];
 }

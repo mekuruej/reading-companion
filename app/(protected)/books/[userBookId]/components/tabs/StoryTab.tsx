@@ -1,3 +1,4 @@
+import { parseLanguageLearningNote, formatLanguageLearningNote } from "./languageLearningNote";
 // Reading Journal Tab
 // 
 
@@ -406,6 +407,8 @@ export default function StoryTab({
   saveBookReview,
   deleteBookReview,
 }: StoryTabProps) {
+  const isLearningJournal = !tabOrder.includes("setting");
+  const languageNoteLabel = isLearningJournal ? "Language Learning" : "Cultural";
   const detectiveReadOnly = Boolean(learningArchiveReadOnlyTabs?.detective);
   const settingReadOnly = Boolean(learningArchiveReadOnlyTabs?.setting);
   const culturalReadOnly = Boolean(learningArchiveReadOnlyTabs?.cultural);
@@ -456,10 +459,10 @@ export default function StoryTab({
     plot: "Plot",
     detective: "Detective",
     setting: "Setting",
-    cultural: "Cultural",
+    cultural: languageNoteLabel,
     quotes: "Quotes",
     notes: "Notes",
-    review: "Review & Ratings",
+    review: isLearningJournal ? "Ratings & Reviews" : "Review & Ratings",
   };
 
   return (
@@ -989,7 +992,7 @@ export default function StoryTab({
         <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
           {culturalReadOnly ? <LearningArchiveNotice /> : null}
           <div className="mb-3 flex items-center justify-between gap-3">
-            <div className="text-sm font-semibold text-stone-900">Cultural</div>
+            <div className="text-sm font-semibold text-stone-900">{languageNoteLabel}</div>
 
             <div className="flex gap-2">
               <button
@@ -1014,7 +1017,7 @@ export default function StoryTab({
                   onClick={addCulturalItem}
                   className="rounded-xl bg-stone-900 px-3 py-2 text-sm font-medium text-white hover:bg-black"
                 >
-                  Add Cultural
+                  {isLearningJournal ? "Add Language Note" : "Add Cultural"}
                 </button>
               ) : null}
             </div>
@@ -1023,18 +1026,19 @@ export default function StoryTab({
           <input
             value={culturalSearch}
             onChange={(event) => setCulturalSearch(event.target.value)}
-            placeholder="Search cultural notes..."
+            placeholder={isLearningJournal ? "Search language notes..." : "Search cultural notes..."}
             className="mb-3 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-stone-300"
           />
 
           {showCulturalItems ? (
             culturalItems.length === 0 ? (
-              <div className="text-sm text-stone-500">No cultural notes yet.</div>
+              <div className="text-sm text-stone-500">{isLearningJournal ? "No language notes yet." : "No cultural notes yet."}</div>
             ) : filteredVisibleCulturalItems.length === 0 ? (
-              <div className="text-sm text-stone-500">No cultural notes match this search.</div>
+              <div className="text-sm text-stone-500">{isLearningJournal ? "No language notes match this search." : "No cultural notes match this search."}</div>
             ) : (
               <div className="space-y-3">
                 {filteredVisibleCulturalItems.map((item) => {
+                  const languageNote = parseLanguageLearningNote(item.details);
                   const isEditing = !culturalReadOnly && editingCulturalIds.includes(item.id);
                   const isSaving = savingCulturalIds.includes(item.id);
                   const isSaved = savedCulturalIds.includes(item.id);
@@ -1044,8 +1048,9 @@ export default function StoryTab({
                       {!isEditing ? (
                         <div className="space-y-2 text-sm">
                           <div className="font-medium text-stone-900">{item.title || "—"}</div>
+                          {languageNote.location ? <div className="text-xs text-stone-500">Location: {languageNote.location}</div> : null}
                           <div className="whitespace-pre-wrap text-stone-700">
-                            {item.details || "—"}
+                            {languageNote.note || "—"}
                           </div>
 
                           {!culturalReadOnly ? (
@@ -1075,16 +1080,29 @@ export default function StoryTab({
                             onChange={(e) =>
                               updateCulturalItem(item.id, "title", e.target.value)
                             }
+                            aria-label="Title"
                             placeholder="Title"
                             className="w-full rounded border px-3 py-2 text-sm"
                           />
 
+                          {isLearningJournal ? (
+                            <label className="block text-sm">
+                              Location
+                              <input
+                                value={languageNote.location}
+                                onChange={(e) => updateCulturalItem(item.id, "details", formatLanguageLearningNote(e.target.value, languageNote.note))}
+                                placeholder="Page, chapter, or %"
+                                className="mt-1 w-full rounded border px-3 py-2 text-sm"
+                              />
+                            </label>
+                          ) : null}
                           <textarea
-                            value={item.details}
+                            aria-label={isLearningJournal ? "Note" : "Details"}
+                            value={languageNote.note}
                             onChange={(e) =>
-                              updateCulturalItem(item.id, "details", e.target.value)
+                              updateCulturalItem(item.id, "details", formatLanguageLearningNote(languageNote.location, e.target.value))
                             }
-                            placeholder="Details"
+                            placeholder={isLearningJournal ? "Language question or interesting observation..." : "Details"}
                             className="min-h-[120px] w-full rounded border px-3 py-2 text-sm"
                           />
 

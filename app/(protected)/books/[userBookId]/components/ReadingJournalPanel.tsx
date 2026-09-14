@@ -962,7 +962,7 @@ export default function ReadingJournalPanel({
     };
 
     if (!payload.title && !payload.details) {
-      alert("Please add a title or details before saving this cultural note.");
+      alert("Please add a title or note before saving.");
       return;
     }
 
@@ -980,7 +980,7 @@ export default function ReadingJournalPanel({
 
       if (error) {
         console.error("Error creating cultural note:", error);
-        alert("Could not save cultural note.");
+        alert("Could not save journal note.");
         return;
       }
 
@@ -1003,7 +1003,7 @@ export default function ReadingJournalPanel({
 
     if (error) {
       console.error("Error updating cultural note:", error);
-      alert("Could not update cultural note.");
+      alert("Could not update journal note.");
       return;
     }
 
@@ -1024,12 +1024,12 @@ export default function ReadingJournalPanel({
       return;
     }
 
-    if (!window.confirm("Delete this cultural note?")) return;
+    if (!window.confirm("Delete this journal note?")) return;
 
     const { error } = await supabase.from("user_book_cultural_items").delete().eq("id", id);
     if (error) {
       console.error("Error deleting cultural note:", error);
-      alert("Could not delete cultural note.");
+      alert("Could not delete journal note.");
       return;
     }
 

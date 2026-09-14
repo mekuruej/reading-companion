@@ -443,7 +443,7 @@ export default function StoryNotesPage() {
               ) : null}
               <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
                 {hasJapaneseLearningJournalTabs
-                  ? "Use this as your personal notebook while you read: characters, plot points, detective notes, settings, cultural details, quotes, and notes you want to remember."
+                  ? "Use this as your personal notebook while you read: characters, plot points, language questions, detective notes, quotes, and notes you want to remember."
                   : "Use this as your personal notebook while you read: characters, plot points, quotes, notes, and anything else you want to remember."}
               </p>
               {hasJapaneseLearningJournalTabs ? (
