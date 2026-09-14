@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import {
   KANJI_BY_COMPONENT,
   KANJI_COMPONENTS,
@@ -315,6 +315,8 @@ export default function KanjiComponentLookup({
   onPickKanji,
   resetKey = 0,
 }: KanjiComponentLookupProps) {
+  const tabId = useId();
+  const [activeStrokeCount, setActiveStrokeCount] = useState(1);
   const [selectedPieces, setSelectedPieces] = useState<string[]>([]);
   const [recentKanji, setRecentKanji] = useState<string[]>([]);
   const [showAllResults, setShowAllResults] = useState(false);
@@ -442,34 +444,52 @@ export default function KanjiComponentLookup({
         </div>
       ) : null}
 
-      <div className="mt-3 max-h-44 overflow-y-auto rounded-xl border border-stone-100 bg-white/60 p-2">
-        <div className="flex flex-wrap gap-2">
-          {pieceGroups.map(([strokes, groupPieces]) => (
-            <div key={strokes} className="contents">
-              <div className="flex min-h-9 min-w-9 items-center justify-center rounded-xl bg-stone-900 px-2 text-sm font-black text-white">
-                {strokes === 99 ? "?" : strokes}
-              </div>
-
-              {groupPieces.map((piece) => {
-                const selected = selectedPieces.includes(piece);
-
-                return (
-                  <button
-                    key={piece}
-                    type="button"
-                    onClick={() => togglePiece(piece)}
-                    className={`min-h-9 rounded-xl border px-3 py-1.5 text-lg font-semibold transition ${
-                      selected
-                        ? "border-sky-500 bg-sky-100 text-sky-950 ring-2 ring-sky-300"
-                        : "border-stone-200 bg-white text-stone-800 hover:bg-stone-100"
-                    }`}
-                  >
-                    {piece}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+      <div className="mt-3 rounded-xl border border-stone-100 bg-white/60 p-2">
+        <div className="mb-2 flex items-center gap-3">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-stone-500">Radicals</h4>
+          <span aria-hidden="true" className="h-px flex-1 bg-stone-200" />
+        </div>
+        <div role="tablist" aria-label="Parts by stroke count" className="flex flex-wrap gap-1 border-b border-stone-200 pb-2">
+          {pieceGroups.map(([strokes, groupPieces], index) => {
+            const selectedCount = groupPieces.filter(piece => selectedPieces.includes(piece)).length;
+            return (
+              <button key={strokes} id={`${tabId}-tab-${strokes}`} type="button" role="tab"
+                aria-selected={activeStrokeCount === strokes} aria-controls={`${tabId}-panel`}
+                tabIndex={activeStrokeCount === strokes ? 0 : -1}
+                aria-label={`${strokes === 99 ? "Unknown" : strokes} strokes${selectedCount ? `, ${selectedCount} selected` : ""}`}
+                onClick={() => setActiveStrokeCount(strokes)}
+                onKeyDown={event => {
+                  const nextIndex = event.key === "ArrowRight" ? (index + 1) % pieceGroups.length
+                    : event.key === "ArrowLeft" ? (index - 1 + pieceGroups.length) % pieceGroups.length
+                    : event.key === "Home" ? 0 : event.key === "End" ? pieceGroups.length - 1 : null;
+                  if (nextIndex == null) return;
+                  event.preventDefault();
+                  const next = pieceGroups[nextIndex][0];
+                  setActiveStrokeCount(next);
+                  document.getElementById(`${tabId}-tab-${next}`)?.focus();
+                }}
+                className={`min-h-9 min-w-9 rounded-lg px-2 py-1 text-sm font-bold ${activeStrokeCount === strokes ? "bg-stone-900 text-white" : "bg-white text-stone-600 hover:bg-stone-100"}`}>
+                {strokes === 99 ? "?" : strokes}{selectedCount ? <span className="ml-1 text-xs">({selectedCount})</span> : null}
+              </button>
+            );
+          })}
+        </div>
+        {selectedPieces.length ? (
+          <div className="mt-2 flex flex-wrap items-center gap-1 text-xs text-stone-500">
+            Selected:
+            {selectedPieces.map(piece => <button key={piece} type="button" onClick={() => togglePiece(piece)} aria-label={`Remove ${piece}`} className="rounded border border-sky-200 bg-sky-50 px-2 py-1 text-base text-sky-900">{piece} ×</button>)}
+          </div>
+        ) : null}
+        <div id={`${tabId}-panel`} role="tabpanel" aria-labelledby={`${tabId}-tab-${activeStrokeCount}`} tabIndex={0} className="mt-2 h-44 overflow-y-auto">
+          <div className="flex flex-wrap content-start gap-2">
+            {(pieceGroups.find(([strokes]) => strokes === activeStrokeCount)?.[1] ?? []).map(piece => {
+              const selected = selectedPieces.includes(piece);
+              return <button key={piece} type="button" aria-pressed={selected} onClick={() => togglePiece(piece)}
+                className={`min-h-9 rounded-xl border px-3 py-1.5 text-lg font-semibold transition ${selected ? "border-sky-500 bg-sky-100 text-sky-950 ring-2 ring-sky-300" : "border-stone-200 bg-white text-stone-800 hover:bg-stone-100"}`}>
+                {piece}
+              </button>;
+            })}
+          </div>
         </div>
       </div>
 

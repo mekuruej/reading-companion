@@ -18,7 +18,6 @@ type CuriosityWordDetailPreview = {
 type CuriosityWordDetailFieldsProps = {
   quickPreview: CuriosityWordDetailPreview;
   chapterNameOptions: string[];
-  hideKanjiInReadingSupport: boolean;
   isEditing: boolean;
   savedQuickNotice: string;
   quickWordFieldsRef: RefObject<HTMLDivElement | null>;
@@ -30,7 +29,6 @@ type CuriosityWordDetailFieldsProps = {
   onPageChange: (value: string) => void;
   onChapterNumberChange: (value: string) => void;
   onChapterNameChange: (value: string) => void;
-  onHideKanjiChange: (checked: boolean) => void;
   onSaveWord: () => void;
   onClearWordFields: () => void;
   locationLabel?: string;
@@ -41,7 +39,6 @@ type CuriosityWordDetailFieldsProps = {
 export default function CuriosityWordDetailFields({
   quickPreview,
   chapterNameOptions,
-  hideKanjiInReadingSupport,
   isEditing,
   savedQuickNotice,
   quickWordFieldsRef,
@@ -53,7 +50,6 @@ export default function CuriosityWordDetailFields({
   onPageChange,
   onChapterNumberChange,
   onChapterNameChange,
-  onHideKanjiChange,
   onSaveWord,
   onClearWordFields,
   locationLabel = "Page",
@@ -182,15 +178,6 @@ export default function CuriosityWordDetailFields({
           />
         </label>
       </div>
-
-      <label className="flex items-center gap-2 text-sm text-stone-700">
-        <input
-          type="checkbox"
-          checked={hideKanjiInReadingSupport}
-          onChange={(event) => onHideKanjiChange(event.target.checked)}
-        />
-        <span>Hide kanji in Read Along (does not affect Vocab List)</span>
-      </label>
 
       <div className="flex flex-wrap items-center gap-2">
         <button

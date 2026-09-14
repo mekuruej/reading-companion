@@ -958,8 +958,17 @@ export function CuriosityReadingExperience({
       if (!input) return;
 
       input.focus({ preventScroll: true });
-      const top = window.scrollY + input.getBoundingClientRect().top - 20;
-      window.scrollTo({ top: Math.max(0, top), behavior: "auto" });
+      const header = document.querySelector<HTMLElement>("[data-mekuru-header]");
+      const viewportTop = window.visualViewport?.offsetTop ?? 0;
+      const visibleTop = Math.max(viewportTop, header?.getBoundingClientRect().bottom ?? 0) + 16;
+      const visibleBottom = viewportTop + (window.visualViewport?.height ?? window.innerHeight) - 16;
+      const bounds = input.getBoundingClientRect();
+      if (bounds.top < visibleTop || bounds.bottom > visibleBottom) {
+        window.scrollTo({
+          top: Math.max(0, window.scrollY + bounds.top - visibleTop),
+          behavior: "instant",
+        });
+      }
     }, 0);
   }
 
@@ -2335,7 +2344,6 @@ export function CuriosityReadingExperience({
             <CuriosityWordDetailFields
               quickPreview={quickPreview}
               chapterNameOptions={sortedChapterNameOptions}
-              hideKanjiInReadingSupport={hideKanjiInReadingSupport}
               isEditing={quickPreview.id != null}
               savedQuickNotice={savedQuickNotice}
               quickWordFieldsRef={quickWordFieldsRef}
@@ -2380,7 +2388,6 @@ export function CuriosityReadingExperience({
                   };
                 })
               }
-              onHideKanjiChange={setHideKanjiInReadingSupport}
               onSaveWord={() => void saveQuickWord()}
               onClearWordFields={() => clearQuickWordFields()}
               locationLabel="Page"
