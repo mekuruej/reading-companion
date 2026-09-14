@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   computeLibraryStudyColorStatus,
+  getRestartSupportCycle,
   getLibraryStudyEncounterStageCounts,
   type LibraryStudyGateStatus,
   type LibraryStudyColorStatus,
@@ -1666,6 +1667,7 @@ export default function LibraryStudyPage() {
   const searchParams = useSearchParams();
   const typingInputRef = useRef<HTMLInputElement | null>(null);
   const autoStartedCheckRef = useRef(false);
+  const restartingCardRef = useRef(false);
   const directStartRequested = searchParams.get("start") === "1";
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -3019,11 +3021,14 @@ export default function LibraryStudyPage() {
   }
 
   async function restartCurrentCardAtAbilityCheckStart() {
-    if (!canUseAbilityCheck) return;
-    if (!currentUserId || !currentCard || isClaimCardId(currentCard.id)) return;
+    if (!canUseAbilityCheck || restartingCardRef.current) return;
+    if (!currentUserId || !currentCard) return;
 
+    restartingCardRef.current = true;
+    try {
     const existing = currentCard.progress;
     const now = new Date().toISOString();
+    const supportCycle = getRestartSupportCycle(currentCard.encounterCount, learningSettings, existing?.reading_gate_attempts ?? 0);
 
     const { data, error } = await supabase
       .from("user_library_word_progress")
@@ -3036,10 +3041,10 @@ export default function LibraryStudyPage() {
           definition_key: "",
           reading_gate_status: "not_started",
           meaning_gate_status: "not_started",
-          held_before_reading_gate: false,
-          held_before_meaning_gate: false,
+          held_before_reading_gate: true,
+          held_before_meaning_gate: true,
           mastered: false,
-          reading_gate_attempts: existing?.reading_gate_attempts ?? 0,
+          reading_gate_attempts: supportCycle - 1,
           meaning_gate_attempts: existing?.meaning_gate_attempts ?? 0,
           reading_gate_passed_at: null,
           reading_gate_failed_at: null,
@@ -3077,14 +3082,14 @@ export default function LibraryStudyPage() {
 
     if (error) {
       console.error("Error restarting Ability Check card:", error);
-      setNotice("Could not restart this card.");
+      setNotice("Could not send this card back to Red.");
       return;
     }
 
     const restartedProgress = data;
 
     if (!restartedProgress) {
-      setNotice("Could not restart this card.");
+      setNotice("Could not send this card back to Red.");
       return;
     }
 
@@ -3115,7 +3120,13 @@ export default function LibraryStudyPage() {
     markStudyCardSeen(currentCard);
     nextCardWithoutMarkingSeen();
     resetCardState();
-    setNotice("Card sent back to the start of Ability Check.");
+    setNotice("Word sent back to Red support. Your saved vocabulary history is preserved.");
+    } catch (error) {
+      console.error("Error sending card back to Red:", error);
+      setNotice("Could not send this card back to Red. Please try again.");
+    } finally {
+      restartingCardRef.current = false;
+    }
   }
 
   async function countMeaningReviewAsPassed(item: MeaningReviewItem) {
@@ -3607,7 +3618,7 @@ export default function LibraryStudyPage() {
           <AbilityCheckActionPanel
             meaningReviewCount={meaningReviewItems.length}
             canComeBackLater={canComeBackLater(currentCard)}
-            canRestartCurrentCard={currentCard ? !isClaimCardId(currentCard.id) : false}
+            canRestartCurrentCard={Boolean(currentCard)}
             onFinishForToday={finishForToday}
             onComeBackLater={() => void comeBackLaterForCurrentCard("hard")}
             onRestartCurrentCard={() => void restartCurrentCardAtAbilityCheckStart()}

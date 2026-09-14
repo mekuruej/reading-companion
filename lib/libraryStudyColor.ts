@@ -125,6 +125,12 @@ function computeEncounterColor(
   };
 }
 
+// Start a fresh support cycle beyond existing encounters so a reset stays Red.
+export function getRestartSupportCycle(encounterCount: number, settings?: LibraryStudyColorSettings | null, previousAttempts = 0) {
+  const total = getLibraryStudyEncounterStageCounts(settings).total;
+  return Math.max(2, Math.ceil((Math.max(0, encounterCount) - total) / 2) + 2, previousAttempts + 1);
+}
+
 function cleanSupportCycle(value: number | null | undefined) {
   if (!Number.isFinite(value ?? 0)) return 2;
   return Math.max(2, Math.floor(value ?? 2));
@@ -222,7 +228,6 @@ export function computeLibraryStudyColorStatus(
   }
 
   if (
-    hasEnoughEncounters &&
     readingGate === "not_started" &&
     input.heldBeforeReadingGate
   ) {

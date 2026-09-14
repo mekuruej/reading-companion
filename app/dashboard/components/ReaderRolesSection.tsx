@@ -48,7 +48,7 @@ export default function ReaderRolesSection() {
           Every reading journey needs its characters.
         </h3>
 
-        <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+        <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-white">
           Alchemist, Sage, or Magician — every reader brings a different kind of
           magic to the story.
         </p>
