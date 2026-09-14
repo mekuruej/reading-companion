@@ -235,7 +235,8 @@ export default function Header() {
         <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
           <div className="text-center md:text-left">
             <Link
-              href={libraryHref}
+              href="/dashboard"
+              aria-label="MEKURU dashboard"
               className="block text-m font-semibold tracking-tight text-stone-900 sm:text-2xl md:text-4xl"
             >
               MEKURU <span className="align-middle text-xs font-semibold text-red-600 md:text-sm">(Beta)</span>

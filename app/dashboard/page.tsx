@@ -20,9 +20,6 @@ import DashboardWarmupPanel from "./components/DashboardWarmupPanel";
 import SignedInDashboardCard from "./components/SignedInDashboardCard";
 import SignedOutLoginSection from "./components/SignedOutLoginSection";
 
-const POST_LOGIN_TARGET = "/books";
-const POST_LOGIN_PARAM = "after_login";
-const POST_LOGIN_VALUE = "library";
 const PROFILE_SETUP_TARGET = "/community/profile/setup";
 const WARMUP_WORD_COUNT = 4;
 const WARMUP_ENABLED_STORAGE_KEY = "mekuru-dashboard-word-warmup-enabled";
@@ -155,7 +152,7 @@ export default function DashboardPage() {
       console.warn("Dashboard warm-up preference did not load:", error);
     }
 
-    async function routeSignedInUser(userId: string, shouldOpenLibraryAfterLogin: boolean) {
+    async function routeSignedInUser(userId: string) {
       const profileResult = await supabase
         .from("profiles")
         .select("username, display_name, native_language, target_language, japanese_learning_enabled, level, role, is_super_teacher, app_access_type, app_access_expires_at")
@@ -204,18 +201,12 @@ export default function DashboardPage() {
         return true;
       }
 
-      if (shouldOpenLibraryAfterLogin) {
-        router.replace(POST_LOGIN_TARGET);
-        return true;
-      }
-
       return false;
     }
 
     async function loadSession() {
       const params = new URLSearchParams(window.location.search);
       const authCode = params.get("code");
-      const shouldOpenLibraryAfterLogin = params.get(POST_LOGIN_PARAM) === POST_LOGIN_VALUE;
 
       if (authCode) {
         const { error } = await supabase.auth.exchangeCodeForSession(authCode);
@@ -235,7 +226,7 @@ export default function DashboardPage() {
 
       if (session?.user?.id) {
         setUserId(session.user.id);
-        const routed = await routeSignedInUser(session.user.id, shouldOpenLibraryAfterLogin);
+        const routed = await routeSignedInUser(session.user.id);
         if (routed) return;
       } else {
         setUserId(null);
@@ -253,12 +244,9 @@ export default function DashboardPage() {
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!alive) return;
 
-      const params = new URLSearchParams(window.location.search);
-      const shouldOpenLibraryAfterLogin = params.get(POST_LOGIN_PARAM) === POST_LOGIN_VALUE;
-
       if (event === "SIGNED_IN" && session?.user) {
         setUserId(session.user.id);
-        const routed = await routeSignedInUser(session.user.id, shouldOpenLibraryAfterLogin);
+        const routed = await routeSignedInUser(session.user.id);
         if (!alive || routed) return;
 
         setIsLoggedIn(true);
