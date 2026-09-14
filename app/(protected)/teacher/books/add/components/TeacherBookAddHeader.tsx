@@ -26,7 +26,7 @@ export function TeacherBookAddHeader({
         </h1>
 
         <p className="max-w-2xl text-sm leading-6 text-stone-600">
-          Create or update shared book metadata. This does not add the book to
+          Edit existing catalog books or create new entries. This does not add the book to
           a student Library, your Library, or My Teaching Books.
         </p>
       </div>

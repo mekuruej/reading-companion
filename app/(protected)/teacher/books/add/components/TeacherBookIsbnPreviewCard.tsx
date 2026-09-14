@@ -28,7 +28,7 @@ export function TeacherBookIsbnPreviewCard({
         <div className="mt-5 rounded-2xl border border-sky-200 bg-white p-4 shadow-sm">
             {preview.found_existing_book ? (
                 <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
-                    This ISBN already exists in the global library. Do not create a duplicate.
+                    This book is already in the catalog. Open it below to edit its details.
                 </div>
             ) : (
                 <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
@@ -107,7 +107,7 @@ export function TeacherBookIsbnPreviewCard({
                             {saving
                                 ? "Working..."
                                 : preview.found_existing_book
-                                    ? "Load existing catalog book"
+                                    ? "Edit existing catalog book"
                                     : "Create catalog book from this metadata"}
                         </button>
 

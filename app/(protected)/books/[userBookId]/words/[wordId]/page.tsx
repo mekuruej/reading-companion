@@ -30,6 +30,8 @@ import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 // Types
 // -------------------------------------------------------------
 type WordRow = {
+  cache_surface?: string | null;
+  vocabulary_cache?: { surface: string | null } | null;
   id: string;
   user_book_id: string;
   surface: string;
@@ -271,7 +273,7 @@ export default function WordDetailPage() {
 
     setEditErr(null);
     setEditing(w);
-    setEditSurface(w.surface ?? "");
+    setEditSurface(w.cache_surface && w.surface === w.cache_surface ? "" : w.surface ?? "");
     setEditReading(w.reading ?? "");
     setEditMeaning(w.meaning ?? "");
     setEditJlpt(w.jlpt ?? "");
@@ -348,7 +350,7 @@ export default function WordDetailPage() {
     }
 
     const patch: any = {
-      surface: editSurface.trim(),
+      surface: editSurface.trim() || editing.cache_surface?.trim() || "",
       reading: editReading.trim() ? editReading.trim() : null,
       meaning: editMeaning.trim() ? editMeaning.trim() : null,
       other_definition: null,
@@ -655,7 +657,8 @@ export default function WordDetailPage() {
           meaning_choice_index,
           hidden,
           hide_kanji_in_reading_support,
-          target_language_code
+          target_language_code,
+          vocabulary_cache: vocabulary_cache_id (surface)
         `
         )
         .eq("id", wordId)
@@ -671,7 +674,7 @@ export default function WordDetailPage() {
         return;
       }
 
-      setWord(w);
+      setWord({ ...w, cache_surface: w.vocabulary_cache?.surface ?? null });
       setMeaningChoices(asStringArray((w as any).meaning_choices));
 
       const { data: neighborRows, error: neighborErr } = await supabase
@@ -833,12 +836,12 @@ export default function WordDetailPage() {
             wordId={editing.id}
             editErr={editErr}
             editSaving={editSaving}
-            saveDisabled={editSaving || !editSurface.trim()}
+            saveDisabled={editSaving || !(editSurface.trim() || editing.cache_surface?.trim())}
             onClose={closeEdit}
             onSave={saveEdit}
           >
             <BookVocabEditFormBody
-              cacheSurface={null}
+              cacheSurface={editing.cache_surface}
               editSurface={editSurface}
               editReading={editReading}
               editJlpt={editJlpt}

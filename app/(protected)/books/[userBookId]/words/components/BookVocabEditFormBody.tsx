@@ -50,19 +50,29 @@ export default function BookVocabEditFormBody({
 }: BookVocabEditFormBodyProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+      {cacheSurface ? (
+        <div className="flex flex-col gap-1 sm:col-span-2">
+          <span className="text-xs text-gray-600">Common usage (dictionary form)</span>
+          <span className="font-medium">{cacheSurface}</span>
+        </div>
+      ) : null}
+
       <label className="flex flex-col gap-1">
-        <span className="text-xs text-gray-600">Word (book form)</span>
+        <span className="text-xs text-gray-600">
+          Word (book form)
+        </span>
         <input
           value={editSurface}
           onChange={(e) => onEditSurfaceChange(e.target.value)}
+          placeholder={cacheSurface ? "Book form, if different" : "Word as it appears in the book"}
           className="border p-2 rounded"
         />
 
-        {cacheSurface && cacheSurface !== editSurface ? (
-          <span className="text-[11px] text-gray-500">
-            Dictionary form: {cacheSurface}
-          </span>
-        ) : null}
+        <span className="text-[11px] text-gray-500">
+          {cacheSurface
+            ? "Optional. Leave blank to use the common form shown above."
+            : "Use the spelling as it appears in this book."}
+        </span>
       </label>
 
       <label className="flex flex-col gap-1">

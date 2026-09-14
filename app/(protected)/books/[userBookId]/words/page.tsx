@@ -416,7 +416,7 @@ export default function BookWordsPage() {
     setEditErr(null);
     setEditing(w);
 
-    setEditSurface(w.surface ?? "");
+    setEditSurface(w.cache_surface && w.surface === w.cache_surface ? "" : w.surface ?? "");
     setEditReading(w.reading ?? "");
     setEditMeaning(w.meaning ?? "");
     setEditOtherDefinition(w.other_definition ?? "");
@@ -505,7 +505,7 @@ export default function BookWordsPage() {
     }
 
     const patch: any = {
-      surface: editSurface.trim(),
+      surface: editSurface.trim() || editing.cache_surface?.trim() || "",
       reading: editReading.trim() ? editReading.trim() : null,
       meaning: editMeaning.trim() ? editMeaning.trim() : null,
       other_definition: null,
@@ -1289,7 +1289,7 @@ export default function BookWordsPage() {
           wordId={editing.id}
           editErr={editErr}
           editSaving={editSaving}
-          saveDisabled={editSaving || !editSurface.trim()}
+          saveDisabled={editSaving || !(editSurface.trim() || editing.cache_surface?.trim())}
           onClose={closeEdit}
           onSave={saveEdit}
         >
