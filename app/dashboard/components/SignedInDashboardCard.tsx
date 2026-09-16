@@ -26,15 +26,15 @@ export default function SignedInDashboardCard({
 
         {showWarmup ? (
           <div className="mt-5 rounded-2xl border border-sky-100 bg-sky-50/80 p-4 shadow-inner">
-            <div className="flex flex-col gap-3 text-left sm:flex-row sm:items-start sm:justify-between">
+            <div className={warmupEnabled ? "flex flex-col gap-3 text-left sm:flex-row sm:items-start sm:justify-between" : "flex items-center justify-between gap-3 text-left"}>
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">
                   Optional word warm-up
                 </p>
 
-                <p className="mt-1 text-sm leading-6 text-slate-600">
+                {warmupEnabled ? <p className="mt-1 text-sm leading-6 text-slate-600">
                   Only tap words you already feel comfortable reading. If none are familiar, that’s okay—skip this and go straight to My Library.
-                </p>
+                </p> : null}
               </div>
 
               <label className="inline-flex shrink-0 items-center gap-2 rounded-full border border-sky-100 bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600">
@@ -48,13 +48,7 @@ export default function SignedInDashboardCard({
               </label>
             </div>
 
-            {warmupEnabled ? (
-              children
-            ) : (
-              <p className="mt-4 rounded-2xl border border-sky-100 bg-white/75 px-3 py-3 text-sm text-slate-500">
-                Word warm-up is hidden on this device.
-              </p>
-            )}
+            {warmupEnabled ? children : null}
           </div>
         ) : null}
 

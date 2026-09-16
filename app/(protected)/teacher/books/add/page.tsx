@@ -17,6 +17,7 @@ import { TeacherBookIsbnPreviewCard } from "./components/TeacherBookIsbnPreviewC
 import { TeacherBookAddHelpCard } from "./components/TeacherBookAddHelpCard";
 import { TeacherBookFindCreateActions } from "./components/TeacherBookFindCreateActions";
 import { TeacherBookFindCreateFields } from "./components/TeacherBookFindCreateFields";
+import { TeacherBookTitleSearch } from "./components/TeacherBookTitleSearch";
 import { TeacherBookFindCreatePanel } from "./components/TeacherBookFindCreatePanel";
 import { TeacherBookInfoSection } from "./components/TeacherBookInfoSection";
 import { TeacherBookAddPageShell } from "./components/TeacherBookAddPageShell";
@@ -1073,6 +1074,8 @@ export default function TeacherAddBookPage() {
                         }}
                         onAsinChange={setAsin}
                     />
+
+                    <TeacherBookTitleSearch title={title} sourceQuerySuffix={sourceQuerySuffix} />
 
                     <TeacherBookFindCreateActions
                         isbnLookupLoading={isbnLookupLoading}

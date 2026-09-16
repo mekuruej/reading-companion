@@ -400,6 +400,7 @@ export function CuriosityReadingExperience({
   const [scratchWord, setScratchWord] = useState("");
   const [kanjiLookupResetKey, setKanjiLookupResetKey] = useState(0);
 
+  const quickLookupVersion = useRef(0);
   const [quickPreview, setQuickPreview] = useState<QuickPreview>(() => makeBlankQuickPreview());
   const [quickSessionWords, setQuickSessionWords] = useState<QuickSessionWord[]>([]);
   const [chapterNameOptions, setChapterNameOptions] = useState<string[]>([]);
@@ -1047,7 +1048,13 @@ export function CuriosityReadingExperience({
     );
   }
 
+  function invalidateQuickLookup() {
+    quickLookupVersion.current += 1;
+    setQuickLoading(false);
+  }
+
   function clearQuickWordFields(options: { preserveSavedNotice?: boolean } = {}) {
+    invalidateQuickLookup();
     const meta = {
       page: quickPreview.page,
       percent: quickPreview.percent ?? "",
@@ -1095,6 +1102,7 @@ export function CuriosityReadingExperience({
   }
 
   function loadQuickSessionWordIntoPreview(item: QuickSessionWord) {
+    invalidateQuickLookup();
     setQuickPreview({
       id: item.id,
       surface: item.surface,
@@ -1132,6 +1140,7 @@ export function CuriosityReadingExperience({
     const word = (wordOverride ?? quickPreview.surface).trim();
     if (!word) return;
 
+    const lookupVersion = ++quickLookupVersion.current;
     setQuickLoading(true);
     setQuickError(null);
     setSavedQuickNotice("");
@@ -1141,12 +1150,14 @@ export function CuriosityReadingExperience({
         data: { session },
       } = await supabase.auth.getSession();
 
+      if (lookupVersion !== quickLookupVersion.current) return;
       const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(word)}`, {
         headers: session?.access_token
           ? { Authorization: `Bearer ${session.access_token}` }
           : undefined,
       });
       const json = await res.json();
+      if (lookupVersion !== quickLookupVersion.current) return;
 
       const candidates = buildQuickLookupCandidates(json?.data ?? [], word);
       const first = candidates[0];
@@ -1197,6 +1208,7 @@ export function CuriosityReadingExperience({
       );
 
     } catch (err) {
+      if (lookupVersion !== quickLookupVersion.current) return;
       console.error(err);
       setQuickPreview((prev) => ({
         ...prev,
@@ -1214,7 +1226,7 @@ export function CuriosityReadingExperience({
       setSelectedQuickLookupCandidateId(null);
       setQuickError("Could not pull word data.");
     } finally {
-      setQuickLoading(false);
+      if (lookupVersion === quickLookupVersion.current) setQuickLoading(false);
     }
   }
 
@@ -1248,6 +1260,10 @@ export function CuriosityReadingExperience({
     )?.trim() ?? "";
     const normalizedCacheSurface = quickPreview.cacheSurface?.trim() || normalizedSurface;
     const normalizedReading = quickPreview.reading?.trim() ?? "";
+    if (!normalizedReading) {
+      setMessage("The reading cannot be left blank.");
+      return;
+    }
     const isManualEntry = quickPreview.isCustomMeaning && quickPreview.meanings.length === 0;
 
     const chapterNum = quickPreview.chapterNumber ? Number(quickPreview.chapterNumber) : null;
@@ -1295,7 +1311,9 @@ export function CuriosityReadingExperience({
 
         if (cacheInsertError) {
           console.error("Error creating vocabulary cache row:", cacheInsertError);
-          setMessage(`❌ Could not save word: ${cacheInsertError.message}`);
+          setMessage(cacheInsertError.message.includes("vocabulary_cache_reading_not_blank")
+            ? "The reading cannot be left blank."
+            : `❌ Could not save word: ${cacheInsertError.message}`);
           return;
         }
 
@@ -2146,6 +2164,7 @@ export function CuriosityReadingExperience({
               lastAddedWord={quickSessionWords[0] ?? null}
               inputRef={quickWordInputRef}
               onSurfaceChange={(value) => {
+                invalidateQuickLookup();
                 setQuickPreview((prev) => ({
                   ...prev,
                   surface: value,
@@ -2171,6 +2190,7 @@ export function CuriosityReadingExperience({
                 }
               }}
               onSelectCandidate={(candidate) => {
+                invalidateQuickLookup();
                 setQuickPreview((prev) => ({
                   ...prev,
                   surface: candidate.surface,
@@ -2283,6 +2303,7 @@ export function CuriosityReadingExperience({
               quickPreviewLibraryColorInfo={quickPreviewLibraryColorInfo}
               quickWordInputRef={quickWordInputRef}
               onSurfaceChange={(value) => {
+                invalidateQuickLookup();
                 setQuickPreview((prev) => ({
                   ...prev,
                   surface: value,
@@ -2326,6 +2347,7 @@ export function CuriosityReadingExperience({
               selectedReading={quickPreview.reading}
               selectedMeaning={quickPreview.meaning}
               onSelectCandidate={(candidate) => {
+                invalidateQuickLookup();
                 setQuickPreview((prev) => ({
                   ...prev,
                   surface: candidate.surface,

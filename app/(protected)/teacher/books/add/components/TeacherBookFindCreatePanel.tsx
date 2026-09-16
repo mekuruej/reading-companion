@@ -13,10 +13,9 @@ export function TeacherBookFindCreatePanel({
                 Edit an existing book or create a new entry
             </h2>
             <p className="mt-2 text-sm leading-6 text-stone-600">
-                To edit an existing book, enter its ISBN and choose Look up ISBN, then
-                Edit existing catalog book. You can also enter a title and ISBN or ASIN
-                below to open a matching book for editing, or create an entry if none matches.
-                For a new book without either identifier, enter its title and choose Create Manual Book Entry.
+                Enter all or part of a title and choose Find by title to edit, then select
+                the matching edition. No ISBN is needed to find an existing book.
+                You can also look up an ISBN, or create a new catalog entry below.
             </p>
 
             {children}
