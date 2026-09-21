@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { normalizeBookLanguageCode } from "@/lib/books/bookLanguage";
 import BookInfoDetailsSection from "./BookInfoDetailsSection";
 import BookInfoLinksSection from "./BookInfoLinksSection";
+import BookAwardsSection from "@/components/books/BookAwardsSection";
 import BookInfoRecordSearchPanel from "./BookInfoRecordSearchPanel";
 
 type Book = {
@@ -1443,6 +1444,8 @@ export default function BookInfoTab({
           )}
         </div>
       </div>
+
+      <BookAwardsSection key={book.id} bookId={book.id} canEdit={canEditBookInfo} />
 
       <BookInfoLinksSection
         canEditBookInfo={canEditBookInfo}

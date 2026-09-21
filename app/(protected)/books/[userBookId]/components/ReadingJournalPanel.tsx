@@ -850,7 +850,7 @@ export default function ReadingJournalPanel({
     };
 
     if (!payload.title && !payload.details) {
-      alert("Please add a location or details before saving this setting note.");
+      alert("Please add a location or notes before saving this setting note.");
       return;
     }
 

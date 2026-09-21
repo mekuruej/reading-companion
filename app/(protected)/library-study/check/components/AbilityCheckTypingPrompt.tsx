@@ -1,3 +1,4 @@
+import { STUDY_CARD_INPUT_CLASS, STUDY_CARD_CHECK_BUTTON_CLASS, STUDY_CARD_CHECK_LABEL } from "@/lib/studyCardPresentation";
 import type { KeyboardEvent, RefObject } from "react";
 
 type AbilityCheckTypingMode = "reading_typing" | "meaning_typing";
@@ -6,6 +7,7 @@ type AbilityCheckTypingPromptProps = {
   mode: AbilityCheckTypingMode;
   surface: string;
   reading: string;
+  meaning: string;
   promptClassName: string;
   typingInput: string;
   checked: { ok: boolean; correct: string } | null;
@@ -22,6 +24,7 @@ export default function AbilityCheckTypingPrompt({
   mode,
   surface,
   reading,
+  meaning,
   promptClassName,
   typingInput,
   checked,
@@ -38,16 +41,18 @@ export default function AbilityCheckTypingPrompt({
   return (
     <>
       <div className={promptClassName}>
-        {isReadingMode ? "READING" : "MEANING"}
+        {isReadingMode ? "Reading" : "Meaning"}
       </div>
 
       <div className="text-5xl font-bold">{surface}</div>
 
-      {!isReadingMode ? (
-        <div className="text-lg text-slate-500">{reading}</div>
+      {isReadingMode ? (
+        <div className="text-base font-semibold text-slate-500">{meaning}</div>
+      ) : surface !== reading ? (
+        <div className="text-lg font-semibold text-slate-500">{reading}</div>
       ) : null}
 
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-md">
         {isReadingMode ? (
           <p className="mb-2 text-center text-xs text-gray-500">
             <span className="inline sm:whitespace-nowrap">Kana is best; </span>
@@ -70,7 +75,7 @@ export default function AbilityCheckTypingPrompt({
           autoCapitalize="none"
           autoComplete="off"
           spellCheck={false}
-          className="w-full rounded border px-4 py-3 text-base"
+          className={STUDY_CARD_INPUT_CLASS}
           disabled={!!checked && (checked.ok || !isReadingMode)}
         />
 
@@ -85,9 +90,9 @@ export default function AbilityCheckTypingPrompt({
             <button
               type="button"
               onClick={onCheckAnswer}
-              className="rounded bg-gray-700 px-4 py-2 text-white"
+              className={STUDY_CARD_CHECK_BUTTON_CLASS}
             >
-              Check
+              {STUDY_CARD_CHECK_LABEL}
             </button>
 
             {canSendBackToSupport ? (

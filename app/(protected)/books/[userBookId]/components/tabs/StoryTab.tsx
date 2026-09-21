@@ -248,7 +248,7 @@ function StorySubTab({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${
+      className={`min-w-0 rounded-xl border px-2 py-2 text-center text-xs font-medium break-words transition sm:text-sm ${
         active
           ? "border-stone-900 bg-stone-900 text-white"
           : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
@@ -407,8 +407,7 @@ export default function StoryTab({
   saveBookReview,
   deleteBookReview,
 }: StoryTabProps) {
-  const isLearningJournal = !tabOrder.includes("setting");
-  const languageNoteLabel = isLearningJournal ? "Language Learning" : "Cultural";
+  const languageNoteLabel = "Language Learning";
   const detectiveReadOnly = Boolean(learningArchiveReadOnlyTabs?.detective);
   const settingReadOnly = Boolean(learningArchiveReadOnlyTabs?.setting);
   const culturalReadOnly = Boolean(learningArchiveReadOnlyTabs?.cultural);
@@ -458,16 +457,16 @@ export default function StoryTab({
     characters: "Characters",
     plot: "Plot",
     detective: "Detective",
-    setting: "Setting",
+    setting: "Settings",
     cultural: languageNoteLabel,
     quotes: "Quotes",
     notes: "Notes",
-    review: isLearningJournal ? "Ratings & Reviews" : "Review & Ratings",
+    review: "Ratings & Reviews",
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-2 pl-2">
+      <div className="grid grid-cols-4 gap-2">
         {tabOrder.map((tab) => (
           <StorySubTab key={tab} active={storyTab === tab} onClick={() => setStoryTab(tab)}>
             {tabLabels[tab]}
@@ -904,9 +903,9 @@ export default function StoryTab({
                     <div key={item.id} className="rounded-xl border bg-white p-4">
                       {!isEditing ? (
                         <div className="space-y-2 text-sm">
-                          <div className="font-medium text-stone-900">{item.title || "—"}</div>
+                          <div className="text-stone-900"><span className="font-medium">Location:</span> {item.title || "—"}</div>
                           <div className="whitespace-pre-wrap text-stone-700">
-                            {item.details || "—"}
+                            <span className="font-medium">Notes:</span> {item.details || "—"}
                           </div>
 
                           {!settingReadOnly ? (
@@ -931,23 +930,27 @@ export default function StoryTab({
                         </div>
                       ) : (
                         <div className="space-y-3">
-                          <input
-                            value={item.title ?? ""}
-                            onChange={(e) =>
-                              updateSettingItem(item.id, "title", e.target.value)
-                            }
-                            placeholder="Location"
-                            className="w-full rounded border px-3 py-2 text-sm"
-                          />
+                          <label className="block text-sm text-stone-700">
+                            <span className="mb-1 block font-medium">Location:</span>
+                            <input
+                              value={item.title ?? ""}
+                              onChange={(e) =>
+                                updateSettingItem(item.id, "title", e.target.value)
+                              }
+                              className="w-full rounded border px-3 py-2 text-sm"
+                            />
+                          </label>
 
-                          <textarea
-                            value={item.details}
-                            onChange={(e) =>
-                              updateSettingItem(item.id, "details", e.target.value)
-                            }
-                            placeholder="Details"
-                            className="min-h-[120px] w-full rounded border px-3 py-2 text-sm"
-                          />
+                          <label className="block text-sm text-stone-700">
+                            <span className="mb-1 block font-medium">Notes:</span>
+                            <textarea
+                              value={item.details}
+                              onChange={(e) =>
+                                updateSettingItem(item.id, "details", e.target.value)
+                              }
+                              className="min-h-[120px] w-full rounded border px-3 py-2 text-sm"
+                            />
+                          </label>
 
                           <div className="flex flex-wrap gap-2">
                             <button
@@ -1017,7 +1020,7 @@ export default function StoryTab({
                   onClick={addCulturalItem}
                   className="rounded-xl bg-stone-900 px-3 py-2 text-sm font-medium text-white hover:bg-black"
                 >
-                  {isLearningJournal ? "Add Language Note" : "Add Cultural"}
+                  Add Language Note
                 </button>
               ) : null}
             </div>
@@ -1026,15 +1029,15 @@ export default function StoryTab({
           <input
             value={culturalSearch}
             onChange={(event) => setCulturalSearch(event.target.value)}
-            placeholder={isLearningJournal ? "Search language notes..." : "Search cultural notes..."}
+            placeholder="Search language notes..."
             className="mb-3 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-stone-300"
           />
 
           {showCulturalItems ? (
             culturalItems.length === 0 ? (
-              <div className="text-sm text-stone-500">{isLearningJournal ? "No language notes yet." : "No cultural notes yet."}</div>
+              <div className="text-sm text-stone-500">No language notes yet.</div>
             ) : filteredVisibleCulturalItems.length === 0 ? (
-              <div className="text-sm text-stone-500">{isLearningJournal ? "No language notes match this search." : "No cultural notes match this search."}</div>
+              <div className="text-sm text-stone-500">No language notes match this search.</div>
             ) : (
               <div className="space-y-3">
                 {filteredVisibleCulturalItems.map((item) => {
@@ -1085,24 +1088,22 @@ export default function StoryTab({
                             className="w-full rounded border px-3 py-2 text-sm"
                           />
 
-                          {isLearningJournal ? (
-                            <label className="block text-sm">
-                              Location
-                              <input
-                                value={languageNote.location}
-                                onChange={(e) => updateCulturalItem(item.id, "details", formatLanguageLearningNote(e.target.value, languageNote.note))}
-                                placeholder="Page, chapter, or %"
-                                className="mt-1 w-full rounded border px-3 py-2 text-sm"
-                              />
-                            </label>
-                          ) : null}
+                          <label className="block text-sm">
+                            Location
+                            <input
+                              value={languageNote.location}
+                              onChange={(e) => updateCulturalItem(item.id, "details", formatLanguageLearningNote(e.target.value, languageNote.note))}
+                              placeholder="Page, chapter, or %"
+                              className="mt-1 w-full rounded border px-3 py-2 text-sm"
+                            />
+                          </label>
                           <textarea
-                            aria-label={isLearningJournal ? "Note" : "Details"}
+                            aria-label="Note"
                             value={languageNote.note}
                             onChange={(e) =>
                               updateCulturalItem(item.id, "details", formatLanguageLearningNote(languageNote.location, e.target.value))
                             }
-                            placeholder={isLearningJournal ? "Language question or interesting observation..." : "Details"}
+                            placeholder="Language question or interesting observation..."
                             className="min-h-[120px] w-full rounded border px-3 py-2 text-sm"
                           />
 

@@ -3,6 +3,8 @@
 
 "use client";
 
+import { studyCardPromptClass, studyCardDefinitionClass, STUDY_CARD_INPUT_CLASS, STUDY_CARD_CHECK_BUTTON_CLASS, STUDY_CARD_CHECK_LABEL } from "@/lib/studyCardPresentation";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -944,41 +946,14 @@ function gatePromptText(card: StudyCard | undefined) {
   }
 
   if (card.activeGate === "meaning") {
-    return "Meaning Check";
+    return "Meaning Typing";
   }
 
-  return "Reading Check";
-}
-
-function gatePromptClass(card: StudyCard | undefined) {
-  const base =
-    "rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-wide shadow-sm sm:px-5 sm:py-2 sm:text-sm";
-
-  if (card?.activeGate === "readiness") {
-    return `${base} border-yellow-300 bg-yellow-100 text-yellow-950`;
-  }
-
-  if (card?.activeGate === "meaning") {
-    return `${base} border-sky-300 bg-sky-100 text-sky-950`;
-  }
-
-  return `${base} border-emerald-300 bg-emerald-100 text-emerald-950`;
+  return "Reading Typing";
 }
 
 function definitionGateChipClass(card: StudyCard | null | undefined) {
-  const base =
-    "rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-wide shadow-sm sm:px-3 sm:py-1.5 sm:text-xs";
-  const pulseClass = isNonPrimaryDefinition(card) ? " animate-pulse" : "";
-
-  if (card?.activeGate === "readiness") {
-    return `${base} border-yellow-300 bg-yellow-100 text-yellow-950${pulseClass}`;
-  }
-
-  if (card?.activeGate === "meaning") {
-    return `${base} border-sky-300 bg-sky-100 text-sky-950${pulseClass}`;
-  }
-
-  return `${base} border-emerald-300 bg-emerald-100 text-emerald-950${pulseClass}`;
+  return studyCardDefinitionClass(card?.colorStatus.color, isNonPrimaryDefinition(card));
 }
 
 function checkModeLabel(card: StudyCard | undefined) {
@@ -1051,21 +1026,6 @@ function AbilityCheckFaq() {
       </div>
     </details>
   );
-}
-
-function promptModeClass(gate: LibraryCheckGate | undefined) {
-  const base =
-    "animate-pulse rounded-2xl border px-5 py-2.5 text-xl font-black uppercase tracking-[0.12em] shadow-sm sm:rounded-3xl sm:px-9 sm:py-4 sm:text-3xl sm:tracking-[0.16em]";
-
-  if (gate === "readiness") {
-    return `${base} border-yellow-300 bg-yellow-100 text-yellow-950`;
-  }
-
-  if (gate === "meaning") {
-    return `${base} border-sky-300 bg-sky-100 text-sky-950`;
-  }
-
-  return `${base} border-emerald-300 bg-emerald-100 text-emerald-950`;
 }
 
 function KatakanaBadge() {
@@ -1314,7 +1274,7 @@ function LibraryPracticePanel({
 
           <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
             {definitionLabel(card) ? (
-              <div className={libraryStudyChipClass(card.colorStatus)}>
+              <div className={definitionGateChipClass(card)}>
                 {definitionLabel(card)}
               </div>
             ) : null}
@@ -1376,7 +1336,7 @@ function LibraryPracticePanel({
 
           <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
             {definitionLabel(card) ? (
-              <div className={libraryStudyChipClass(card.colorStatus)}>
+              <div className={definitionGateChipClass(card)}>
                 {definitionLabel(card)}
               </div>
             ) : null}
@@ -1389,7 +1349,7 @@ function LibraryPracticePanel({
           </div>
 
           <div className="flex w-full flex-col items-center gap-5 pt-12 pb-10">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <div className={studyCardPromptClass(typingStep)}>
               {typingLabel}
             </div>
             <div className="text-5xl font-bold text-slate-950">{card.surface}</div>
@@ -1452,7 +1412,7 @@ function LibraryPracticePanel({
                   onClick={submitTypingPractice}
                   className="rounded-xl bg-gray-700 px-4 py-2 text-sm font-semibold text-white"
                 >
-                  Show answer
+                  {STUDY_CARD_CHECK_LABEL}
                 </button>
               )}
             </div>
@@ -1689,6 +1649,9 @@ export default function LibraryStudyPage() {
   const [practiceStudyMode, setPracticeStudyMode] = useState<PracticeStudyMode>("reveal");
   const [, setDebugInfo] = useState<LibraryCheckDebug | null>(null);
 
+  const flaggingCardRef = useRef(false);
+  const brokenCardIdsRef = useRef(new Set<string>());
+  const [isFlaggingCard, setIsFlaggingCard] = useState(false);
   const [libraryMode, setLibraryMode] = useState<LibraryStudyMode>("check");
   const [selectedJlpt, setSelectedJlpt] = useState("all");
   const [dailyCheckPlan, setDailyCheckPlan] = useState<DailyCheckPlan | null>(null);
@@ -2311,6 +2274,7 @@ export default function LibraryStudyPage() {
     const nextDeckSource = planCardIds
       .map((id) => cardById.get(id))
       .filter((card): card is StudyCard => Boolean(card))
+      .filter((card) => !brokenCardIdsRef.current.has(card.id))
       .filter((card) => !isCardSeenToday(card, seenTodayIds))
       .filter((card) => hasAbilityCheckRestDays(card.progress?.last_studied_at));
 
@@ -2346,7 +2310,7 @@ export default function LibraryStudyPage() {
   }, [practiceFilteredCards]);
 
   useEffect(() => {
-    if (!checked) return;
+    if (!checked || isFlaggingCard) return;
     if (!checked.ok && !typingCorrectionComplete) return;
 
     const timer = window.setTimeout(() => {
@@ -2354,7 +2318,7 @@ export default function LibraryStudyPage() {
     }, 4000);
 
     return () => window.clearTimeout(timer);
-  }, [checked, typingCorrectionComplete]);
+  }, [checked, typingCorrectionComplete, isFlaggingCard]);
 
   useEffect(() => {
     if (!checked || libraryMode !== "check") return;
@@ -2438,6 +2402,7 @@ export default function LibraryStudyPage() {
 
     saveDailyCheckPlanForToday(plan);
 
+    brokenCardIdsRef.current.clear();
     setDailyCheckPlan(plan);
     setNotice(null);
     setEndedEarly(false);
@@ -3240,46 +3205,45 @@ export default function LibraryStudyPage() {
   }
 
   async function flagCurrentCard() {
-    if (!canUseAbilityCheck) return;
-    if (!currentUserId || !currentCard) return;
+    if (!canUseAbilityCheck || !currentUserId || !currentCard || flaggingCardRef.current) return;
 
-    const ok = window.confirm("Hide this card from study?");
-    if (!ok) return;
+    flaggingCardRef.current = true;
+    setIsFlaggingCard(true);
+    try {
+      if (!isClaimCardId(currentCard.id)) {
+        if (!currentCard.userBookId) {
+          setNotice("This card could not be reported. Please try again.");
+          return;
+        }
+        const { data, error } = await supabase
+          .from("user_book_words")
+          .update({
+            flagged_for_review: true,
+            flagged_by_user_id: currentUserId,
+            flagged_at: new Date().toISOString(),
+          })
+          .eq("id", currentCard.id)
+          .eq("user_book_id", currentCard.userBookId)
+          .select("id")
+          .maybeSingle();
 
-    if (isClaimCardId(currentCard.id)) {
-      const { error } = await supabase
-        .from("user_library_word_claims")
-        .delete()
-        .eq("user_id", currentUserId)
-        .eq("study_identity_key", currentCard.studyIdentityKey);
-
-      if (error) {
-        console.error("Error hiding Word Sky claim:", error);
-        alert(`Could not flag card.\n${error.message}`);
-        return;
+        if (error || !data) {
+          setNotice("Could not flag this card for review. Please try again.");
+          return;
+        }
+        setNotice("Card flagged for review and skipped for this session. Your saved word and progress are unchanged.");
+      } else {
+        // Word Sky claims have no reporting fields yet. Keep the claim intact.
+        setNotice("Broken Word Sky card skipped for this session. Your claim and progress are unchanged.");
       }
-
-      setAllCards((prev) => prev.filter((card) => card.id !== currentCard.id));
-      setNotice("Word Sky claim removed from study.");
-      return;
+      brokenCardIdsRef.current.add(currentCard.id);
+      nextCardWithoutMarkingSeen();
+    } catch {
+      setNotice("Could not skip this broken card. Please try again.");
+    } finally {
+      flaggingCardRef.current = false;
+      setIsFlaggingCard(false);
     }
-
-    if (!currentCard.userBookId) return;
-
-    const { error } = await supabase
-      .from("user_book_words")
-      .update({ hidden: true })
-      .eq("id", currentCard.id)
-      .eq("user_book_id", currentCard.userBookId);
-
-    if (error) {
-      console.error("Error hiding study card:", error);
-      alert(`Could not flag card.\n${error.message}`);
-      return;
-    }
-
-    setAllCards((prev) => prev.filter((card) => card.id !== currentCard.id));
-    setNotice("Card hidden from study.");
   }
 
   if (loading) {
@@ -3542,7 +3506,8 @@ export default function LibraryStudyPage() {
           <AbilityCheckCardShell
             cardClassName={libraryStudyCardClass(currentCard?.colorStatus)}
             hasCard={!!currentCard}
-            gateClassName={currentCard ? gatePromptClass(currentCard) : ""}
+            modeTarget={currentCard?.activeGate}
+            jlpt={currentCard?.jlpt}
             gateLabel={currentCard ? gatePromptText(currentCard) : ""}
             colorDotClassName={
               currentCard ? libraryStudyDotClass(currentCard.colorStatus) : ""
@@ -3560,7 +3525,7 @@ export default function LibraryStudyPage() {
               {currentCard?.activeGate === "readiness" ? (
                 <AbilityCheckReadinessPrompt
                   surface={currentCard.surface}
-                  promptClassName={promptModeClass("readiness")}
+                  promptClassName={studyCardPromptClass("readiness")}
                   onReadyForReadingGate={() => void moveCurrentCardToReadingGate()}
                   onNeedsSupport={() => void comeBackLaterForCurrentCard("hard")}
                 />
@@ -3571,10 +3536,11 @@ export default function LibraryStudyPage() {
                   mode={activeStudyMode}
                   surface={currentCard.surface}
                   reading={currentCard.reading}
+                  meaning={currentCard.meaning}
                   promptClassName={
                     activeStudyMode === "reading_typing"
-                      ? promptModeClass("reading")
-                      : promptModeClass("meaning")
+                      ? studyCardPromptClass("reading")
+                      : studyCardPromptClass("meaning")
                   }
                   typingInput={typingInput}
                   checked={checked}
@@ -3623,6 +3589,7 @@ export default function LibraryStudyPage() {
             onComeBackLater={() => void comeBackLaterForCurrentCard("hard")}
             onRestartCurrentCard={() => void restartCurrentCardAtAbilityCheckStart()}
             onFlagCurrentCard={() => void flagCurrentCard()}
+            isFlaggingCard={isFlaggingCard}
           />
         </>
       )}

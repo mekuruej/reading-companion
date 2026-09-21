@@ -15,21 +15,41 @@ type BookInfoLinksSectionProps = {
 const LINK_FIELD_OPTIONS = [
   {
     label: "Amazon",
+    group: "Shopping",
     placeholder: "https://www.amazon.co.jp/...",
   },
   {
     label: "Ehon Hiroba",
+    group: "Reading & other",
     placeholder: "https://ehon.alphapolis.co.jp/...",
   },
   {
     label: "BookWalker",
+    group: "Shopping",
     placeholder: "https://bookwalker.jp/...",
   },
   {
+    label: "Publisher",
+    group: "Reference",
+    placeholder: "Publisher’s page for this book",
+  },
+  {
+    label: "Books.or.jp",
+    group: "Reference",
+    placeholder: "https://www.books.or.jp/...",
+  },
+  {
     label: "Other",
+    group: "Reading & other",
     placeholder: "https://...",
   },
 ] as const;
+
+const LINK_GROUPS = ["Shopping", "Reference", "Reading & other"] as const;
+
+function linkGroup(label: string) {
+  return LINK_FIELD_OPTIONS.find((option) => option.label === label)?.group ?? "Reading & other";
+}
 
 function parseLinkTextToMap(text: string) {
   const map = new Map<string, string>();
@@ -87,11 +107,8 @@ export default function BookInfoLinksSection({
       nextMap.delete(label);
     }
 
-    const nextText = LINK_FIELD_OPTIONS
-      .map((option) => {
-        const url = nextMap.get(option.label)?.trim();
-        return url ? `${option.label} | ${url}` : "";
-      })
+    const nextText = Array.from(nextMap.entries())
+      .map(([linkLabel, url]) => `${linkLabel} | ${url}`)
       .filter(Boolean)
       .join("\n");
 
@@ -133,52 +150,67 @@ export default function BookInfoLinksSection({
         )}
       </div>
 
-      {relatedLinksArr.length > 0 ? (
-        <ul className="flex flex-wrap gap-2 text-sm">
-          {relatedLinksArr.map((item: any, idx: number) => {
-            const label = displayLinkLabel(item);
-            const url = displayLinkUrl(item);
+      <p className="mb-3 text-sm text-stone-500">
+        Links to read, buy, or learn more about this book.
+      </p>
 
-            return (
-              <li key={idx}>
-                {url ? (
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center rounded-full border border-stone-300 bg-white px-3 py-1.5 font-medium text-stone-700 transition hover:bg-stone-100"
-                  >
-                    {label}
-                  </a>
-                ) : (
-                  <span className="text-stone-500">{label || "—"}</span>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      ) : (
-        <div className="text-sm text-stone-500">—</div>
-      )}
+      <div className="space-y-4">
+        {LINK_GROUPS.map((group) => {
+          const groupLinks = relatedLinksArr.filter((item) => linkGroup(displayLinkLabel(item)) === group);
+          const groupOptions = LINK_FIELD_OPTIONS.filter((option) => option.group === group);
 
-      {isEditingLinks ? (
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          {LINK_FIELD_OPTIONS.map((option) => (
-            <label key={option.label} className="block">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-stone-500">
-                {option.label}
-              </span>
+          if (!isEditingLinks && groupLinks.length === 0) return null;
 
-              <input
-                value={getLinkFieldValue(option.label)}
-                onChange={(event) => updateLinkField(option.label, event.target.value)}
-                placeholder={option.placeholder}
-                className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              />
-            </label>
-          ))}
-        </div>
-      ) : null}
+          return (
+            <section key={group}>
+              <h4 className="mb-2 text-sm font-semibold text-stone-700">{group}</h4>
+              {isEditingLinks ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {groupOptions.map((option) => (
+                    <label key={option.label} className="block">
+                      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-stone-500">
+                        {option.label}
+                      </span>
+                      <input
+                        value={getLinkFieldValue(option.label)}
+                        onChange={(event) => updateLinkField(option.label, event.target.value)}
+                        placeholder={option.placeholder}
+                        className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <ul className="flex flex-wrap gap-2 text-sm">
+                  {groupLinks.map((item: any, idx: number) => {
+                    const label = displayLinkLabel(item);
+                    const url = displayLinkUrl(item);
+                    return (
+                      <li key={idx}>
+                        {url ? (
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center rounded-full border border-stone-300 bg-white px-3 py-1.5 font-medium text-stone-700 transition hover:bg-stone-100"
+                          >
+                            {label}
+                          </a>
+                        ) : (
+                          <span className="text-stone-500">{label || "—"}</span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+          );
+        })}
+        {!isEditingLinks && relatedLinksArr.length === 0 ? (
+          <div className="text-sm text-stone-500">—</div>
+        ) : null}
+      </div>
     </div>
   );
 }

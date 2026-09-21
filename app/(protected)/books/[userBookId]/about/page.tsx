@@ -4,6 +4,7 @@
 "use client";
 
 import Link from "next/link";
+import BookAwardsSection from "@/components/books/BookAwardsSection";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
@@ -799,6 +800,8 @@ export default function AboutBookPage() {
             </div>
           </ProfileSection>
         ) : null}
+
+        <BookAwardsSection key={book.id} bookId={book.id} className="mt-6" />
 
         {bookstoreHint ? (
           <section className="mt-6 rounded-[2rem] border border-amber-200 bg-amber-50 p-6 shadow-sm">

@@ -3,7 +3,7 @@ import type { StoryTabMode } from "./readingJournalTypes";
 export const DEFAULT_BOOK_JOURNAL_TAB: StoryTabMode = "characters";
 
 const BOOK_JOURNAL_TABS: StoryTabMode[] = [
-  "characters", "plot", "cultural", "detective", "quotes", "notes", "review",
+  "characters", "plot", "setting", "quotes", "cultural", "detective", "notes", "review",
 ];
 
 // All books share the same journal navigation, regardless of language.

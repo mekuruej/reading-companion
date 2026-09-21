@@ -6,6 +6,7 @@ type AbilityCheckActionPanelProps = {
   onComeBackLater: () => void;
   onRestartCurrentCard: () => void;
   onFlagCurrentCard: () => void;
+  isFlaggingCard?: boolean;
 };
 
 export default function AbilityCheckActionPanel({
@@ -16,6 +17,7 @@ export default function AbilityCheckActionPanel({
   onComeBackLater,
   onRestartCurrentCard,
   onFlagCurrentCard,
+  isFlaggingCard = false,
 }: AbilityCheckActionPanelProps) {
   return (
     <div className="mt-4 grid w-full max-w-3xl gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -50,9 +52,10 @@ export default function AbilityCheckActionPanel({
       <button
         type="button"
         onClick={onFlagCurrentCard}
+        disabled={isFlaggingCard}
         className="rounded-full border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
       >
-        Flag card
+        {isFlaggingCard ? "Skipping broken card…" : "Broken card — skip"}
       </button>
     </div>
   );

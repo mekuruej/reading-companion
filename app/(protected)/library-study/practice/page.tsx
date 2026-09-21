@@ -3,6 +3,8 @@
 
 "use client";
 
+import { studyCardPromptClass, studyCardDefinitionClass, STUDY_CARD_INPUT_CLASS, STUDY_CARD_CHECK_BUTTON_CLASS, STUDY_CARD_CHECK_LABEL } from "@/lib/studyCardPresentation";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -400,35 +402,7 @@ function isNonPrimaryDefinition(card: StudyCard | null | undefined) {
 }
 
 function libraryReviewDefinitionChipClass(card: StudyCard | null | undefined) {
-  const base =
-    "rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-wide shadow-sm sm:px-3 sm:py-1.5 sm:text-xs";
-  const pulseClass = isNonPrimaryDefinition(card) ? " animate-pulse" : "";
-
-  if (card?.colorStatus.color === "yellow") {
-    return `${base} border-yellow-300 bg-yellow-100 text-yellow-950${pulseClass}`;
-  }
-
-  if (card?.colorStatus.color === "blue") {
-    return `${base} border-sky-300 bg-sky-100 text-sky-950${pulseClass}`;
-  }
-
-  if (card?.colorStatus.color === "purple") {
-    return `${base} border-violet-300 bg-violet-100 text-violet-950${pulseClass}`;
-  }
-
-  if (card?.colorStatus.color === "red") {
-    return `${base} border-red-300 bg-red-100 text-red-950${pulseClass}`;
-  }
-
-  if (card?.colorStatus.color === "orange") {
-    return `${base} border-orange-300 bg-orange-100 text-orange-950${pulseClass}`;
-  }
-
-  if (card?.colorStatus.color === "grey") {
-    return `${base} border-slate-300 bg-slate-100 text-slate-700${pulseClass}`;
-  }
-
-  return `${base} border-emerald-300 bg-emerald-100 text-emerald-950${pulseClass}`;
+  return studyCardDefinitionClass(card?.colorStatus.color, isNonPrimaryDefinition(card));
 }
 
 async function loadAllLibraryCheckWords(userBookIds: string[]) {
@@ -790,7 +764,7 @@ function LibraryPracticePanel({
   cards,
   total,
   revealStep,
-  practiceMode,
+  practiceMode: selectedPracticeMode,
   onAdvance,
   onNext,
   onPrevious,
@@ -824,6 +798,13 @@ function LibraryPracticePanel({
   onOpenWordSky: () => void;
 }) {
   const cardSkipsReading = isKanaOnly(card?.surface);
+  // Kana already supplies the reading. Use the same effective mode for the
+  // badge, prompt, hints, answer choices, and grading on this card.
+  const practiceMode = cardSkipsReading && selectedPracticeMode === "READING"
+    ? "MEANING"
+    : cardSkipsReading && selectedPracticeMode === "READING_MC"
+      ? "MEANING_MC"
+      : selectedPracticeMode;
   const [typingInput, setTypingInput] = useState("");
   const [typingFeedback, setTypingFeedback] = useState<null | {
     ok: boolean;
@@ -846,8 +827,6 @@ function LibraryPracticePanel({
   const modeTarget =
     practiceMode === "COMPLETE_TYPING"
       ? typingStep
-      : cardSkipsReading && (practiceMode === "READING" || practiceMode === "READING_MC")
-      ? "meaning"
       : practiceModeTarget(practiceMode);
   const typingLabel = modeTarget === "word" ? "Word" : modeTarget === "reading" ? "Reading" : "Meaning";
   const isTypingMode = isPracticeTypingMode(practiceMode);
@@ -1091,6 +1070,7 @@ function LibraryPracticePanel({
         <div className="relative flex min-h-[24rem] w-full max-w-3xl items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-2xl sm:min-h-[28rem]">
           <LibraryPracticeCardBadges
             modeLabel={practiceStudyModeLabel(practiceMode)}
+            modeTarget={modeTarget}
             jlpt={card.jlpt}
             colorDotClassName={libraryStudyDotClass(card.colorStatus)}
             colorName={libraryStudyColorName(card.colorStatus)}
@@ -1102,7 +1082,7 @@ function LibraryPracticePanel({
           />
 
           <div className="flex w-full flex-col items-center gap-5 pt-12 pb-10">
-            <div className="text-base font-black uppercase tracking-[0.16em] text-slate-600">
+            <div className={studyCardPromptClass(modeTarget)}>
               {typingLabel}
             </div>
             {practiceMode === "FROM_READING_MEANING" ? (
@@ -1144,7 +1124,7 @@ function LibraryPracticePanel({
                 autoComplete="off"
                 spellCheck={false}
                 disabled={typingFeedback?.ok === true}
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base"
+                className={STUDY_CARD_INPUT_CLASS}
               />
 
               {typingFeedback ? (
@@ -1190,9 +1170,9 @@ function LibraryPracticePanel({
                 <button
                   type="button"
                   onClick={submitTypingPractice}
-                  className="rounded-xl bg-gray-700 px-4 py-2 text-sm font-semibold text-white"
+                  className={STUDY_CARD_CHECK_BUTTON_CLASS}
                 >
-                  Show answer
+                  {STUDY_CARD_CHECK_LABEL}
                 </button>
               )}
             </div>
@@ -1202,6 +1182,7 @@ function LibraryPracticePanel({
         <div className="relative flex min-h-[24rem] w-full max-w-3xl items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-2xl sm:min-h-[28rem]">
           <LibraryPracticeCardBadges
             modeLabel={practiceStudyModeLabel(practiceMode)}
+            modeTarget={modeTarget}
             jlpt={card.jlpt}
             colorDotClassName={libraryStudyDotClass(card.colorStatus)}
             colorName={libraryStudyColorName(card.colorStatus)}
@@ -1213,7 +1194,7 @@ function LibraryPracticePanel({
           />
 
           <div className="flex w-full flex-col items-center gap-5 pt-12 pb-10">
-            <div className="text-base font-black uppercase tracking-[0.16em] text-slate-600">
+            <div className={studyCardPromptClass(modeTarget)}>
               Choose {practicePromptLabel(practiceMode)}
             </div>
 
