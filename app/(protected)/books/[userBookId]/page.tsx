@@ -30,7 +30,8 @@ import TeacherPrepAssignBox from "./components/TeacherPrepAssignBox";
 import BookHubActionGrid from "./components/BookHubActionGrid";
 import BookFlagModal from "./components/BookFlagModal";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
-import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
+import { parseWordPosition, wordPositionPayload, wordPosition, wordPositionInput } from "@/lib/vocabulary/wordPosition";
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
 import { BOOK_TYPE_OPTIONS, bookTypeLabel as formatBookTypeLabel } from "@/lib/books/bookTypes";
 import { isValidAsin, normalizeAsin } from "@/lib/books/asin";
 import { isEnglishNativeTrackerBook as getIsEnglishNativeTrackerBook } from "@/lib/books/englishNativeTracker";
@@ -961,6 +962,7 @@ export default function BookHubPage() {
     useAlternateSurface: boolean;
     alternateSurface: string;
     page: string;
+    positionUnit?: ProgressTrackingMethod;
     chapterNumber: string;
     chapterName: string;
   } | null>(null);
@@ -972,6 +974,7 @@ export default function BookHubPage() {
       reading: string;
       meaning: string;
       page: string;
+    positionUnit?: ProgressTrackingMethod;
       chapterNumber: string;
       chapterName: string;
     }[]
@@ -984,6 +987,7 @@ export default function BookHubPage() {
     reading: string;
     meaning: string;
     page: string;
+    positionUnit?: ProgressTrackingMethod;
     chapterNumber: string;
     chapterName: string;
   } | null>(null);
@@ -1893,7 +1897,7 @@ export default function BookHubPage() {
   async function saveCharacter(item: Character) {
     if (!row?.id) return;
 
-    const parsedQuickPage = parseOptionalPageLocationInput(quickPreview.page, book?.page_count ?? null);
+    const parsedQuickPage = parseWordPosition(quickPreview.page, tracking.method ?? "page");
     if (parsedQuickPage.error) {
       alert(parsedQuickPage.error);
       return;
@@ -3498,14 +3502,24 @@ export default function BookHubPage() {
   }
 
   const loadUniqueLookupCount = async (id: string) => {
+    const fields = "surface, meaning, page_number, chapter_number, chapter_name, created_at";
     const { data, error } = await supabase
       .from("user_book_words")
-      .select("surface, meaning, page_number, chapter_number, chapter_name, created_at")
+      .select(fields)
       .eq("user_book_id", id)
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("Error loading lookup count:", error);
+      console.error("Error loading lookup count:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        table: "user_book_words",
+        select: fields,
+        userBookId: id,
+        order: "created_at descending",
+      });
       setUniqueLookupCount(null);
       setLastSavedWord("");
       setLastSavedWordPage(null);
@@ -3515,7 +3529,7 @@ export default function BookHubPage() {
 
     const rows = (data ?? []) as LookupRow[];
     const newestWord = rows.find((r) => (r.surface ?? "").trim() || (r.meaning ?? "").trim());
-    setLastSavedWord((newestWord?.surface ?? newestWord?.meaning ?? "").trim());
+    setLastSavedWord((newestWord?.surface ?? "").trim() || (newestWord?.meaning ?? "").trim());
     setLastSavedWordPage(newestWord?.page_number ?? null);
     const furthestChapterWord =
       rows
@@ -5147,7 +5161,7 @@ export default function BookHubPage() {
         isCustomMeaning: false,
         useAlternateSurface: false,
         alternateSurface: "",
-        page: defaultVocabPage || (furthestPage != null ? String(furthestPage + 1) : ""),
+        page: tracking.method === "page" ? defaultVocabPage || (furthestPage != null ? String(furthestPage + 1) : "") : "",
         chapterNumber: defaultChapterNumber,
         chapterName: defaultChapterName,
       });
@@ -5253,10 +5267,7 @@ export default function BookHubPage() {
       }
     }
 
-    const parsedQuickPage = parseOptionalPageLocationInput(
-      quickPreview.page,
-      book?.page_count ?? null
-    );
+    const parsedQuickPage = parseWordPosition(quickPreview.page, tracking.method ?? "page");
     if (parsedQuickPage.error) {
       alert(parsedQuickPage.error);
       return;
@@ -5272,7 +5283,7 @@ export default function BookHubPage() {
       meaning_choice_index: quickPreview.isCustomMeaning
         ? null
         : quickPreview.selectedMeaningIndex,
-      page_number: parsedQuickPage.value,
+      ...wordPositionPayload(parsedQuickPage.value, tracking.method ?? "page"),
       chapter_number: quickPreview.chapterNumber
         ? Number(quickPreview.chapterNumber)
         : null,
@@ -5283,7 +5294,7 @@ export default function BookHubPage() {
     const { data, error } = await supabase
       .from("user_book_words")
       .insert(payload)
-      .select("id, surface, reading, meaning, page_number, chapter_number, chapter_name, vocabulary_cache_id")
+      .select("id, surface, reading, meaning, page_number, position_unit, position_value, percent_location, chapter_number, chapter_name, vocabulary_cache_id")
       .single();
 
     if (error) {
@@ -5302,7 +5313,8 @@ export default function BookHubPage() {
         surface: data.surface ?? "",
         reading: data.reading ?? "",
         meaning: data.meaning ?? "",
-        page: data.page_number != null ? String(data.page_number) : "",
+        page: wordPositionInput(data),
+        positionUnit: wordPosition(data).unit,
         chapterNumber: data.chapter_number != null ? String(data.chapter_number) : "",
         chapterName: data.chapter_name ?? "",
       },
@@ -5342,10 +5354,7 @@ export default function BookHubPage() {
   async function saveEditedQuickSessionWord() {
     if (!editingQuickSessionWord) return;
 
-    const parsedQuickPage = parseOptionalPageLocationInput(
-      editingQuickSessionWord.page,
-      book?.page_count ?? null
-    );
+    const parsedQuickPage = parseWordPosition(editingQuickSessionWord.page, editingQuickSessionWord.positionUnit ?? "page");
     if (parsedQuickPage.error) {
       alert(parsedQuickPage.error);
       return;
@@ -5355,7 +5364,7 @@ export default function BookHubPage() {
       surface: editingQuickSessionWord.surface || null,
       reading: editingQuickSessionWord.reading || null,
       meaning: editingQuickSessionWord.meaning || null,
-      page_number: parsedQuickPage.value,
+      ...wordPositionPayload(parsedQuickPage.value, editingQuickSessionWord.positionUnit ?? "page"),
       chapter_number: editingQuickSessionWord.chapterNumber
         ? Number(editingQuickSessionWord.chapterNumber)
         : null,

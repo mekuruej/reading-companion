@@ -1,3 +1,5 @@
+import WordPositionField from "@/components/vocabulary/WordPositionField";
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
 type BookVocabEditFormBodyProps = {
   cacheSurface?: string | null;
 
@@ -7,6 +9,8 @@ type BookVocabEditFormBodyProps = {
   editMeaning: string;
   editChapterNum: string;
   editChapterName: string;
+  positionUnit: ProgressTrackingMethod;
+  onPositionUnitChange: (unit: ProgressTrackingMethod) => void;
   editPage: string;
   editMeaningChoices: unknown[];
   editMeaningChoiceIndex: number | null;
@@ -34,6 +38,8 @@ export default function BookVocabEditFormBody({
   editMeaning,
   editChapterNum,
   editChapterName,
+  positionUnit,
+  onPositionUnitChange,
   editPage,
   editMeaningChoices,
   editMeaningChoiceIndex,
@@ -163,16 +169,7 @@ export default function BookVocabEditFormBody({
         />
       </label>
 
-      <label className="flex flex-col gap-1">
-        <span className="text-xs text-gray-600">Page or %</span>
-        <input
-          value={editPage}
-          onChange={(e) => onEditPageChange(e.target.value)}
-          inputMode="decimal"
-          placeholder="p. 42 or 18%"
-          className="border p-2 rounded"
-        />
-      </label>
+      <WordPositionField value={editPage} unit={positionUnit} onChange={onEditPageChange} onUnitChange={onPositionUnitChange} />
 
       <label className="flex items-start gap-2 text-sm text-stone-700 sm:col-span-2">
         <input

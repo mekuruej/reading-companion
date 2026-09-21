@@ -1,9 +1,12 @@
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
+import { positionLabel } from "@/lib/vocabulary/wordPosition";
 import Link from "next/link";
 
 type WordDetailHeaderProps = {
   bookTitle: string;
   bookCover: string | null;
   chapter: string;
+  positionUnit?: ProgressTrackingMethod;
   pageNumber: number | null;
   bookHubHref: string;
   vocabListHref: string;
@@ -13,6 +16,7 @@ export default function WordDetailHeader({
   bookTitle,
   bookCover,
   chapter,
+  positionUnit = "page",
   pageNumber,
   bookHubHref,
   vocabListHref,
@@ -49,7 +53,7 @@ export default function WordDetailHeader({
             </div>
             <p className="mt-1 truncate text-sm text-stone-500">
               {chapter ? chapter : null}
-              {pageNumber != null ? ` • p. ${pageNumber}` : null}
+              {pageNumber != null ? ` • ${positionLabel(positionUnit)} ${pageNumber}` : null}
             </p>
           </div>
         </Link>

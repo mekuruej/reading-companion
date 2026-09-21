@@ -1,3 +1,5 @@
+import WordPositionField from "@/components/vocabulary/WordPositionField";
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
 import type { RefObject } from "react";
 import ChapterNameCombobox from "@/components/ChapterNameCombobox";
 
@@ -9,7 +11,6 @@ type CuriosityWordDetailPreview = {
   selectedMeaningIndex: number;
   meaning: string;
   isCustomMeaning: boolean;
-  percent?: string;
   page: string;
   chapterNumber: string;
   chapterName: string;
@@ -25,14 +26,13 @@ type CuriosityWordDetailFieldsProps = {
   onAlternateSurfaceChange: (value: string) => void;
   onMeaningChoiceChange: (index: number, meaning: string) => void;
   onCustomMeaningChange: (value: string) => void;
-  onPercentChange?: (value: string) => void;
+  positionUnit: ProgressTrackingMethod;
+  onPositionUnitChange?: (unit: ProgressTrackingMethod) => void;
   onPageChange: (value: string) => void;
   onChapterNumberChange: (value: string) => void;
   onChapterNameChange: (value: string) => void;
   onSaveWord: () => void;
   onClearWordFields: () => void;
-  locationLabel?: string;
-  locationHelpText?: string;
   saveAreaWarning?: string;
 };
 
@@ -46,14 +46,13 @@ export default function CuriosityWordDetailFields({
   onAlternateSurfaceChange,
   onMeaningChoiceChange,
   onCustomMeaningChange,
-  onPercentChange,
+  positionUnit,
+  onPositionUnitChange,
   onPageChange,
   onChapterNumberChange,
   onChapterNameChange,
   onSaveWord,
   onClearWordFields,
-  locationLabel = "Page",
-  locationHelpText,
   saveAreaWarning,
 }: CuriosityWordDetailFieldsProps) {
   return (
@@ -126,39 +125,8 @@ export default function CuriosityWordDetailFields({
         />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="block">
-          <span className="mb-1 block text-sm font-medium text-stone-700">
-            {locationLabel}
-          </span>
-          <input
-            type="number"
-            min={1}
-            step={1}
-            inputMode="numeric"
-            value={quickPreview.page}
-            onChange={(event) => onPageChange(event.target.value)}
-            placeholder="Page"
-            className="w-full rounded border bg-white px-3 py-2 text-sm"
-          />
-          {locationHelpText ? (
-            <span className="mt-1 block text-xs leading-5 text-stone-500">
-              {locationHelpText}
-            </span>
-          ) : null}
-        </label>
-
-        {onPercentChange ? (
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium text-stone-700">Percent</span>
-            <input type="number" min={0} max={100} step="any" inputMode="decimal"
-              value={quickPreview.percent ?? ""}
-              onChange={(event) => onPercentChange(event.target.value)}
-              placeholder="0–100%"
-              className="w-full rounded border bg-white px-3 py-2 text-sm" />
-            <span className="mt-1 block text-xs leading-5 text-stone-500">Optional. Saved separately from page.</span>
-          </label>
-        ) : null}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <WordPositionField value={quickPreview.page} unit={positionUnit} onChange={onPageChange} onUnitChange={isEditing ? onPositionUnitChange : undefined} />
 
         <ChapterNameCombobox
           value={quickPreview.chapterName}

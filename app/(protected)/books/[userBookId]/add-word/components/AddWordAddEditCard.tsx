@@ -2,10 +2,12 @@ import type { ReactNode } from "react";
 
 type AddWordAddEditCardProps = {
   children: ReactNode;
+  positionLabel?: string;
 };
 
 export default function AddWordAddEditCard({
   children,
+  positionLabel = "Page",
 }: AddWordAddEditCardProps) {
   return (
     <div className="mt-4 rounded-2xl border border-stone-300 bg-white p-4">
@@ -15,7 +17,7 @@ export default function AddWordAddEditCard({
         </div>
 
         <p className="mt-1 text-sm text-stone-600">
-          Search, adjust, and save from one place. Page and chapter stay ready
+          Search, adjust, and save from one place. {positionLabel} and chapter stay ready
           for the next word.
         </p>
       </div>

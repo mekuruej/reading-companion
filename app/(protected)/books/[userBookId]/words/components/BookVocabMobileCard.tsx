@@ -1,3 +1,5 @@
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
+import { positionLabel } from "@/lib/vocabulary/wordPosition";
 import { KeyboardEvent, useEffect, useState } from "react";
 import BookVocabKatakanaBadge from "./BookVocabKatakanaBadge";
 
@@ -6,6 +8,7 @@ type BookVocabMobileCardProps = {
   surface: string | null | undefined;
   reading: string | null | undefined;
   meaning: string | null | undefined;
+  positionUnit?: ProgressTrackingMethod;
   pageNumber: number | null | undefined;
   readOnly?: boolean;
   onPageChange?: (value: string) => void | Promise<void>;
@@ -24,6 +27,7 @@ export default function BookVocabMobileCard({
   surface,
   reading,
   meaning,
+  positionUnit = "page",
   pageNumber,
   readOnly = false,
   onPageChange,
@@ -113,13 +117,13 @@ export default function BookVocabMobileCard({
         {readOnly || !onPageChange ? (
           <div
             className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-black uppercase tracking-wide text-stone-500"
-            title="Words can be reordered within the same page"
+            title="Words can be reordered within the same position"
           >
-            Page {pageNumber ?? "—"}
+            {positionLabel(positionUnit)} {pageNumber ?? "—"}
           </div>
         ) : (
           <label className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs font-black uppercase tracking-wide text-stone-500">
-            Page
+            {positionLabel(positionUnit)}
             <input
               type="text"
               inputMode="decimal"
@@ -127,9 +131,9 @@ export default function BookVocabMobileCard({
               onChange={(event) => setPageDraft(event.target.value)}
               onBlur={() => void commitPage()}
               onKeyDown={handlePageKeyDown}
-              placeholder="%"
+              placeholder={positionLabel(positionUnit)}
               className="w-20 rounded-lg border border-stone-200 bg-white px-2 py-1 text-center text-sm font-semibold normal-case tracking-normal text-stone-700 focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-100"
-              aria-label="Page number or percent"
+              aria-label={positionLabel(positionUnit)}
             />
           </label>
         )}

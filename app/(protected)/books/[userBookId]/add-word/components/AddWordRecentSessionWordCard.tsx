@@ -1,7 +1,10 @@
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
+import { positionLabel } from "@/lib/vocabulary/wordPosition";
 import LibraryColorBadge from "@/components/LibraryColorBadge";
 import type { LibraryStudyWordColorInfo } from "@/lib/libraryStudyColorLookup";
 
 type AddWordRecentSessionWord = {
+  positionUnit?: ProgressTrackingMethod;
   id: string;
   surface: string;
   reading: string;
@@ -50,7 +53,7 @@ export default function AddWordRecentSessionWordCard({
 
           {showLocation ? (
             <div className="mt-1 text-xs text-stone-500">
-              Page {word.pageNumber || "—"} · Ch {word.chapterNumber || "—"} ·{" "}
+              {positionLabel(word.positionUnit ?? "page")} {word.pageNumber || "—"} · Ch {word.chapterNumber || "—"} ·{" "}
               {word.chapterName || "—"}
             </div>
           ) : null}

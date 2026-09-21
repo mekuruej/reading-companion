@@ -1,5 +1,7 @@
 "use client";
 
+import WordPositionField from "@/components/vocabulary/WordPositionField";
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
 import { type KeyboardEvent, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import {
@@ -22,6 +24,7 @@ export type JapaneseDictionaryCaptureValue = {
 };
 
 type JapaneseDictionaryCaptureProps = {
+  positionUnit?: ProgressTrackingMethod;
   title: string;
   description: string;
   saveLabel?: string;
@@ -64,6 +67,7 @@ function valueFromCandidate(candidate: JapaneseDictionaryCandidate): JapaneseDic
 }
 
 export default function JapaneseDictionaryCapture({
+  positionUnit = "page",
   title,
   description,
   saveLabel = "Save to Follow-Along",
@@ -306,10 +310,7 @@ export default function JapaneseDictionaryCapture({
           Optional location and Follow-Along note
         </summary>
         <div className="mt-3 grid gap-3 md:grid-cols-[120px_140px_minmax(0,1fr)]">
-          <label className="block">
-            <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-400">Page or %</span>
-            <input value={draft.pageNumber} onChange={(event) => setDraft((current) => ({ ...current, pageNumber: event.target.value }))} placeholder="p. 42 or 18%" className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm" />
-          </label>
+          <WordPositionField unit={positionUnit} value={draft.pageNumber} onChange={value => setDraft(current => ({ ...current, pageNumber: value }))} />
           <label className="block">
             <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-400">Chapter</span>
             <input value={draft.chapterNumber} onChange={(event) => setDraft((current) => ({ ...current, chapterNumber: event.target.value }))} className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm" />

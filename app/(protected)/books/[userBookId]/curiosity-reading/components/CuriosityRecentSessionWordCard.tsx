@@ -1,12 +1,14 @@
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
+import { positionLabel } from "@/lib/vocabulary/wordPosition";
 import LibraryColorBadge from "@/components/LibraryColorBadge";
 import type { LibraryStudyWordColorInfo } from "@/lib/libraryStudyColorLookup";
 
 type CuriosityRecentSessionWord = {
+  positionUnit?: ProgressTrackingMethod;
   id: string;
   surface: string;
   reading: string;
   meaning: string;
-  percent?: string;
   page: string;
   chapterNumber: string;
   chapterName: string;
@@ -49,9 +51,8 @@ export default function CuriosityRecentSessionWordCard({
 
           {showLocation ? (
             <div className="mt-1 text-xs text-stone-500">
-              Page {word.page || "—"} · Ch {word.chapterNumber || "—"} ·{" "}
+              {positionLabel(word.positionUnit ?? "page")} {word.page || "—"} · Ch {word.chapterNumber || "—"} ·{" "}
               {word.chapterName || "—"}
-              {word.percent ? ` · ${word.percent}%` : ""}
             </div>
           ) : null}
         </div>

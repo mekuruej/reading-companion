@@ -1,8 +1,12 @@
+import { wordPositionText, type WordPositionRecord } from "@/lib/vocabulary/wordPosition";
 type WordSeenInstanceItem = {
   id: string;
   books_title: string;
   meaning: string | null;
   meaning_choice_index: number | null;
+  position_unit?: WordPositionRecord["position_unit"];
+  position_value?: number | null;
+  percent_location?: number | null;
   page_number: number | null;
   chapter_number: number | null;
   chapter_name: string | null;
@@ -49,7 +53,7 @@ export default function WordSeenInSection({
 
                   <div className="mt-1 text-sm text-stone-600">
                     {chapterLabel ? chapterLabel : "No chapter"}
-                    {item.page_number != null ? ` • p. ${item.page_number}` : ""}
+                    {wordPositionText(item) ? ` • ${wordPositionText(item)}` : ""}
                   </div>
 
                   {item.meaning ? (

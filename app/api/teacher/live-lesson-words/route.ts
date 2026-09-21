@@ -1,3 +1,5 @@
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
+import { parseWordPosition, wordPosition, wordPositionPayload } from "@/lib/vocabulary/wordPosition";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
@@ -14,6 +16,7 @@ type ProfileRow = {
 };
 
 type AuthorizedBook = {
+  progress_tracking_method?: ProgressTrackingMethod | null;
   id: string;
   user_id: string;
   book_id: string;
@@ -52,6 +55,7 @@ type LiveLessonSessionRow = {
 };
 
 type LiveLessonWordUpdate = {
+  positionUnit?: ProgressTrackingMethod;
   id?: string;
   surface?: unknown;
   reading?: unknown;
@@ -209,7 +213,7 @@ async function authorizeTeacherForStudentBook({
       `
       id,
       user_id,
-      book_id,
+      book_id, progress_tracking_method,
       books:book_id (
         title,
         cover_url,
@@ -287,7 +291,8 @@ async function authorizeTeacherForStudentBook({
 async function nextPageOrder(
   userBookId: string,
   chapterNumber: number | null,
-  pageNumber: number | null
+  pageNumber: number | null,
+  unit: ProgressTrackingMethod
 ) {
   let query = supabaseAdmin
     .from("user_book_words")
@@ -301,8 +306,8 @@ async function nextPageOrder(
 
   query =
     pageNumber == null
-      ? query.is("page_number", null)
-      : query.eq("page_number", pageNumber);
+      ? query.eq("position_unit", unit).is("position_value", null)
+      : query.eq("position_unit", unit).eq("position_value", pageNumber);
 
   const { data, error } = await query;
   if (error) throw error;
@@ -320,7 +325,7 @@ function wordSelect() {
     surface,
     reading,
     meaning,
-    page_number,
+    page_number, position_unit, position_value, percent_location,
     page_order,
     chapter_number,
     chapter_name,
@@ -575,7 +580,6 @@ async function attachWordToSession({
 async function saveReviewWords({
   sessionId,
   userBookId,
-  pageCount,
   words,
   finalizeReadiness,
 }: {
@@ -602,6 +606,12 @@ async function saveReviewWords({
     const id = cleanString(word.id);
     if (!id || !allowedIds.has(id)) continue;
 
+    const { data: savedWord, error: savedError } = await supabaseAdmin.from("user_book_words").select("position_unit,position_value,page_number,percent_location").eq("id", id).eq("user_book_id", userBookId).single();
+    if (savedError) throw savedError;
+    const unit = word.positionUnit ?? wordPosition(savedWord).unit;
+    if (!["page", "kindle_location", "percent"].includes(unit)) throw new Error("Invalid position unit");
+    const parsedPosition = parseWordPosition(word.page_number ?? word.pageNumber, unit);
+    if (parsedPosition.error) throw new Error(parsedPosition.error);
     const surface = cleanString(word.surface);
     const targetLanguageCode = cleanString(
       word.target_language_code ?? word.targetLanguageCode
@@ -617,7 +627,7 @@ async function saveReviewWords({
       meaning_choice_index: nullableNonNegativeInt(
         word.meaning_choice_index ?? word.meaningChoiceIndex
       ),
-      page_number: parsePageLocationForBook(word.page_number ?? word.pageNumber, pageCount),
+      ...wordPositionPayload(parsedPosition.value, unit),
       chapter_number: toNullableInt(word.chapter_number ?? word.chapterNumber),
       chapter_name: nullableText(word.chapter_name ?? word.chapterName),
     };
@@ -826,7 +836,11 @@ export async function POST(req: Request) {
     const targetLanguageCode =
       access.userBook.books?.language_code?.trim() || "ja";
     const supportLanguageCode = supportLanguageForTarget(targetLanguageCode);
-    const pageNumber = parsePageLocationForBook(body?.page, access.userBook.books?.page_count ?? null);
+    const unit = access.userBook.progress_tracking_method ?? "page";
+    if (body?.positionUnit && body.positionUnit !== unit) return NextResponse.json({ error: "The reader changed tracking methods. Reload before entering a position." }, { status: 409 });
+    const parsedPosition = parseWordPosition(body?.page, unit);
+    if (parsedPosition.error) return NextResponse.json({ error: parsedPosition.error }, { status: 400 });
+    const pageNumber = parsedPosition.value;
     const chapterNumber = toNullableInt(body?.chapterNumber);
     const chapterName = cleanString(body?.chapterName) || null;
 
@@ -847,8 +861,8 @@ export async function POST(req: Request) {
       meaning_choice_index: null,
       jlpt: null,
       is_common: null,
-      page_number: pageNumber,
-      page_order: await nextPageOrder(userBookId, chapterNumber, pageNumber),
+      ...wordPositionPayload(pageNumber, unit),
+      page_order: await nextPageOrder(userBookId, chapterNumber, pageNumber, unit),
       chapter_number: chapterNumber,
       chapter_name: chapterName,
       hidden: false,

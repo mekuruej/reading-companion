@@ -6,6 +6,8 @@
 
 "use client";
 
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
+import { wordPosition, wordPositionPayload, wordPositionText } from "@/lib/vocabulary/wordPosition";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import JapaneseDictionaryCapture, {
@@ -52,6 +54,9 @@ type TeacherFollowAlongItem = {
   surface_text: string | null;
   reading: string | null;
   meaning: string | null;
+  position_unit?: ProgressTrackingMethod | null;
+  position_value?: number | null;
+  percent_location?: number | null;
   page_number: number | null;
   page_order?: number | null;
   follow_along_order?: number | null;
@@ -71,6 +76,9 @@ type ReaderVocabWord = {
   surface: string | null;
   reading: string | null;
   meaning: string | null;
+  position_unit?: ProgressTrackingMethod | null;
+  position_value?: number | null;
+  percent_location?: number | null;
   page_number: number | null;
   page_order?: number | null;
   chapter_number?: number | null;
@@ -86,6 +94,9 @@ type TeachingVocabWord = {
   surface: string | null;
   reading: string | null;
   meaning: string | null;
+  position_unit?: ProgressTrackingMethod | null;
+  position_value?: number | null;
+  percent_location?: number | null;
   page_number: number | null;
   page_order?: number | null;
   follow_along_order?: number | null;
@@ -106,6 +117,9 @@ type TeacherBookItem = {
   surface_text: string | null;
   reading: string | null;
   meaning: string | null;
+  position_unit?: ProgressTrackingMethod | null;
+  position_value?: number | null;
+  percent_location?: number | null;
   page_number: number | null;
   page_order?: number | null;
   chapter_number?: number | null;
@@ -203,6 +217,7 @@ function readerWordToFollowAlongItem(word: ReaderVocabWord): TeacherFollowAlongI
     reading: word.reading,
     meaning: word.meaning,
     page_number: word.page_number,
+    position_unit: word.position_unit, position_value: word.position_value, percent_location: word.percent_location,
     page_order: word.page_order,
     follow_along_order: null,
     chapter_number: word.chapter_number,
@@ -227,6 +242,7 @@ function teachingVocabToFollowAlongItem(word: TeachingVocabWord): TeacherFollowA
     reading: word.reading,
     meaning: word.meaning,
     page_number: word.page_number,
+    position_unit: word.position_unit, position_value: word.position_value, percent_location: word.percent_location,
     page_order: word.page_order,
     follow_along_order: word.follow_along_order ?? null,
     chapter_number: word.chapter_number,
@@ -250,7 +266,7 @@ function sharedVocabularyToFollowAlongItem(word: SharedTeacherVocabularyWord): T
     surface_text: word.surface,
     reading: word.reading,
     meaning: word.meaning,
-    page_number: word.pageNumber,
+    ...wordPositionPayload(word.pageNumber, word.positionUnit),
     page_order: word.pageOrder,
     follow_along_order: word.followAlongOrder,
     chapter_number: word.chapterNumber,
@@ -297,6 +313,7 @@ function teacherSupportToFollowAlongItem(item: TeacherBookItem): TeacherFollowAl
     reading: item.reading,
     meaning: item.meaning,
     page_number: item.page_number,
+    position_unit: item.position_unit, position_value: item.position_value, percent_location: item.percent_location,
     page_order: item.page_order,
     follow_along_order: null,
     chapter_number: item.chapter_number,
@@ -441,7 +458,7 @@ export function TeacherFollowAlongPanel({
         const { data: wordRows, error: wordError } = await supabase
           .from("user_book_words")
           .select(
-            "id, surface, reading, meaning, jlpt, meaning_choice_index, page_number, page_order, chapter_number, chapter_name, created_at"
+            "id, surface, reading, meaning, jlpt, meaning_choice_index, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, created_at"
           )
           .eq("user_book_id", loadedTeacherBook.user_book_id)
           .eq("hidden", false)
@@ -462,7 +479,7 @@ export function TeacherFollowAlongPanel({
         const { data: teachingVocabRows, error: teachingVocabError } = await supabase
           .from("teacher_book_vocabulary")
           .select(
-            "id, linked_user_book_word_id, surface, reading, meaning, page_number, page_order, follow_along_order, chapter_number, chapter_name, follow_along_support_note, hidden_from_teaching, included_in_follow_along, origin_my_library, origin_teaching, meaning_choice_index, created_at"
+            "id, linked_user_book_word_id, surface, reading, meaning, page_number, position_unit, position_value, percent_location, page_order, follow_along_order, chapter_number, chapter_name, follow_along_support_note, hidden_from_teaching, included_in_follow_along, origin_my_library, origin_teaching, meaning_choice_index, created_at"
           )
           .eq("teacher_book_id", teacherBookId)
           .order("follow_along_order", { ascending: true, nullsFirst: false })
@@ -491,7 +508,7 @@ export function TeacherFollowAlongPanel({
       const { data: itemRows, error: itemsError } = await supabase
         .from("teacher_book_items")
         .select(
-          "id, item_type, surface_text, reading, meaning, page_number, page_order, chapter_number, chapter_name, teacher_note, explanation, translation, support_url, created_at"
+          "id, item_type, surface_text, reading, meaning, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, teacher_note, explanation, translation, support_url, created_at"
         )
         .eq("teacher_book_id", teacherBookId)
         .neq("item_type", "word")
@@ -512,7 +529,7 @@ export function TeacherFollowAlongPanel({
         const { data: fallbackRows, error: fallbackError } = await supabase
           .from("teacher_book_items")
           .select(
-            "id, item_type, surface_text, reading, meaning, page_number, chapter_number, chapter_name, teacher_note, explanation, translation, created_at"
+            "id, item_type, surface_text, reading, meaning, page_number, position_unit, position_value, percent_location, chapter_number, chapter_name, teacher_note, explanation, translation, created_at"
           )
           .eq("teacher_book_id", teacherBookId)
           .neq("item_type", "word")
@@ -572,40 +589,19 @@ export function TeacherFollowAlongPanel({
 
   const pages = useMemo<PageChunk[]>(() => {
     const orderedItems = sortTeacherFollowAlongItems(items);
-    const numberedItems = orderedItems.filter((item) => item.page_number != null);
-    const unplacedItems = orderedItems.filter((item) => item.page_number == null);
-    const nextPages: PageChunk[] = [];
-
-    if (numberedItems.length > 0) {
-      const grouped = new Map<number, TeacherFollowAlongItem[]>();
-
-      for (const item of numberedItems) {
-        const page = item.page_number as number;
-        if (!grouped.has(page)) grouped.set(page, []);
-        grouped.get(page)!.push(item);
-      }
-
-      nextPages.push(
-        ...Array.from(grouped.keys())
-          .sort((a, b) => a - b)
-          .map((page) => ({
-            label: `Page ${page}`,
-            items: grouped.get(page) ?? [],
-            pageNumber: page,
-          }))
-      );
+    const grouped = new Map<string, TeacherFollowAlongItem[]>();
+    const unplaced: TeacherFollowAlongItem[] = [];
+    for (const item of orderedItems) {
+      const label = wordPositionText(item);
+      if (!label) { unplaced.push(item); continue; }
+      grouped.set(label, [...(grouped.get(label) ?? []), item]);
     }
-
-    if (unplacedItems.length > 0) {
-      nextPages.push(
-        ...chunkArray(unplacedItems, 8).map((chunk, index) => ({
-          label: numberedItems.length > 0 ? `Unplaced ${index + 1}` : `Section ${index + 1}`,
-          items: chunk,
-          pageNumber: null,
-        }))
-      );
-    }
-
+    const nextPages: PageChunk[] = [...grouped].sort(([, a], [, b]) => wordPosition(a[0]).unit.localeCompare(wordPosition(b[0]).unit) || (wordPosition(a[0]).value ?? 0) - (wordPosition(b[0]).value ?? 0)).map(([label, items]) => ({
+      label, items, pageNumber: wordPosition(items[0]).value,
+    }));
+    nextPages.push(...chunkArray(unplaced, 8).map((items, index) => ({
+      label: `Unplaced ${index + 1}`, items, pageNumber: null,
+    })));
     return nextPages;
   }, [items]);
 
@@ -636,7 +632,7 @@ export function TeacherFollowAlongPanel({
   }, []);
 
   function jumpToPage(pageNumber: number) {
-    const matchIndex = pages.findIndex((page) => page.pageNumber === pageNumber);
+    const matchIndex = pages.findIndex((page) => page.pageNumber === pageNumber && page.label.split(" ")[0] === currentPage?.label.split(" ")[0]);
     if (matchIndex >= 0) {
       setPageIndex(matchIndex);
       setJumpPageInput(String(pageNumber));
@@ -795,6 +791,8 @@ export function TeacherFollowAlongPanel({
 
         <div className="mt-4 rounded-2xl border border-blue-100 bg-white p-3">
           <JapaneseDictionaryCapture
+            key={teacherVocabContext?.positionUnit ?? "page"}
+            positionUnit={teacherVocabContext?.positionUnit ?? "page"}
             title="Add a lesson word"
             description="Search, choose the meaning, and add the word to this Follow-Along list without changing My Library."
             saveLabel="Add to Follow-Along"

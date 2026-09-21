@@ -26,7 +26,7 @@ export default function BookVocabTableHeader({
           style={headerStickyStyle}
           title="Words can be reordered within the same page"
         >
-          Page
+          Position
         </th>
 
         <th

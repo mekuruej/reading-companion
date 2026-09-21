@@ -1,4 +1,5 @@
 type ReadAlongPageNavigatorProps = {
+  positionLabel?: string;
   pageIndex: number;
   pageCount: number;
   jumpPageInput: string;
@@ -12,6 +13,7 @@ type ReadAlongPageNavigatorProps = {
 // page.tsx still owns pageIndex, URL/page-jump behavior, and keyboard navigation;
 // this component only renders the buttons/input and calls the page-owned callbacks.
 export default function ReadAlongPageNavigator({
+  positionLabel = "Position",
   pageIndex,
   pageCount,
   jumpPageInput,
@@ -38,7 +40,8 @@ export default function ReadAlongPageNavigator({
       <div className="flex items-center gap-2">
         <input
           type="number"
-          min={1}
+          min={0}
+          step={positionLabel === "Percent" ? "any" : 1}
           value={jumpPageInput}
           onChange={(e) => onJumpPageInputChange(e.target.value)}
           onKeyDown={(e) => {
@@ -47,7 +50,7 @@ export default function ReadAlongPageNavigator({
               onJumpToPage(Number(jumpPageInput));
             }
           }}
-          placeholder="Page"
+          placeholder={positionLabel}
           className="w-20 rounded-lg border border-stone-300 px-2 py-1 text-sm"
         />
 

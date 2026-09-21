@@ -1,9 +1,12 @@
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
+import { positionLabel } from "@/lib/vocabulary/wordPosition";
 import ChapterNameCombobox from "@/components/ChapterNameCombobox";
 
 type BulkFieldName = "page" | "chapterNumber" | "chapterName";
 type BulkApplyMode = "blank" | "all";
 
 type TeacherPrepBulkFieldsPanelProps = {
+  positionUnit: ProgressTrackingMethod;
   pageNumber: string;
   onPageNumberChange: (value: string) => void;
   chapterNumber: string;
@@ -63,6 +66,7 @@ function BulkFieldInput({
 }
 
 export default function TeacherPrepBulkFieldsPanel({
+  positionUnit,
   pageNumber,
   onPageNumberChange,
   chapterNumber,
@@ -79,7 +83,7 @@ export default function TeacherPrepBulkFieldsPanel({
 
       <div className="mt-3 grid gap-3 md:grid-cols-3">
         <BulkFieldInput
-          label="Page or %"
+          label={positionLabel(positionUnit)}
           value={pageNumber}
           onChange={onPageNumberChange}
           field="page"

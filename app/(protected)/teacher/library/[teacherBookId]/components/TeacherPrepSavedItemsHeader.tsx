@@ -5,7 +5,7 @@ type TeacherPrepSavedItemsHeaderProps = {
   onSearchChange: (value: string) => void;
   pageFilter: string;
   onPageFilterChange: (value: string) => void;
-  pageOptions: number[];
+  pageOptions: string[];
 };
 
 export default function TeacherPrepSavedItemsHeader({
@@ -53,10 +53,10 @@ export default function TeacherPrepSavedItemsHeader({
               onChange={(event) => onPageFilterChange(event.target.value)}
               className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
             >
-              <option value="all">All pages</option>
+              <option value="all">All positions</option>
               {pageOptions.map((page) => (
                 <option key={page} value={String(page)}>
-                  Page {page}
+                  {page}
                 </option>
               ))}
             </select>

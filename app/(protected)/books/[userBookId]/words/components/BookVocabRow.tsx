@@ -1,3 +1,4 @@
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
 import BookVocabActionsCell from "./BookVocabActionsCell";
 import BookVocabKatakanaBadge from "./BookVocabKatakanaBadge";
 import BookVocabPageCell from "./BookVocabPageCell";
@@ -7,6 +8,7 @@ type BookVocabRowProps = {
   surface: string | null | undefined;
   reading: string | null | undefined;
   meaning: string | null | undefined;
+  positionUnit?: ProgressTrackingMethod;
   pageNumber: number | null | undefined;
   readOnly?: boolean;
   onPageChange?: (value: string) => void | Promise<void>;
@@ -28,6 +30,7 @@ export default function BookVocabRow({
   surface,
   reading,
   meaning,
+  positionUnit = "page",
   pageNumber,
   readOnly = false,
   onPageChange,
@@ -66,6 +69,7 @@ export default function BookVocabRow({
       </td>
 
       <BookVocabPageCell
+        positionUnit={positionUnit}
         pageNumber={pageNumber}
         readOnly={readOnly}
         onPageChange={onPageChange}

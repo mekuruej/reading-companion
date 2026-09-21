@@ -1,3 +1,4 @@
+import { wordPositionText, type WordPositionRecord } from "@/lib/vocabulary/wordPosition";
 type SeenInstance = {
   id: string;
   meaning: string | null;
@@ -5,6 +6,9 @@ type SeenInstance = {
   meaning_choice_index: number | null;
   chapter_number: number | null;
   chapter_name: string | null;
+  position_unit?: WordPositionRecord["position_unit"];
+  position_value?: number | null;
+  percent_location?: number | null;
   page_number: number | null;
 };
 
@@ -48,8 +52,8 @@ export default function SeenInstancesPanel({
               <div key={instance.id} className="rounded-xl border p-3">
                 <div className="text-sm text-stone-600">
                   {chapter ? chapter : "No chapter"}
-                  {instance.page_number != null
-                    ? ` • p. ${instance.page_number}`
+                  {wordPositionText(instance)
+                    ? ` • ${wordPositionText(instance)}`
                     : ""}
                 </div>
 

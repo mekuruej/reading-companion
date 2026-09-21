@@ -8,7 +8,10 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
+import { parseWordPosition, wordPosition, wordPositionInput, positionLabel, wordPositionText } from "@/lib/vocabulary/wordPosition";
 import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
+import WordPositionField from "@/components/vocabulary/WordPositionField";
 import { TeacherFollowAlongPanel } from "../../../../../library/[teacherBookId]/follow/components/TeacherFollowAlongPanel";
 
 type StudentProfile = {
@@ -28,6 +31,7 @@ type BookMeta = {
 };
 
 type StudentUserBook = {
+  progress_tracking_method?: ProgressTrackingMethod | null;
   id: string;
   user_id: string;
   book_id: string;
@@ -61,6 +65,9 @@ type LiveLessonSession = {
 };
 
 type CapturedWord = {
+  position_unit?: ProgressTrackingMethod | null;
+  position_value?: number | null;
+  percent_location?: number | null;
   id: string;
   vocabulary_cache_id?: number | null;
   surface: string | null;
@@ -83,6 +90,7 @@ type CapturedWord = {
 };
 
 type ReviewDraft = {
+  positionUnit: ProgressTrackingMethod;
   id: string;
   surface: string;
   reading: string;
@@ -133,6 +141,7 @@ type ChapterSuggestion = {
 const INITIAL_DICTIONARY_CHOICE_LIMIT = 2;
 
 type PersistedLiveLessonSession = {
+  positionUnit?: ProgressTrackingMethod;
   version: 1;
   teacherId: string;
   studentId: string;
@@ -316,6 +325,7 @@ function readPersistedSession(
         ? uniqueStrings(parsed.capturedRowIds)
         : [],
       currentPage: typeof parsed.currentPage === "string" ? parsed.currentPage : "",
+      positionUnit: parsed.positionUnit,
       chapterNumber:
         typeof parsed.chapterNumber === "string" ? parsed.chapterNumber : "",
       chapterName: typeof parsed.chapterName === "string" ? parsed.chapterName : "",
@@ -365,7 +375,8 @@ function wordToDraft(word: CapturedWord): ReviewDraft {
     meaningChoices: Array.isArray(word.meaning_choices) ? word.meaning_choices : [],
     meaningChoiceIndex:
       typeof word.meaning_choice_index === "number" ? word.meaning_choice_index : null,
-    pageNumber: toInputNumber(word.page_number),
+    pageNumber: wordPositionInput(word),
+    positionUnit: wordPosition(word).unit,
     chapterNumber: toInputNumber(word.chapter_number),
     chapterName: word.chapter_name ?? "",
     targetLanguageCode: word.target_language_code ?? "ja",
@@ -412,6 +423,7 @@ export default function LiveLessonQuickAddPanel({
   const [teacherId, setTeacherId] = useState("");
   const [student, setStudent] = useState<StudentProfile | null>(null);
   const [studentBook, setStudentBook] = useState<StudentUserBook | null>(null);
+  const positionUnit = studentBook?.progress_tracking_method ?? "page";
   const [bookPageCount, setBookPageCount] = useState<number | null>(null);
   const [session, setSession] = useState<LiveLessonSession | null>(null);
   const [word, setWord] = useState("");
@@ -495,7 +507,8 @@ export default function LiveLessonQuickAddPanel({
     if (chapterManuallyEdited) return;
     if (chapterNumber.trim() || chapterName.trim()) return;
 
-    const parsedPage = parseOptionalPageLocationInput(currentPage, bookPageCount);
+    if (positionUnit !== "page") return;
+    const parsedPage = parseWordPosition(currentPage, positionUnit);
     const pageNumber = parsedPage.value;
     if (pageNumber == null) return;
 
@@ -521,7 +534,7 @@ export default function LiveLessonQuickAddPanel({
     chapterNumber,
     chapterSuggestions,
     currentPage,
-  ]);
+    positionUnit,  ]);
 
   useEffect(() => {
     if (!key || !sessionReady || session?.status !== "capturing") return;
@@ -538,6 +551,7 @@ export default function LiveLessonQuickAddPanel({
       userBookId,
       capturedRowIds: capturedIds,
       currentPage,
+      positionUnit,
       chapterNumber,
       chapterName,
       startedAt,
@@ -552,7 +566,7 @@ export default function LiveLessonQuickAddPanel({
     userBookId,
     capturedIds,
     currentPage,
-    chapterNumber,
+    positionUnit,    chapterNumber,
     chapterName,
     startedAt,
   ]);
@@ -729,7 +743,7 @@ export default function LiveLessonQuickAddPanel({
           `
           id,
           user_id,
-          book_id,
+          book_id, progress_tracking_method,
           books:book_id (
             id,
             title,
@@ -814,14 +828,14 @@ export default function LiveLessonQuickAddPanel({
 
       if (!restored.session && persisted && persisted.capturedRowIds.length > 0) {
         restored = await migrateLocalSession(persisted, nextKey);
-        setCurrentPage(persisted.currentPage);
+        setCurrentPage(persisted.positionUnit === (loadedStudentBook.progress_tracking_method ?? "page") ? persisted.currentPage : "");
         setChapterNumber(persisted.chapterNumber);
         setChapterName(persisted.chapterName);
         setChapterManuallyEdited(Boolean(persisted.chapterNumber.trim() || persisted.chapterName.trim()));
         setStartedAt(persisted.startedAt);
         setRestoredOlderSession(isOlderSession(persisted.savedAt));
       } else if (persisted && !restored.session) {
-        setCurrentPage(persisted.currentPage);
+        setCurrentPage(persisted.positionUnit === (loadedStudentBook.progress_tracking_method ?? "page") ? persisted.currentPage : "");
         setChapterNumber(persisted.chapterNumber);
         setChapterName(persisted.chapterName);
         setChapterManuallyEdited(Boolean(persisted.chapterNumber.trim() || persisted.chapterName.trim()));
@@ -854,13 +868,13 @@ export default function LiveLessonQuickAddPanel({
   }
 
   function nudgePage(delta: number) {
-    const value = parseOptionalPageLocationInput(currentPage, bookPageCount).value;
+    const value = parseWordPosition(currentPage, positionUnit).value;
     if (!Number.isFinite(value)) {
       if (delta > 0) setCurrentPage("1");
       return;
     }
 
-    setCurrentPage(String(Math.max(1, value + delta)));
+    setCurrentPage(String(Math.min(positionUnit === "percent" ? 100 : Infinity, Math.max(0, (value ?? 0) + delta))));
   }
 
   function applyChapterSuggestion(suggestionKey: string) {
@@ -898,6 +912,7 @@ export default function LiveLessonQuickAddPanel({
           sessionId: session?.id,
           surface: cleanWord,
           page: currentPage,
+          positionUnit,
           chapterNumber,
           chapterName,
         }),
@@ -994,7 +1009,7 @@ export default function LiveLessonQuickAddPanel({
         if (!bulkSelectedIds.includes(draft.id)) return draft;
         return {
           ...draft,
-          ...(bulkPage.trim() ? { pageNumber: bulkPage } : {}),
+          ...(bulkPage.trim() ? { pageNumber: bulkPage, positionUnit } : {}),
           ...(bulkChapterNumber.trim() ? { chapterNumber: bulkChapterNumber } : {}),
           ...(bulkChapterName.trim() ? { chapterName: bulkChapterName } : {}),
         };
@@ -1016,7 +1031,7 @@ export default function LiveLessonQuickAddPanel({
 
     setMessage("");
     setNotice("");
-    setStoppingPageDraft(currentPage);
+    setStoppingPageDraft(positionUnit === "page" ? currentPage : "");
     setStoppingTextDraft("");
     setCheckpointOpen(true);
   }
@@ -1468,14 +1483,14 @@ export default function LiveLessonQuickAddPanel({
 
                 <label className="block">
                   <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-stone-500">
-                    Current page or %
+                    Current {positionLabel(positionUnit).toLowerCase()}
                   </span>
                   <div className="flex rounded-xl border border-amber-300 bg-amber-50 p-1 shadow-sm">
                     <button
                       type="button"
                       onClick={() => nudgePage(-1)}
                       className="h-11 w-11 rounded-lg bg-white text-xl font-black text-stone-800 shadow-sm hover:bg-amber-100"
-                      aria-label="Previous page"
+                      aria-label={`Previous ${positionLabel(positionUnit).toLowerCase()}`}
                     >
                       -
                     </button>
@@ -1484,14 +1499,14 @@ export default function LiveLessonQuickAddPanel({
                       inputMode="decimal"
                       value={currentPage}
                       onChange={(event) => setCurrentPage(event.target.value)}
-                      placeholder="Page or %"
+                      placeholder={positionLabel(positionUnit)}
                       className="min-w-0 flex-1 bg-transparent px-2 text-center text-2xl font-black text-stone-950 outline-none"
                     />
                     <button
                       type="button"
                       onClick={() => nudgePage(1)}
                       className="h-11 w-11 rounded-lg bg-white text-xl font-black text-stone-800 shadow-sm hover:bg-amber-100"
-                      aria-label="Next page"
+                      aria-label={`Next ${positionLabel(positionUnit).toLowerCase()}`}
                     >
                       +
                     </button>
@@ -1551,7 +1566,7 @@ export default function LiveLessonQuickAddPanel({
 
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-stone-600">
                   <span className="rounded-full bg-amber-100 px-3 py-1 font-semibold text-amber-900">
-                    Page {currentPage.trim() || "not set"}
+                    {positionLabel(positionUnit)} {currentPage.trim() || "not set"}
                   </span>
                   <span className="rounded-full bg-stone-100 px-3 py-1 font-semibold text-stone-700">
                     Chapter # {chapterNumber.trim() || "not set"}
@@ -1611,19 +1626,7 @@ export default function LiveLessonQuickAddPanel({
             {session?.status !== "completed" ? (
               <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-3">
                 <div className="flex flex-wrap items-end gap-3">
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-sky-900">
-                      Page or %
-                    </span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={bulkPage}
-                      onChange={(event) => setBulkPage(event.target.value)}
-                      placeholder="p. 42 or 18%"
-                      className="w-28 rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm"
-                    />
-                  </label>
+                  <WordPositionField value={bulkPage} unit={positionUnit} onChange={setBulkPage} />
                   <label className="block">
                     <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-sky-900">
                       Chapter #
@@ -1791,22 +1794,7 @@ export default function LiveLessonQuickAddPanel({
                       </div>
 
                       <div className="mt-3 grid gap-3 md:grid-cols-3">
-                        <label className="block">
-                          <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-stone-500">
-                            Page or %
-                          </span>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={draft.pageNumber}
-                            onChange={(event) =>
-                              updateReviewDraft(draft.id, { pageNumber: event.target.value })
-                            }
-                            disabled={isCompleted}
-                            placeholder="p. 42 or 18%"
-                            className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm disabled:bg-stone-100"
-                          />
-                        </label>
+                        <WordPositionField value={draft.pageNumber} unit={draft.positionUnit} disabled={isCompleted} onChange={value => updateReviewDraft(draft.id, { pageNumber: value })} onUnitChange={unit => updateReviewDraft(draft.id, { positionUnit: unit })} />
                         <label className="block">
                           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-stone-500">
                             Chapter number
@@ -1954,7 +1942,7 @@ function CapturedList({
                     ) : null}
                   </div>
                   <p className="mt-1 text-sm text-stone-500">
-                    Page {toInputNumber(capturedWord.page_number) || "-"}
+                    {wordPositionText(capturedWord) || "No position"}
                     {" - "}
                     Chapter # {toInputNumber(capturedWord.chapter_number) || "-"}
                     {" - "}

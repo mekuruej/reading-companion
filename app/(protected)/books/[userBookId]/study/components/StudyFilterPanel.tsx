@@ -75,8 +75,8 @@ function chapterSummary(
 }
 
 function pageSummary(pageFilter: string) {
-  if (pageFilter === "all") return "All pages";
-  return `Page ${pageFilter}`;
+  if (pageFilter === "all") return "All positions";
+  return /^\d+$/.test(pageFilter) ? `Page ${pageFilter}` : pageFilter;
 }
 
 type StudyFilterPanelProps = {
@@ -87,7 +87,7 @@ type StudyFilterPanelProps = {
   chapterFilter: string;
   chapterOptions: { value: string; label: string }[];
   pageFilter: string;
-  pageOptions: number[];
+  pageOptions: string[];
   repeatsOnly: boolean;
   onToggleJlpt: (level: string) => void;
   onSelectAllJlpt: () => void;
@@ -189,16 +189,16 @@ export default function StudyFilterPanel({
                 </label>
 
                 <label className="block">
-                  <span className="sr-only">Page</span>
+                  <span className="sr-only">Position</span>
                   <select
                     value={pageFilter}
                     onChange={(event) => onPageFilterChange(event.target.value)}
                     className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   >
-                    <option value="all">All pages</option>
+                    <option value="all">All positions</option>
                     {pageOptions.map((page) => (
                       <option key={page} value={String(page)}>
-                        Page {page}
+                        {page}
                       </option>
                     ))}
                   </select>

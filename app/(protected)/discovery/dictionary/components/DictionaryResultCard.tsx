@@ -36,6 +36,7 @@ type DictionaryPersonalHistoryItem = {
   userBookId: string;
   meaning: string | null;
   meaningChoiceIndex: number | null;
+  positionText?: string;
   pageNumber: number | null;
   chapterNumber: number | null;
   chapterName: string | null;
@@ -147,7 +148,7 @@ export default function DictionaryResultCard({
                 const chapter = chapterDisplay(item.chapterNumber, item.chapterName);
                 const location = [
                   chapter || null,
-                  item.pageNumber != null ? `p. ${item.pageNumber}` : null,
+                  item.positionText || null,
                 ].filter(Boolean).join(" · ");
 
                 return (

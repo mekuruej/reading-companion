@@ -1,4 +1,7 @@
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
+import { positionLabel } from "@/lib/vocabulary/wordPosition";
 type BulkColumnPastePanelProps = {
+  positionUnit: ProgressTrackingMethod;
   bulkPageList: string;
   bulkChapterNumberList: string;
   bulkChapterNameList: string;
@@ -14,6 +17,7 @@ type BulkColumnPastePanelProps = {
 };
 
 export default function BulkColumnPastePanel({
+  positionUnit,
   bulkPageList,
   bulkChapterNumberList,
   bulkChapterNameList,
@@ -32,7 +36,7 @@ export default function BulkColumnPastePanel({
 
       <div className="space-y-4">
         <div>
-          <div className="mb-1 text-sm font-medium text-gray-700">Page or % values</div>
+          <div className="mb-1 text-sm font-medium text-gray-700">{positionLabel(positionUnit)} values</div>
           <textarea
             value={bulkPageList}
             onChange={(e) => onBulkPageListChange(e.target.value)}
@@ -46,7 +50,7 @@ export default function BulkColumnPastePanel({
               onClick={() => onApplyBulkColumnList("page", bulkPageList, "page-list")}
               className="rounded bg-blue-600 px-3 py-2 text-white hover:bg-blue-700"
             >
-              {recentAction === "page-list" ? "Added!" : "Apply page list"}
+              {recentAction === "page-list" ? "Added!" : `Apply ${positionLabel(positionUnit).toLowerCase()} list`}
             </button>
           </div>
         </div>

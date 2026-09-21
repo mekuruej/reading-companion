@@ -1,5 +1,6 @@
 "use client";
 
+import { positionLabel } from "@/lib/vocabulary/wordPosition";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -170,6 +171,8 @@ export default function TeacherVocabularyPage() {
 
         <div className="mt-5">
           <JapaneseDictionaryCapture
+            key={context?.positionUnit ?? "page"}
+            positionUnit={context?.positionUnit ?? "page"}
             title="Add a teaching word"
             description="Search dictionary candidates, choose the meaning that fits this book, and save it directly into Follow-Along."
             onSave={saveCapturedWord}
@@ -215,7 +218,7 @@ export default function TeacherVocabularyPage() {
                   </div>
                   <p className="mt-3 text-sm leading-6 text-stone-700">{word.meaning || "No meaning saved."}</p>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs font-black text-stone-500">
-                    {word.pageNumber != null ? <span>p. {word.pageNumber}</span> : null}
+                    {word.pageNumber != null ? <span>{positionLabel(word.positionUnit)} {word.pageNumber}</span> : null}
                     {word.includedInFollowAlong ? <span className="text-blue-700">In Follow-Along</span> : null}
                     {!word.includedInFollowAlong ? <span>Not in Follow-Along</span> : null}
                     {word.hiddenFromTeaching ? <span className="text-rose-700">Hidden from Teaching</span> : null}

@@ -1,3 +1,5 @@
+import WordPositionField from "@/components/vocabulary/WordPositionField";
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
 import type { RefObject } from "react";
 import ChapterNameCombobox from "@/components/ChapterNameCombobox";
 
@@ -8,6 +10,8 @@ type AddWordDetailFieldsProps = {
   meaning: string;
   meaningChoices: string[];
   meaningChoiceIndex: number | null;
+  positionUnit: ProgressTrackingMethod;
+  onPositionUnitChange?: (unit: ProgressTrackingMethod) => void;
   pageNumber: string;
   chapterNumber: string;
   chapterName: string;
@@ -36,6 +40,8 @@ export default function AddWordDetailFields({
   meaning,
   meaningChoices,
   meaningChoiceIndex,
+  positionUnit,
+  onPositionUnitChange,
   pageNumber,
   chapterNumber,
   chapterName,
@@ -129,19 +135,7 @@ export default function AddWordDetailFields({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <label className="block">
-          <span className="mb-1 block text-sm font-medium text-stone-700">
-            Page or %
-          </span>
-          <input
-            type="text"
-            inputMode="decimal"
-            value={pageNumber}
-            onChange={(event) => onPageNumberChange(event.target.value)}
-            placeholder="p. 42 or 18%"
-            className="w-full rounded border px-3 py-2 text-sm"
-          />
-        </label>
+        <WordPositionField value={pageNumber} unit={positionUnit} onChange={onPageNumberChange} onUnitChange={isEditing ? onPositionUnitChange : undefined} />
 
         <ChapterNameCombobox
           value={chapterName}

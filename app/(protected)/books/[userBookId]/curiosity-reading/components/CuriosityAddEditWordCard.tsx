@@ -9,7 +9,7 @@ type CuriosityAddEditWordCardProps = {
 export default function CuriosityAddEditWordCard({
   children,
   title = "Add / Edit Word",
-  description = "Search, adjust, and save from one place. Page and chapter stay ready for the next word.",
+  description = "Search, adjust, and save from one place. Position and chapter stay ready for the next word.",
 }: CuriosityAddEditWordCardProps) {
   return (
     <div className="mt-4 rounded-2xl border border-stone-300 bg-white p-4">

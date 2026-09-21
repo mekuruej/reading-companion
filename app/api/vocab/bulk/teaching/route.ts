@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
-import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
+import { parseWordPosition, wordPositionPayload } from "@/lib/vocabulary/wordPosition";
+
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -28,12 +30,14 @@ type LessonBookRow = {
         id: string;
         user_id: string;
         book_id: string;
+        progress_tracking_method?: ProgressTrackingMethod | null;
         books?: { page_count?: number | null } | { page_count?: number | null }[] | null;
       }
     | {
         id: string;
         user_id: string;
         book_id: string;
+        progress_tracking_method?: ProgressTrackingMethod | null;
         books?: { page_count?: number | null } | { page_count?: number | null }[] | null;
       }[]
     | null;
@@ -191,7 +195,7 @@ async function loadStudentDestinations(teacherId: string, bookId: string) {
         status,
         user_books:user_book_id (
           id,
-          user_id,
+          user_id, progress_tracking_method,
           book_id,
           books:book_id (
             page_count
@@ -247,6 +251,7 @@ async function loadStudentDestinations(teacherId: string, bookId: string) {
       userBookId: row.user_book_id,
       studentId: row.student_id,
       label: namesById.get(row.student_id) ?? "Student",
+      positionUnit: userBook?.progress_tracking_method ?? "page",
       pageCount: book?.page_count ?? null,
     };
   });
@@ -327,10 +332,12 @@ async function authorizeStudentDestination({
 }
 
 async function maxPageOrder({
+  unit,
   userBookId,
   chapterNumber,
   pageNumber,
 }: {
+  unit: ProgressTrackingMethod;
   userBookId: string;
   chapterNumber: number | null;
   pageNumber: number | null;
@@ -347,8 +354,8 @@ async function maxPageOrder({
 
   query =
     pageNumber == null
-      ? query.is("page_number", null)
-      : query.eq("page_number", pageNumber);
+      ? query.eq("position_unit", unit).is("position_value", null)
+      : query.eq("position_unit", unit).eq("position_value", pageNumber);
 
   const { data, error } = await query;
   if (error) throw error;
@@ -374,6 +381,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: source.error }, { status: source.status });
     }
 
+    const { data: sourceReader } = await supabaseAdmin.from("user_books").select("progress_tracking_method").eq("id", source.sourceUserBookId).single();
     const students = await loadStudentDestinations(auth.user.id, source.bookId);
     return NextResponse.json({
       destinations: [
@@ -381,6 +389,7 @@ export async function GET(req: Request) {
           type: "teacher",
           userBookId: source.sourceUserBookId,
           label: "My Teaching Vocabulary",
+          positionUnit: sourceReader?.progress_tracking_method ?? "page",
         },
         ...students,
       ],
@@ -430,9 +439,13 @@ export async function POST(req: Request) {
       );
     }
 
+    const { data: destinationBook, error: destinationBookError } = await supabaseAdmin.from("user_books").select("progress_tracking_method").eq("id", destination.userBookId).single();
+    if (destinationBookError) throw destinationBookError;
+    const unit: ProgressTrackingMethod = destinationBook.progress_tracking_method ?? "page";
+    if (body?.positionUnit && body.positionUnit !== unit) return NextResponse.json({ error: "This reader changed tracking methods. Reload before entering positions." }, { status: 409 });
     const today = new Date().toISOString().slice(0, 10);
     const itemsWithPages = rawItems.map((item: any, index: number) => {
-      const parsedPage = parseOptionalPageLocationInput(item?.page, destination.pageCount);
+      const parsedPage = parseWordPosition(item?.page, unit);
       if (parsedPage.error) {
         throw new Error(`Word ${index + 1}: ${parsedPage.error}`);
       }
@@ -456,6 +469,7 @@ export async function POST(req: Request) {
       nextOrderByCombo.set(
         key,
         await maxPageOrder({
+          unit,
           userBookId: destination.userBookId,
           chapterNumber,
           pageNumber,
@@ -482,7 +496,7 @@ export async function POST(req: Request) {
           item?.meaningChoiceIndex == null ? null : Number(item.meaningChoiceIndex),
         jlpt: normalizeJlpt(cleanString(item?.jlpt)),
         is_common: booleanValue(item?.isCommon),
-        page_number: pageNumber,
+        ...wordPositionPayload(pageNumber, unit),
         page_order: nextPageOrder,
         chapter_number: chapterNumber,
         chapter_name: cleanString(item?.chapterName) || null,

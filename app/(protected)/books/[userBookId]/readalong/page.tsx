@@ -2,6 +2,8 @@
 // 
 
 "use client";
+import WordPositionField from "@/components/vocabulary/WordPositionField";
+import { wordPosition, wordPositionText, wordPositionPayload, wordPositionInput, parseWordPosition, type WordPositionRecord } from "@/lib/vocabulary/wordPosition";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
 import { matchingTotal, parseProgressRange, sessionEnd } from "@/lib/books/readingProgress";
 
@@ -57,6 +59,9 @@ type ReadAlongWord = {
     meaning: string | null;
     jlpt?: string | null;
     meaning_choice_index?: number | null;
+    position_unit?: WordPositionRecord["position_unit"];
+    position_value?: number | null;
+    percent_location?: number | null;
     page_number: number | null;
     page_order: number | null;
     chapter_number: number | null;
@@ -96,6 +101,7 @@ type PageChunk = {
     label: string;
     words: ReadAlongWord[];
     pageNumber?: number | null;
+    positionUnit?: WordPositionRecord["position_unit"];
 };
 
 function chunkArray<T>(arr: T[], size: number) {
@@ -252,13 +258,13 @@ function hasKanji(text: string) {
 }
 
 function sameWordOrderGroup(
-    a: Pick<ReadAlongWord, "chapter_number" | "chapter_name" | "page_number">,
-    b: Pick<ReadAlongWord, "chapter_number" | "chapter_name" | "page_number">
+    a: Pick<ReadAlongWord, "chapter_number" | "chapter_name" | "page_number" | "position_unit" | "position_value" | "percent_location">,
+    b: Pick<ReadAlongWord, "chapter_number" | "chapter_name" | "page_number" | "position_unit" | "position_value" | "percent_location">
 ) {
     return (
         (a.chapter_number ?? null) === (b.chapter_number ?? null) &&
         (a.chapter_name ?? "").trim() === (b.chapter_name ?? "").trim() &&
-        (a.page_number ?? null) === (b.page_number ?? null)
+        wordPosition(a).unit === wordPosition(b).unit && wordPosition(a).value === wordPosition(b).value
     );
 }
 
@@ -365,6 +371,9 @@ export default function ReadAlongPage() {
 
     const [activeAddAfterWordId, setActiveAddAfterWordId] = useState<string | null>(null);
     const [activeAddPlacement, setActiveAddPlacement] = useState<AddWordPlacement>("after");
+    const [addPosition, setAddPosition] = useState({ value: "", unit: tracking.method ?? "page" });
+    const newWordUnit = tracking.method ?? "page";
+    const newWordPosition = addPosition.unit === newWordUnit ? addPosition.value : "";
     const [addAfterDraft, setAddAfterDraft] = useState<AddAfterDraft>(() =>
         makeBlankAddAfterDraft()
     );
@@ -599,7 +608,7 @@ export default function ReadAlongPage() {
                     meaning,
                     jlpt,
                     meaning_choice_index,
-                    page_number,
+                    page_number, position_unit, position_value, percent_location,
                     page_order,
                     chapter_number,
                     chapter_name,
@@ -688,7 +697,7 @@ export default function ReadAlongPage() {
             {
                 label: string;
                 wordCount: number;
-                pages: Set<number>;
+                pages: Set<string>;
                 sortNumber: number;
             }
         >();
@@ -702,14 +711,14 @@ export default function ReadAlongPage() {
                 {
                     label: chapterLabelForWord(word),
                     wordCount: 0,
-                    pages: new Set<number>(),
+                    pages: new Set<string>(),
                     sortNumber: word.chapter_number ?? 999999,
                 };
 
             existing.wordCount += 1;
 
-            if (word.page_number != null) {
-                existing.pages.add(word.page_number);
+            if (wordPositionText(word)) {
+                existing.pages.add(wordPositionText(word));
             }
 
             map.set(key, existing);
@@ -742,39 +751,29 @@ export default function ReadAlongPage() {
             "Selected chapter";
 
     const pages = useMemo<PageChunk[]>(() => {
-        const numberedWords = filteredWords.filter((w) => w.page_number != null);
-
-        if (numberedWords.length > 0) {
-            const grouped = new Map<number, ReadAlongWord[]>();
-
-            for (const w of numberedWords) {
-                const page = w.page_number as number;
-                if (!grouped.has(page)) grouped.set(page, []);
-                grouped.get(page)!.push(w);
-            }
-
-            const pageNumbers = Array.from(grouped.keys()).sort((a, b) => a - b);
-            const minPage = pageNumbers[0];
-            const maxPage = pageNumbers[pageNumbers.length - 1];
-
-            const result: PageChunk[] = [];
-
-            for (let pageNum = minPage; pageNum <= maxPage; pageNum++) {
-                result.push({
-                    label: `Page ${pageNum}`,
-                    words: grouped.get(pageNum) ?? [],
-                    pageNumber: pageNum,
-                });
-            }
-
-            return result;
+        const grouped = new Map<string, ReadAlongWord[]>();
+        const unplaced: ReadAlongWord[] = [];
+        for (const word of filteredWords) {
+            const label = wordPositionText(word);
+            if (!label) { unplaced.push(word); continue; }
+            grouped.set(label, [...(grouped.get(label) ?? []), word]);
         }
-
-        return chunkArray(filteredWords, 8).map((chunk, idx) => ({
-            label: `Section ${idx + 1}`,
-            words: chunk,
-            pageNumber: null,
+        const placed: PageChunk[] = [...grouped].sort(([, a], [, b]) => wordPosition(a[0]).unit.localeCompare(wordPosition(b[0]).unit) || (wordPosition(a[0]).value ?? 0) - (wordPosition(b[0]).value ?? 0)).map(([label, words]) => ({
+            label, words, pageNumber: wordPosition(words[0]).value, positionUnit: wordPosition(words[0]).unit,
         }));
+        // Preserve the existing empty-page navigation for page-only books.
+        if (placed.length && placed.every(chunk => chunk.positionUnit === "page")) {
+            const first = placed[0].pageNumber ?? 0;
+            const last = placed[placed.length - 1].pageNumber ?? first;
+            const pageWords = new Map(placed.map(chunk => [chunk.pageNumber, chunk.words]));
+            placed.length = 0;
+            for (let value = first; value <= last; value++) {
+                placed.push({ label: `Page ${value}`, pageNumber: value, positionUnit: "page", words: pageWords.get(value) ?? [] });
+            }
+        }
+        return [...placed, ...chunkArray(unplaced, 8).map((words, index) => ({
+            label: `Unplaced ${index + 1}`, words, pageNumber: null,
+        }))];
     }, [filteredWords]);
 
     useEffect(() => {
@@ -797,9 +796,9 @@ export default function ReadAlongPage() {
         if (!pageParam) return;
 
         const pageNum = Number(pageParam);
-        if (!Number.isFinite(pageNum) || pageNum <= 0) return;
+        if (!Number.isFinite(pageNum) || pageNum < 0) return;
 
-        const matchIndex = pages.findIndex((p) => p.pageNumber === pageNum);
+        const matchIndex = pages.findIndex((p) => p.pageNumber === pageNum && p.positionUnit === "page");
 
         if (matchIndex >= 0) {
             setPageIndex(matchIndex);
@@ -813,13 +812,13 @@ export default function ReadAlongPage() {
         if (searchParams.get("page")) return;
         if (typeof window === "undefined") return;
 
-        const savedPage = Number(window.localStorage.getItem(savedPageStorageKey));
-        if (!Number.isFinite(savedPage) || savedPage <= 0) {
+        const savedPage = window.localStorage.getItem(savedPageStorageKey);
+        if (!savedPage) {
             setHasRestoredSavedPage(true);
             return;
         }
 
-        const matchIndex = pages.findIndex((p) => p.pageNumber === savedPage);
+        const matchIndex = pages.findIndex((p) => p.label === savedPage || p.label === `Page ${savedPage}`);
         if (matchIndex >= 0) {
             setPageIndex(matchIndex);
         }
@@ -842,8 +841,8 @@ export default function ReadAlongPage() {
         if (!hasRestoredSavedPage || currentPageNumber == null) return;
         if (typeof window === "undefined") return;
 
-        window.localStorage.setItem(savedPageStorageKey, String(currentPageNumber));
-    }, [currentPageNumber, hasRestoredSavedPage, savedPageStorageKey]);
+        window.localStorage.setItem(savedPageStorageKey, currentPage?.label ?? "");
+    }, [currentPageNumber, currentPage?.label, hasRestoredSavedPage, savedPageStorageKey]);
 
     useEffect(() => {
         if (canUseReadingJournal) return;
@@ -851,9 +850,9 @@ export default function ReadAlongPage() {
     }, [canUseReadingJournal]);
 
     function jumpToPage(pageNum: number) {
-        if (!Number.isFinite(pageNum) || pageNum <= 0) return;
+        if (!Number.isFinite(pageNum) || pageNum < 0) return;
 
-        const matchIndex = pages.findIndex((p) => p.pageNumber === pageNum);
+        const matchIndex = pages.findIndex((p) => p.pageNumber === pageNum && p.positionUnit === (currentPage?.positionUnit ?? tracking.method));
 
         if (matchIndex >= 0) {
             setPageIndex(matchIndex);
@@ -952,7 +951,7 @@ export default function ReadAlongPage() {
 
         if (error) {
             console.error("Error loading latest reading session:", error);
-            setSessionEndPage(tracking.method === "page" && currentPageNumber != null ? String(currentPageNumber) : "");
+            setSessionEndPage(tracking.method === currentPage?.positionUnit && currentPageNumber != null ? String(currentPageNumber) : "");
             setShowTimedSessionForm(true);
             return;
         }
@@ -960,7 +959,7 @@ export default function ReadAlongPage() {
         const latest = data?.[0];
         const position = latest ? sessionEnd(latest) : null;
         setSessionStartPage(position == null ? "" : String(tracking.method === "page" ? Math.min(position + 1, tracking.totals.page_count ?? Infinity) : position));
-        setSessionEndPage(tracking.method === "page" && currentPageNumber != null ? String(currentPageNumber) : "");
+        setSessionEndPage(tracking.method === currentPage?.positionUnit && currentPageNumber != null ? String(currentPageNumber) : "");
         setShowTimedSessionForm(true);
     }
 
@@ -1388,6 +1387,7 @@ export default function ReadAlongPage() {
     }
 
     function openAddAfter(word: ReadAlongWord, placement: AddWordPlacement) {
+        setAddPosition({ unit: newWordUnit, value: wordPosition(word).unit === newWordUnit ? wordPositionInput(word) : "" });
         setActiveAddAfterWordId((current) => {
             if (current === word.id && activeAddPlacement === placement) {
                 setAddAfterDraft(makeBlankAddAfterDraft());
@@ -1402,6 +1402,7 @@ export default function ReadAlongPage() {
 
     function openEmptyPageAddWord() {
         if (!emptyPageAddWordKey) return;
+        setAddPosition({ unit: newWordUnit, value: currentPage?.positionUnit === newWordUnit ? String(currentPage.pageNumber ?? "") : "" });
 
         setActiveAddAfterWordId((current) => {
             if (current === emptyPageAddWordKey) {
@@ -1438,6 +1439,9 @@ export default function ReadAlongPage() {
     }
 
     async function lookupAddAfterWord() {
+        const parsedPosition = parseWordPosition(newWordPosition, newWordUnit);
+        if (parsedPosition.error) { setAddAfterDraft(current => ({ ...current, message: parsedPosition.error ?? "Invalid position" })); return; }
+
         const cleanWord = addAfterDraft.word.trim();
 
         if (!cleanWord) {
@@ -1536,8 +1540,9 @@ export default function ReadAlongPage() {
         if (anchor.chapter_number == null) query = query.is("chapter_number", null);
         else query = query.eq("chapter_number", anchor.chapter_number);
 
-        if (anchor.page_number == null) query = query.is("page_number", null);
-        else query = query.eq("page_number", anchor.page_number);
+        query = query.eq("position_unit", wordPosition(anchor).unit);
+        if (wordPosition(anchor).value == null) query = query.is("position_value", null);
+        else query = query.eq("position_value", wordPosition(anchor).value);
 
         const { data, error } = await query
             .order("page_order", { ascending: true, nullsFirst: false })
@@ -1579,6 +1584,9 @@ export default function ReadAlongPage() {
 
     async function saveAddAfterWord(anchor: ReadAlongWord) {
         if (!userBookId || !canAccessBook || !canUseSavedWordReading) return;
+
+        const parsedPosition = parseWordPosition(newWordPosition, newWordUnit);
+        if (parsedPosition.error) { setAddAfterDraft(current => ({ ...current, message: parsedPosition.error ?? "Invalid position" })); return; }
 
         const cleanWord = addAfterDraft.word.trim();
         const cleanReading = addAfterDraft.reading.trim();
@@ -1675,7 +1683,7 @@ export default function ReadAlongPage() {
                 meaning_choice_index: addAfterDraft.meaningChoiceIndex,
                 jlpt: normalizeJlpt(addAfterDraft.jlpt),
                 is_common: !!addAfterDraft.isCommon,
-                page_number: anchor.page_number,
+                ...wordPositionPayload(parsedPosition.value, newWordUnit),
                 page_order:
                     activeAddPlacement === "before"
                         ? Math.max(1, anchor.page_order ?? 1)
@@ -1695,7 +1703,7 @@ export default function ReadAlongPage() {
                 .from("user_book_words")
                 .insert(payload)
                 .select(
-                    "id, surface, reading, meaning, jlpt, meaning_choice_index, page_number, page_order, chapter_number, chapter_name, hide_kanji_in_reading_support"
+                    "id, surface, reading, meaning, jlpt, meaning_choice_index, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, hide_kanji_in_reading_support"
                 )
                 .single();
 
@@ -1716,7 +1724,7 @@ export default function ReadAlongPage() {
                     insertedRow.meaning_choice_index == null
                         ? null
                         : Number(insertedRow.meaning_choice_index),
-                page_number: insertedRow.page_number ?? anchor.page_number,
+                ...wordPositionPayload(wordPosition(insertedRow).value, wordPosition(insertedRow).unit),
                 page_order:
                     pageOrderById?.get(String(insertedRow.id)) ??
                     insertedRow.page_order ??
@@ -1777,6 +1785,9 @@ export default function ReadAlongPage() {
 
     async function saveWordToCurrentEmptyPage() {
         if (!userBookId || !canAccessBook || !canUseSavedWordReading || !currentPage) return;
+
+        const parsedPosition = parseWordPosition(newWordPosition, newWordUnit);
+        if (parsedPosition.error) { setAddAfterDraft(current => ({ ...current, message: parsedPosition.error ?? "Invalid position" })); return; }
 
         const cleanWord = addAfterDraft.word.trim();
         const cleanReading = addAfterDraft.reading.trim();
@@ -1871,8 +1882,9 @@ export default function ReadAlongPage() {
             if (chapterContext.chapterNumber == null) orderQuery = orderQuery.is("chapter_number", null);
             else orderQuery = orderQuery.eq("chapter_number", chapterContext.chapterNumber);
 
-            if (currentPage.pageNumber == null) orderQuery = orderQuery.is("page_number", null);
-            else orderQuery = orderQuery.eq("page_number", currentPage.pageNumber);
+            orderQuery = orderQuery.eq("position_unit", newWordUnit);
+            if (parsedPosition.value == null) orderQuery = orderQuery.is("position_value", null);
+            else orderQuery = orderQuery.eq("position_value", parsedPosition.value);
 
             const { data: orderRows, error: orderError } = await orderQuery;
 
@@ -1895,7 +1907,7 @@ export default function ReadAlongPage() {
                 meaning_choice_index: addAfterDraft.meaningChoiceIndex,
                 jlpt: normalizeJlpt(addAfterDraft.jlpt),
                 is_common: !!addAfterDraft.isCommon,
-                page_number: currentPage.pageNumber ?? null,
+                ...wordPositionPayload(parsedPosition.value, newWordUnit),
                 page_order: nextPageOrder,
                 chapter_number: chapterContext.chapterNumber,
                 chapter_name: chapterContext.chapterName,
@@ -1912,7 +1924,7 @@ export default function ReadAlongPage() {
                 .from("user_book_words")
                 .insert(payload)
                 .select(
-                    "id, surface, reading, meaning, jlpt, meaning_choice_index, page_number, page_order, chapter_number, chapter_name, hide_kanji_in_reading_support"
+                    "id, surface, reading, meaning, jlpt, meaning_choice_index, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, hide_kanji_in_reading_support"
                 )
                 .single();
 
@@ -1928,7 +1940,7 @@ export default function ReadAlongPage() {
                     insertedRow.meaning_choice_index == null
                         ? null
                         : Number(insertedRow.meaning_choice_index),
-                page_number: insertedRow.page_number ?? currentPage.pageNumber ?? null,
+                ...wordPositionPayload(wordPosition(insertedRow).value, wordPosition(insertedRow).unit),
                 page_order: insertedRow.page_order ?? nextPageOrder,
                 chapter_number: insertedRow.chapter_number ?? chapterContext.chapterNumber,
                 chapter_name: insertedRow.chapter_name ?? chapterContext.chapterName,
@@ -1999,6 +2011,7 @@ export default function ReadAlongPage() {
                     {options.heading ?? `Add ${placementLabel} ${anchor.surface}`}
                 </p>
 
+                <WordPositionField unit={newWordUnit} value={newWordPosition} onChange={value => setAddPosition({ unit: newWordUnit, value })} />
                 <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                     <input
                         value={addAfterDraft.word}
@@ -2148,6 +2161,7 @@ export default function ReadAlongPage() {
             header={
                 <>
                     <ReadAlongPageNavigator
+                    positionLabel={currentPage?.label.split(" ")[0] ?? "Position"}
                         pageIndex={pageIndex}
                         pageCount={pages.length}
                         jumpPageInput={jumpPageInput}
@@ -2178,7 +2192,7 @@ export default function ReadAlongPage() {
                                     surface: currentPage.label,
                                     reading: null,
                                     meaning: null,
-                                    page_number: currentPage.pageNumber ?? null,
+                                    ...wordPositionPayload(currentPage.pageNumber ?? null, currentPage.positionUnit ?? "page"),
                                     page_order: null,
                                     chapter_number: null,
                                     chapter_name: null,
@@ -2324,7 +2338,7 @@ export default function ReadAlongPage() {
                                 favoriteQuotes={favoriteQuotes}
                                 bookLanguageCode={bookLanguageCode}
                                 pageCount={bookPageCount}
-                                currentPageNumber={currentPageNumber}
+                                currentPageNumber={currentPage?.positionUnit === "page" ? currentPageNumber : null}
                                 selectedChapterLabel={currentPageChapterLabel}
                                 selectedChapterNumber={currentPageChapterNumber}
                                 canUseJapaneseLearningJournal={canUseSavedWordReading}
@@ -2354,7 +2368,7 @@ export default function ReadAlongPage() {
                                 favoriteQuotes={favoriteQuotes}
                                 bookLanguageCode={bookLanguageCode}
                                 pageCount={bookPageCount}
-                                currentPageNumber={currentPageNumber}
+                                currentPageNumber={currentPage?.positionUnit === "page" ? currentPageNumber : null}
                                 selectedChapterLabel={currentPageChapterLabel}
                                 selectedChapterNumber={currentPageChapterNumber}
                                 canUseJapaneseLearningJournal={canUseSavedWordReading}

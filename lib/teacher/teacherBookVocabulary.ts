@@ -1,7 +1,9 @@
 "use client";
 
 type SupabaseClientLike = any;
-import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
+import { parseWordPosition, wordPosition, wordPositionPayload } from "@/lib/vocabulary/wordPosition";
+
 
 export type SharedVocabularyOrigin = "my_library" | "teaching";
 export type SharedTeacherVocabularyWord = {
@@ -14,6 +16,7 @@ export type SharedTeacherVocabularyWord = {
   meaning: string | null;
   meaningChoices: string[];
   meaningChoiceIndex: number | null;
+  positionUnit: ProgressTrackingMethod;
   pageNumber: number | null;
   pageOrder: number | null;
   chapterNumber: number | null;
@@ -35,6 +38,7 @@ export type TeacherBookContext = {
   bookId: string;
   linkedUserBookId: string | null;
   personalUserBookId: string | null;
+  positionUnit?: ProgressTrackingMethod;
   pageCount: number | null;
 };
 
@@ -213,7 +217,7 @@ async function findMatchingPersonalWord(
 
   const { data, error } = await supabase
     .from("user_book_words")
-    .select("id, surface, reading, meaning, meaning_choices, meaning_choice_index, page_number, page_order, chapter_number, chapter_name, vocabulary_cache_id, created_at")
+    .select("id, surface, reading, meaning, meaning_choices, meaning_choice_index, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, vocabulary_cache_id, created_at")
     .eq("user_book_id", personalUserBookId);
 
   if (error) throw error;
@@ -291,7 +295,8 @@ function personalToShared(row: any): SharedTeacherVocabularyWord {
     meaning: row.meaning ?? null,
     meaningChoices: asStringArray(row.meaning_choices),
     meaningChoiceIndex: typeof row.meaning_choice_index === "number" ? row.meaning_choice_index : null,
-    pageNumber: row.page_number ?? null,
+    pageNumber: wordPosition(row).value,
+    positionUnit: wordPosition(row).unit,
     pageOrder: row.page_order ?? null,
     chapterNumber: row.chapter_number ?? null,
     chapterName: row.chapter_name ?? null,
@@ -318,7 +323,8 @@ function teachingToShared(row: any): SharedTeacherVocabularyWord {
     meaning: row.meaning ?? null,
     meaningChoices: asStringArray(row.meaning_choices),
     meaningChoiceIndex: typeof row.meaning_choice_index === "number" ? row.meaning_choice_index : null,
-    pageNumber: row.page_number ?? null,
+    pageNumber: wordPosition(row).value,
+    positionUnit: wordPosition(row).unit,
     pageOrder: row.page_order ?? null,
     chapterNumber: row.chapter_number ?? null,
     chapterName: row.chapter_name ?? null,
@@ -401,15 +407,22 @@ export async function loadTeacherBookContext(
 
   const { data: personalRows, error: personalError } = await supabase
     .from("user_books")
-    .select("id")
+    .select("id, progress_tracking_method")
     .eq("user_id", currentUserId)
     .eq("book_id", data.book_id)
     .order("created_at", { ascending: true })
     .limit(1);
 
   if (personalError) throw personalError;
+  let readerMethod = personalRows?.[0]?.progress_tracking_method ?? "page";
+  if (data.user_book_id && data.user_book_id !== personalRows?.[0]?.id) {
+    const { data: linkedReader, error: linkedError } = await supabase.from("user_books").select("progress_tracking_method").eq("id", data.user_book_id).single();
+    if (linkedError) throw linkedError;
+    readerMethod = linkedReader.progress_tracking_method ?? "page";
+  }
 
   return {
+    positionUnit: readerMethod,
     teacherBookId: data.id,
     teacherId: data.teacher_id,
     bookId: data.book_id,
@@ -430,7 +443,7 @@ export async function loadSharedTeacherVocabulary(
   const personalRows = personalUserBookId
     ? await supabase
         .from("user_book_words")
-        .select("id, user_book_id, surface, reading, meaning, jlpt, page_number, page_order, chapter_number, chapter_name, created_at, hidden, meaning_choices, meaning_choice_index, target_language_code, vocabulary_cache_id")
+        .select("id, user_book_id, surface, reading, meaning, jlpt, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, created_at, hidden, meaning_choices, meaning_choice_index, target_language_code, vocabulary_cache_id")
         .eq("user_book_id", personalUserBookId)
         .or("target_language_code.is.null,target_language_code.eq.ja")
         .then((result: any) => {
@@ -441,7 +454,7 @@ export async function loadSharedTeacherVocabulary(
 
   const teachingResult = await supabase
     .from("teacher_book_vocabulary")
-    .select("id, linked_user_book_word_id, source_teacher_book_item_id, vocabulary_cache_id, surface, reading, meaning, meaning_choices, meaning_choice_index, page_number, page_order, chapter_number, chapter_name, origin_my_library, origin_teaching, hidden_from_my_library, hidden_from_teaching, included_in_follow_along, follow_along_order, follow_along_support_note, created_at")
+    .select("id, linked_user_book_word_id, source_teacher_book_item_id, vocabulary_cache_id, surface, reading, meaning, meaning_choices, meaning_choice_index, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, origin_my_library, origin_teaching, hidden_from_my_library, hidden_from_teaching, included_in_follow_along, follow_along_order, follow_along_support_note, created_at")
     .eq("teacher_book_id", context.teacherBookId);
 
   if (teachingResult.error) {
@@ -470,7 +483,7 @@ export async function createTeachingVocabularyWord(
 ) {
   const surface = values.surface.trim();
   if (!surface) throw new Error("Add a word first.");
-  const parsedPageNumber = parseOptionalPageLocationInput(values.pageNumber, context.pageCount);
+  const parsedPageNumber = parseWordPosition(values.pageNumber, context.positionUnit ?? "page");
   if (parsedPageNumber.error) throw new Error(parsedPageNumber.error);
 
   const { data, error } = await supabase
@@ -482,7 +495,7 @@ export async function createTeachingVocabularyWord(
       surface,
       reading: values.reading?.trim() || null,
       meaning: values.meaning?.trim() || null,
-      page_number: parsedPageNumber.value,
+      ...wordPositionPayload(parsedPageNumber.value, context.positionUnit ?? "page"),
       origin_teaching: true,
       origin_my_library: false,
       included_in_follow_along: Boolean(values.followAlong),
@@ -509,7 +522,7 @@ export async function saveTeacherVocabularyAndInclude(
     values.meaningChoiceIndex != null && values.meaningChoiceIndex >= 0
       ? values.meaningChoiceIndex
       : null;
-  const parsedPageNumber = parseOptionalPageLocationInput(values.pageNumber, context.pageCount);
+  const parsedPageNumber = parseWordPosition(values.pageNumber, context.positionUnit ?? "page");
   if (parsedPageNumber.error) throw new Error(parsedPageNumber.error);
   const pageNumber = parsedPageNumber.value;
   const chapterNumber = toNullableInt(values.chapterNumber);
@@ -549,7 +562,7 @@ export async function saveTeacherVocabularyAndInclude(
     meaning,
     meaning_choices: meaningChoices,
     meaning_choice_index: meaningChoiceIndex,
-    page_number: pageNumber,
+    ...wordPositionPayload(pageNumber, context.positionUnit ?? "page"),
     chapter_number: chapterNumber,
     chapter_name: chapterName,
     origin_my_library: Boolean(existing?.origin_my_library) || Boolean(personalWord?.id),
@@ -656,7 +669,7 @@ export async function ensureTeachingVocabularyAssociationForPersonalWord(
       meaning: word.meaning,
       meaning_choices: word.meaningChoices,
       meaning_choice_index: word.meaningChoiceIndex,
-      page_number: word.pageNumber,
+      ...wordPositionPayload(word.pageNumber, word.positionUnit),
       page_order: word.pageOrder,
       chapter_number: word.chapterNumber,
       chapter_name: word.chapterName,

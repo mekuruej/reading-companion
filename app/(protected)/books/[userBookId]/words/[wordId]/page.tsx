@@ -24,7 +24,9 @@ import {
   makeLibraryStudyColorKey,
   type LibraryStudyWordColorInfo,
 } from "@/lib/libraryStudyColorLookup";
-import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
+import { parseWordPosition, wordPosition, wordPositionInput, wordPositionPayload } from "@/lib/vocabulary/wordPosition";
+
 
 // -------------------------------------------------------------
 // Types
@@ -40,6 +42,9 @@ type WordRow = {
   other_definition: string | null;
   jlpt: string | null;
   is_common: boolean | null;
+  position_unit?: ProgressTrackingMethod | null;
+  position_value?: number | null;
+  percent_location?: number | null;
   page_number: number | null;
   chapter_number: number | null;
   chapter_name: string | null;
@@ -58,6 +63,9 @@ type SeenInstance = {
   reading: string | null;
   meaning: string | null;
   meaning_choice_index: number | null;
+  position_unit?: ProgressTrackingMethod | null;
+  position_value?: number | null;
+  percent_location?: number | null;
   page_number: number | null;
   chapter_number: number | null;
   chapter_name: string | null;
@@ -70,6 +78,9 @@ type WordNeighbor = {
   id: string;
   surface: string;
   reading: string | null;
+  position_unit?: ProgressTrackingMethod | null;
+  position_value?: number | null;
+  percent_location?: number | null;
   page_number: number | null;
   chapter_number: number | null;
   chapter_name: string | null;
@@ -235,7 +246,6 @@ export default function WordDetailPage() {
 
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState<string | null>(null);
-  const [bookPageCount, setBookPageCount] = useState<number | null>(null);
   const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
 
   const [word, setWord] = useState<WordRow | null>(null);
@@ -250,6 +260,7 @@ export default function WordDetailPage() {
   const [editReading, setEditReading] = useState("");
   const [editMeaning, setEditMeaning] = useState("");
   const [editJlpt, setEditJlpt] = useState("");
+  const [editPositionUnit, setEditPositionUnit] = useState<ProgressTrackingMethod>("page");
   const [editPage, setEditPage] = useState<string>("");
   const [editChapterNum, setEditChapterNum] = useState<string>("");
   const [editChapterName, setEditChapterName] = useState("");
@@ -277,7 +288,8 @@ export default function WordDetailPage() {
     setEditReading(w.reading ?? "");
     setEditMeaning(w.meaning ?? "");
     setEditJlpt(w.jlpt ?? "");
-    setEditPage(w.page_number != null ? String(w.page_number) : "");
+    setEditPage(wordPositionInput(w));
+    setEditPositionUnit(wordPosition(w).unit);
     setEditChapterNum(w.chapter_number != null ? String(w.chapter_number) : "");
     setEditChapterName(w.chapter_name ?? "");
     setEditHideKanjiInReadingSupport(!!w.hide_kanji_in_reading_support);
@@ -342,7 +354,7 @@ export default function WordDetailPage() {
     setEditErr(null);
 
     const hasChoices = (editMeaningChoices?.length ?? 0) > 0;
-    const parsedEditPage = parseOptionalPageLocationInput(editPage, bookPageCount);
+    const parsedEditPage = parseWordPosition(editPage, editPositionUnit);
     if (parsedEditPage.error) {
       setEditErr(parsedEditPage.error);
       setEditSaving(false);
@@ -355,7 +367,7 @@ export default function WordDetailPage() {
       meaning: editMeaning.trim() ? editMeaning.trim() : null,
       other_definition: null,
       jlpt: editJlpt.trim() ? editJlpt.trim().toUpperCase() : null,
-      page_number: parsedEditPage.value,
+      ...wordPositionPayload(parsedEditPage.value, editPositionUnit),
       chapter_number: parseNullableInt(editChapterNum),
       chapter_name: editChapterName.trim() ? editChapterName.trim() : null,
       hide_kanji_in_reading_support: editHideKanjiInReadingSupport,
@@ -634,7 +646,6 @@ export default function WordDetailPage() {
 
       setBookTitle((ub as any)?.books?.title ?? "");
       setBookCover((ub as any)?.books?.cover_url ?? null);
-      setBookPageCount((ub as any)?.books?.page_count ?? null);
       setOwnerUserId(bookOwnerUserId);
 
       const { data: w, error: wErr } = await supabase
@@ -649,7 +660,7 @@ export default function WordDetailPage() {
           other_definition,
           jlpt,
           is_common,
-          page_number,
+          page_number, position_unit, position_value, percent_location,
           chapter_number,
           chapter_name,
           created_at,
@@ -684,7 +695,7 @@ export default function WordDetailPage() {
           id,
           surface,
           reading,
-          page_number,
+          page_number, position_unit, position_value, percent_location,
           chapter_number,
           chapter_name,
           page_order,
@@ -848,6 +859,8 @@ export default function WordDetailPage() {
               editMeaning={editMeaning}
               editChapterNum={editChapterNum}
               editChapterName={editChapterName}
+              positionUnit={editPositionUnit}
+              onPositionUnitChange={setEditPositionUnit}
               editPage={editPage}
               editMeaningChoices={editMeaningChoices}
               editMeaningChoiceIndex={editMeaningChoiceIndex}
@@ -869,7 +882,8 @@ export default function WordDetailPage() {
           bookTitle={bookTitle}
           bookCover={bookCover}
           chapter={chapter}
-          pageNumber={word.page_number}
+          positionUnit={wordPosition(word).unit}
+              pageNumber={wordPosition(word).value}
           bookHubHref={`/books/${encodeURIComponent(userBookId)}`}
           vocabListHref={`/books/${encodeURIComponent(userBookId)}/words`}
         />

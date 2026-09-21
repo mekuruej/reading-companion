@@ -2,6 +2,7 @@
 //
 "use client";
 
+import { wordPositionText, type WordPositionRecord } from "@/lib/vocabulary/wordPosition";
 import { useStudyModeRotation } from "@/lib/study/useStudyModeRotation";
 import { canLoadJapaneseFlashcard, canStudyWord } from "@/lib/wordSupportEligibility";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -119,6 +120,9 @@ type WordRow = {
   meaning: string | null;
   jlpt: string | null;
   is_common: boolean | null;
+  position_unit?: WordPositionRecord["position_unit"];
+  position_value?: number | null;
+  percent_location?: number | null;
   page_number: number | null;
   chapter_number: number | null;
   chapter_name: string | null;
@@ -147,6 +151,9 @@ type Flashcard = {
   jlpt: string;
   chapterLabel: string;
   chapterDisplay: string;
+  position_unit?: WordPositionRecord["position_unit"];
+  position_value?: number | null;
+  percent_location?: number | null;
   page_number: number | null;
   meaningChoices: string[];
   meaningChoiceIndex: number;
@@ -322,8 +329,8 @@ function bookFlashcardChapterFilterLabel(
 }
 
 function bookFlashcardPageFilterLabel(pageFilter: string) {
-  if (pageFilter === "all") return "All pages";
-  return `Page ${pageFilter}`;
+  if (pageFilter === "all") return "All positions";
+  return /^\d+$/.test(pageFilter) ? `Page ${pageFilter}` : pageFilter;
 }
 
 function buildBookFlashcardsStudyingNowLabel({
@@ -452,7 +459,7 @@ export default function BookFlashcardsPage() {
   const [repeatsOnly, setRepeatsOnly] = useState(false);
 
   const [chapterOptions, setChapterOptions] = useState<{ value: string; label: string }[]>([]);
-  const [pageOptions, setPageOptions] = useState<number[]>([]);
+  const [pageOptions, setPageOptions] = useState<string[]>([]);
 
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
@@ -723,7 +730,7 @@ export default function BookFlashcardsPage() {
               meaning,
               jlpt,
               is_common,
-              page_number,
+              page_number, position_unit, position_value, percent_location,
               chapter_number,
               chapter_name,
               seen_on,
@@ -779,6 +786,7 @@ export default function BookFlashcardsPage() {
                 chapterLabel: ch.label,
                 chapterDisplay: ch.display,
                 page_number: w.page_number ?? null,
+                position_unit: w.position_unit, position_value: w.position_value, percent_location: w.percent_location,
                 meaningChoices: [],
                 meaningChoiceIndex: 0,
                 repeatKey,
@@ -827,7 +835,7 @@ export default function BookFlashcardsPage() {
                 meaning,
                 jlpt,
                 is_common,
-                page_number,
+                page_number, position_unit, position_value, percent_location,
                 chapter_number,
                 chapter_name,
                 seen_on,
@@ -892,6 +900,7 @@ export default function BookFlashcardsPage() {
                 chapterLabel: ch.label,
                 chapterDisplay: ch.display,
                 page_number: w.page_number ?? null,
+                position_unit: w.position_unit, position_value: w.position_value, percent_location: w.percent_location,
                 meaningChoices,
                 meaningChoiceIndex: safeIdx,
                 repeatKey,
@@ -932,7 +941,7 @@ export default function BookFlashcardsPage() {
             meaning,
             jlpt,
             is_common,
-            page_number,
+            page_number, position_unit, position_value, percent_location,
             chapter_number,
             chapter_name,
             seen_on,
@@ -993,6 +1002,7 @@ export default function BookFlashcardsPage() {
             chapterLabel: ch.label,
             chapterDisplay: ch.display,
             page_number: w.page_number ?? null,
+                position_unit: w.position_unit, position_value: w.position_value, percent_location: w.percent_location,
             meaningChoices,
             meaningChoiceIndex: safeIdx,
             repeatKey,
@@ -1070,10 +1080,10 @@ export default function BookFlashcardsPage() {
           Array.from(
             new Set(
               deduped
-                .map((card) => card.page_number)
-                .filter((page): page is number => page != null)
+                .map((card) => wordPositionText(card))
+                .filter(Boolean)
             )
-          ).sort((a, b) => a - b)
+          ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
         );
 
         setStepIndex(0);
@@ -1131,10 +1141,8 @@ export default function BookFlashcardsPage() {
     }
 
     if (pageFilter !== "all") {
-      const selectedPage = Number(pageFilter);
-      if (Number.isFinite(selectedPage)) {
-        result = result.filter((c) => c.page_number === selectedPage);
-      }
+      const position = /^\d+$/.test(pageFilter) ? `Page ${pageFilter}` : pageFilter;
+      result = result.filter(c => wordPositionText(c) === position);
     }
 
     if (repeatsOnly) {

@@ -3,6 +3,7 @@
 
 "use client";
 
+import { wordPositionText } from "@/lib/vocabulary/wordPosition";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -56,6 +57,7 @@ type DictionaryPersonalHistoryItem = {
   userBookId: string;
   meaning: string | null;
   meaningChoiceIndex: number | null;
+  positionText?: string;
   pageNumber: number | null;
   chapterNumber: number | null;
   chapterName: string | null;
@@ -370,7 +372,7 @@ export default function DictionaryPage() {
             reading,
             meaning,
             meaning_choice_index,
-            page_number,
+            page_number, position_unit, position_value, percent_location,
             chapter_number,
             chapter_name,
             created_at,
@@ -404,6 +406,7 @@ export default function DictionaryPage() {
           meaning: item.meaning ?? null,
           meaningChoiceIndex: item.meaning_choice_index ?? null,
           pageNumber: item.page_number ?? null,
+          positionText: wordPositionText(item),
           chapterNumber: item.chapter_number ?? null,
           chapterName: item.chapter_name ?? null,
           createdAt: item.created_at ?? null,

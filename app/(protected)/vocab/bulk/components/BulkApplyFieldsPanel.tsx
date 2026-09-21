@@ -1,6 +1,9 @@
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
+import { positionLabel } from "@/lib/vocabulary/wordPosition";
 import ChapterNameCombobox from "@/components/ChapterNameCombobox";
 
 type BulkApplyFieldsPanelProps = {
+  positionUnit: ProgressTrackingMethod;
   bulkPageNumber: string;
   bulkChapterNumber: string;
   bulkChapterName: string;
@@ -18,6 +21,7 @@ type BulkApplyFieldsPanelProps = {
 };
 
 export default function BulkApplyFieldsPanel({
+  positionUnit,
   bulkPageNumber,
   bulkChapterNumber,
   bulkChapterName,
@@ -32,7 +36,7 @@ export default function BulkApplyFieldsPanel({
     <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="space-y-4">
         <div className="grid items-center gap-3 md:grid-cols-[160px_520px_auto]">
-          <div className="text-sm font-medium text-gray-700">Page or %</div>
+          <div className="text-sm font-medium text-gray-700">{positionLabel(positionUnit)}</div>
           <input
             type="text"
             inputMode="decimal"

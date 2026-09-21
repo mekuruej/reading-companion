@@ -21,7 +21,9 @@ import {
   makeLibraryStudyColorKey,
   type LibraryStudyWordColorInfo,
 } from "@/lib/libraryStudyColorLookup";
-import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
+import { parseWordPosition, wordPosition, wordPositionInput, wordPositionPayload, positionLabel } from "@/lib/vocabulary/wordPosition";
+import { useBookProgress } from "@/components/books/BookProgressProvider";
 import {
   addChapterNameOption,
   normalizeChapterNameOptions,
@@ -66,6 +68,7 @@ type SessionWord = {
   isCommon: boolean;
   meaningChoices: string[];
   meaningChoiceIndex: number | null;
+  positionUnit: ProgressTrackingMethod;
   pageNumber: string;
   chapterNumber: string;
   chapterName: string;
@@ -75,6 +78,7 @@ type SessionWord = {
 };
 
 type LastSavedWordContext = {
+  positionUnit?: ProgressTrackingMethod;
   surface: string;
   page: string;
 };
@@ -209,6 +213,8 @@ async function generateVocabularyKanjiMap(vocabularyCacheId: number) {
 }
 
 export default function AddWordPage() {
+  const tracking = useBookProgress();
+  const [editPositionUnit, setEditPositionUnit] = useState<ProgressTrackingMethod>("page");
   const router = useRouter();
   const params = useParams<{ userBookId: string }>();
   const userBookId = params.userBookId;
@@ -216,7 +222,6 @@ export default function AddWordPage() {
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
   const [bookLanguageCode, setBookLanguageCode] = useState<string | null>(null);
-  const [bookPageCount, setBookPageCount] = useState<number | null>(null);
   const [accessChecked, setAccessChecked] = useState(false);
   const [canAccessBook, setCanAccessBook] = useState(false);
   const [canUseAddWord, setCanUseAddWord] = useState(false);
@@ -263,6 +268,9 @@ export default function AddWordPage() {
     useState<LastSavedWordContext | null>(null);
 
   const [editingSessionWordId, setEditingSessionWordId] = useState<string | null>(null);
+  const positionUnit = editingSessionWordId ? editPositionUnit : tracking.method ?? "page";
+  const lastPositionUnit = useRef(positionUnit);
+  useEffect(() => { if (lastPositionUnit.current !== positionUnit) { setPageNumber(""); lastPositionUnit.current = positionUnit; } }, [positionUnit]);
   const [sessionWords, setSessionWords] = useState<SessionWord[]>([]);
   const [libraryColorByWordKey, setLibraryColorByWordKey] = useState<
     Record<string, LibraryStudyWordColorInfo>
@@ -281,15 +289,15 @@ export default function AddWordPage() {
 
   const addWordProgressLine = useMemo(() => {
     const parts = [];
-    const currentPage = pageNumber.trim() || lastSavedWordContext?.page || "";
+    const currentPage = pageNumber.trim() || (lastSavedWordContext?.positionUnit === positionUnit ? lastSavedWordContext.page : "") || "";
 
-    if (currentPage) parts.push(`On page ${currentPage}`);
+    if (currentPage) parts.push(`${positionLabel(positionUnit)} ${currentPage}`);
     if (lastSavedWordContext?.surface) {
       parts.push(`Last saved word: ${lastSavedWordContext.surface}`);
     }
 
     return parts.join(" · ");
-  }, [pageNumber, lastSavedWordContext]);
+  }, [pageNumber, lastSavedWordContext, positionUnit]);
 
   async function canAccessUserBook(
     authedUserId: string,
@@ -437,7 +445,6 @@ export default function AddWordPage() {
       setBookTitle(b?.title ?? "");
       setBookCover(b?.cover_url ?? "");
       setBookLanguageCode(b?.language_code ?? null);
-      setBookPageCount(b?.page_count ?? null);
     }
 
     loadBookInfo();
@@ -530,7 +537,7 @@ export default function AddWordPage() {
 
     const { data, error } = await supabase
       .from("user_book_words")
-      .select("surface, page_number, created_at")
+      .select("surface, page_number, position_unit, position_value, percent_location, created_at")
       .eq("user_book_id", userBookId)
       .order("created_at", { ascending: false })
       .limit(1);
@@ -545,7 +552,8 @@ export default function AddWordPage() {
       latest?.surface
         ? {
             surface: latest.surface,
-            page: latest.page_number != null ? String(latest.page_number) : "",
+            page: wordPositionInput(latest),
+            positionUnit: wordPosition(latest).unit,
           }
         : null
     );
@@ -687,6 +695,8 @@ export default function AddWordPage() {
     setIsCommon(!!sessionWord.isCommon);
     setMeaningChoices(sessionWord.meaningChoices ?? []);
     setMeaningChoiceIndex(sessionWord.meaningChoiceIndex);
+    lastPositionUnit.current = sessionWord.positionUnit;
+    setEditPositionUnit(sessionWord.positionUnit);
     setPageNumber(sessionWord.pageNumber);
     setChapterNumber(sessionWord.chapterNumber);
     setChapterName(sessionWord.chapterName);
@@ -816,7 +826,7 @@ export default function AddWordPage() {
       }
 
       const chapterNum = toNullableInt(chapterNumber);
-      const parsedPage = parseOptionalPageLocationInput(pageNumber, bookPageCount);
+      const parsedPage = parseWordPosition(pageNumber, positionUnit);
       if (parsedPage.error) {
         setMessage(`❌ ${parsedPage.error}`);
         setSaving(false);
@@ -848,7 +858,7 @@ export default function AddWordPage() {
         meaning_choice_index: null,
         jlpt: null,
         is_common: null,
-        page_number: pageNum,
+        ...wordPositionPayload(pageNum, positionUnit),
         chapter_number: chapterNum,
         chapter_name: chapterNameTrimmed,
         hide_kanji_in_reading_support: false,
@@ -871,7 +881,7 @@ export default function AddWordPage() {
             surface,
             reading,
             meaning,
-            page_number,
+            page_number, position_unit, position_value, percent_location,
             chapter_number,
             chapter_name,
             page_order,
@@ -891,7 +901,8 @@ export default function AddWordPage() {
           isCommon: false,
           meaningChoices: [],
           meaningChoiceIndex: null,
-          pageNumber: toDisplayString(insertedRow.page_number),
+          pageNumber: wordPositionInput(insertedRow),
+          positionUnit: wordPosition(insertedRow).unit,
           chapterNumber: toDisplayString(insertedRow.chapter_number),
           chapterName: insertedRow.chapter_name ?? "",
           hideKanjiInReadingSupport: false,
@@ -905,7 +916,7 @@ export default function AddWordPage() {
         ]);
         setLastSavedWordContext({
           surface: newSessionWord.surface,
-          page: newSessionWord.pageNumber,
+          page: newSessionWord.pageNumber, positionUnit: newSessionWord.positionUnit,
         });
         setSavedNotice(`Saved: ${cleanSource}`);
         setMessage("");
@@ -921,7 +932,7 @@ export default function AddWordPage() {
             surface,
             reading,
             meaning,
-            page_number,
+            page_number, position_unit, position_value, percent_location,
             chapter_number,
             chapter_name,
             page_order,
@@ -941,7 +952,8 @@ export default function AddWordPage() {
           isCommon: false,
           meaningChoices: [],
           meaningChoiceIndex: null,
-          pageNumber: toDisplayString(updatedRow.page_number),
+          pageNumber: wordPositionInput(updatedRow),
+          positionUnit: wordPosition(updatedRow).unit,
           chapterNumber: toDisplayString(updatedRow.chapter_number),
           chapterName: updatedRow.chapter_name ?? "",
           hideKanjiInReadingSupport: false,
@@ -955,7 +967,7 @@ export default function AddWordPage() {
         ]);
         setLastSavedWordContext({
           surface: updatedSessionWord.surface,
-          page: updatedSessionWord.pageNumber,
+          page: updatedSessionWord.pageNumber, positionUnit: updatedSessionWord.positionUnit,
         });
         setSavedNotice(`Saved: ${cleanSource}`);
         setMessage("");
@@ -1011,8 +1023,8 @@ export default function AddWordPage() {
     if (chapterNum == null) query = query.is("chapter_number", null);
     else query = query.eq("chapter_number", chapterNum);
 
-    if (pageNum == null) query = query.is("page_number", null);
-    else query = query.eq("page_number", pageNum);
+    if (pageNum == null) query = query.eq("position_unit", positionUnit).is("position_value", null);
+    else query = query.eq("position_unit", positionUnit).eq("position_value", pageNum);
 
     const { data, error } = await query;
     if (error) throw error;
@@ -1228,7 +1240,7 @@ export default function AddWordPage() {
       }
 
       const chapterNum = toNullableInt(chapterNumber);
-      const parsedPage = parseOptionalPageLocationInput(pageNumber, bookPageCount);
+      const parsedPage = parseWordPosition(pageNumber, positionUnit);
       if (parsedPage.error) {
         setMessage(`❌ ${parsedPage.error}`);
         setSaving(false);
@@ -1254,7 +1266,7 @@ export default function AddWordPage() {
         meaning_choice_index: meaningChoiceIndex,
         jlpt: normalizeJlpt(jlpt),
         is_common: !!isCommon,
-        page_number: pageNum,
+        ...wordPositionPayload(pageNum, positionUnit),
         chapter_number: chapterNum,
         chapter_name: chapterNameTrimmed,
         hide_kanji_in_reading_support: hideKanjiInReadingSupport,
@@ -1285,7 +1297,7 @@ export default function AddWordPage() {
             is_common,
             meaning_choices,
             meaning_choice_index,
-            page_number,
+            page_number, position_unit, position_value, percent_location,
             chapter_number,
             chapter_name,
             hide_kanji_in_reading_support,
@@ -1306,7 +1318,8 @@ export default function AddWordPage() {
           isCommon: !!insertedRow.is_common,
           meaningChoices: insertedRow.meaning_choices ?? [],
           meaningChoiceIndex: insertedRow.meaning_choice_index,
-          pageNumber: toDisplayString(insertedRow.page_number),
+          pageNumber: wordPositionInput(insertedRow),
+          positionUnit: wordPosition(insertedRow).unit,
           chapterNumber: toDisplayString(insertedRow.chapter_number),
           chapterName: insertedRow.chapter_name ?? "",
           hideKanjiInReadingSupport: !!insertedRow.hide_kanji_in_reading_support,
@@ -1329,7 +1342,7 @@ export default function AddWordPage() {
         ]);
         setLastSavedWordContext({
           surface: newSessionWord.surface,
-          page: newSessionWord.pageNumber,
+          page: newSessionWord.pageNumber, positionUnit: newSessionWord.positionUnit,
         });
         setSavedNotice(`Saved: ${finalSurface}`);
         setMessage("");
@@ -1349,7 +1362,7 @@ export default function AddWordPage() {
             is_common,
             meaning_choices,
             meaning_choice_index,
-            page_number,
+            page_number, position_unit, position_value, percent_location,
             chapter_number,
             chapter_name,
             hide_kanji_in_reading_support,
@@ -1370,7 +1383,8 @@ export default function AddWordPage() {
           isCommon: !!updatedRow.is_common,
           meaningChoices: updatedRow.meaning_choices ?? [],
           meaningChoiceIndex: updatedRow.meaning_choice_index,
-          pageNumber: toDisplayString(updatedRow.page_number),
+          pageNumber: wordPositionInput(updatedRow),
+          positionUnit: wordPosition(updatedRow).unit,
           chapterNumber: toDisplayString(updatedRow.chapter_number),
           chapterName: updatedRow.chapter_name ?? "",
           hideKanjiInReadingSupport: !!updatedRow.hide_kanji_in_reading_support,
@@ -1393,7 +1407,7 @@ export default function AddWordPage() {
         ]);
         setLastSavedWordContext({
           surface: updatedSessionWord.surface,
-          page: updatedSessionWord.pageNumber,
+          page: updatedSessionWord.pageNumber, positionUnit: updatedSessionWord.positionUnit,
         });
         setSavedNotice(`Saved: ${finalSurface}`);
         setMessage("");
@@ -1495,13 +1509,15 @@ export default function AddWordPage() {
         )}
 
         <AddWordStatusMessage message={message} />
-        <AddWordAddEditCard>
+        <AddWordAddEditCard positionLabel={positionLabel(positionUnit)}>
           <AddWordFormShell editingSurface={editingSessionWordId ? word : null}>
             {isEnglishBook ? (
               <AddEnglishWordFields
                 itemType={englishItemType}
                 source={word}
                 support={meaning}
+                positionUnit={positionUnit}
+                onPositionUnitChange={setEditPositionUnit}
                 pageNumber={pageNumber}
                 chapterNumber={chapterNumber}
                 chapterName={chapterName}
@@ -1604,7 +1620,9 @@ export default function AddWordPage() {
               meaning={meaning}
               meaningChoices={meaningChoices}
               meaningChoiceIndex={meaningChoiceIndex}
-              pageNumber={pageNumber}
+              positionUnit={positionUnit}
+                onPositionUnitChange={setEditPositionUnit}
+                pageNumber={pageNumber}
               chapterNumber={chapterNumber}
               chapterName={chapterName}
               chapterNameOptions={sortedChapterNameOptions}

@@ -39,6 +39,7 @@ export function TeacherFollowAlongReaderHeader({
       </div>
 
       <ReadAlongPageNavigator
+        positionLabel={currentPageLabel.split(" ")[0]}
         pageIndex={pageIndex}
         pageCount={pageCount}
         jumpPageInput={jumpPageInput}

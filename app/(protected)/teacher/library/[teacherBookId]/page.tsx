@@ -13,7 +13,9 @@ import {
   normalizeChapterNameOptions,
   sortChapterNameOptionsByNumber,
 } from "@/lib/chapterNameOptions";
-import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
+import { parseWordPosition, wordPosition, wordPositionInput, wordPositionPayload, positionLabel, wordPositionText } from "@/lib/vocabulary/wordPosition";
+import WordPositionField from "@/components/vocabulary/WordPositionField";
 import TeacherLibraryBookAccessState from "./components/TeacherLibraryBookAccessState";
 import TeacherLibraryBookHeader from "./components/TeacherLibraryBookHeader";
 import TeacherLibraryBookLoadingState from "./components/TeacherLibraryBookLoadingState";
@@ -51,6 +53,9 @@ type TeacherBookRow = {
 };
 
 type TeacherBookItem = {
+  position_unit?: ProgressTrackingMethod | null;
+  position_value?: number | null;
+  percent_location?: number | null;
   id: string;
   item_type: ItemType;
   surface_text: string | null;
@@ -87,6 +92,7 @@ type PrepItemDraft = {
 };
 
 type SavedItemEditDraft = {
+  positionUnit: ProgressTrackingMethod;
   itemType: ItemType;
   surfaceText: string;
   reading: string;
@@ -132,10 +138,12 @@ function canAccessAnyTeacherBook(profile: any) {
 }
 
 function InlinePageNumberInput({
+  positionUnit,
   pageNumber,
   disabled,
   onPageChange,
 }: {
+  positionUnit: ProgressTrackingMethod;
   pageNumber: number | null | undefined;
   disabled?: boolean;
   onPageChange: (value: string) => void | Promise<void>;
@@ -172,8 +180,8 @@ function InlinePageNumberInput({
       onBlur={() => void commit()}
       onKeyDown={handleKeyDown}
       disabled={disabled}
-      placeholder="%"
-      aria-label="Page number or percent"
+      placeholder={positionLabel(positionUnit)}
+      aria-label={positionLabel(positionUnit)}
       className="w-20 rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-center text-sm font-semibold text-stone-700 shadow-sm focus:border-sky-300 focus:outline-none focus:ring-2 focus:ring-sky-100 disabled:bg-stone-100 disabled:opacity-60"
     />
   );
@@ -293,7 +301,7 @@ function savedItemSearchText(item: TeacherBookItem) {
     item.support_url,
     item.chapter_name,
     item.chapter_number == null ? "" : String(item.chapter_number),
-    item.page_number == null ? "" : String(item.page_number),
+    wordPositionText(item),
   ]
     .join(" ")
     .toLowerCase();
@@ -305,7 +313,8 @@ function editDraftFromItem(item: TeacherBookItem): SavedItemEditDraft {
     surfaceText: item.surface_text ?? "",
     reading: item.reading ?? "",
     meaning: item.meaning ?? "",
-    page: item.page_number == null ? "" : String(item.page_number),
+    page: wordPositionInput(item),
+    positionUnit: wordPosition(item).unit,
     chapterNumber: item.chapter_number == null ? "" : String(item.chapter_number),
     chapterName: item.chapter_name ?? "",
     teacherNote: combinedTeacherNote(item),
@@ -341,6 +350,7 @@ function blankDraft(surfaceText: string, defaultType: ItemType): PrepItemDraft {
 }
 
 export default function TeacherBookPrepPage() {
+  const [positionUnit, setPositionUnit] = useState<ProgressTrackingMethod>("page");
   const params = useParams<{ teacherBookId: string }>();
   const searchParams = useSearchParams();
   const teacherBookId = params.teacherBookId;
@@ -383,10 +393,10 @@ export default function TeacherBookPrepPage() {
     return Array.from(
       new Set(
         savedItems
-          .map((item) => item.page_number)
-          .filter((page): page is number => page != null)
+          .map(wordPositionText)
+          .filter(Boolean)
       )
-    ).sort((a, b) => a - b);
+    ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   }, [savedItems]);
 
   const chapterNameOptions = useMemo(() => {
@@ -434,10 +444,10 @@ export default function TeacherBookPrepPage() {
   const visibleSavedItems = useMemo(() => {
     const query = savedSearch.trim().toLowerCase();
     const pageNumber =
-      savedPageFilter === "all" ? null : Number.parseInt(savedPageFilter, 10);
+      savedPageFilter === "all" ? null : savedPageFilter;
 
     return savedItems.filter((item) => {
-      if (pageNumber != null && item.page_number !== pageNumber) return false;
+      if (pageNumber != null && wordPositionText(item) !== pageNumber) return false;
       if (!query) return true;
       return savedItemSearchText(item).includes(query);
     });
@@ -545,10 +555,13 @@ export default function TeacherBookPrepPage() {
         return;
       }
 
+      const { data: reader } = await supabase.from("user_books").select("progress_tracking_method").eq("user_id", teacherBookRow.teacher_id).eq("book_id", teacherBookRow.book_id).limit(1).maybeSingle();
+      setPositionUnit(reader?.progress_tracking_method ?? "page");
+
       const { data: itemRows, error: itemsError } = await supabase
         .from("teacher_book_items")
         .select(
-          "id, item_type, surface_text, reading, meaning, vocabulary_cache_id, page_number, page_order, chapter_number, chapter_name, teacher_note, explanation, translation, support_url, created_at"
+          "id, item_type, surface_text, reading, meaning, vocabulary_cache_id, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, teacher_note, explanation, translation, support_url, created_at"
         )
         .eq("teacher_book_id", teacherBookId)
         .order("page_number", { ascending: true, nullsFirst: false })
@@ -568,7 +581,7 @@ export default function TeacherBookPrepPage() {
         const { data: fallbackRows, error: fallbackError } = await supabase
           .from("teacher_book_items")
           .select(
-            "id, item_type, surface_text, reading, meaning, vocabulary_cache_id, page_number, chapter_number, chapter_name, teacher_note, explanation, translation, created_at"
+            "id, item_type, surface_text, reading, meaning, vocabulary_cache_id, page_number, position_unit, position_value, percent_location, chapter_number, chapter_name, teacher_note, explanation, translation, created_at"
           )
           .eq("teacher_book_id", teacherBookId)
           .order("page_number", { ascending: true, nullsFirst: false })
@@ -830,7 +843,6 @@ export default function TeacherBookPrepPage() {
 
     try {
       const payload = [];
-      const book = firstBook(teacherBook?.books ?? null);
       const existingMaxPageOrder = savedItems.reduce((maxOrder, item) => {
         const pageOrder = Number(item.page_order);
         return Number.isFinite(pageOrder) ? Math.max(maxOrder, pageOrder) : maxOrder;
@@ -847,7 +859,7 @@ export default function TeacherBookPrepPage() {
           knownChapterNumber ||
           "";
 
-        const parsedPage = parseOptionalPageLocationInput(pageValue, book?.page_count ?? null);
+        const parsedPage = parseWordPosition(pageValue, positionUnit);
         if (parsedPage.error) throw new Error(parsedPage.error);
 
         payload.push({
@@ -857,7 +869,7 @@ export default function TeacherBookPrepPage() {
           reading: cleanNullable(draft.reading),
           meaning: cleanNullable(draft.meaning),
           vocabulary_cache_id: draft.vocabularyCacheId,
-          page_number: parsedPage.value,
+          ...wordPositionPayload(parsedPage.value, positionUnit),
           page_order: existingMaxPageOrder + payload.length + 1,
           chapter_number: toNullableInt(chapterNumberValue),
           chapter_name: cleanNullable(chapterNameValue),
@@ -935,8 +947,7 @@ export default function TeacherBookPrepPage() {
     setMessage("Saving prep item...");
 
     try {
-      const book = firstBook(teacherBook?.books ?? null);
-      const parsedPage = parseOptionalPageLocationInput(editDraft.page, book?.page_count ?? null);
+      const parsedPage = parseWordPosition(editDraft.page, editDraft.positionUnit);
       if (parsedPage.error) throw new Error(parsedPage.error);
 
       const payload = {
@@ -944,7 +955,7 @@ export default function TeacherBookPrepPage() {
         surface_text: cleanNullable(editDraft.surfaceText),
         reading: cleanNullable(editDraft.reading),
         meaning: cleanNullable(editDraft.meaning),
-        page_number: parsedPage.value,
+        ...wordPositionPayload(parsedPage.value, editDraft.positionUnit),
         chapter_number: toNullableInt(editDraft.chapterNumber),
         chapter_name: cleanNullable(editDraft.chapterName),
         teacher_note: cleanNullable(editDraft.teacherNote),
@@ -989,36 +1000,35 @@ export default function TeacherBookPrepPage() {
   }
 
   async function saveSavedItemPage(item: TeacherBookItem, value: string) {
-    const book = firstBook(teacherBook?.books ?? null);
-    const parsedPage = parseOptionalPageLocationInput(value, book?.page_count ?? null);
+    const parsedPage = parseWordPosition(value, wordPosition(item).unit);
     if (parsedPage.error) {
       setMessage(parsedPage.error);
       return;
     }
     const nextPage = parsedPage.value;
-    if ((item.page_number ?? null) === nextPage) return;
+    if (wordPosition(item).value === nextPage) return;
 
-    const previousPage = item.page_number ?? null;
+    const previousPage = wordPosition(item).value;
     setPageSavingItemId(item.id);
     setSavedItems((prev) =>
       prev.map((savedItem) =>
-        savedItem.id === item.id ? { ...savedItem, page_number: nextPage } : savedItem
+        savedItem.id === item.id ? { ...savedItem, ...wordPositionPayload(nextPage, wordPosition(item).unit) } : savedItem
       )
     );
 
     try {
       const { error } = await supabase
         .from("teacher_book_items")
-        .update({ page_number: nextPage })
+        .update({ ...wordPositionPayload(nextPage, wordPosition(item).unit) })
         .eq("id", item.id)
         .eq("teacher_book_id", teacherBookId);
 
       if (error) throw error;
-      setMessage("Page updated.");
+      setMessage("Position updated.");
     } catch (error: any) {
       setSavedItems((prev) =>
         prev.map((savedItem) =>
-          savedItem.id === item.id ? { ...savedItem, page_number: previousPage } : savedItem
+          savedItem.id === item.id ? { ...savedItem, ...wordPositionPayload(previousPage, wordPosition(item).unit) } : savedItem
         )
       );
       setMessage(error?.message ?? "Could not update page.");
@@ -1187,11 +1197,11 @@ export default function TeacherBookPrepPage() {
                               </p>
                             ) : null}
                           </div>
-                          {[chapterDisplay(item), item.page_number == null ? "" : `p. ${item.page_number}`]
+                          {[chapterDisplay(item), wordPositionText(item)]
                             .filter(Boolean)
                             .join(" · ") ? (
                             <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-stone-500 shadow-sm">
-                              {[chapterDisplay(item), item.page_number == null ? "" : `p. ${item.page_number}`]
+                              {[chapterDisplay(item), wordPositionText(item)]
                                 .filter(Boolean)
                                 .join(" · ")}
                             </span>
@@ -1409,6 +1419,7 @@ export default function TeacherBookPrepPage() {
                 />
 
                 <TeacherPrepBulkFieldsPanel
+                  positionUnit={positionUnit}
                   pageNumber={bulkPageNumber}
                   onPageNumberChange={setBulkPageNumber}
                   chapterNumber={bulkChapterNumber}
@@ -1458,15 +1469,7 @@ export default function TeacherBookPrepPage() {
                       </div>
 
                       <div className="grid gap-3 md:grid-cols-3">
-                        <label className="text-sm">
-                          <span className="mb-1 block text-xs text-gray-500">Page or %</span>
-                          <input
-                            value={draft.page}
-                            onChange={(event) => updateDraft(index, { page: event.target.value })}
-                            placeholder="p. 42 or 18%"
-                            className="w-full rounded border p-2 text-sm"
-                          />
-                        </label>
+                        <WordPositionField unit={positionUnit} value={draft.page} onChange={value => updateDraft(index, { page: value })} />
                         <ChapterNameCombobox
                           value={draft.chapterName}
                           onChange={(value) => updateDraftChapterName(index, value)}
@@ -1542,7 +1545,7 @@ export default function TeacherBookPrepPage() {
                           Chapter
                         </th>
                         <th className="w-20 p-2 text-xs font-semibold text-stone-600">
-                          Page
+                          Position
                         </th>
                         <th className="w-36 p-2 text-xs font-semibold text-stone-600">
                           Actions
@@ -1605,8 +1608,10 @@ export default function TeacherBookPrepPage() {
                                 {chapterDisplay(item)}
                               </td>
                               <td className="border-t border-stone-100 p-2 text-stone-700">
+                                <span className="text-xs text-stone-500">{positionLabel(wordPosition(item).unit)}</span>
                                 <InlinePageNumberInput
-                                  pageNumber={item.page_number}
+                                  positionUnit={wordPosition(item).unit}
+                                  pageNumber={wordPosition(item).value}
                                   disabled={pageSavingItemId === item.id}
                                   onPageChange={(value) => saveSavedItemPage(item, value)}
                                 />
@@ -1787,15 +1792,7 @@ export default function TeacherBookPrepPage() {
                 </div>
 
                 <div className="mt-3 grid gap-3 md:grid-cols-3">
-                  <label className="text-sm">
-                    <span className="mb-1 block text-xs text-gray-500">Page or %</span>
-                    <input
-	                      value={editDraft.page}
-	                      onChange={(event) => updateEditDraft({ page: event.target.value })}
-	                      placeholder="p. 42 or 18%"
-	                      className="w-full rounded border p-2 text-sm"
-                    />
-                  </label>
+                  <WordPositionField unit={editDraft.positionUnit} value={editDraft.page} onChange={value => setEditDraft(current => current ? { ...current, page: value } : current)} onUnitChange={unit => setEditDraft(current => current ? { ...current, positionUnit: unit } : current)} />
                   <ChapterNameCombobox
                     value={editDraft.chapterName}
                     onChange={updateEditDraftChapterName}

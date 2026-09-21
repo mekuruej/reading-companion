@@ -20,7 +20,9 @@ import BulkColumnPastePanel from "./components/BulkColumnPastePanel";
 import BulkApplyFieldsPanel from "./components/BulkApplyFieldsPanel";
 import BulkDefinitionReviewItem from "./components/BulkDefinitionReviewItem";
 import BulkDetailEditItem from "./components/BulkDetailEditItem";
-import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
+import { parseWordPosition, wordPosition, wordPositionInput, wordPositionPayload, positionLabel } from "@/lib/vocabulary/wordPosition";
+
 
 
 // -------------------------------------------------------------
@@ -120,6 +122,7 @@ type BulkItem = {
 type BulkStep = "paste" | "definitions" | "details" | "done";
 
 type LastSavedWordContext = {
+  positionUnit?: ProgressTrackingMethod;
   surface: string;
   page: string;
 };
@@ -135,6 +138,7 @@ type TeachingBulkDestination =
       type: "teacher";
       userBookId: string;
       label: string;
+      positionUnit: ProgressTrackingMethod;
     }
   | {
       type: "student";
@@ -142,6 +146,7 @@ type TeachingBulkDestination =
       userBookId: string;
       studentId: string;
       label: string;
+      positionUnit: ProgressTrackingMethod;
     };
 
 // -------------------------------------------------------------
@@ -153,7 +158,7 @@ export default function BulkVocabPage() {
   const [userBookId, setUserBookId] = useState("");
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState<string | null>(null);
-  const [bookPageCount, setBookPageCount] = useState<number | null>(null);
+  const [positionUnit, setPositionUnit] = useState<ProgressTrackingMethod>("page");
   const [teacherStudentContext, setTeacherStudentContext] =
     useState<TeacherStudentBulkContext | null>(null);
   const [isTeachingModeBulkAdd, setIsTeachingModeBulkAdd] = useState(false);
@@ -186,15 +191,15 @@ export default function BulkVocabPage() {
 
   const bulkProgressLine = useMemo(() => {
     const parts = [];
-    const currentPage = bulkPageNumber.trim() || lastSavedWordContext?.page || "";
+    const currentPage = bulkPageNumber.trim() || (lastSavedWordContext?.positionUnit === positionUnit ? lastSavedWordContext.page : "") || "";
 
-    if (currentPage) parts.push(`On page ${currentPage}`);
+    if (currentPage) parts.push(`${positionLabel(positionUnit)} ${currentPage}`);
     if (lastSavedWordContext?.surface) {
       parts.push(`Last saved word: ${lastSavedWordContext.surface}`);
     }
 
     return parts.join(" · ");
-  }, [bulkPageNumber, lastSavedWordContext]);
+  }, [bulkPageNumber, lastSavedWordContext, positionUnit]);
 
   const selectedDestination = useMemo(() => {
     return teachingDestinations.find((destination) =>
@@ -259,7 +264,6 @@ export default function BulkVocabPage() {
       setAuthorizedUserBookId("");
       setBookTitle("");
       setBookCover(null);
-      setBookPageCount(null);
       setTeacherStudentContext(null);
       setTeachingDestinations([]);
       setSelectedTeachingDestination("teacher");
@@ -287,7 +291,7 @@ export default function BulkVocabPage() {
           .select(
             `
     id,
-    user_id,
+    user_id, progress_tracking_method,
     books:book_id (
       title,
       cover_url,
@@ -385,7 +389,7 @@ export default function BulkVocabPage() {
         setAuthorizedUserBookId((data as any).id);
         setBookTitle(b?.title ?? "");
         setBookCover(b?.cover_url ?? null);
-        setBookPageCount(b?.page_count ?? null);
+        setPositionUnit(data.progress_tracking_method ?? "page");
 
         if (isTeachingModeBulkAdd) {
           if (!canUseTeachingBulkAdd) {
@@ -554,7 +558,7 @@ export default function BulkVocabPage() {
 
     const { data, error } = await supabase
       .from("user_book_words")
-      .select("surface, page_number, created_at")
+      .select("surface, page_number, position_unit, position_value, percent_location, created_at")
       .eq("user_book_id", authorizedUserBookId)
       .order("created_at", { ascending: false })
       .limit(1);
@@ -569,7 +573,8 @@ export default function BulkVocabPage() {
       latest?.surface
         ? {
           surface: latest.surface,
-          page: latest.page_number != null ? String(latest.page_number) : "",
+          page: wordPositionInput(latest),
+            positionUnit: wordPosition(latest).unit,
         }
         : null
     );
@@ -592,6 +597,11 @@ export default function BulkVocabPage() {
     setSelectedTeachingDestination(value);
     if (destination) {
       setAuthorizedUserBookId(destination.userBookId);
+      if (positionUnit !== destination.positionUnit) {
+        setPositionUnit(destination.positionUnit);
+        setBulkPageNumber(""); setBulkPageList("");
+        setItems(previous => previous.map(item => ({ ...item, page: "" })));
+      }
       setLastSavedWordContext(null);
     }
   }
@@ -956,7 +966,7 @@ export default function BulkVocabPage() {
 
       const today = new Date().toISOString().slice(0, 10);
       const itemsWithPages = items.map((item, index) => {
-        const parsedPage = parseOptionalPageLocationInput(item.page, bookPageCount);
+        const parsedPage = parseWordPosition(item.page, positionUnit);
         if (parsedPage.error) {
           throw new Error(`Word ${index + 1}: ${parsedPage.error}`);
         }
@@ -979,6 +989,7 @@ export default function BulkVocabPage() {
           body: JSON.stringify({
             sourceUserBookId: userBookId,
             lessonBookId: selectedDestination.lessonBookId,
+            positionUnit,
             items,
           }),
         });
@@ -1045,8 +1056,8 @@ export default function BulkVocabPage() {
         if (chNum == null) query = query.is("chapter_number", null);
         else query = query.eq("chapter_number", chNum);
 
-        if (pgNum == null) query = query.is("page_number", null);
-        else query = query.eq("page_number", pgNum);
+        if (pgNum == null) query = query.eq("position_unit", positionUnit).is("position_value", null);
+        else query = query.eq("position_unit", positionUnit).eq("position_value", pgNum);
 
         const { data: existingRows, error: existingErr } = await query;
         if (existingErr) throw existingErr;
@@ -1079,7 +1090,7 @@ export default function BulkVocabPage() {
           meaning_choice_index: i.meaningChoiceIndex,
           jlpt: normalizeJlpt(i.jlpt),
           is_common: !!i.isCommon,
-          page_number: pageNumber,
+          ...wordPositionPayload(pageNumber, positionUnit),
           page_order: nextPageOrder,
           chapter_number: chNum,
           chapter_name: i.chapterName?.trim() || null,
@@ -1114,8 +1125,8 @@ export default function BulkVocabPage() {
         setLastSavedWordContext({
           surface: lastSavedPayload.surface,
           page:
-            lastSavedPayload.page_number != null
-              ? String(lastSavedPayload.page_number)
+            lastSavedPayload.position_value != null
+              ? String(lastSavedPayload.position_value)
               : "",
         });
       }
@@ -1326,7 +1337,7 @@ export default function BulkVocabPage() {
         {step === "details" && (
           <>
             <BulkStepIntroCard
-              title="Step 3 — Add Page and Chapter Info"
+              title={`Step 3 — Add ${positionLabel(positionUnit)} and Chapter Info`}
               description="Use the bulk tools or edit row by row, then save everything."
             />
 
@@ -1339,6 +1350,7 @@ export default function BulkVocabPage() {
             </div>
 
             <BulkApplyFieldsPanel
+                positionUnit={positionUnit}
               bulkPageNumber={bulkPageNumber}
               bulkChapterNumber={bulkChapterNumber}
               bulkChapterName={bulkChapterName}
@@ -1351,6 +1363,7 @@ export default function BulkVocabPage() {
             />
 
             <BulkColumnPastePanel
+                positionUnit={positionUnit}
               bulkPageList={bulkPageList}
               bulkChapterNumberList={bulkChapterNumberList}
               bulkChapterNameList={bulkChapterNameList}
@@ -1364,6 +1377,7 @@ export default function BulkVocabPage() {
             <ul className="space-y-3">
               {items.map((i, idx) => (
                 <BulkDetailEditItem
+                positionUnit={positionUnit}
                   key={`${i.surface}_${idx}`}
                   surface={i.surface}
                   reading={i.reading}

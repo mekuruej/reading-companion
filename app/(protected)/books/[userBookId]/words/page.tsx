@@ -36,7 +36,9 @@ import {
   type LibraryStudyColorStatus,
   type LibraryStudyGateStatus,
 } from "@/lib/libraryStudyColor";
-import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
+import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
+import { parseWordPosition, wordPosition, wordPositionInput, wordPositionPayload, wordPositionText } from "@/lib/vocabulary/wordPosition";
+
 import { BookVocabBackToTopButton } from "./components/BookVocabBackToTopButton";
 import {
   resolveStudentWorkspaceBackContext,
@@ -69,6 +71,9 @@ type WordRow = {
   other_definition: string | null;
   jlpt: string | null;
   is_common: boolean | null;
+  position_unit?: ProgressTrackingMethod | null;
+  position_value?: number | null;
+  percent_location?: number | null;
   page_number: number | null;
   page_order: number | null;
   chapter_number: number | null;
@@ -302,7 +307,6 @@ export default function BookWordsPage() {
 
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
-  const [bookPageCount, setBookPageCount] = useState<number | null>(null);
   const [studentWorkspaceBackContext, setStudentWorkspaceBackContext] =
     useState<StudentWorkspaceBackContext | null>(null);
 
@@ -325,6 +329,7 @@ export default function BookWordsPage() {
   const [editMeaning, setEditMeaning] = useState("");
   const [editOtherDefinition, setEditOtherDefinition] = useState("");
   const [editJlpt, setEditJlpt] = useState("");
+  const [editPositionUnit, setEditPositionUnit] = useState<ProgressTrackingMethod>("page");
   const [editPage, setEditPage] = useState<string>("");
   const [editChapterNum, setEditChapterNum] = useState<string>("");
   const [editChapterName, setEditChapterName] = useState("");
@@ -337,7 +342,7 @@ export default function BookWordsPage() {
     return (
       (a.chapter_number ?? null) === (b.chapter_number ?? null) &&
       (a.chapter_name ?? "").trim() === (b.chapter_name ?? "").trim() &&
-      (a.page_number ?? null) === (b.page_number ?? null)
+      wordPosition(a).unit === wordPosition(b).unit && wordPosition(a).value === wordPosition(b).value
     );
   }
 
@@ -422,7 +427,8 @@ export default function BookWordsPage() {
     setEditOtherDefinition(w.other_definition ?? "");
     setEditJlpt(w.jlpt ?? "");
 
-    setEditPage(w.page_number != null ? String(w.page_number) : "");
+    setEditPage(wordPositionInput(w));
+    setEditPositionUnit(wordPosition(w).unit);
     setEditChapterNum(w.chapter_number != null ? String(w.chapter_number) : "");
     setEditChapterName(w.chapter_name ?? "");
     setEditHideKanjiInReadingSupport(!!w.hide_kanji_in_reading_support);
@@ -497,7 +503,7 @@ export default function BookWordsPage() {
 
     const hasChoices = (editMeaningChoices?.length ?? 0) > 0;
 
-    const parsedEditPage = parseOptionalPageLocationInput(editPage, bookPageCount);
+    const parsedEditPage = parseWordPosition(editPage, editPositionUnit);
     if (parsedEditPage.error) {
       setEditErr(parsedEditPage.error);
       setEditSaving(false);
@@ -510,7 +516,7 @@ export default function BookWordsPage() {
       meaning: editMeaning.trim() ? editMeaning.trim() : null,
       other_definition: null,
       jlpt: editJlpt.trim() ? editJlpt.trim().toUpperCase() : null,
-      page_number: parsedEditPage.value,
+      ...wordPositionPayload(parsedEditPage.value, editPositionUnit),
       chapter_number: parseNullableInt(editChapterNum),
       chapter_name: editChapterName.trim() ? editChapterName.trim() : null,
       hide_kanji_in_reading_support: editHideKanjiInReadingSupport,
@@ -584,30 +590,30 @@ export default function BookWordsPage() {
   async function updateWordPage(w: WordRow, value: string) {
     if (!canUseVocabularyTools) return;
 
-    const parsedPage = parseOptionalPageLocationInput(value, bookPageCount);
+    const parsedPage = parseWordPosition(value, wordPosition(w).unit);
     if (parsedPage.error) {
       alert(parsedPage.error);
       return;
     }
     const nextPage = parsedPage.value;
-    if ((w.page_number ?? null) === nextPage) return;
+    if (wordPosition(w).value === nextPage) return;
 
-    const previousPage = w.page_number ?? null;
+    const previousPage = wordPosition(w).value;
     setWords((prev) =>
-      prev.map((word) => (word.id === w.id ? { ...word, page_number: nextPage } : word))
+      prev.map((word) => (word.id === w.id ? { ...word, ...wordPositionPayload(nextPage, wordPosition(w).unit) } : word))
     );
 
     try {
       const { error } = await supabase
         .from("user_book_words")
-        .update({ page_number: nextPage })
+        .update({ ...wordPositionPayload(nextPage, wordPosition(w).unit) })
         .eq("id", w.id)
         .eq("user_book_id", userBookId);
 
       if (error) throw error;
     } catch (e: any) {
       setWords((prev) =>
-        prev.map((word) => (word.id === w.id ? { ...word, page_number: previousPage } : word))
+        prev.map((word) => (word.id === w.id ? { ...word, ...wordPositionPayload(previousPage, wordPosition(w).unit) } : word))
       );
       alert(e?.message ?? "Failed to update page number.");
     }
@@ -732,7 +738,6 @@ export default function BookWordsPage() {
 
         setBookTitle((ub as any)?.books?.title ?? "");
         setBookCover((ub as any)?.books?.cover_url ?? "");
-        setBookPageCount((ub as any)?.books?.page_count ?? null);
         const ownerUserId = (ub as any)?.user_id ?? authedUser.id;
         const bookId = (ub as any)?.book_id ?? null;
 
@@ -891,7 +896,7 @@ export default function BookWordsPage() {
               other_definition,
               jlpt,
               is_common,
-              page_number,
+              page_number, position_unit, position_value, percent_location,
               page_order,
               chapter_number,
               chapter_name,
@@ -1072,7 +1077,7 @@ export default function BookWordsPage() {
         w.meaning ?? "",
         normalizeJlpt(w.jlpt),
         chLabel,
-        w.page_number?.toString() ?? "",
+        wordPositionText(w),
         w.meaning_choice_index != null ? String(w.meaning_choice_index + 1) : "o",
       ]
         .join(" ")
@@ -1088,8 +1093,10 @@ export default function BookWordsPage() {
       const bChapter = b.chapter_number ?? Number.MAX_SAFE_INTEGER;
       if (aChapter !== bChapter) return aChapter - bChapter;
 
-      const aPage = a.page_number ?? Number.MAX_SAFE_INTEGER;
-      const bPage = b.page_number ?? Number.MAX_SAFE_INTEGER;
+      const unitOrder = wordPosition(a).unit.localeCompare(wordPosition(b).unit);
+      if (unitOrder) return unitOrder;
+      const aPage = wordPosition(a).value ?? Number.MAX_SAFE_INTEGER;
+      const bPage = wordPosition(b).value ?? Number.MAX_SAFE_INTEGER;
       if (aPage !== bPage) return aPage - bPage;
 
       const aOrder = a.page_order ?? Number.MAX_SAFE_INTEGER;
@@ -1122,14 +1129,14 @@ export default function BookWordsPage() {
         : chapterOptions.find((option) => option.value === exportChapter)?.label ?? "chapter";
 
     const rows = [
-      ["Surface", "Reading", "Meaning", "Def #", "Chapter", "Page", "JLPT", "Common"],
+      ["Surface", "Reading", "Meaning", "Def #", "Chapter", "Position", "JLPT", "Common"],
       ...exportWords.map((word) => [
         word.surface,
         word.reading ?? "",
         word.meaning ?? "",
         word.meaning_choice_index == null ? "" : word.meaning_choice_index + 1,
         chapterCsvLabel(word),
-        word.page_number == null ? "" : word.page_number,
+        wordPositionText(word),
         word.jlpt ?? "",
         commonCsvLabel(word.is_common),
       ]),
@@ -1301,7 +1308,9 @@ export default function BookWordsPage() {
             editMeaning={editMeaning}
             editChapterNum={editChapterNum}
             editChapterName={editChapterName}
-            editPage={editPage}
+            positionUnit={editPositionUnit}
+              onPositionUnitChange={setEditPositionUnit}
+              editPage={editPage}
             editMeaningChoices={editMeaningChoices}
             editMeaningChoiceIndex={editMeaningChoiceIndex}
             editHideKanjiInReadingSupport={editHideKanjiInReadingSupport}
@@ -1413,7 +1422,8 @@ export default function BookWordsPage() {
               surface={w.surface}
               reading={w.reading}
               meaning={w.meaning}
-              pageNumber={w.page_number}
+              positionUnit={wordPosition(w).unit}
+              pageNumber={wordPosition(w).value}
               readOnly={!canUseVocabularyTools}
               onPageChange={(value) => updateWordPage(w, value)}
               canMoveUp={orderPosition.canMoveUp}
@@ -1459,7 +1469,8 @@ export default function BookWordsPage() {
                 surface={w.surface}
                 reading={w.reading}
                 meaning={w.meaning}
-                pageNumber={w.page_number}
+                positionUnit={wordPosition(w).unit}
+              pageNumber={wordPosition(w).value}
                 readOnly={!canUseVocabularyTools}
                 onPageChange={(value) => updateWordPage(w, value)}
                 canMoveUp={orderPosition.canMoveUp}

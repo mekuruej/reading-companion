@@ -2,6 +2,7 @@
 // 
 "use client";
 
+import { type WordPositionRecord } from "@/lib/vocabulary/wordPosition";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -24,6 +25,9 @@ type SeenInstance = {
   meaning_choices: any | null;
   jlpt: string | null;
   is_common: boolean | null;
+  position_unit?: WordPositionRecord["position_unit"];
+  position_value?: number | null;
+  percent_location?: number | null;
   page_number: number | null;
   chapter_number: number | null;
   chapter_name: string | null;
@@ -324,7 +328,7 @@ export default function WordHistorySearchPage() {
           meaning_choices,
           jlpt,
           is_common,
-          page_number,
+          page_number, position_unit, position_value, percent_location,
           chapter_number,
           chapter_name,
           created_at
@@ -346,6 +350,7 @@ export default function WordHistorySearchPage() {
         jlpt: row.jlpt ?? null,
         is_common: row.is_common ?? null,
         page_number: row.page_number ?? null,
+        position_unit: row.position_unit, position_value: row.position_value, percent_location: row.percent_location,
         chapter_number: row.chapter_number ?? null,
         chapter_name: row.chapter_name ?? null,
         created_at: row.created_at,
