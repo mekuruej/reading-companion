@@ -65,12 +65,15 @@ export function progressSummary(sessions: ProgressRecord[], method: ProgressTrac
   const matching = method ? sessions.filter((s) => sessionProgressUnit(s) === method) : [];
   const positions = matching.map(sessionEnd).filter((p): p is number => p != null);
   const position = positions.length ? Math.max(...positions) : null;
-  const timed = matching.filter((s) => !s.is_filler && s.session_mode !== "listening" && (s.minutes_read ?? 0) > 0 && sessionDistance(s) != null);
+  const reading = matching.filter((s) => !s.is_filler && s.session_mode !== "listening" && sessionDistance(s) != null);
+  const totalDistance = reading.reduce((sum, s) => sum + (sessionDistance(s) ?? 0), 0);
+  const timed = reading.filter((s) => (s.minutes_read ?? 0) > 0);
   const distance = timed.reduce((sum, s) => sum + (sessionDistance(s) ?? 0), 0);
   const minutes = timed.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
   const total = matchingTotal(method, book);
   const rate = minutes > 0 && distance > 0 ? distance / minutes * 60 : null;
   return { position, total, percent: completionPercent(position, method, book), rate,
+    totalDistance, averageMinutesPerUnit: minutes > 0 && distance > 0 ? minutes / distance : null,
     remainingMinutes: position != null && total != null && position <= total && rate ? (total - position) / rate * 60 : null };
 }
 export function parseProgressRange(startText: string, endText: string, method: ProgressTrackingMethod, total: number | null) {

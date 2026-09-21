@@ -720,6 +720,8 @@ export default function BooksPage() {
 
     setLibraryBooksError(null);
     setRows(rowsWithTeachingBadges);
+    // Show the books immediately; statistics and alerts can finish afterward.
+    setLibraryBooksLoading(false);
 
     const userBookIds = rowsWithTeachingBadges
       .filter((r: any) => resolvePersonalTrackingStatus(r) !== "not_tracking")

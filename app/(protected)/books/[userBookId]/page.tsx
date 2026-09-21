@@ -1179,9 +1179,9 @@ export default function BookHubPage() {
     canSeeVocabularySummary && lastSavedWord.trim() ? lastSavedWord.trim() : "";
   const bookHubLastChapterLabel =
     canSeeVocabularySummary && lastSavedChapter.trim() ? lastSavedChapter.trim() : "";
-  const bookHubLastPage = furthestPage ?? (canSeeVocabularySummary ? lastSavedWordPage : null);
+  const bookHubLastPosition = trackedProgress.position ?? (tracking.method === "page" && canSeeVocabularySummary ? lastSavedWordPage : null);
   const bookHubLastPageLabel =
-    isNativeAudiobook ? "" : bookHubLastPage != null ? `Page ${bookHubLastPage}` : "";
+    isNativeAudiobook || bookHubLastPosition == null ? "" : `${progressLabels(tracking.method).unit} ${bookHubLastPosition}${tracking.method === "percent" ? "%" : ""}`;
 
   const bookHubDaysEngagedLabel = daysRead != null ? String(daysRead) : "—";
   const savedWordsPerPage =
@@ -1192,6 +1192,24 @@ export default function BookHubPage() {
     savedWordsPerPage != null ? savedWordsPerPage.toFixed(1) : "—";
   const bookHubAverageMinutesPerPageLabel =
     averageMinutesPerPage != null ? averageMinutesPerPage.toFixed(1) : "—";
+  const bookHubSummaryStats = isEnglishNativeTrackerBook ? [] : tracking.method === "kindle_location" ? [
+    { label: "Days Engaged", value: bookHubDaysEngagedLabel, caption: "Reading or listening" },
+    ...(canSeeVocabularySummary ? [{
+      label: "Saved Words/Location",
+      value: uniqueLookupCount != null && trackedProgress.totalDistance > 0
+        ? (uniqueLookupCount / trackedProgress.totalDistance).toFixed(2) : "—",
+      caption: "Saved-word load",
+    }] : []),
+    {
+      label: "Avg Min/Location",
+      value: trackedProgress.averageMinutesPerUnit != null
+        ? trackedProgress.averageMinutesPerUnit.toFixed(2) : "—",
+      caption: "Timed location-tracked reading",
+    },
+  ] : tracking.method === "percent" ? [
+    { label: "Days Engaged", value: bookHubDaysEngagedLabel, caption: "Reading or listening" },
+    { label: "Percentage Points/Hour", value: trackedProgress.rate != null ? trackedProgress.rate.toFixed(1) : "—", caption: "Timed reading in the selected unit" },
+  ] : undefined;
   const shouldNudgeStartBook = !started && realReadingSessions.length === 0;
   const lastReadDate = useMemo(() => {
     if (visualReadingSessions.length === 0) return null;
@@ -5659,7 +5677,7 @@ export default function BookHubPage() {
                     averageMinutesPerPageLabel={bookHubAverageMinutesPerPageLabel}
                     showVocabularyStats={canSeeVocabularySummary}
                     showProgressSection={false}
-                    summaryStats={isEnglishNativeTrackerBook ? [] : undefined}
+                    summaryStats={bookHubSummaryStats}
                   />
                 </div>
               ) : null}
@@ -5716,7 +5734,7 @@ export default function BookHubPage() {
                 averageMinutesPerPageLabel={bookHubAverageMinutesPerPageLabel}
                 showVocabularyStats={canSeeVocabularySummary}
                 showSummaryCard={false}
-                summaryStats={isEnglishNativeTrackerBook ? [] : undefined}
+                summaryStats={bookHubSummaryStats}
               />
 
               <BookHubActionPrompt />

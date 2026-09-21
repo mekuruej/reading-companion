@@ -158,3 +158,47 @@ test('timer storage round-trips the draft unit with elapsed time',()=> {
     assert.equal(timer.readPersistedTimedSession('fluid','another-copy'),null);
   } finally { delete globalThis.window; }
 });
+
+test('Book Hub reached position follows Kindle sessions beyond legacy page history', () => {
+  const filename = path.resolve(__dirname, '../app/(protected)/books/[userBookId]/page.tsx');
+  const ast = ts.createSourceFile(filename, fs.readFileSync(filename, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const names = ['bookHubLastPosition', 'bookHubLastPageLabel'];
+  const declarations = new Map();
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && names.includes(node.name.getText(ast))) declarations.set(node.name.getText(ast), node.getText(ast));
+    ts.forEachChild(node, visit);
+  }
+  visit(ast);
+  const code = ts.transpileModule(names.map(name => `const ${declarations.get(name)};`).join('\n'), {compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText;
+  const label = new Function('trackedProgress', 'tracking', 'canSeeVocabularySummary', 'lastSavedWordPage', 'isNativeAudiobook', 'progressLabels', `${code}; return bookHubLastPageLabel;`);
+  const sessions = [
+    {tracking_unit:'page', start_page:28, end_page:37, minutes_read:24},
+    {tracking_unit:'kindle_location', start_position:38, end_position:52, start_page:null, end_page:null, minutes_read:25},
+  ];
+  const summary = p.progressSummary(sessions, 'kindle_location', {kindle_location_count:196});
+  assert.equal(label(summary, {method:'kindle_location'}, true, 37, false, p.progressLabels), 'Location 52');
+  assert.equal(summary.percent, 26.5);
+  assert.equal(summary.rate, 33.6);
+  assert.equal(label({position:null}, {method:'kindle_location'}, true, 37, false, p.progressLabels), '');
+  assert.equal(label({position:null}, {method:'page'}, true, 37, false, p.progressLabels), 'Page 37');
+  assert.equal(label({position:0}, {method:'percent'}, true, 37, false, p.progressLabels), 'Percent 0%');
+});
+
+test('location hub averages use matching reading distances and only paired timed minutes', () => {
+  const location = (start, end, extra = {}) => ({...p.progressPayload('kindle_location', start, end, 4000), ...extra});
+  const sessions = [
+    location(100, 300, {minutes_read: 30}),
+    location(300, 400),
+    location(null, 500, {minutes_read: 60}),
+    location(400, 800, {minutes_read: 20, session_mode: 'listening'}),
+    location(0, 100, {is_filler: true}),
+    {...p.progressPayload('page', 1, 20, 200), minutes_read: 50},
+  ];
+  const summary = p.progressSummary(sessions, 'kindle_location', totals);
+  assert.equal(summary.totalDistance, 300);
+  assert.equal(summary.averageMinutesPerUnit, 0.15);
+  assert.equal(summary.rate, 400);
+  for (const entries of [[], [location(100, 100, {minutes_read: 10})], [location(100, 200)]]) {
+    assert.equal(p.progressSummary(entries, 'kindle_location', totals).averageMinutesPerUnit, null);
+  }
+});

@@ -1259,7 +1259,16 @@ export function CuriosityReadingExperience({
         .maybeSingle();
 
       if (cacheLookupError) {
-        console.error("Error looking up vocabulary cache:", cacheLookupError);
+        console.error("Error looking up vocabulary cache:", {
+          message: cacheLookupError.message,
+          details: cacheLookupError.details,
+          hint: cacheLookupError.hint,
+          code: cacheLookupError.code,
+          table: "vocabulary_cache",
+          select: "id",
+          surface: normalizedCacheSurface,
+          reading: normalizedReading || "",
+        });
         setMessage(`❌ Could not save word: ${cacheLookupError.message}`);
         return;
       }
@@ -1277,7 +1286,12 @@ export function CuriosityReadingExperience({
           .single();
 
         if (cacheInsertError) {
-          console.error("Error creating vocabulary cache row:", cacheInsertError);
+          console.error("Error creating vocabulary cache row:", {
+            message: cacheInsertError.message,
+            details: cacheInsertError.details,
+            hint: cacheInsertError.hint,
+            code: cacheInsertError.code,
+          });
           setMessage(cacheInsertError.message.includes("vocabulary_cache_reading_not_blank")
             ? "The reading cannot be left blank."
             : `❌ Could not save word: ${cacheInsertError.message}`);

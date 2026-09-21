@@ -86,7 +86,7 @@ export default function BookHubProgressSummary({
                       <span className="text-stone-400">·</span>{" "}
                     </>
                   ) : null}
-                  Page reached: <span className="text-stone-800">{lastPageLabel}</span>
+                  Position reached: <span className="text-stone-800">{lastPageLabel}</span>
                 </>
               ) : null}
             </div>
