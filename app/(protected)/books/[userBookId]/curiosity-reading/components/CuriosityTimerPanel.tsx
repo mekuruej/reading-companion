@@ -125,17 +125,17 @@ export default function CuriosityTimerPanel({
 
           {listeningProgressOnly ? (
             <div>
-              <div className="mb-1 text-sm text-stone-600">Up to page or percent</div>
+              <div className="mb-1 text-sm text-stone-600">{endPageLabel}</div>
               <input
                 type="text"
                 inputMode="decimal"
                 value={sessionEndPage}
                 onChange={(event) => onSessionEndPageChange(event.target.value)}
-                placeholder="e.g. p. 42 or 18%"
+                placeholder={endPageLabel}
                 className="w-full rounded border px-3 py-2 text-sm"
               />
               <div className="mt-1 text-xs text-stone-500">
-                Optional. Use a page if you have the book open, or a percent for audiobook progress.
+                Optional. Use the saved progress tracking method for this copy.
               </div>
             </div>
           ) : (
@@ -144,7 +144,7 @@ export default function CuriosityTimerPanel({
                 <div className="mb-1 text-sm text-stone-600">{startPageLabel}</div>
                 <input
                   type="number"
-                  min={1}
+                  min={0} step="any"
                   value={sessionStartPage}
                   onChange={(event) =>
                     onSessionStartPageChange(event.target.value)
@@ -158,7 +158,7 @@ export default function CuriosityTimerPanel({
                 <div className="mb-1 text-sm text-stone-600">{endPageLabel}</div>
                 <input
                   type="number"
-                  min={1}
+                  min={0} step="any"
                   value={sessionEndPage}
                   onChange={(event) => onSessionEndPageChange(event.target.value)}
                   placeholder="e.g. 52"

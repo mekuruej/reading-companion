@@ -385,6 +385,7 @@ export async function POST(request: Request) {
     actorProfile,
     bookId,
     input: {
+      initialPersonalTrackingStatus: body?.initialPersonalTrackingStatus,
       mode,
       destinations: body?.destinations,
       targetUserId,

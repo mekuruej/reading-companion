@@ -44,6 +44,7 @@ function ymdLocal(date: Date) {
 }
 
 function sessionPages(row: SessionRow) {
+  if (row.start_page == null || row.end_page == null) return 0;
   const start = Number(row.start_page);
   const end = Number(row.end_page);
 
@@ -348,6 +349,8 @@ export default function ReadingHabitsPage() {
     let readingSessions = 0;
     let listeningSessions = 0;
 
+    let pageFluidMinutes = 0;
+    let pageCuriosityMinutes = 0;
     let timedFluidPages = 0;
     let timedCuriosityPages = 0;
 
@@ -361,6 +364,7 @@ export default function ReadingHabitsPage() {
 
       if (row.session_mode === "curiosity") {
         curiosityMinutes += minutes;
+        if (pages > 0 && minutes > 0) pageCuriosityMinutes += minutes;
         curiosityPages += pages;
         readingSessions += 1;
         if (minutes > 0) timedCuriosityPages += pages;
@@ -369,6 +373,7 @@ export default function ReadingHabitsPage() {
         listeningSessions += 1;
       } else {
         fluidMinutes += minutes;
+        if (pages > 0 && minutes > 0) pageFluidMinutes += minutes;
         fluidPages += pages;
         readingSessions += 1;
         if (minutes > 0) timedFluidPages += pages;
@@ -392,9 +397,9 @@ export default function ReadingHabitsPage() {
       readingMinutes,
       pagesRead,
       fluidMinutesPerPage:
-        timedFluidPages > 0 ? fluidMinutes / timedFluidPages : null,
+        timedFluidPages > 0 ? pageFluidMinutes / timedFluidPages : null,
       curiosityMinutesPerPage:
-        timedCuriosityPages > 0 ? curiosityMinutes / timedCuriosityPages : null,
+        timedCuriosityPages > 0 ? pageCuriosityMinutes / timedCuriosityPages : null,
     };
   }, [filteredSessions]);
 

@@ -1,6 +1,9 @@
 // Reading Sessions Page
 //
 "use client";
+import { useBookProgress } from "@/components/books/BookProgressProvider";
+import { progressLabels, matchingTotal, parseProgressRange, sessionStart, sessionEnd, sessionProgressUnit, sessionProgressLabel as formatSessionProgress, sessionDistance, type ProgressRecord } from "@/lib/books/readingProgress";
+
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -10,7 +13,6 @@ import { getBookIdentity } from "@/lib/books/bookIdentity";
 import { isNativeLanguageBook } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
-import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 
 type ProfileRole = "teacher" | "member" | "super_teacher" | "admin";
 
@@ -38,7 +40,7 @@ type UserBookRow = {
   books: BookRow | null;
 };
 
-type ReadingSession = {
+type ReadingSession = ProgressRecord & {
   id: string;
   user_book_id: string;
   read_on: string;
@@ -72,39 +74,8 @@ function isSuperTeacherFlag(value: unknown) {
   return value === true || value === "true";
 }
 
-function percentToPage(percent: number | null, pageCount: number | null) {
-  if (percent == null || !pageCount || pageCount <= 0) return null;
-  const clamped = Math.max(0, Math.min(100, percent));
-  return Math.max(1, Math.min(pageCount, Math.round((clamped / 100) * pageCount)));
-}
 
-function parseListeningProgressInput(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return { value: null, kind: null as "page" | "percent" | null };
-
-  const isPercent = trimmed.includes("%");
-  const isPage = /^p(?:age)?\.?\s*/i.test(trimmed);
-  const normalized = trimmed
-    .replace(/%/g, "")
-    .replace(/^p(?:age)?\.?\s*/i, "")
-    .trim();
-  const numeric = Number(normalized);
-
-  return {
-    value: Number.isFinite(numeric) ? Math.round(numeric) : Number.NaN,
-    kind: isPercent ? "percent" as const : isPage ? "page" as const : null,
-  };
-}
-
-function pageToPercent(page: number | null, pageCount: number | null) {
-  if (page == null || !pageCount || pageCount <= 0) return null;
-  return Math.max(0, Math.min(100, Math.round((page / pageCount) * 100)));
-}
-
-function formatYmd(value: string | null) {
-  if (!value) return "";
-  return value.slice(0, 10);
-}
+function formatYmd(value: string | null) { return value?.slice(0, 10) ?? ""; }
 
 async function getAccessToken() {
   const { data, error } = await supabase.auth.getSession();
@@ -139,6 +110,7 @@ async function callReadingSessionsApi(
 }
 
 export default function ReadingSessionsPage() {
+  const tracking = useBookProgress();
   const params = useParams<{ userBookId: string }>();
   const userBookId = params?.userBookId;
 
@@ -161,8 +133,6 @@ export default function ReadingSessionsPage() {
   const [isNativeBook, setIsNativeBook] = useState(false);
 
   const book = row?.books ?? null;
-  const usePercentMode = row?.progress_mode === "percent" && !!book?.page_count && book.page_count > 0;
-  const useListeningPercentMode = !!book?.page_count && book.page_count > 0;
   const realSessions = useMemo(() => sessions.filter((session) => !session.is_filler), [sessions]);
 
   useEffect(() => {
@@ -313,6 +283,11 @@ export default function ReadingSessionsPage() {
     }
   }
 
+  const editingProgressRecord = sessions.find((session) => session.id === editingSessionId);
+  const entryMethod = editingProgressRecord ? sessionProgressUnit(editingProgressRecord) ?? tracking.method : tracking.method;
+  const entryTotal = editingProgressRecord ? editingProgressRecord.progress_total ?? null : matchingTotal(entryMethod, tracking.totals);
+  const entryLabels = progressLabels(entryMethod);
+
   function startEditingSession(session: ReadingSession) {
     setEditingSessionId(session.id);
     setSessionDate(session.read_on);
@@ -321,8 +296,8 @@ export default function ReadingSessionsPage() {
         ? session.session_mode
         : "fluid"
     );
-    setSessionStartPage(session.start_page != null ? String(session.start_page) : "");
-    setSessionEndPage(session.end_page != null ? String(session.end_page) : "");
+    setSessionStartPage(sessionStart(session) == null ? "" : String(sessionStart(session)));
+    setSessionEndPage(sessionEnd(session) == null ? "" : String(sessionEnd(session)));
     setSessionMinutesRead(session.minutes_read != null ? String(session.minutes_read) : "");
   }
 
@@ -338,95 +313,17 @@ export default function ReadingSessionsPage() {
   async function saveSession() {
     if (!row?.id) return;
 
-    const usingPercentMode = row.progress_mode === "percent";
-    const usingListeningPercentMode =
-      sessionMode === "listening" && book?.page_count != null && book.page_count > 0;
-    const listeningEndInput =
-      sessionMode === "listening"
-        ? parseListeningProgressInput(sessionEndPage)
-        : null;
-    const endInputIsPercent =
-      sessionMode === "listening"
-        ? listeningEndInput?.kind === "percent" ||
-          (listeningEndInput?.kind !== "page" && usingListeningPercentMode)
-        : usingPercentMode;
-    const parsedStart =
-      sessionMode === "listening" || sessionStartPage.trim() === ""
-        ? null
-        : parseOptionalPageLocationInput(sessionStartPage, book?.page_count ?? null).value;
-    const parsedEnd =
-      sessionEndPage.trim() === ""
-        ? null
-        : sessionMode === "listening"
-          ? listeningEndInput?.value ?? null
-          : parseOptionalPageLocationInput(sessionEndPage, book?.page_count ?? null).value;
-    const startPageInputError =
-      sessionMode !== "listening" && sessionStartPage.trim()
-        ? parseOptionalPageLocationInput(sessionStartPage, book?.page_count ?? null).error
-        : null;
-    const endPageInputError =
-      sessionMode !== "listening" && sessionEndPage.trim()
-        ? parseOptionalPageLocationInput(sessionEndPage, book?.page_count ?? null).error
-        : null;
-
-    const start = parsedStart;
-    const end =
-      sessionMode === "listening" && endInputIsPercent
-        ? percentToPage(parsedEnd, book?.page_count ?? null) ?? parsedEnd
-        : parsedEnd;
+    if (!entryMethod) { tracking.requireMethod(); return; }
+    const parsed = parseProgressRange(sessionMode === "listening" ? "" : sessionStartPage, sessionEndPage, entryMethod, entryTotal);
+    if (parsed.error) { alert(parsed.error); return; }
+    if (!sessionDate) { alert("Please fill in the date."); return; }
     const minutes = sessionMinutesRead.trim() === "" ? null : Number(sessionMinutesRead);
-
-    if (!sessionDate) {
-      alert("Please fill in the date.");
-      return;
-    }
-
-    if (sessionMode !== "listening") {
-      if (usingPercentMode && (!book?.page_count || book.page_count <= 0)) {
-        alert("Percent progress needs a page count for this book.");
-        return;
-      }
-
-      if (
-        startPageInputError ||
-        endPageInputError ||
-        (usingPercentMode && (!Number.isFinite(parsedStart) || !Number.isFinite(parsedEnd))) ||
-        (!usingPercentMode && (!Number.isFinite(start) || !Number.isFinite(end)))
-      ) {
-        alert(startPageInputError || endPageInputError || "Please fill in start and end page or percent.");
-        return;
-      }
-
-      if ((end as number) < (start as number)) {
-        alert(usingPercentMode ? "End percent must be greater than or equal to start percent." : "End page must be greater than or equal to start page.");
-        return;
-      }
-    } else {
-      if (
-        endInputIsPercent &&
-        parsedEnd !== null &&
-        (!Number.isFinite(parsedEnd) || parsedEnd < 0 || parsedEnd > 100)
-      ) {
-        alert("Listening end percent must be between 0 and 100 if provided.");
-        return;
-      }
-
-      if (!endInputIsPercent && end !== null && (!Number.isFinite(end) || end <= 0)) {
-        alert("Listening end page must be greater than 0 if provided.");
-        return;
-      }
-    }
-
-    if (minutes !== null && (!Number.isFinite(minutes) || minutes <= 0)) {
-      alert("Minutes must be greater than 0 if provided.");
-      return;
-    }
+    if (minutes != null && (!Number.isFinite(minutes) || minutes <= 0)) { alert("Minutes must be greater than zero."); return; }
 
     const payload = {
       user_book_id: row.id,
       read_on: sessionDate,
-      start_page: sessionMode === "listening" ? null : start,
-      end_page: end,
+      ...parsed.payload,
       minutes_read: minutes,
       session_mode: sessionMode,
     };
@@ -506,6 +403,7 @@ export default function ReadingSessionsPage() {
     setDnfReason(nextDnfReason ?? "");
     setDnfNote(nextDnfNote ?? "");
     setWouldRetry(nextWouldRetry ?? "");
+    await tracking.refresh();
   }
 
   async function deleteSession(id: string) {
@@ -527,31 +425,7 @@ export default function ReadingSessionsPage() {
   }
 
   function sessionProgressLabel(session: ReadingSession) {
-    if (session.session_mode === "listening") {
-      if (session.end_page == null) return "Listening session";
-      const percent = pageToPercent(session.end_page, book?.page_count ?? null);
-      return percent != null ? `Listening · up to ${percent}%` : `Listening · up to p. ${session.end_page}`;
-    }
-
-    if (isNativeBook && session.session_mode === "curiosity") {
-      if (session.start_page == null || session.end_page == null) return "Reading session";
-      return usePercentMode
-        ? `Reading · ${pageToPercent(session.start_page, book?.page_count ?? null)}% -> ${pageToPercent(session.end_page, book?.page_count ?? null)}%`
-        : `Reading · p. ${session.start_page} -> ${session.end_page}`;
-    }
-
-    if (session.start_page == null && session.end_page != null) {
-      const progress = usePercentMode
-        ? `${pageToPercent(session.end_page, book?.page_count ?? null)}%`
-        : `p. ${session.end_page}`;
-      return isNativeBook ? `Reading · up to ${progress}` : `Up to ${progress}`;
-    }
-
-    if (session.start_page == null || session.end_page == null) return "Pages not recorded";
-    const progress = usePercentMode
-      ? `${pageToPercent(session.start_page, book?.page_count ?? null)}% -> ${pageToPercent(session.end_page, book?.page_count ?? null)}%`
-      : `p. ${session.start_page} -> ${session.end_page}`;
-    return isNativeBook ? `Reading · ${progress}` : progress;
+    return formatSessionProgress(session);
   }
 
   if (loading) {
@@ -718,7 +592,7 @@ export default function ReadingSessionsPage() {
                   <option value="curiosity">Reading (historical)</option>
                 ) : null}
                 {!isNativeBook ? <option value="curiosity">Curiosity Reading</option> : null}
-                <option value="listening">{useListeningPercentMode && !isNativeBook ? "Listening (%)" : "Listening"}</option>
+                <option value="listening">Listening</option>
               </select>
             </label>
 
@@ -750,41 +624,41 @@ export default function ReadingSessionsPage() {
               <>
                 <label className="rounded border bg-white p-3 text-sm">
                   <span className="block text-stone-600">
-                    {usePercentMode ? "Start percent" : "Start page"}
+                    {`Start ${entryLabels.unit.toLowerCase()}`}
                   </span>
                   <input
                     type="text"
                     inputMode="decimal"
                     value={sessionStartPage}
                     onChange={(event) => setSessionStartPage(event.target.value)}
-                    placeholder={usePercentMode ? "e.g. 12%" : "e.g. p. 4 or 12%"}
+                    placeholder={`Enter ${entryLabels.unit.toLowerCase()}`}
                     className="mt-1 w-full rounded border px-2 py-1"
                   />
                 </label>
 
                 <label className="rounded border bg-white p-3 text-sm">
                   <span className="block text-stone-600">
-                    {usePercentMode ? "End percent" : "End page"}
+                    {`End ${entryLabels.unit.toLowerCase()}`}
                   </span>
                   <input
                     type="text"
                     inputMode="decimal"
                     value={sessionEndPage}
                     onChange={(event) => setSessionEndPage(event.target.value)}
-                    placeholder={usePercentMode ? "e.g. 18%" : "e.g. p. 10 or 18%"}
+                    placeholder={`Enter ${entryLabels.unit.toLowerCase()}`}
                     className="mt-1 w-full rounded border px-2 py-1"
                   />
                 </label>
               </>
             ) : (
               <label className="rounded border bg-white p-3 text-sm">
-                <span className="block text-stone-600">Up to page or percent (optional)</span>
+                <span className="block text-stone-600">{`${entryLabels.current} (optional)`}</span>
                 <input
                   type="text"
                   inputMode="decimal"
                   value={sessionEndPage}
                   onChange={(event) => setSessionEndPage(event.target.value)}
-                  placeholder={useListeningPercentMode ? "e.g. 18% or p. 42" : "e.g. p. 42 or 18%"}
+                  placeholder={`Enter ${entryLabels.unit.toLowerCase()}`}
                   className="mt-1 w-full rounded border px-2 py-1"
                 />
               </label>
@@ -819,10 +693,7 @@ export default function ReadingSessionsPage() {
           ) : (
             <div className="space-y-2">
               {realSessions.map((session) => {
-                const pagesRead =
-                  session.start_page != null && session.end_page != null
-                    ? session.end_page - session.start_page + 1
-                    : null;
+                const pagesRead = sessionDistance(session);
 
                 return (
                   <div key={session.id} className="rounded-xl border bg-white p-3 text-sm text-stone-700">
@@ -832,7 +703,7 @@ export default function ReadingSessionsPage() {
                         <div className="mt-1">{sessionProgressLabel(session)}</div>
                         <div className="mt-1 text-stone-500">
                           {session.minutes_read != null ? `${session.minutes_read} min` : "Untimed"}
-                          {pagesRead != null ? ` · ${pagesRead} pages` : ""}
+                          {pagesRead != null ? ` · ${pagesRead} ${progressLabels(sessionProgressUnit(session)).plural}` : ""}
                         </div>
                       </div>
 

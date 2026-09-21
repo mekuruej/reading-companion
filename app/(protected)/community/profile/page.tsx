@@ -91,6 +91,7 @@ function formatMinPerPage(value: number | null | undefined) {
 }
 
 function sessionPages(row: SessionRow) {
+  if (row.start_page == null || row.end_page == null) return 0;
   const start = Number(row.start_page);
   const end = Number(row.end_page);
 

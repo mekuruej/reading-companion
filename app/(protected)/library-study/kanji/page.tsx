@@ -3,6 +3,7 @@
 
 "use client";
 
+import { useStudyModeRotation } from "@/lib/study/useStudyModeRotation";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -131,6 +132,17 @@ const KANJI_STUDY_MODE_OPTIONS: Array<{
       description: "See a kanji and choose how many strokes it has.",
     },
   ];
+
+type KanjiModeChoice = `${KanjiStudyMode}:${KanjiAnswerStyle}`;
+const KANJI_ROTATION_MODES: KanjiModeChoice[] = KANJI_STUDY_MODE_OPTIONS.flatMap(({ value }) =>
+  questionModeForStudyMode(value) === "readingChoice"
+    ? [`${value}:multipleChoice` as const, `${value}:typing` as const]
+    : [`${value}:multipleChoice` as const]
+);
+function splitKanjiModeChoice(choice: KanjiModeChoice) {
+  const [mode, style] = choice.split(":");
+  return { mode: mode as KanjiStudyMode, style: style as KanjiAnswerStyle };
+}
 
 function normalizeJlpt(value: string | null | undefined) {
   const normalized = (value ?? "").trim().toUpperCase().replace(/^JLPT-/, "");
@@ -261,14 +273,6 @@ function studyModeSummary(mode: KanjiStudyMode) {
   if (mode === "onyomiToKanji") return "Onyomi to kanji";
   if (mode === "kanjiStrokeCount") return "Kanji stroke count";
   return "Kanji to onyomi";
-}
-
-function nextKanjiStudyMode(mode: KanjiStudyMode): KanjiStudyMode {
-  if (mode === "kanjiStrokeCount") return "kanjiToOnyomi";
-  if (mode === "kanjiToOnyomi") return "onyomiToKanji";
-  if (mode === "onyomiToKanji") return "kanjiToKunyomi";
-  if (mode === "kanjiToKunyomi") return "kunyomiToKanji";
-  return "kanjiStrokeCount";
 }
 
 function studyModeDescription(mode: KanjiStudyMode) {
@@ -885,7 +889,6 @@ export default function KanjiReadingStudyPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [checked, setChecked] = useState<null | { ok: boolean; correct: string }>(null);
   const [autoAdvancePaused, setAutoAdvancePaused] = useState(false);
-  const [answerStyle, setAnswerStyle] = useState<KanjiAnswerStyle>("multipleChoice");
   const [typingAnswer, setTypingAnswer] = useState("");
 
   const [guessInput, setGuessInput] = useState("");
@@ -903,7 +906,15 @@ export default function KanjiReadingStudyPage() {
   const [levelFilters, setLevelFilters] = useState<LevelFilter[]>(
     [...KANJI_LEVEL_FILTER_VALUES]
   );
-  const [studyMode, setStudyMode] = useState<KanjiStudyMode>("kanjiToOnyomi");
+  const [kanjiModeChoice, selectKanjiModeChoice, nextKanjiChoice] = useStudyModeRotation(KANJI_ROTATION_MODES, "kanjiToOnyomi:multipleChoice");
+  const { mode: studyMode, style: answerStyle } = splitKanjiModeChoice(kanjiModeChoice);
+  const nextKanjiMode = splitKanjiModeChoice(nextKanjiChoice);
+  function setStudyMode(mode: KanjiStudyMode) {
+    selectKanjiModeChoice(`${mode}:${answerStyleForMode(mode, answerStyle)}`);
+  }
+  function setAnswerStyle(style: KanjiAnswerStyle) {
+    selectKanjiModeChoice(`${studyMode}:${answerStyleForMode(studyMode, style)}`);
+  }
 
   const canAccessKanjiPractice = true;
 
@@ -1306,8 +1317,8 @@ export default function KanjiReadingStudyPage() {
   }
 
   function moveDeckToNextMode() {
-    const nextMode = nextKanjiStudyMode(studyMode);
-    setStudyMode(nextMode);
+    const nextMode = nextKanjiMode.mode;
+    selectKanjiModeChoice(nextKanjiChoice);
     setIndex(0);
     resetCardState();
     setSkipTypingThisSession(false);
@@ -1566,7 +1577,7 @@ export default function KanjiReadingStudyPage() {
     return (
       <KanjiStudyCompleteState
         endedEarly={endedEarly}
-        nextModeLabel={studyModeSummary(nextKanjiStudyMode(studyMode))}
+        nextModeLabel={`${studyModeSummary(nextKanjiMode.mode)} · ${nextKanjiMode.style === "typing" ? "Typing" : "Multiple choice"}`}
         onBackToFoundationSets={() => router.push("/library-study/characters")}
         onNextMode={moveDeckToNextMode}
         onRestart={restartDeck}

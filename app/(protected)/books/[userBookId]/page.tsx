@@ -1,6 +1,9 @@
 // Single Book Hub
 //
 "use client";
+import { useBookProgress } from "@/components/books/BookProgressProvider";
+import { progressLabels, matchingTotal, parseProgressRange, sessionStart, sessionEnd, sessionProgressUnit, progressSummary, type ProgressRecord } from "@/lib/books/readingProgress";
+
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -102,6 +105,7 @@ type Book = {
   published_date: string | null;
   trigger_warnings: string | null;
   page_count: number | null;
+  kindle_location_count?: number | null;
   series_number: number | null;
   series_total: number | null;
   isbn: string | null;
@@ -169,7 +173,7 @@ type LookupRow = {
   created_at?: string | null;
 };
 
-type ReadingSession = {
+type ReadingSession = ProgressRecord & {
   id: string;
   user_book_id: string;
   read_on: string;
@@ -531,35 +535,6 @@ function formatTimer(seconds: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-function pageToPercent(page: number | null, pageCount: number | null) {
-  if (page == null || !pageCount || pageCount <= 0) return null;
-  return Math.max(0, Math.min(100, Math.round((page / pageCount) * 100)));
-}
-
-function percentToPage(percent: number | null, pageCount: number | null) {
-  if (percent == null || !pageCount || pageCount <= 0) return null;
-  const clamped = Math.max(0, Math.min(100, percent));
-  return Math.max(1, Math.min(pageCount, Math.round((clamped / 100) * pageCount)));
-}
-
-function parseListeningProgressInput(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) return { value: null, kind: null as "page" | "percent" | null };
-
-  const isPercent = trimmed.includes("%");
-  const isPage = /^p(?:age)?\.?\s*/i.test(trimmed);
-  const normalized = trimmed
-    .replace(/%/g, "")
-    .replace(/^p(?:age)?\.?\s*/i, "")
-    .trim();
-  const numeric = Number(normalized);
-
-  return {
-    value: Number.isFinite(numeric) ? Math.round(numeric) : Number.NaN,
-    kind: isPercent ? "percent" as const : isPage ? "page" as const : null,
-  };
-}
-
 function percentFromProgressLocation(value: string | null | undefined) {
   const match = value?.match(/([0-9]+(?:\.[0-9]+)?)\s*%/);
   if (!match) return null;
@@ -668,6 +643,7 @@ function FullAccessBookHubTabPanel({
 }
 
 export default function BookHubPage() {
+  const tracking = useBookProgress();
   const router = useRouter();
   const params = useParams<{ userBookId: string }>();
   const searchParams = useSearchParams();
@@ -769,6 +745,7 @@ export default function BookHubPage() {
   const [sharedGenres, setSharedGenres] = useState<{ value: string; count: number }[]>([]);
   const [sharedContentNotes, setSharedContentNotes] = useState<{ value: string; count: number }[]>([]);
   const [publishedDate, setPublishedDate] = useState("");
+  const [kindleLocationCount, setKindleLocationCount] = useState("");
   const [pageCount, setPageCount] = useState<string>("");
   const [seriesNumber, setSeriesNumber] = useState<string>("");
   const [seriesTotal, setSeriesTotal] = useState<string>("");
@@ -955,8 +932,8 @@ export default function BookHubPage() {
 
   const [isRunning, setIsRunning] = useState(false);
   const [startTime, setStartTime] = useState<number | null>(null);
-  const [elapsed, setElapsed] = useState(0);
-  const [showTimedSessionForm, setShowTimedSessionForm] = useState(false);
+  const [, setElapsed] = useState(0);
+  const [, setShowTimedSessionForm] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [timerSaveMessage, setTimerSaveMessage] = useState("");
 
@@ -1147,9 +1124,10 @@ export default function BookHubPage() {
   }, [timedPageTrackedSessions]);
 
   const averageMinutesPerPage = useMemo(() => {
-    if (!totalTimedPages || !totalTimedMinutes) return null;
-    return totalTimedMinutes / totalTimedPages;
-  }, [totalTimedMinutes, totalTimedPages]);
+    const pageMinutes = timedPageTrackedSessions.reduce((sum, session) => sum + (session.minutes_read ?? 0), 0);
+    if (!totalTimedPages || !pageMinutes) return null;
+    return pageMinutes / totalTimedPages;
+  }, [timedPageTrackedSessions, totalTimedPages]);
 
   const furthestPage = useMemo(() => {
     const sessionsWithEndPage = realReadingSessions.filter(
@@ -1162,20 +1140,16 @@ export default function BookHubPage() {
   }, [realReadingSessions]);
 
   const canFillBeginningPages = useMemo(() => {
-    return earliestTrackedStartPage != null && earliestTrackedStartPage > 1;
-  }, [earliestTrackedStartPage]);
+    return tracking.method === "page" && earliestTrackedStartPage != null && earliestTrackedStartPage > 1;
+  }, [earliestTrackedStartPage, tracking.method]);
 
   const canFillEndingPages = useMemo(() => {
-    if (!finished || !book?.page_count || coverageReadingSessions.length === 0) return false;
+    if (tracking.method !== "page" || !finished || !book?.page_count || coverageReadingSessions.length === 0) return false;
     return furthestTrackedPage != null && furthestTrackedPage < book.page_count;
-  }, [finished, book?.page_count, coverageReadingSessions.length, furthestTrackedPage]);
+  }, [finished, book?.page_count, coverageReadingSessions.length, furthestTrackedPage, tracking.method]);
 
-  const progressPercent = useMemo(() => {
-    if (isNativeAudiobook) return percentFromProgressLocation(row?.current_location);
-    if (finished) return 100;
-    if (!book?.page_count || !furthestPage) return null;
-    return Math.min(100, Math.round((furthestPage / book.page_count) * 100));
-  }, [book?.page_count, furthestPage, finished, isNativeAudiobook, row?.current_location]);
+  const trackedProgress = progressSummary(readingSessions, tracking.method, tracking.totals);
+  const progressPercent = finished ? 100 : trackedProgress.percent ?? (isNativeAudiobook && tracking.method === "percent" ? percentFromProgressLocation(row?.current_location) : null);
 
   const savedWordsProgressCount =
     canSeeVocabularySummary && uniqueLookupCount != null ? uniqueLookupCount : 0;
@@ -1185,29 +1159,16 @@ export default function BookHubPage() {
       ? `${savedWordsProgressCount} word${savedWordsProgressCount === 1 ? "" : "s"} saved`
       : "";
 
-  const currentProgressPage = furthestPage ?? (finished && book?.page_count ? book.page_count : null);
-  const bookHubProgressLabel = isNativeAudiobook
-    ? row?.current_location?.trim()
-      ? `Listening: ${row.current_location.trim()}`
-      : started
-        ? "Listening in progress"
-        : "Not started"
-    : currentProgressPage != null
-      ? book?.page_count
-        ? `${currentProgressPage} / ${book.page_count}`
-        : `Page ${currentProgressPage}`
-      : started
-        ? "In progress"
-        : "Not started";
+  const bookHubProgressLabel = trackedProgress.position != null
+    ? `${progressLabels(tracking.method).unit} ${trackedProgress.position}${tracking.method === "percent" ? "%" : trackedProgress.total ? ` / ${trackedProgress.total}` : ""}`
+    : isNativeAudiobook && row?.current_location?.trim() ? `Listening: ${row.current_location.trim()}` : started ? "In progress" : "Not started";
 
   const bookHubProgressBarWidth =
     progressPercent != null
       ? `${progressPercent}%`
       : finished
         ? "100%"
-        : started
-          ? "8%"
-          : "0%";
+        : "0%";
   const bookHubProgressPercentLabel =
     progressPercent != null ? `${progressPercent}% done` : "";
   const bookHubLastSavedWordLabel =
@@ -1270,12 +1231,11 @@ export default function BookHubPage() {
     return chapterReverseOrder ? sorted.reverse() : sorted;
   }, [chapterSummaries, chapterReverseOrder]);
 
-  function startEditingReadingSession(session: ReadingSession) {
-    const usePercentMode =
-      (progressMode === "percent" || session.session_mode === "listening") &&
-      book?.page_count != null &&
-      book.page_count > 0;
+  const editingProgressRecord = readingSessions.find((session) => session.id === editingReadingSessionId);
+  const entryMethod = editingProgressRecord ? sessionProgressUnit(editingProgressRecord) ?? tracking.method : tracking.method;
+  const entryTotal = editingProgressRecord ? editingProgressRecord.progress_total ?? null : matchingTotal(entryMethod, tracking.totals);
 
+  function startEditingReadingSession(session: ReadingSession) {
     setEditingReadingSessionId(session.id);
     setSessionDate(session.read_on);
     setSessionMode(
@@ -1285,24 +1245,8 @@ export default function BookHubPage() {
         ? session.session_mode
         : "fluid"
     );
-    setSessionStartPage(
-      usePercentMode
-        ? session.start_page != null
-          ? String(pageToPercent(session.start_page, book?.page_count ?? null) ?? "")
-          : ""
-        : session.start_page != null
-          ? String(session.start_page)
-          : ""
-    );
-    setSessionEndPage(
-      progressMode === "percent"
-        ? session.end_page != null
-          ? String(pageToPercent(session.end_page, book?.page_count ?? null) ?? "")
-          : ""
-        : session.end_page != null
-          ? String(session.end_page)
-          : ""
-    );
+    setSessionStartPage(sessionStart(session) == null ? "" : String(sessionStart(session)));
+    setSessionEndPage(sessionEnd(session) == null ? "" : String(sessionEnd(session)));
     setSessionMinutesRead(
       session.minutes_read != null ? String(session.minutes_read) : ""
     );
@@ -1477,6 +1421,7 @@ export default function BookHubPage() {
     setDnfNote(nextDnfNote ?? "");
     setWouldRetry(nextWouldRetry ?? "");
     setPersonalTrackingStatus(nextPersonalTrackingStatus);
+    await tracking.refresh();
   }
 
   async function saveSettingItem(item: SettingItem) {
@@ -1914,7 +1859,7 @@ export default function BookHubPage() {
   async function loadReadingSessions(userBookIdValue: string) {
     const { data, error } = await supabase
       .from("user_book_reading_sessions")
-      .select("id, user_book_id, read_on, start_page, end_page, minutes_read, is_filler, created_at, session_mode")
+      .select("id, user_book_id, read_on, start_page, end_page, tracking_unit, start_position, end_position, progress_total, minutes_read, is_filler, created_at, session_mode")
       .eq("user_book_id", userBookIdValue)
       .order("read_on", { ascending: false })
       .order("created_at", { ascending: false });
@@ -2644,7 +2589,7 @@ export default function BookHubPage() {
   }
 
   async function fillBeginningPages() {
-    if (!row?.id || earliestTrackedStartPage == null || earliestTrackedStartPage <= 1) return;
+    if (tracking.method !== "page" || !row?.id || earliestTrackedStartPage == null || earliestTrackedStartPage <= 1) return;
 
     const { error } = await supabase
       .from("user_book_reading_sessions")
@@ -2668,7 +2613,7 @@ export default function BookHubPage() {
   }
 
   async function fillEndingPages() {
-    if (!row?.id || !book?.page_count || furthestTrackedPage == null || furthestTrackedPage >= book.page_count) return;
+    if (tracking.method !== "page" || !row?.id || !book?.page_count || furthestTrackedPage == null || furthestTrackedPage >= book.page_count) return;
 
     const { error } = await supabase
       .from("user_book_reading_sessions")
@@ -3307,6 +3252,7 @@ export default function BookHubPage() {
         : prev
     );
     setBookStatusError(null);
+    await tracking.refresh();
     return true;
   }
 
@@ -3462,112 +3408,17 @@ export default function BookHubPage() {
   async function saveReadingSession() {
     if (!row?.id) return;
 
-    const usingPercentMode = progressMode === "percent";
-    const usingListeningPercentMode =
-      sessionMode === "listening" &&
-      book?.page_count != null &&
-      book.page_count > 0;
-    const listeningEndInput =
-      sessionMode === "listening"
-        ? parseListeningProgressInput(sessionEndPage)
-        : null;
-    const endInputIsPercent =
-      sessionMode === "listening"
-        ? listeningEndInput?.kind === "percent" ||
-          (listeningEndInput?.kind !== "page" && usingListeningPercentMode)
-        : usingPercentMode;
-    const parsedStart =
-      sessionMode === "listening" || sessionStartPage.trim() === ""
-        ? null
-        : parseOptionalPageLocationInput(sessionStartPage, book?.page_count ?? null).value;
-    const parsedEnd =
-      sessionEndPage.trim() === ""
-        ? null
-        : sessionMode === "listening"
-          ? listeningEndInput?.value ?? null
-          : parseOptionalPageLocationInput(sessionEndPage, book?.page_count ?? null).value;
-    const startPageInputError =
-      sessionMode !== "listening" && sessionStartPage.trim()
-        ? parseOptionalPageLocationInput(sessionStartPage, book?.page_count ?? null).error
-        : null;
-    const endPageInputError =
-      sessionMode !== "listening" && sessionEndPage.trim()
-        ? parseOptionalPageLocationInput(sessionEndPage, book?.page_count ?? null).error
-        : null;
-
-    const start = parsedStart;
-
-    const end =
-      sessionMode === "listening" && endInputIsPercent
-        ? percentToPage(parsedEnd, book?.page_count ?? null) ?? parsedEnd
-        : parsedEnd;
-
-    const minutesFromInput =
-      sessionMinutesRead.trim() === "" ? null : Number(sessionMinutesRead);
-
-    const minutes =
-      showTimedSessionForm
-        ? Math.max(1, Math.round(elapsed / 60))
-        : minutesFromInput;
-
-    if (!sessionDate) {
-      alert("Please fill in the date.");
-      return;
-    }
-
-    if (sessionMode !== "listening") {
-      if (usingPercentMode && (!book?.page_count || book.page_count <= 0)) {
-        alert("Percent progress needs a page count for this book.");
-        return;
-      }
-
-      if (
-        startPageInputError ||
-        endPageInputError ||
-        (usingPercentMode &&
-          (!Number.isFinite(parsedStart) || !Number.isFinite(parsedEnd))) ||
-        (!usingPercentMode &&
-          (!Number.isFinite(start) || !Number.isFinite(end)))
-      ) {
-        alert(startPageInputError || endPageInputError || "Please fill in date, start page/end page or percent.");
-        return;
-      }
-
-      if ((start as number) <= 0 || (end as number) <= 0) {
-        alert("Pages must be greater than 0.");
-        return;
-      }
-
-      if ((end as number) < (start as number)) {
-        alert("End page must be greater than or equal to start page.");
-        return;
-      }
-    } else {
-      if (
-        endInputIsPercent &&
-        parsedEnd !== null &&
-        (!Number.isFinite(parsedEnd) || parsedEnd < 0 || parsedEnd > 100)
-      ) {
-        alert("Listening end percent must be between 0 and 100 if provided.");
-        return;
-      }
-
-      if (!endInputIsPercent && end !== null && (!Number.isFinite(end) || end <= 0)) {
-        alert("Listening end page must be greater than 0 if provided.");
-        return;
-      }
-    }
-
-    if (minutes !== null && (!Number.isFinite(minutes) || minutes <= 0)) {
-      alert("Minutes must be greater than 0 if provided.");
-      return;
-    }
+    if (!entryMethod) { tracking.requireMethod(); return; }
+    const parsed = parseProgressRange(sessionMode === "listening" ? "" : sessionStartPage, sessionEndPage, entryMethod, entryTotal);
+    if (parsed.error) { alert(parsed.error); return; }
+    if (!sessionDate) { alert("Please fill in the date."); return; }
+    const minutes = sessionMinutesRead.trim() === "" ? null : Number(sessionMinutesRead);
+    if (minutes != null && (!Number.isFinite(minutes) || minutes <= 0)) { alert("Minutes must be greater than zero."); return; }
 
     const payload = {
       user_book_id: row.id,
       read_on: sessionDate,
-      start_page: sessionMode === "listening" ? null : start,
-      end_page: end,
+      ...parsed.payload,
       minutes_read: minutes,
       session_mode: sessionMode,
     };
@@ -3880,6 +3731,7 @@ export default function BookHubPage() {
           audience_category,
           trigger_warnings,
           page_count,
+          kindle_location_count,
           series_number,
           series_total,
           isbn,
@@ -4084,6 +3936,7 @@ export default function BookHubPage() {
     setEditionFormat(b?.edition_format ?? "");
     setEditionNote(b?.edition_note ?? "");
     setPublishedDate(b?.published_date ?? "");
+    setKindleLocationCount(b?.kindle_location_count == null ? "" : String(b.kindle_location_count));
     setPageCount(b?.page_count != null ? String(b.page_count) : "");
     setSeriesNumber(b?.series_number != null ? String(b.series_number) : "");
     setSeriesTotal(b?.series_total != null ? String(b.series_total) : "");
@@ -4267,6 +4120,7 @@ export default function BookHubPage() {
     setEditionFormat(b?.edition_format ?? "");
     setEditionNote(b?.edition_note ?? "");
     setPublishedDate(b?.published_date ?? "");
+    setKindleLocationCount(b?.kindle_location_count == null ? "" : String(b.kindle_location_count));
     setPageCount(b?.page_count != null ? String(b.page_count) : "");
     setSeriesNumber(b?.series_number != null ? String(b.series_number) : "");
     setSeriesTotal(b?.series_total != null ? String(b.series_total) : "");
@@ -4818,6 +4672,12 @@ export default function BookHubPage() {
       dnfAt: dnf_at,
     });
 
+  if (kindleLocationCount.trim() && (!/^\d+$/.test(kindleLocationCount.trim()) || Number(kindleLocationCount) <= 0 || !Number.isSafeInteger(Number(kindleLocationCount)))) {
+    setSaving(false);
+    alert("Total Kindle Location must be a positive whole number.");
+    return;
+  }
+
     const pc = pageCount.trim() ? Number(pageCount.trim()) : null;
     const page_count = Number.isFinite(pc as any) ? (pc as number) : null;
     const sn = seriesNumber.trim() ? Number(seriesNumber.trim()) : null;
@@ -4895,6 +4755,7 @@ export default function BookHubPage() {
       edition_format: editionFormat || null,
       edition_note: editionNote.trim() || null,
       page_count,
+      kindle_location_count: kindleLocationCount.trim() ? Number(kindleLocationCount) : null,
       series_number,
       series_total,
       isbn: isbn || null,
@@ -5585,13 +5446,13 @@ export default function BookHubPage() {
 
   const curiosityMinPerPage = useMemo(() => {
     if (!curiosityPages) return null;
-    return curiosityMinutes / curiosityPages;
-  }, [curiosityMinutes, curiosityPages]);
+    return timedCuriositySessions.filter(s => s.start_page != null && s.end_page != null).reduce((n,s) => n + (s.minutes_read ?? 0), 0) / curiosityPages;
+  }, [timedCuriositySessions, curiosityPages]);
 
   const fluidMinPerPage = useMemo(() => {
     if (!fluidPages) return null;
-    return fluidMinutes / fluidPages;
-  }, [fluidMinutes, fluidPages]);
+    return timedFluidSessions.filter(s => s.start_page != null && s.end_page != null).reduce((n,s) => n + (s.minutes_read ?? 0), 0) / fluidPages;
+  }, [timedFluidSessions, fluidPages]);
 
   if (loading) {
     return <BookHubLoadingState />;
@@ -5757,6 +5618,7 @@ export default function BookHubPage() {
                     earliestTrackedStartPage={earliestTrackedStartPage}
                     furthestTrackedPage={furthestTrackedPage}
                     pageCount={book.page_count}
+                    progressPercent={trackedProgress.percent}
                     onStartToday={() => void markStartedToday()}
                     onPersonalTrackingStatusChange={(value) =>
                       void savePersonalTrackingStatus(value)

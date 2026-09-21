@@ -3,6 +3,7 @@
 
 "use client";
 
+import { hasUsableProgressTotal } from "@/lib/books/catalogProgressTotal";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -33,6 +34,7 @@ type GlobalBookRow = {
   publisher: string | null;
   published_date: string | null;
   page_count: number | null;
+  kindle_location_count?: number | null;
   allow_missing_isbn?: boolean | null;
   allow_missing_publisher?: boolean | null;
   missing_info_cleared_at?: string | null;
@@ -63,7 +65,7 @@ function missingGlobalBookFields(book: GlobalBookRow) {
   if (!String(book.author ?? "").trim()) missing.push("author");
   if (!book.allow_missing_publisher && !String(book.publisher ?? "").trim()) missing.push("publisher");
   if (!String(book.published_date ?? "").trim()) missing.push("published date");
-  if (book.page_count == null) missing.push("page count");
+  if (!hasUsableProgressTotal(book)) missing.push("progress total");
   return missing;
 }
 
@@ -203,7 +205,7 @@ export default function TeacherBooksQueuePage() {
       const { data: globalBooks, error: globalBooksError } = await supabase
         .from("books")
         .select(
-          "id, title, isbn13, asin, cover_url, book_type, author, publisher, published_date, page_count, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at"
+          "id, title, isbn13, asin, cover_url, book_type, author, publisher, published_date, page_count, kindle_location_count, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at"
         )
         .order("title", { ascending: true });
 

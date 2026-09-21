@@ -30,6 +30,7 @@ type Book = {
   edition_note?: string | null;
   trigger_warnings: string | null;
   page_count: number | null;
+  kindle_location_count?: number | null;
   series_number: number | null;
   series_total?: number | null;
   isbn: string | null;
@@ -120,6 +121,8 @@ type BookInfoTabProps = {
   setEditionNote: (value: string) => void;
   publishedDate: string;
   setPublishedDate: (value: string) => void;
+  kindleLocationCount?: string;
+  setKindleLocationCount?: (value: string) => void;
   pageCount: string;
   setPageCount: (value: string) => void;
   seriesNumber: string;
@@ -261,6 +264,8 @@ export default function BookInfoTab({
   setEditionNote,
   publishedDate,
   setPublishedDate,
+  kindleLocationCount = "",
+  setKindleLocationCount = () => {},
   pageCount,
   setPageCount,
   seriesNumber,
@@ -1030,6 +1035,8 @@ export default function BookInfoTab({
         setEditionNote={setEditionNote}
         publishedDate={publishedDate}
         setPublishedDate={setPublishedDate}
+        kindleLocationCount={kindleLocationCount}
+        setKindleLocationCount={setKindleLocationCount}
         pageCount={pageCount}
         setPageCount={setPageCount}
         seriesNumber={seriesNumber}

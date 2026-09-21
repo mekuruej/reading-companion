@@ -1,3 +1,4 @@
+import { todayYmdAppTimeZone } from "@/lib/timeZone";
 import {
   type PersonalTrackingStatus,
   resolvePersonalTrackingStatus,
@@ -32,7 +33,7 @@ export async function getOrCreateUserBook({
     if (enablePersonalTracking && existingPersonalStatus === "not_tracking") {
       const { error: trackingError } = await supabase
         .from("user_books")
-        .update({ personal_tracking_status: initialPersonalTrackingStatus })
+        .update({ personal_tracking_status: initialPersonalTrackingStatus, ...(initialPersonalTrackingStatus === "reading" ? { status: "reading", started_at: todayYmdAppTimeZone() } : {}) })
         .eq("id", existingUserBook.id);
 
       if (trackingError) throw trackingError;
@@ -47,6 +48,7 @@ export async function getOrCreateUserBook({
       user_id: userId,
       book_id: bookId,
       personal_tracking_status: initialPersonalTrackingStatus,
+      ...(initialPersonalTrackingStatus === "reading" ? { status: "reading", started_at: todayYmdAppTimeZone() } : {}),
     })
     .select("id")
     .single();
@@ -65,7 +67,7 @@ export async function getOrCreateUserBook({
       if (enablePersonalTracking && racedPersonalStatus === "not_tracking") {
         const { error: trackingError } = await supabase
           .from("user_books")
-          .update({ personal_tracking_status: initialPersonalTrackingStatus })
+          .update({ personal_tracking_status: initialPersonalTrackingStatus, ...(initialPersonalTrackingStatus === "reading" ? { status: "reading", started_at: todayYmdAppTimeZone() } : {}) })
           .eq("id", racedUserBook.id);
 
         if (trackingError) throw trackingError;

@@ -1,3 +1,4 @@
+import { isValidProgressTotal } from "@/lib/books/catalogProgressTotal";
 import { canTeachTargetUser } from "@/lib/teacher/targetUserAccess";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -40,7 +41,7 @@ function cleanPageCount(value: unknown) {
   if (value == null || value === "") return { value: null };
 
   const numberValue = Number(value);
-  if (!Number.isInteger(numberValue) || numberValue <= 0) {
+  if (!isValidProgressTotal(value)) {
     return { error: "Page count must be a positive whole number." };
   }
 
@@ -262,7 +263,7 @@ async function findPossibleMatches({
 }) {
   const { data, error } = await supabaseAdmin
     .from("books")
-    .select("id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, language_code")
+    .select("id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, kindle_location_count, language_code")
     .ilike("title", title)
     .eq("language_code", languageCode)
     .eq("edition_format", editionFormat)
@@ -294,10 +295,10 @@ export async function POST(request: Request) {
     const asin = rawAsin || null;
     const languageCode = normalizeBookLanguageCode(body?.languageCode ?? body?.language_code);
     const editionFormat = cleanOptionalText(body?.editionFormat ?? body?.edition_format);
-    const editionNote =
-      editionFormat === "other"
-        ? cleanOptionalText(body?.editionNote ?? body?.edition_note)
-        : null;
+    const editionNote = cleanOptionalText(body?.editionNote ?? body?.edition_note);
+    const locationRaw = body?.kindleLocationCount ?? body?.kindle_location_count;
+    const locationTotal = locationRaw == null || locationRaw === "" ? null : Number(locationRaw);
+    if (locationTotal !== null && !isValidProgressTotal(locationRaw)) return NextResponse.json({ error: "Total Kindle Location must be a positive whole number." }, { status: 400 });
     const pageCountResult = cleanPageCount(body?.pageCount ?? body?.page_count);
     const confirmDifferentEdition = body?.confirmDifferentEdition === true;
     const mode =
@@ -375,6 +376,7 @@ export async function POST(request: Request) {
         actorProfile,
         bookId: existingIdentifierBookId,
         input: {
+      initialPersonalTrackingStatus: body?.initialPersonalTrackingStatus,
           mode,
           destinations: body?.destinations,
           targetUserId,
@@ -452,6 +454,7 @@ export async function POST(request: Request) {
         edition_format: editionFormat,
         edition_note: editionNote,
         page_count: pageCountResult.value,
+        kindle_location_count: locationTotal,
         allow_missing_isbn: !isbn13 && !asin,
         needs_review: true,
       })
@@ -470,6 +473,7 @@ export async function POST(request: Request) {
           edition_format: editionFormat,
           edition_note: editionNote,
           page_count: pageCountResult.value,
+        kindle_location_count: locationTotal,
         })
         .select("id")
         .single();
@@ -503,6 +507,7 @@ export async function POST(request: Request) {
       actorProfile,
       bookId,
       input: {
+      initialPersonalTrackingStatus: body?.initialPersonalTrackingStatus,
         mode,
         destinations: body?.destinations,
         targetUserId,

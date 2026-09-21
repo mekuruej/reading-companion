@@ -3,6 +3,7 @@
 
 "use client";
 
+import { hasUsableProgressTotal } from "@/lib/books/catalogProgressTotal";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { countNeededTeacherRatingBooks } from "@/lib/teacher/teacherReviewCompletion";
@@ -38,6 +39,7 @@ type GlobalBookRow = {
   publisher: string | null;
   published_date: string | null;
   page_count: number | null;
+  kindle_location_count?: number | null;
   created_at?: string | null;
   allow_missing_isbn?: boolean | null;
   allow_missing_publisher?: boolean | null;
@@ -156,7 +158,7 @@ function missingGlobalBookFields(book: GlobalBookRow) {
   if (!String(book.author ?? "").trim()) missing.push("author");
   if (!book.allow_missing_publisher && !String(book.publisher ?? "").trim()) missing.push("publisher");
   if (!String(book.published_date ?? "").trim()) missing.push("published date");
-  if (book.page_count == null) missing.push("page count");
+  if (!hasUsableProgressTotal(book)) missing.push("progress total");
   return missing;
 }
 

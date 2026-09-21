@@ -8,6 +8,7 @@ type BookDetails = {
   edition_format?: string | null;
   edition_note?: string | null;
   published_date?: string | null;
+  kindle_location_count?: number | null;
   page_count?: number | string | null;
   series_number?: number | string | null;
   series_total?: number | string | null;
@@ -40,6 +41,8 @@ type BookInfoDetailsSectionProps = {
   setEditionNote: (value: string) => void;
   publishedDate: string;
   setPublishedDate: (value: string) => void;
+  kindleLocationCount?: string;
+  setKindleLocationCount?: (value: string) => void;
   pageCount: string;
   setPageCount: (value: string) => void;
   seriesNumber: string;
@@ -86,6 +89,8 @@ export default function BookInfoDetailsSection({
   setEditionNote,
   publishedDate,
   setPublishedDate,
+  kindleLocationCount = "",
+  setKindleLocationCount = () => {},
   pageCount,
   setPageCount,
   seriesNumber,
@@ -238,6 +243,15 @@ export default function BookInfoDetailsSection({
           inputValue={publishedDate}
           setInputValue={setPublishedDate}
           placeholder="e.g. 2005"
+        />
+
+        <Detail
+          label="Total Kindle Location"
+          value={book.kindle_location_count}
+          editing={isEditingBookInfo}
+          inputValue={kindleLocationCount}
+          setInputValue={setKindleLocationCount}
+          placeholder="Optional, e.g. 4820. Separate from page count."
         />
 
         <Detail

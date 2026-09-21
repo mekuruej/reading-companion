@@ -1,3 +1,4 @@
+import { ProgressTrackingSettings } from "@/components/books/BookProgressProvider";
 import {
   PERSONAL_TRACKING_STATUSES,
   type PersonalTrackingStatus,
@@ -28,6 +29,7 @@ type BookHubStatusPanelProps = {
   earliestTrackedStartPage: number | null;
   furthestTrackedPage: number | null;
   pageCount: number | null;
+  progressPercent: number | null;
 
 
   onStartToday: () => void;
@@ -93,6 +95,7 @@ export default function BookHubStatusPanel({
   earliestTrackedStartPage,
   furthestTrackedPage,
   pageCount,
+  progressPercent,
   onStartToday,
   onPersonalTrackingStatusChange,
   onOpenReview,
@@ -106,10 +109,8 @@ export default function BookHubStatusPanel({
     personalTrackingStatus !== "finished" &&
     personalTrackingStatus !== "dnf" &&
     personalTrackingStatus !== "not_tracking" &&
-    pageCount != null &&
-    pageCount > 0 &&
-    furthestTrackedPage != null &&
-    furthestTrackedPage >= pageCount;
+    progressPercent != null &&
+    progressPercent >= 100;
 
   return (
     <div className="rounded-2xl border border-violet-100 bg-violet-50/60 p-4">
@@ -148,6 +149,7 @@ export default function BookHubStatusPanel({
             <span className="mt-1 block text-xs font-semibold text-red-700">{statusError}</span>
           ) : null}
         </label>
+        <ProgressTrackingSettings readingStatus={personalTrackingStatus} />
         <div>
           <span className="font-medium">Started:</span> {startedAt || "—"}
         </div>
@@ -162,7 +164,7 @@ export default function BookHubStatusPanel({
       {shouldNudgeFinishBook ? (
         <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
           <p className="text-sm font-semibold text-emerald-950">
-            You’ve logged the last page! Mark the book as finished to complete it.
+            You’ve logged the end of this copy! Mark the book as finished to complete it.
           </p>
           <button
             type="button"

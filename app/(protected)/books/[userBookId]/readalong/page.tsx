@@ -2,6 +2,9 @@
 // 
 
 "use client";
+import { useBookProgress } from "@/components/books/BookProgressProvider";
+import { matchingTotal, parseProgressRange, sessionEnd } from "@/lib/books/readingProgress";
+
 
 import { isReadyForFlashcards } from "@/lib/wordSupportEligibility";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -44,7 +47,6 @@ import {
     resolveStudentWorkspaceBackContext,
     type StudentWorkspaceBackContext,
 } from "@/lib/teacher/studentWorkspaceContext";
-import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 
 const READ_ALONG_TIMED_SESSION_MODE = "readalong";
 
@@ -319,6 +321,7 @@ async function generateVocabularyKanjiMap(vocabularyCacheId: number) {
 }
 
 export default function ReadAlongPage() {
+    const tracking = useBookProgress();
     const router = useRouter();
     const params = useParams<{ userBookId: string }>();
     const userBookId = params.userBookId;
@@ -940,7 +943,8 @@ export default function ReadAlongPage() {
 
         const { data, error } = await supabase
             .from("user_book_reading_sessions")
-            .select("end_page, read_on, created_at")
+            .select("end_page, end_position, tracking_unit, read_on, created_at")
+            .eq("tracking_unit", tracking.method ?? "page")
             .eq("user_book_id", userBookId)
             .order("read_on", { ascending: false })
             .order("created_at", { ascending: false })
@@ -948,19 +952,15 @@ export default function ReadAlongPage() {
 
         if (error) {
             console.error("Error loading latest reading session:", error);
-            setSessionEndPage(currentPageNumber != null ? String(currentPageNumber) : "");
+            setSessionEndPage(tracking.method === "page" && currentPageNumber != null ? String(currentPageNumber) : "");
             setShowTimedSessionForm(true);
             return;
         }
 
         const latest = data?.[0];
-        const nextStart =
-            latest?.end_page != null && Number.isFinite(Number(latest.end_page))
-                ? String(Number(latest.end_page) + 1)
-                : "";
-
-        setSessionStartPage(nextStart);
-        setSessionEndPage(currentPageNumber != null ? String(currentPageNumber) : nextStart);
+        const position = latest ? sessionEnd(latest) : null;
+        setSessionStartPage(position == null ? "" : String(tracking.method === "page" ? Math.min(position + 1, tracking.totals.page_count ?? Infinity) : position));
+        setSessionEndPage(tracking.method === "page" && currentPageNumber != null ? String(currentPageNumber) : "");
         setShowTimedSessionForm(true);
     }
 
@@ -972,22 +972,10 @@ export default function ReadAlongPage() {
             return;
         }
 
-        const parsedStartPage = parseOptionalPageLocationInput(sessionStartPage, bookPageCount);
-        const parsedEndPage = parseOptionalPageLocationInput(sessionEndPage, bookPageCount);
+        if (!tracking.requireMethod() || !tracking.method) return;
+        const parsed = parseProgressRange(sessionStartPage, sessionEndPage, tracking.method, matchingTotal(tracking.method, tracking.totals));
+        if (parsed.error) { alert(parsed.error); return; }
         const minutesNum = Number(sessionMinutesRead || Math.max(1, Math.round(elapsed / 60)));
-
-        if (parsedStartPage.error || parsedEndPage.error || parsedStartPage.value == null || parsedEndPage.value == null) {
-            alert(parsedStartPage.error || parsedEndPage.error || "Please enter a valid start page and end page.");
-            return;
-        }
-
-        const startPageNum = parsedStartPage.value;
-        const endPageNum = parsedEndPage.value;
-
-        if (endPageNum < startPageNum) {
-            alert("End page cannot be before start page.");
-            return;
-        }
 
         if (!Number.isFinite(minutesNum) || minutesNum <= 0) {
             alert("Minutes read must be at least 1.");
@@ -999,8 +987,7 @@ export default function ReadAlongPage() {
         const { error } = await supabase.from("user_book_reading_sessions").insert({
             user_book_id: userBookId,
             read_on: readOn,
-            start_page: startPageNum,
-            end_page: endPageNum,
+            ...parsed.payload,
             minutes_read: minutesNum,
             session_mode: "fluid",
         });
@@ -1040,7 +1027,7 @@ export default function ReadAlongPage() {
     }, [isRunning, startTime]);
 
     useEffect(() => {
-        if (!userBookId) return;
+        if (!userBookId || !tracking.loaded) return;
 
         skippedInitialPersistenceWriteRef.current = false;
         const persisted = readPersistedTimedSession(READ_ALONG_TIMED_SESSION_MODE, userBookId);
@@ -1058,8 +1045,8 @@ export default function ReadAlongPage() {
             setShowTimedSessionForm(persisted.showTimedSessionForm);
             setHasFinishedTimer(persisted.showTimedSessionForm);
             setSessionDate(persisted.sessionDate);
-            setSessionStartPage(persisted.sessionStartPage);
-            setSessionEndPage(persisted.sessionEndPage);
+            setSessionStartPage(persisted.trackingUnit === tracking.method ? persisted.sessionStartPage : "");
+            setSessionEndPage(persisted.trackingUnit === tracking.method ? persisted.sessionEndPage : "");
             setSessionMinutesRead(
                 persisted.showTimedSessionForm
                     ? String(Math.max(1, Math.round(restoredElapsedMs / 60000)))
@@ -1068,7 +1055,7 @@ export default function ReadAlongPage() {
         }
 
         setTimerPersistenceReady(true);
-    }, [userBookId]);
+    }, [userBookId, tracking.loaded, tracking.method]);
 
     useEffect(() => {
         if (!timerPersistenceReady || !userBookId) return;
@@ -1086,6 +1073,7 @@ export default function ReadAlongPage() {
         writePersistedTimedSession({
             version: 1,
             sessionMode: READ_ALONG_TIMED_SESSION_MODE,
+            trackingUnit: tracking.method,
             userBookId,
             startedAt: isRunning ? startTime : null,
             accumulatedElapsedMs: isRunning ? 0 : Math.max(0, elapsed * 1000),
@@ -1105,7 +1093,8 @@ export default function ReadAlongPage() {
         sessionStartPage,
         showTimedSessionForm,
         startTime,
-        timerPersistenceReady,
+        tracking.method,
+    timerPersistenceReady,
         userBookId,
     ]);
 
@@ -1118,6 +1107,7 @@ export default function ReadAlongPage() {
             writePersistedTimedSession({
                 version: 1,
                 sessionMode: READ_ALONG_TIMED_SESSION_MODE,
+            trackingUnit: tracking.method,
                 userBookId,
                 startedAt: isRunning ? startTime : null,
                 accumulatedElapsedMs: isRunning ? 0 : Math.max(0, elapsed * 1000),
@@ -1150,7 +1140,8 @@ export default function ReadAlongPage() {
         sessionStartPage,
         showTimedSessionForm,
         startTime,
-        timerPersistenceReady,
+        tracking.method,
+    timerPersistenceReady,
         userBookId,
     ]);
 
@@ -1333,6 +1324,7 @@ export default function ReadAlongPage() {
     }
 
     function handleStartTimer() {
+        if (!tracking.requireMethod()) return;
         const today = todayYmdAppTimeZone();
 
         setSessionDate(today);

@@ -2,6 +2,7 @@
 //
 "use client";
 
+import { useStudyModeRotation } from "@/lib/study/useStudyModeRotation";
 import { canLoadJapaneseFlashcard, canStudyWord } from "@/lib/wordSupportEligibility";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -271,12 +272,6 @@ const STUDY_MODE_ORDER: StudySet[] = [
   "COMPLETE_TYPING",
 ];
 
-function getNextStudySet(studySet: StudySet) {
-  const currentIndex = STUDY_MODE_ORDER.indexOf(studySet);
-  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % STUDY_MODE_ORDER.length : 0;
-  return STUDY_MODE_ORDER[nextIndex];
-}
-
 function bookFlashcardColorName(color: LibraryStudyColor) {
   if (color === "grey") return "Limbo";
   return color.charAt(0).toUpperCase() + color.slice(1);
@@ -373,7 +368,7 @@ export default function BookFlashcardsPage() {
     Record<string, LibraryStudyWordColorInfo>
   >({});
 
-  const [studySet, setStudySet] = useState<StudySet>("READING");
+  const [studySet, setStudySet, nextStudySet] = useStudyModeRotation(STUDY_MODE_ORDER, "READING");
   const studyOnceMode = true;
 
   const [sessionOrder, setSessionOrder] = useState<number[]>([]);
@@ -525,7 +520,6 @@ export default function BookFlashcardsPage() {
       if (!raw) return;
 
       const parsed = JSON.parse(raw);
-      if (parsed?.studySet) setStudySet(parsed.studySet as StudySet);
       if (Array.isArray(parsed?.jlptSelected)) setJlptSelected(parsed.jlptSelected);
       if (Array.isArray(parsed?.colorSelected)) {
         setColorSelected(
@@ -2121,7 +2115,6 @@ export default function BookFlashcardsPage() {
     resetMcState();
   };
 
-  const nextStudySet = getNextStudySet(studySet);
 
   const filterControls = (
     isEnglishBook ? null : <StudyFilterPanel

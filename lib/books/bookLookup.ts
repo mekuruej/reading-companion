@@ -39,6 +39,7 @@ export type NormalizedBookLookupResult = {
   publisher: string | null;
   published_date: string | null;
   page_count: number | null;
+  kindle_location_count?: number | null;
   description: string | null;
   metadata_source: BookMetadataSource;
   source_id: string | null;
@@ -198,6 +199,7 @@ export function normalizedLookupFromExistingBook({
   publisher,
   published_date,
   page_count,
+  kindle_location_count,
   language_code,
 }: {
   id: string | null | undefined;
@@ -209,6 +211,7 @@ export function normalizedLookupFromExistingBook({
   publisher: string | null | undefined;
   published_date: string | null | undefined;
   page_count: number | string | null | undefined;
+  kindle_location_count?: number | string | null;
   language_code: string | null | undefined;
 }): NormalizedBookLookupResult {
   const authors = cleanAuthors([author]);
@@ -223,6 +226,7 @@ export function normalizedLookupFromExistingBook({
     publisher: publisher?.trim() || null,
     published_date: published_date?.trim() || null,
     page_count: cleanNumber(page_count),
+    kindle_location_count: cleanNumber(kindle_location_count),
     description: null,
     metadata_source: "mekuru",
     source_id: id ?? null,

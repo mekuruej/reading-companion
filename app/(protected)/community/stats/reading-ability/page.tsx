@@ -88,6 +88,8 @@ type BookMetric = {
     wordsSaved: number;
     curiosityMinutes: number;
     fluidMinutes: number;
+    pageFluidMinutes: number;
+    pageCuriosityMinutes: number;
     listeningMinutes: number;
     totalMinutes: number;
     readingMinutes: number;
@@ -158,6 +160,7 @@ function formatDecimal(value: number | null, digits = 1) {
 }
 
 function sessionPages(row: SessionRow) {
+    if (row.start_page == null || row.end_page == null) return 0;
     const start = Number(row.start_page);
     const end = Number(row.end_page);
 
@@ -477,6 +480,8 @@ export default function ReadingAbilityPage() {
                     return minutes > 0 ? sum + sessionPages(session) : sum;
                 }, 0);
 
+                const pageFluidMinutes = fluidSessions.filter(s => sessionPages(s) > 0).reduce((n,s) => n + Math.max(0, Number(s.minutes_read) || 0), 0);
+                const pageCuriosityMinutes = curiositySessions.filter(s => sessionPages(s) > 0).reduce((n,s) => n + Math.max(0, Number(s.minutes_read) || 0), 0);
                 const curiosityMinutes = curiositySessions.reduce(
                     (sum, session) => sum + (Number(session.minutes_read) || 0),
                     0
@@ -511,11 +516,13 @@ export default function ReadingAbilityPage() {
                     wordsSaved: bookWords.length,
                     curiosityMinutes,
                     fluidMinutes,
+                    pageFluidMinutes,
+                    pageCuriosityMinutes,
                     listeningMinutes,
                     totalMinutes,
                     readingMinutes,
                     averageMinutesPerPage:
-                        timedReadingPages > 0 ? readingMinutes / timedReadingPages : null,
+                        timedReadingPages > 0 ? (pageFluidMinutes + pageCuriosityMinutes) / timedReadingPages : null,
                     wordsPerPage: pagesRead > 0 ? uniqueWords / pagesRead : null,
                     sessions: bookSessions.length,
                 } satisfies BookMetric;
@@ -610,9 +617,9 @@ export default function ReadingAbilityPage() {
             timedCoveragePercent: pagesRead > 0 ? (timedPages / pagesRead) * 100 : null,
             averageWordsPerPage: pagesRead > 0 ? wordsSaved / pagesRead : null,
             fluidMinutesPerPage:
-                timedFluidPages > 0 ? fluidMinutes / timedFluidPages : null,
+                timedFluidPages > 0 ? filteredBookMetrics.reduce((n, b) => n + b.pageFluidMinutes, 0) / timedFluidPages : null,
             curiosityMinutesPerPage:
-                timedCuriosityPages > 0 ? curiosityMinutes / timedCuriosityPages : null,
+                timedCuriosityPages > 0 ? filteredBookMetrics.reduce((n, b) => n + b.pageCuriosityMinutes, 0) / timedCuriosityPages : null,
         };
     }, [filteredBookMetrics]);
 
@@ -633,7 +640,7 @@ export default function ReadingAbilityPage() {
             .map((item) => ({
                 ...item,
                 fluidMinPerPage:
-                    item.timedFluidPages > 0 ? item.fluidMinutes / item.timedFluidPages : null,
+                    item.timedFluidPages > 0 ? item.pageFluidMinutes / item.timedFluidPages : null,
             }))
             .filter((item) => item.fluidMinPerPage != null);
 
@@ -642,7 +649,7 @@ export default function ReadingAbilityPage() {
                 ...item,
                 curiosityMinPerPage:
                     item.timedCuriosityPages > 0
-                        ? item.curiosityMinutes / item.timedCuriosityPages
+                        ? item.pageCuriosityMinutes / item.timedCuriosityPages
                         : null,
             }))
             .filter((item) => item.curiosityMinPerPage != null);
@@ -699,7 +706,7 @@ export default function ReadingAbilityPage() {
             existing.pagesRead += item.pagesRead;
             existing.timedPages += item.timedReadingPages;
             existing.wordsSaved += item.wordsSaved;
-            existing.totalMinutes += item.fluidMinutes + item.curiosityMinutes;
+            existing.totalMinutes += item.pageFluidMinutes + item.pageCuriosityMinutes;
             grouped.set(key, existing);
         }
 

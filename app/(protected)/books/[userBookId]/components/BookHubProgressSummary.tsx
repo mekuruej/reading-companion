@@ -98,7 +98,7 @@ export default function BookHubProgressSummary({
         <>
           <div>
             <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-stone-500">
-              <span>Current Page Progress</span>
+              <span>Current Progress</span>
               <span>
                 {progressPercentLabel ? `${progressPercentLabel} · ` : ""}{progressLabel}
               </span>

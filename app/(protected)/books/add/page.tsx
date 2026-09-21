@@ -2,6 +2,7 @@
 // 
 "use client";
 
+import { hasUsableProgressTotal } from "@/lib/books/catalogProgressTotal";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -68,6 +69,7 @@ type BookSearchResult = {
     publisher: string | null;
     published_date: string | null;
     page_count: number | null;
+  kindle_location_count?: number | null;
     allow_missing_isbn?: boolean | null;
     allow_missing_publisher?: boolean | null;
     missing_info_cleared_at?: string | null;
@@ -132,7 +134,7 @@ function missingGlobalBookFields(book: BookSearchResult) {
     if (!String(book.author ?? "").trim()) missing.push("author");
     if (!book.allow_missing_publisher && !String(book.publisher ?? "").trim()) missing.push("publisher");
     if (!String(book.published_date ?? "").trim()) missing.push("published date");
-    if (book.page_count == null) missing.push("page count");
+    if (!hasUsableProgressTotal(book)) missing.push("progress total");
     return missing;
 }
 
@@ -166,6 +168,7 @@ export default function AddBookPage() {
     const [manualEditionFormat, setManualEditionFormat] = useState("");
     const [manualEditionNote, setManualEditionNote] = useState("");
     const [manualLanguageCode, setManualLanguageCode] = useState("");
+    const [manualKindleLocationCount, setManualKindleLocationCount] = useState("");
     const [manualPageCount, setManualPageCount] = useState("");
     const [manualAddError, setManualAddError] = useState("");
     const [manualAddLoading, setManualAddLoading] = useState(false);
@@ -180,6 +183,7 @@ export default function AddBookPage() {
     const [teacherStudents, setTeacherStudents] = useState<TeacherStudentOption[]>([]);
     const [teacherStudentLoading, setTeacherStudentLoading] = useState(false);
     const [teacherStudentSearch, setTeacherStudentSearch] = useState("");
+    const [initialReadingStatus, setInitialReadingStatus] = useState<"want_to_read" | "reading">("want_to_read");
     const [addToCatalogOnly, setAddToCatalogOnly] = useState(false);
     const [addToTeachingBooks, setAddToTeachingBooks] = useState(opensTeachingBooksDestination);
     const [addToMyLibrary, setAddToMyLibrary] = useState(
@@ -600,6 +604,7 @@ export default function AddBookPage() {
             if (addToCatalogOnly) {
                 return {
                     mode: "add_to_library",
+                    initialPersonalTrackingStatus: initialReadingStatus,
                     destinations: {
                         catalogOnly: true,
                         teachingBooks: false,
@@ -611,6 +616,7 @@ export default function AddBookPage() {
 
             return {
                 mode: "add_to_library",
+                initialPersonalTrackingStatus: initialReadingStatus,
                 targetUserId: addToStudentLibrary ? selectedTeacherStudentId : currentUserId,
                 destinations: {
                     catalogOnly: false,
@@ -624,6 +630,7 @@ export default function AddBookPage() {
         if (!isTeacherGlobalContext) {
             return {
                 mode: "add_to_library",
+                initialPersonalTrackingStatus: initialReadingStatus,
                 targetUserId: targetLibraryUserId,
                 ...studentLessonBookPayload(),
             };
@@ -631,6 +638,7 @@ export default function AddBookPage() {
 
         return {
             mode: "add_to_library",
+                initialPersonalTrackingStatus: initialReadingStatus,
             targetUserId: targetLibraryUserId,
         };
     }
@@ -684,6 +692,7 @@ export default function AddBookPage() {
         setManualEditionNote("");
         setManualLanguageCode("");
         setManualPageCount("");
+        setManualKindleLocationCount("");
         setManualAddError("");
         setManualPossibleMatches([]);
     }
@@ -699,12 +708,17 @@ export default function AddBookPage() {
         setManualEditionNote(seed?.format === "other" ? seed?.editionNote ?? "" : "");
         setManualLanguageCode("");
         setManualPageCount("");
+        setManualKindleLocationCount("");
         setManualAddError("");
         setManualPossibleMatches([]);
     }
 
     function handleSuccessfulAdd(data: any, actionKey: string) {
         markActionSatisfied(actionKey, data);
+        if (initialReadingStatus === "reading" && (data?.teacherUserBookId ?? data?.userBookId) && (!canChooseTeacherDestinations || addToMyLibrary) && !isStudentDestination && !isOtherUserDestination && !isStudentLessonBookContext) {
+            router.push(`/books/${data.teacherUserBookId ?? data.userBookId}`);
+            return;
+        }
 
         if (isStudentLessonBookContext) {
             const notice = data?.alreadyInLibrary
@@ -862,7 +876,7 @@ export default function AddBookPage() {
             const { data, error: asinSearchError } = await supabase
                 .from("books")
                 .select(
-                    "id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at, language_code, edition_format, edition_note"
+                    "id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, kindle_location_count, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at, language_code, edition_format, edition_note"
                 )
                 .ilike("asin", normalizedAsin)
                 .limit(1)
@@ -1096,7 +1110,8 @@ export default function AddBookPage() {
                     title: manualTitle,
                     author: manualAuthor,
                     editionFormat: manualEditionFormat || null,
-                    editionNote: manualEditionFormat === "other" ? manualEditionNote : null,
+                    editionNote: manualEditionNote || null,
+                    kindleLocationCount: manualKindleLocationCount || null,
                     languageCode: manualLanguageCode,
                     pageCount: manualPageCount || null,
                     ...addModePayload(),
@@ -1724,6 +1739,16 @@ export default function AddBookPage() {
                     ) : null}
                 </div>
 
+                {!isStudentDestination && !isOtherUserDestination && !isStudentLessonBookContext && !addToCatalogOnly && (!canChooseTeacherDestinations || addToMyLibrary) ? (
+                    <label className="mt-4 block text-sm font-semibold text-stone-700">
+                        Add to My Library as
+                        <select value={initialReadingStatus} onChange={(event) => setInitialReadingStatus(event.target.value as "want_to_read" | "reading")} className="ml-3 rounded-xl border bg-white px-3 py-2">
+                            <option value="want_to_read">Want to Read</option>
+                            <option value="reading">Currently Reading</option>
+                        </select>
+                    </label>
+                ) : null}
+
                 {canChooseTeacherDestinations && hasEditionToActOn ? (
                     <div className="mt-4 rounded-2xl border border-stone-200 bg-stone-50 p-4">
                         <p className="text-xs font-black uppercase tracking-[0.16em] text-stone-500">
@@ -1860,6 +1885,8 @@ export default function AddBookPage() {
                         editionNote={manualEditionNote}
                         languageCode={manualLanguageCode}
                         pageCount={manualPageCount}
+                        kindleLocationCount={manualKindleLocationCount}
+                        onKindleLocationCountChange={setManualKindleLocationCount}
                         error={manualAddError}
                         loading={manualAddLoading}
                         addLabel={manualButtonState.label}
@@ -1885,9 +1912,6 @@ export default function AddBookPage() {
                         }}
                         onEditionFormatChange={(value) => {
                             setManualEditionFormat(value);
-                            if (value !== "other") {
-                                setManualEditionNote("");
-                            }
                             setManualAddError("");
                             setManualPossibleMatches([]);
                         }}

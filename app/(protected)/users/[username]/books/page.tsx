@@ -2,6 +2,7 @@
 //
 "use client";
 
+import { progressSummary, type ProgressTrackingMethod, type ProgressTotals } from "@/lib/books/readingProgress";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -78,6 +79,7 @@ type Book = {
   isbn13: string | null;
   cover_url: string | null;
   page_count: number | null;
+  kindle_location_count?: number | null;
   book_type: string | null;
 };
 
@@ -97,6 +99,7 @@ type UserBookRow = {
   books: Book | null;
   format_type: string | null;
   progress_mode: string | null;
+  progress_tracking_method: ProgressTrackingMethod | null;
   show_page_numbers: boolean | null;
   rating_overall?: number | null;
   rating_difficulty?: number | null;
@@ -618,6 +621,7 @@ export default function BooksPage() {
         dnf_at,
         format_type,
         progress_mode,
+        progress_tracking_method,
         show_page_numbers,
         rating_overall,
         rating_difficulty,
@@ -633,6 +637,7 @@ export default function BooksPage() {
           author,
           cover_url,
           page_count,
+          kindle_location_count,
           book_type
         )
       `)
@@ -719,15 +724,13 @@ export default function BooksPage() {
     const userBookIds = rowsWithTeachingBadges
       .filter((r: any) => resolvePersonalTrackingStatus(r) !== "not_tracking")
       .map((r: any) => r.id);
-    const pageCountByUserBookId: Record<string, number | null> = {};
     const formatTypeByUserBookId: Record<string, string | null> = {};
 
     for (const r of rowsWithTeachingBadges) {
-      pageCountByUserBookId[r.id] = r.books?.page_count ?? null;
       formatTypeByUserBookId[r.id] = r.format_type ?? null;
     }
 
-    await loadReadingStatsForBooks(userBookIds, pageCountByUserBookId, formatTypeByUserBookId);
+    await loadReadingStatsForBooks(userBookIds, formatTypeByUserBookId, Object.fromEntries(rowsWithTeachingBadges.map(r => [r.id, { method: r.progress_tracking_method, totals: r.books ?? {} }])));
 
     if (isTeacher && targetUserId === meId) {
       const studentAlertUserIds = isSuperTeacher
@@ -1166,8 +1169,8 @@ export default function BooksPage() {
 
   async function loadReadingStatsForBooks(
     userBookIds: string[],
-    pageCountByUserBookId: Record<string, number | null>,
-    formatTypeByUserBookId: Record<string, string | null>
+    formatTypeByUserBookId: Record<string, string | null>,
+    progressByBook: Record<string, {method: ProgressTrackingMethod | null; totals: ProgressTotals}>
   ) {
     if (userBookIds.length === 0) {
       setReadingStatsByUserBookId({});
@@ -1176,7 +1179,7 @@ export default function BooksPage() {
 
     const { data, error } = await supabase
       .from("user_book_reading_sessions")
-      .select("user_book_id, start_page, end_page, minutes_read, read_on, session_mode")
+      .select("user_book_id, tracking_unit, start_position, end_position, progress_total, start_page, end_page, minutes_read, read_on, session_mode")
       .in("user_book_id", userBookIds);
 
     if (error) {
@@ -1206,8 +1209,8 @@ export default function BooksPage() {
 
     for (const row of data ?? []) {
       const userBookId = row.user_book_id as string;
-      const startPage = Number((row as any).start_page);
-      const endPage = Number((row as any).end_page);
+      const startPage = row.start_page == null ? NaN : Number((row as any).start_page);
+      const endPage = row.end_page == null ? NaN : Number((row as any).end_page);
       const rawMinutes = (row as any).minutes_read;
       const readOn = (row as any).read_on as string | null;
       const sessionMode = (row as any).session_mode as string | null;
@@ -1281,7 +1284,6 @@ export default function BooksPage() {
     const stats: Record<string, ReadingSessionStats> = {};
 
     for (const userBookId of userBookIds) {
-      const pageCount = pageCountByUserBookId[userBookId];
       const g = grouped[userBookId];
 
       if (!g) {
@@ -1295,10 +1297,7 @@ export default function BooksPage() {
         continue;
       }
 
-      const progressPercent =
-        pageCount && pageCount > 0
-          ? Math.min(100, Math.round((g.furthestPage / pageCount) * 100))
-          : null;
+      const progressPercent = progressSummary((data ?? []).filter(s => s.user_book_id === userBookId), progressByBook[userBookId]?.method ?? null, progressByBook[userBookId]?.totals ?? {}).percent;
 
       const averageMinutesPerPage =
         g.totalTimedPages > 0 ? g.totalTimedMinutes / g.totalTimedPages : null;

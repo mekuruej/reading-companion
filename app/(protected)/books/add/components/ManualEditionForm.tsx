@@ -24,6 +24,7 @@ type ManualEditionCandidate = {
     publisher: string | null;
     published_date: string | null;
     page_count: number | null;
+    kindle_location_count?: number | null;
     allow_missing_isbn?: boolean | null;
     allow_missing_publisher?: boolean | null;
     missing_info_cleared_at?: string | null;
@@ -46,6 +47,8 @@ type ManualEditionFormProps = {
   editionNote: string;
   languageCode: string;
   pageCount: string;
+  kindleLocationCount: string;
+  onKindleLocationCountChange: (value: string) => void;
   error: string;
   loading: boolean;
   addLabel?: string;
@@ -80,6 +83,8 @@ export default function ManualEditionForm({
   editionNote,
   languageCode,
   pageCount,
+  kindleLocationCount,
+  onKindleLocationCountChange,
   error,
   loading,
   addLabel = "Add to Library",
@@ -122,7 +127,7 @@ export default function ManualEditionForm({
         {manualEditionTitle(mode)}
       </h2>
       <p className="mt-2 text-sm leading-6 text-stone-600">
-        Add the details you know. Page count is recommended for pacing and
+        Add the details you know. A total page count or Kindle Location is recommended for pacing and
         page-based stats, but it is optional.
       </p>
 
@@ -170,10 +175,10 @@ export default function ManualEditionForm({
             </select>
           </label>
 
-          {editionFormat === "other" ? (
+          {(
             <label className="block">
               <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-stone-500">
-                Other format note
+                Edition note (optional)
               </span>
               <input
                 value={editionNote}
@@ -182,8 +187,11 @@ export default function ManualEditionForm({
                 className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
               />
             </label>
-          ) : null}
+          )}
 
+          <label className="block">Total Kindle Location (optional)
+            <input value={kindleLocationCount} onChange={(event) => onKindleLocationCountChange(event.target.value)} inputMode="numeric" className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3" placeholder="e.g. 4200" />
+          </label>
           <div>
             <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-stone-500">
               Page count (optional)

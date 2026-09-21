@@ -3,6 +3,7 @@
 
 "use client";
 
+import { useStudyModeRotation } from "@/lib/study/useStudyModeRotation";
 import { studyCardPromptClass, studyCardDefinitionClass, STUDY_CARD_INPUT_CLASS, STUDY_CARD_CHECK_BUTTON_CLASS, STUDY_CARD_CHECK_LABEL } from "@/lib/studyCardPresentation";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -261,11 +262,6 @@ const LIBRARY_REVIEW_MODE_ORDER: PracticeStudyMode[] = [
   "COMPLETE",
   "COMPLETE_TYPING",
 ];
-
-function nextPracticeStudyMode(mode: PracticeStudyMode): PracticeStudyMode {
-  const index = LIBRARY_REVIEW_MODE_ORDER.indexOf(mode);
-  return LIBRARY_REVIEW_MODE_ORDER[(index + 1) % LIBRARY_REVIEW_MODE_ORDER.length] ?? "READING";
-}
 
 const DEFAULT_LEARNING_SETTINGS: LearningSettingsRow = {
   red_stages: 1,
@@ -1502,7 +1498,7 @@ export default function LibraryStudyPage() {
   const [practiceFinished, setPracticeFinished] = useState(false);
   const [practiceStarted, setPracticeStarted] = useState(false);
   const [practiceStarting, setPracticeStarting] = useState(false);
-  const [practiceStudyMode, setPracticeStudyMode] = useState<PracticeStudyMode>("READING");
+  const [practiceStudyMode, setPracticeStudyMode, nextPracticeMode] = useStudyModeRotation(LIBRARY_REVIEW_MODE_ORDER, "READING");
 
   const [selectedJlptLevels, setSelectedJlptLevels] = useState<string[]>([]);
   const [practiceColorFilters, setPracticeColorFilters] = useState<PracticeColorFilter[]>([]);
@@ -2043,7 +2039,7 @@ export default function LibraryStudyPage() {
   }
 
   function movePracticeDeckToNextMode() {
-    setPracticeStudyMode(nextPracticeStudyMode(practiceStudyMode));
+    setPracticeStudyMode(nextPracticeMode);
     setPracticeIndex(0);
     setPracticeFinished(false);
     resetPracticeReveal();
@@ -2460,7 +2456,7 @@ export default function LibraryStudyPage() {
 
           {practiceFinished ? (
             <LibraryPracticeCompleteCard
-              nextModeLabel={practiceStudyModeLabel(nextPracticeStudyMode(practiceStudyMode))}
+              nextModeLabel={practiceStudyModeLabel(nextPracticeMode)}
               onNextMode={movePracticeDeckToNextMode}
               onReviewAgain={shufflePracticeDeck}
               onOpenWordSky={() => router.push("/library-study/word-sky")}

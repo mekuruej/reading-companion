@@ -1,3 +1,4 @@
+import { hasUsableProgressTotal } from "@/lib/books/catalogProgressTotal";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -7,7 +8,7 @@ const supabaseAdmin = createClient(
 );
 
 const BOOK_BASE_SELECT =
-  "id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, language_code, edition_format, edition_note";
+  "id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, kindle_location_count, language_code, edition_format, edition_note";
 const BOOK_REVIEW_SELECT = `${BOOK_BASE_SELECT}, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at`;
 
 function isMissingColumnError(error: any) {
@@ -78,7 +79,7 @@ function bookCompletenessScore(book: any) {
   if (String(book.author ?? "").trim()) score += 4;
   if (String(book.publisher ?? "").trim()) score += 3;
   if (String(book.published_date ?? "").trim()) score += 3;
-  if (book.page_count != null) score += 3;
+  if (hasUsableProgressTotal(book)) score += 3;
   if (String(book.isbn13 ?? "").trim()) score += 2;
   if (String(book.asin ?? "").trim()) score += 2;
   if (String(book.edition_format ?? "").trim()) score += 1;

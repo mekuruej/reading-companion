@@ -2,6 +2,7 @@
 
 "use client";
 
+import { hasUsableProgressTotal, isValidProgressTotal } from "@/lib/books/catalogProgressTotal";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -68,6 +69,7 @@ type BookRow = {
     publisher_image_url: string | null;
     published_date: string | null;
     page_count: number | null;
+  kindle_location_count?: number | null;
     series_number: number | null;
     series_total: number | null;
     related_links: any | null;
@@ -297,6 +299,7 @@ export default function TeacherAddBookPage() {
     const [publishedDate, setPublishedDate] = useState("");
     const [editionFormat, setEditionFormat] = useState("");
     const [editionNote, setEditionNote] = useState("");
+    const [kindleLocationCount, setKindleLocationCount] = useState("");
     const [pageCount, setPageCount] = useState("");
     const [seriesNumber, setSeriesNumber] = useState("");
     const [seriesTotal, setSeriesTotal] = useState("");
@@ -329,7 +332,7 @@ export default function TeacherAddBookPage() {
         if (!isbn13.trim() && !normalizedAsin && !allowMissingIsbn) missing.push("ISBN-13 or ASIN");
         if (!publisher.trim() && !allowMissingPublisher) missing.push("Publisher");
         if (!publishedDate.trim()) missing.push("Published date");
-        if (!pageCount.trim()) missing.push("Page count");
+        if (!hasUsableProgressTotal({ page_count: pageCount, kindle_location_count: kindleLocationCount })) missing.push("Progress Total");
 
         return missing;
     }, [
@@ -343,6 +346,7 @@ export default function TeacherAddBookPage() {
         publisher,
         publishedDate,
         pageCount,
+        kindleLocationCount,
     ]);
 
     useEffect(() => {
@@ -426,6 +430,7 @@ export default function TeacherAddBookPage() {
         publisher_image_url,
         published_date,
         page_count,
+        kindle_location_count,
         series_number,
         series_total,
         related_links,
@@ -492,6 +497,7 @@ export default function TeacherAddBookPage() {
         }
 
         setPublishedDate(data.published_date ?? "");
+        setKindleLocationCount(data.kindle_location_count == null ? "" : String(data.kindle_location_count));
         setPageCount(data.page_count == null ? "" : String(data.page_count));
         setSeriesNumber(data.series_number == null ? "" : String(data.series_number));
         setSeriesTotal(data.series_total == null ? "" : String(data.series_total));
@@ -640,6 +646,7 @@ export default function TeacherAddBookPage() {
 
         setPublishedDate("");
         setPageCount("");
+        setKindleLocationCount("");
         setSeriesNumber("");
         setSeriesTotal("");
         setLinksText("");
@@ -716,6 +723,8 @@ export default function TeacherAddBookPage() {
             return;
         }
 
+        if (pageCount.trim() && !isValidProgressTotal(pageCount)) { setMessage("Page count must be a positive whole number."); return; }
+        if (kindleLocationCount.trim() && !isValidProgressTotal(kindleLocationCount)) { setMessage("Total Kindle Location must be a positive whole number."); return; }
         setSaving(true);
 
         try {
@@ -768,6 +777,8 @@ export default function TeacherAddBookPage() {
                     asin: normalizedAsin,
                     edition_format: cleanText(editionFormat),
                     edition_note: cleanText(editionNote),
+                    kindle_location_count: kindleLocationCount.trim() ? Number(kindleLocationCount) : null,
+                    page_count: pageCount.trim() ? Number(pageCount) : null,
                 })
                 .select("id")
                 .single();
@@ -838,7 +849,7 @@ export default function TeacherAddBookPage() {
         }
 
         if (isbnLookupPreview.found_existing_book && isbnLookupPreview.existing_book_id) {
-            setSaving(true);
+        setSaving(true);
             try {
                 await loadBook(isbnLookupPreview.existing_book_id);
                 setMessage("This ISBN already exists in Mekuru. Loaded the existing catalog book.");
@@ -858,6 +869,8 @@ export default function TeacherAddBookPage() {
             return;
         }
 
+        if (pageCount.trim() && !isValidProgressTotal(pageCount)) { setMessage("Page count must be a positive whole number."); return; }
+        if (kindleLocationCount.trim() && !isValidProgressTotal(kindleLocationCount)) { setMessage("Total Kindle Location must be a positive whole number."); return; }
         setSaving(true);
 
         try {
@@ -877,7 +890,7 @@ export default function TeacherAddBookPage() {
                 return;
             }
 
-            const cleanPageCount =
+        const cleanPageCount =
                 isbnLookupPreview.page_count != null && Number.isFinite(isbnLookupPreview.page_count)
                     ? isbnLookupPreview.page_count
                     : null;
@@ -891,6 +904,7 @@ export default function TeacherAddBookPage() {
                     cover_url: cleanText(isbnLookupPreview.cover_url ?? ""),
                     publisher: cleanText(isbnLookupPreview.publisher ?? ""),
                     published_date: cleanText(isbnLookupPreview.published_date ?? ""),
+                    kindle_location_count: kindleLocationCount.trim() ? Number(kindleLocationCount) : null,
                     page_count: cleanPageCount,
                     edition_format: cleanText(editionFormat),
                     edition_note: cleanText(editionNote),
@@ -944,7 +958,7 @@ export default function TeacherAddBookPage() {
         }
 
         const cleanPageCount = pageCount.trim()
-            ? Number(pageCount.replace(/[^0-9]/g, ""))
+            ? Number(pageCount)
             : null;
         const cleanSeriesNumber = seriesNumber.trim()
             ? Number(seriesNumber.replace(/[^0-9]/g, ""))
@@ -954,6 +968,8 @@ export default function TeacherAddBookPage() {
             : null;
         const relatedLinks = linksText.trim() ? parseLinks(linksText) : null;
 
+        if (pageCount.trim() && !isValidProgressTotal(pageCount)) { setMessage("Page count must be a positive whole number."); return; }
+        if (kindleLocationCount.trim() && !isValidProgressTotal(kindleLocationCount)) { setMessage("Total Kindle Location must be a positive whole number."); return; }
         setSaving(true);
 
         try {
@@ -993,6 +1009,7 @@ export default function TeacherAddBookPage() {
                     published_date: cleanText(publishedDate),
                     edition_format: cleanText(editionFormat),
                     edition_note: cleanText(editionNote),
+                    kindle_location_count: kindleLocationCount.trim() ? Number(kindleLocationCount) : null,
                     page_count: cleanPageCount,
                     series_number: cleanSeriesNumber,
                     series_total: cleanSeriesTotal,
@@ -1037,8 +1054,8 @@ export default function TeacherAddBookPage() {
         <TeacherBookAddPageShell>
             <TeacherBookAddHeader
                 isEditing={isEditMode || !!currentBookId}
-                backHref={backLink.href}
-                backLabel={backLink.label}
+                backHref={isEditMode || currentBookId ? "/teacher/books/add" : backLink.href}
+                backLabel={isEditMode || currentBookId ? "← Back to Catalog Editor" : backLink.label}
             />
 
             {bookRequest ? (
@@ -1129,6 +1146,8 @@ export default function TeacherAddBookPage() {
                         setEditionNote={setEditionNote}
                         publishedDate={publishedDate}
                         setPublishedDate={setPublishedDate}
+                        kindleLocationCount={kindleLocationCount}
+                        setKindleLocationCount={setKindleLocationCount}
                         pageCount={pageCount}
                         setPageCount={setPageCount}
                         seriesNumber={seriesNumber}

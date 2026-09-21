@@ -28,7 +28,9 @@ export function TeacherBookInfoSectionHeader({
         }`}
       >
         {hasMissingFields
-          ? `Missing: ${missingFieldsLabel}`
+          ? missingFields.length === 1 && missingFields[0] === "Progress Total"
+            ? "No Progress Total"
+            : `Missing: ${missingFieldsLabel}`
           : "Core details complete"}
       </div>
     </div>

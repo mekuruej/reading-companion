@@ -46,7 +46,7 @@ export default function TeacherMissingBookInfoPage() {
       const { data, error } = await supabase
         .from("books")
         .select(
-          "id, title, isbn13, asin, cover_url, book_type, author, publisher, published_date, page_count, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at"
+          "id, title, isbn13, asin, cover_url, book_type, author, publisher, published_date, page_count, kindle_location_count, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at"
         )
         .order("title", { ascending: true });
 
@@ -115,7 +115,7 @@ export default function TeacherMissingBookInfoPage() {
           {items.length} book attention item{items.length === 1 ? "" : "s"}
         </h1>
         <p className="mt-2 text-sm leading-6 text-stone-600">
-          Catalog book records missing core details such as author, cover, page count, or publication info.
+          Catalog book records missing core details such as author, cover, a progress total (pages or Kindle Locations), or publication info.
         </p>
       </section>
 

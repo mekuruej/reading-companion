@@ -3,6 +3,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useBookProgress } from "@/components/books/BookProgressProvider";
+import { progressSummary, progressLabels, type ProgressRecord } from "@/lib/books/readingProgress";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
@@ -41,7 +43,7 @@ type UserBook = {
   books: Book | null;
 };
 
-type ReadingSession = {
+type ReadingSession = ProgressRecord & {
   id: string;
   user_book_id: string;
   read_on: string;
@@ -133,11 +135,6 @@ function formatMinutes(total: number | null) {
   return `${hours}h ${minutes}m`;
 }
 
-function pageCountLabel(currentPage: number | null, pageCount: number | null) {
-  if (currentPage == null) return "—";
-  if (pageCount && pageCount > 0) return `${currentPage} / ${pageCount}`;
-  return `p. ${currentPage}`;
-}
 
 function readerLevelDescription(levelValue: string | null | undefined) {
   const level = findMekuruReadingLevel(levelValue);
@@ -185,6 +182,7 @@ function mostCommonReaderLevel(signals: PublicRecommendationSignal[]) {
 }
 
 export default function TeacherReadingSnapshotPage() {
+  const tracking = useBookProgress();
   const params = useParams<{ userBookId: string }>();
   const userBookId = params.userBookId;
 
@@ -333,7 +331,7 @@ export default function TeacherReadingSnapshotPage() {
           supabase
             .from("user_book_reading_sessions")
             .select(
-              "id, user_book_id, read_on, start_page, end_page, minutes_read, is_filler, created_at, session_mode"
+              "id, user_book_id, read_on, tracking_unit, start_position, end_position, progress_total, start_page, end_page, minutes_read, is_filler, created_at, session_mode"
             )
             .eq("user_book_id", userBookId)
             .order("read_on", { ascending: false })
@@ -479,12 +477,6 @@ export default function TeacherReadingSnapshotPage() {
     if (session.start_page == null || session.end_page == null) return sum;
     return sum + (session.end_page - session.start_page + 1);
   }, 0);
-  const furthestPage =
-    realSessions.reduce<number | null>((maxPage, session) => {
-      if (session.end_page == null) return maxPage;
-      if (maxPage == null) return session.end_page;
-      return Math.max(maxPage, session.end_page);
-    }, null) ?? (row?.finished_at && book?.page_count ? book.page_count : null);
   const daysEngaged =
     realSessions.length > 0
       ? new Set(realSessions.map((session) => session.read_on)).size
@@ -503,18 +495,14 @@ export default function TeacherReadingSnapshotPage() {
   );
   const averageMinutesPerPage =
     timedPages > 0 ? timedPageMinutes / timedPages : null;
-  const percentComplete =
-    row?.finished_at && book?.page_count
-      ? 100
-      : furthestPage != null && book?.page_count
-        ? Math.min(100, Math.round((furthestPage / book.page_count) * 100))
-        : null;
+  const tracked = progressSummary(sessions, tracking.method, tracking.totals);
+  const percentComplete = row?.finished_at ? 100 : tracked.percent;
 
   const progressStats: TeacherSnapshotStat[] = [
     { label: "Reader status", value: readerStatusLabel(row) },
     {
-      label: "Current page",
-      value: pageCountLabel(furthestPage, book?.page_count ?? null),
+      label: progressLabels(tracking.method).current,
+      value: tracked.position == null ? "—" : `${tracked.position}${tracking.method === "percent" ? "%" : ""}${tracked.total && tracking.method !== "percent" ? ` / ${tracked.total}` : ""}`,
       note: percentComplete != null ? `${percentComplete}% complete` : undefined,
     },
     { label: "Pages read", value: pagesRead > 0 ? String(pagesRead) : "—" },

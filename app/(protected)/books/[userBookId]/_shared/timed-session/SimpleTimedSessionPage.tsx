@@ -2,13 +2,15 @@
 //
 
 "use client";
+import { useBookProgress } from "@/components/books/BookProgressProvider";
+import { nextProgressStart, matchingTotal, progressLabels, parseProgressRange, progressPayload, sessionEnd } from "@/lib/books/readingProgress";
+
 
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { displayBookTitle } from "@/lib/books/bookIdentity";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
-import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import {
     clearPersistedTimedSession,
@@ -50,52 +52,6 @@ function formatTimer(totalSeconds: number) {
     return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-function percentToPage(percent: number | null, pageCount: number | null) {
-    if (percent == null || !pageCount || pageCount <= 0) return null;
-    const clamped = Math.max(0, Math.min(100, percent));
-    return Math.max(1, Math.min(pageCount, Math.round((clamped / 100) * pageCount)));
-}
-
-function pageToPercent(page: number | null, pageCount: number | null) {
-    if (page == null || !pageCount || pageCount <= 0) return null;
-    return Math.max(0, Math.min(100, Math.round((page / pageCount) * 100)));
-}
-
-function parseListeningEndpoint(value: string, pageCount: number | null) {
-    const trimmed = value.trim();
-    if (!trimmed) return { value: null, error: null };
-
-    const isPercent = trimmed.includes("%");
-    const normalized = trimmed
-        .replace(/%/g, "")
-        .replace(/^p(?:age)?\.?\s*/i, "")
-        .trim();
-    const numeric = Number(normalized);
-
-    if (!Number.isFinite(numeric)) {
-        return { value: null, error: "Enter a page number or percent, like 42, p. 42, or 18%." };
-    }
-
-    if (isPercent) {
-        if (numeric < 0 || numeric > 100) {
-            return { value: null, error: "Listening percent must be between 0 and 100." };
-        }
-
-        return { value: percentToPage(numeric, pageCount) ?? Math.round(numeric), error: null };
-    }
-
-    if (numeric <= 0) {
-        return { value: null, error: "Listening page must be greater than 0." };
-    }
-
-    return { value: Math.round(numeric), error: null };
-}
-
-function parseFlexibleListeningEndpoint(value: string, pageCount: number | null) {
-    const parsed = parseListeningEndpoint(value, pageCount);
-    return parsed.error ? { value: null, error: null } : parsed;
-}
-
 export default function SimpleTimedSessionPage({
     sessionMode,
     allowNativeReadListenToggle = false,
@@ -106,13 +62,13 @@ export default function SimpleTimedSessionPage({
     description,
     saveSuccessMessage,
     backLabel = "Back to Book Hub",
-    startLocationLabel = "Start page optional",
-    endLocationLabel = "End page optional",
-    sessionLocationNote = "Page numbers are optional. If you leave them blank, only the time will be saved. Pace stats can only be generated with page numbers.",
     listeningLocationNote = "Optional. Add an audiobook position like Chapter 8, 37%, or 3:12:45. Listening time stays separate from reading pace.",
     embedded = false,
     workspaceCompact = false,
 }: SimpleTimedSessionPageProps) {
+    const tracking = useBookProgress();
+    const labels = progressLabels(tracking.method);
+    const progressTotal = matchingTotal(tracking.method, tracking.totals);
     const router = useRouter();
     const params = useParams<{ userBookId: string }>();
     const userBookId = params.userBookId;
@@ -120,7 +76,7 @@ export default function SimpleTimedSessionPage({
     const [loading, setLoading] = useState(true);
     const [bookTitle, setBookTitle] = useState("");
     const [bookCover, setBookCover] = useState("");
-    const [bookPageCount, setBookPageCount] = useState<number | null>(null);
+    const [, setBookPageCount] = useState<number | null>(null);
     const [bookStartedAt, setBookStartedAt] = useState<string | null>(null);
     const [showFinishedNav, setShowFinishedNav] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
@@ -176,8 +132,7 @@ export default function SimpleTimedSessionPage({
             ? "Your listening session has been saved in Reading History."
             : "Your reading session has been saved in Reading History."
         : saveSuccessMessage;
-    const activeSessionLocationNote =
-        activeSessionMode === "listening" ? listeningLocationNote : sessionLocationNote;
+
 
     useEffect(() => {
         setActiveSessionMode(sessionMode);
@@ -319,7 +274,7 @@ export default function SimpleTimedSessionPage({
     }, [userBookId]);
 
     useEffect(() => {
-        if (!userBookId) return;
+        if (!userBookId || !tracking.loaded) return;
 
         skippedInitialPersistenceWriteRef.current = false;
         const persisted = readPersistedTimedSession(activeSessionMode, userBookId);
@@ -338,12 +293,12 @@ export default function SimpleTimedSessionPage({
             setShowTimedSessionForm(persisted.showTimedSessionForm);
             setHasFinishedTimer(persisted.showTimedSessionForm);
             setSessionDate(persisted.sessionDate);
-            setSessionStartPage(persisted.sessionStartPage);
-            setSessionEndPage(persisted.sessionEndPage);
+            setSessionStartPage(persisted.trackingUnit === tracking.method ? persisted.sessionStartPage : "");
+            setSessionEndPage(persisted.trackingUnit === tracking.method ? persisted.sessionEndPage : "");
         }
 
         setTimerPersistenceReady(true);
-    }, [activeSessionMode, userBookId]);
+    }, [activeSessionMode, userBookId, tracking.loaded, tracking.method]);
 
     useEffect(() => {
         if (isRunning && startTime) {
@@ -384,6 +339,7 @@ export default function SimpleTimedSessionPage({
         writePersistedTimedSession({
             version: 1,
             sessionMode: activeSessionMode,
+            trackingUnit: tracking.method,
             userBookId,
             startedAt: isRunning ? startTime : null,
             accumulatedElapsedMs,
@@ -404,7 +360,8 @@ export default function SimpleTimedSessionPage({
         sessionStartPage,
         showTimedSessionForm,
         startTime,
-        timerPersistenceReady,
+        tracking.method,
+    timerPersistenceReady,
         userBookId,
     ]);
 
@@ -417,6 +374,7 @@ export default function SimpleTimedSessionPage({
             writePersistedTimedSession({
                 version: 1,
                 sessionMode: activeSessionMode,
+            trackingUnit: tracking.method,
                 userBookId,
                 startedAt: isRunning ? startTime : null,
                 accumulatedElapsedMs,
@@ -450,7 +408,8 @@ export default function SimpleTimedSessionPage({
         sessionStartPage,
         showTimedSessionForm,
         startTime,
-        timerPersistenceReady,
+        tracking.method,
+    timerPersistenceReady,
         userBookId,
     ]);
 
@@ -464,7 +423,8 @@ export default function SimpleTimedSessionPage({
 
         const { data, error } = await supabase
             .from("user_book_reading_sessions")
-            .select("end_page, read_on, created_at")
+            .select("end_page, end_position, tracking_unit, read_on, created_at")
+            .eq("tracking_unit", tracking.method ?? "page")
             .eq("user_book_id", userBookId)
             .order("read_on", { ascending: false })
             .order("created_at", { ascending: false })
@@ -477,23 +437,10 @@ export default function SimpleTimedSessionPage({
         }
 
         const latest = data?.[0];
-        const latestEndPage =
-            latest?.end_page != null && Number.isFinite(Number(latest.end_page))
-                ? Number(latest.end_page)
-                : null;
-        const latestPercent = pageToPercent(latestEndPage, bookPageCount);
-        const nextStart = latestEndPage != null ? String(latestEndPage + 1) : "";
-
+        const latestPosition = latest ? sessionEnd(latest) : null;
+        const nextStart = nextProgressStart(latestPosition, tracking.method, progressTotal);
         setSessionStartPage(activeSessionMode === "listening" ? "" : nextStart);
-        setSessionEndPage(
-            activeSessionMode === "listening"
-                ? latestPercent != null
-                    ? `${latestPercent}%`
-                    : latestEndPage != null
-                        ? `p. ${latestEndPage}`
-                        : ""
-                : nextStart
-        );
+        setSessionEndPage(activeSessionMode === "listening" ? nextStart : "");
         setShowTimedSessionForm(true);
     }
 
@@ -505,39 +452,11 @@ export default function SimpleTimedSessionPage({
             return;
         }
 
-        const trimmedStartPage = sessionStartPage.trim();
+        if (!tracking.requireMethod() || !tracking.method) return;
         const trimmedEndPage = sessionEndPage.trim();
-        const hasAnyPageInput = trimmedStartPage !== "" || trimmedEndPage !== "";
-
-        let startPageNum: number | null = null;
-        let endPageNum: number | null = null;
-
-        if (activeSessionMode === "listening") {
-            const parsedEndpoint = isNativeListeningMode
-                ? parseFlexibleListeningEndpoint(trimmedEndPage, bookPageCount)
-                : parseListeningEndpoint(trimmedEndPage, bookPageCount);
-            if (parsedEndpoint.error) {
-                alert(parsedEndpoint.error);
-                return;
-            }
-            endPageNum = parsedEndpoint.value;
-        } else if (hasAnyPageInput) {
-            const parsedStart = parseOptionalPageLocationInput(trimmedStartPage, bookPageCount);
-            const parsedEnd = parseOptionalPageLocationInput(trimmedEndPage, bookPageCount);
-
-            if (parsedStart.error || parsedEnd.error || parsedStart.value == null || parsedEnd.value == null) {
-                alert(parsedStart.error || parsedEnd.error || "Please enter both a valid start page/end page or percent, or leave both blank.");
-                return;
-            }
-
-            startPageNum = parsedStart.value;
-            endPageNum = parsedEnd.value;
-
-            if (endPageNum < startPageNum) {
-                alert("End page cannot be before start page.");
-                return;
-            }
-        }
+        const parsed = parseProgressRange(activeSessionMode === "listening" ? "" : sessionStartPage, trimmedEndPage, tracking.method, progressTotal);
+        if (parsed.error && (!isNativeListeningMode || (!/^\d+:\d{2}(?::\d{2})?$/.test(trimmedEndPage) && /^[\d.+-]|^(?:p(?:age)?|loc(?:ation)?)\.?\s*\d/i.test(trimmedEndPage)))) { alert(parsed.error); return; }
+        const positionPayload = parsed.error ? progressPayload(tracking.method, null, null, progressTotal) : parsed.payload;
 
         const minutesNum = Number(sessionMinutesRead || Math.max(1, Math.round(elapsed / 60)));
 
@@ -546,8 +465,7 @@ export default function SimpleTimedSessionPage({
         const { error } = await supabase.from("user_book_reading_sessions").insert({
             user_book_id: userBookId,
             read_on: readOn,
-            start_page: startPageNum,
-            end_page: endPageNum,
+            ...positionPayload,
             minutes_read: minutesNum,
             session_mode: activeSessionMode,
         });
@@ -607,6 +525,7 @@ export default function SimpleTimedSessionPage({
         }, 4000);
     }
     function startTimer() {
+        if (!tracking.requireMethod()) return;
         const today = todayYmdAppTimeZone();
 
         setSessionDate(today);
@@ -692,21 +611,10 @@ export default function SimpleTimedSessionPage({
             return;
         }
 
-        let endPageNum: number | null = null;
-
-        if (activeSessionMode === "listening") {
-            const parsedEndpoint = parseFlexibleListeningEndpoint(trimmedLocation, bookPageCount);
-            endPageNum = parsedEndpoint.value;
-        } else {
-            const parsedPage = parseOptionalPageLocationInput(trimmedLocation, bookPageCount);
-
-            if (parsedPage.error || parsedPage.value == null) {
-                setProgressUpdateMessage(parsedPage.error || "Enter a valid current page or percent.");
-                return;
-            }
-
-            endPageNum = parsedPage.value;
-        }
+        if (!tracking.requireMethod() || !tracking.method) return;
+        const parsed = parseProgressRange("", trimmedLocation, tracking.method, progressTotal);
+        if (parsed.error && (!isNativeListeningMode || (!/^\d+:\d{2}(?::\d{2})?$/.test(trimmedLocation) && /^[\d.+-]|^(?:p(?:age)?|loc(?:ation)?)\.?\s*\d/i.test(trimmedLocation)))) { setProgressUpdateMessage(parsed.error); return; }
+        const positionPayload = parsed.error ? progressPayload(tracking.method, null, null, progressTotal) : parsed.payload;
 
         setSavingProgressUpdate(true);
         setProgressUpdateMessage("");
@@ -715,8 +623,7 @@ export default function SimpleTimedSessionPage({
         const { error: sessionError } = await supabase.from("user_book_reading_sessions").insert({
             user_book_id: userBookId,
             read_on: readOn,
-            start_page: null,
-            end_page: endPageNum,
+            ...positionPayload,
             minutes_read: null,
             session_mode: activeSessionMode,
         });
@@ -918,44 +825,44 @@ export default function SimpleTimedSessionPage({
             {activeSessionMode === "listening" ? (
                 <div>
                     <div className="mb-1 text-sm text-stone-600">
-                        {isNativeListeningMode ? "Listening position" : "Up to page or percent"}
+                        {isNativeListeningMode ? "Listening position" : labels.current}
                     </div>
                     <input
                         type="text"
                         inputMode="decimal"
                         value={sessionEndPage}
                         onChange={(e) => setSessionEndPage(e.target.value)}
-                        placeholder={isNativeListeningMode ? "e.g. Chapter 8, 37%, or 3:12:45" : "e.g. p. 42 or 18%"}
+                        placeholder={isNativeListeningMode ? "e.g. Chapter 8, 37%, or 3:12:45" : `Enter ${labels.unit.toLowerCase()}`}
                         className="w-full rounded-xl border px-3 py-2 text-sm"
                     />
                     <div className="mt-1 text-xs text-stone-500">
                         {isNativeListeningMode
                             ? "Optional. This updates your audiobook position without adding page data."
-                            : "Optional. Use a page if you have the book open, or a percent for audiobook progress."}
+                            : "Optional. Use the saved progress tracking method for this copy."}
                     </div>
                 </div>
             ) : (
                 <div className={workspaceCompact ? "grid grid-cols-1 gap-3" : "grid grid-cols-1 gap-3 sm:grid-cols-2"}>
                     <div>
-                        <div className="mb-1 text-sm text-stone-600">{startLocationLabel}</div>
+                        <div className="mb-1 text-sm text-stone-600">{`Start ${labels.unit.toLowerCase()} (optional)`}</div>
                         <input
                             type="text"
                             inputMode="decimal"
                             value={sessionStartPage}
                             onChange={(e) => setSessionStartPage(e.target.value)}
-                            placeholder="e.g. p. 45 or 18%"
+                            placeholder={labels.unit}
                             className="w-full rounded-xl border px-3 py-2 text-sm"
                         />
                     </div>
 
                     <div>
-                        <div className="mb-1 text-sm text-stone-600">{endLocationLabel}</div>
+                        <div className="mb-1 text-sm text-stone-600">{`End ${labels.unit.toLowerCase()} (optional)`}</div>
                         <input
                             type="text"
                             inputMode="decimal"
                             value={sessionEndPage}
                             onChange={(e) => setSessionEndPage(e.target.value)}
-                            placeholder="e.g. p. 52 or 21%"
+                            placeholder={labels.unit}
                             className="w-full rounded-xl border px-3 py-2 text-sm"
                         />
                     </div>
@@ -965,7 +872,7 @@ export default function SimpleTimedSessionPage({
             <div className="mt-3 space-y-1 text-sm text-stone-500">
                 <div>Time: {formatTimer(elapsed)}</div>
                 <div className="text-xs">
-                    {activeSessionLocationNote}
+                    {isNativeListeningMode ? listeningLocationNote : `Positions are optional. Entries are saved in ${labels.plural}.`}
                 </div>
             </div>
 
@@ -1006,6 +913,7 @@ export default function SimpleTimedSessionPage({
                 <button
                     type="button"
                     onClick={() => {
+                        setProgressUpdateLocation("");
                         setShowProgressUpdateForm(true);
                         setProgressUpdateMessage("");
                     }}
@@ -1026,7 +934,7 @@ export default function SimpleTimedSessionPage({
 
                     <label className="block">
                         <span className="text-xs font-semibold text-stone-600">
-                            {activeSessionMode === "listening" ? "Listening position" : "Current page"}
+                            {activeSessionMode === "listening" ? "Listening position" : labels.current}
                         </span>
                         <input
                             type="text"

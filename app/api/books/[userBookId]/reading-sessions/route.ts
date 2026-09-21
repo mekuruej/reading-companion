@@ -1,3 +1,4 @@
+import { normalizeSessionPayload } from "@/lib/books/readingSessionPayload";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { canTeacherAccessStudent } from "@/lib/teacher/studentLessonBooks";
@@ -59,7 +60,7 @@ async function authorizeBookAccess(actorId: string, userBookId: string) {
   const [{ data: userBook, error: userBookError }, profile] = await Promise.all([
     supabaseAdmin
       .from("user_books")
-      .select("id, user_id, started_at")
+      .select("id, user_id, started_at, progress_tracking_method, books(page_count,kindle_location_count)")
       .eq("id", userBookId)
       .maybeSingle(),
     getProfile(actorId),
@@ -88,7 +89,7 @@ async function authorizeBookAccess(actorId: string, userBookId: string) {
 
   return {
     ok: true as const,
-    userBook: userBook as { id: string; user_id: string; started_at: string | null },
+    userBook: userBook as any,
   };
 }
 
@@ -99,32 +100,6 @@ async function requireAuthorizedBook(req: Request, userBookId: string) {
   return authorizeBookAccess(authResult.user.id, userBookId);
 }
 
-function normalizeSessionPayload(body: any) {
-  const read_on = typeof body?.read_on === "string" ? body.read_on : null;
-  const session_mode =
-    body?.session_mode === "curiosity" ||
-    body?.session_mode === "listening" ||
-    body?.session_mode === "fluid"
-      ? body.session_mode
-      : "fluid";
-
-  return {
-    read_on,
-    start_page:
-      typeof body?.start_page === "number" && Number.isFinite(body.start_page)
-        ? body.start_page
-        : null,
-    end_page:
-      typeof body?.end_page === "number" && Number.isFinite(body.end_page)
-        ? body.end_page
-        : null,
-    minutes_read:
-      typeof body?.minutes_read === "number" && Number.isFinite(body.minutes_read)
-        ? body.minutes_read
-        : null,
-    session_mode,
-  };
-}
 
 export async function GET(
   req: Request,
@@ -145,7 +120,7 @@ export async function GET(
       await Promise.all([
         supabaseAdmin
           .from("user_book_reading_sessions")
-          .select("id, user_book_id, read_on, start_page, end_page, minutes_read, is_filler, created_at, session_mode")
+          .select("id, user_book_id, read_on, start_page, end_page, tracking_unit, start_position, end_position, progress_total, minutes_read, is_filler, created_at, session_mode")
           .eq("user_book_id", userBookId)
           .order("read_on", { ascending: false })
           .order("created_at", { ascending: false }),
@@ -166,7 +141,7 @@ export async function GET(
     console.error("Error loading reading sessions:", error);
     return NextResponse.json(
       { error: error?.message ?? "Could not load reading sessions." },
-      { status: 500 }
+      { status: error?.status === 400 ? 400 : 500 }
     );
   }
 }
@@ -187,7 +162,7 @@ export async function POST(
     }
 
     const body = await req.json().catch(() => ({}));
-    const payload = normalizeSessionPayload(body);
+    const payload = normalizeSessionPayload(body, access.userBook);
 
     if (!payload.read_on) {
       return NextResponse.json({ error: "Session date is required." }, { status: 400 });
@@ -199,7 +174,7 @@ export async function POST(
         user_book_id: userBookId,
         ...payload,
       })
-      .select("id, user_book_id, read_on, start_page, end_page, minutes_read, is_filler, created_at, session_mode")
+      .select("id, user_book_id, read_on, start_page, end_page, tracking_unit, start_position, end_position, progress_total, minutes_read, is_filler, created_at, session_mode")
       .single();
 
     if (sessionError) throw sessionError;
@@ -229,7 +204,7 @@ export async function POST(
     console.error("Error saving reading session:", error);
     return NextResponse.json(
       { error: error?.message ?? "Could not save reading session." },
-      { status: 500 }
+      { status: error?.status === 400 ? 400 : 500 }
     );
   }
 }
@@ -256,6 +231,7 @@ export async function PATCH(
         .from("user_books")
         .update({
           status: body.status,
+          personal_tracking_status: body.dnf_at ? "dnf" : body.finished_at ? "finished" : body.started_at ? "reading" : "want_to_read",
           started_at: body.started_at ?? null,
           finished_at: body.finished_at ?? null,
           dnf_at: body.dnf_at ?? null,
@@ -276,7 +252,11 @@ export async function PATCH(
       return NextResponse.json({ error: "Session id is required." }, { status: 400 });
     }
 
-    const payload = normalizeSessionPayload(body);
+    const { data: existing, error: existingError } = await supabaseAdmin.from("user_book_reading_sessions")
+      .select("tracking_unit, progress_total").eq("id", sessionId).eq("user_book_id", userBookId).maybeSingle();
+    if (existingError) throw existingError;
+    if (!existing) return NextResponse.json({ error: "Session not found." }, { status: 404 });
+    const payload = normalizeSessionPayload(body, access.userBook, existing);
     if (!payload.read_on) {
       return NextResponse.json({ error: "Session date is required." }, { status: 400 });
     }
@@ -286,7 +266,7 @@ export async function PATCH(
       .update(payload)
       .eq("id", sessionId)
       .eq("user_book_id", userBookId)
-      .select("id, user_book_id, read_on, start_page, end_page, minutes_read, is_filler, created_at, session_mode")
+      .select("id, user_book_id, read_on, start_page, end_page, tracking_unit, start_position, end_position, progress_total, minutes_read, is_filler, created_at, session_mode")
       .maybeSingle();
 
     if (error) throw error;
@@ -295,7 +275,7 @@ export async function PATCH(
     console.error("Error updating reading sessions:", error);
     return NextResponse.json(
       { error: error?.message ?? "Could not update reading sessions." },
-      { status: 500 }
+      { status: error?.status === 400 ? 400 : 500 }
     );
   }
 }
@@ -334,7 +314,7 @@ export async function DELETE(
     console.error("Error deleting reading session:", error);
     return NextResponse.json(
       { error: error?.message ?? "Could not delete reading session." },
-      { status: 500 }
+      { status: error?.status === 400 ? 400 : 500 }
     );
   }
 }

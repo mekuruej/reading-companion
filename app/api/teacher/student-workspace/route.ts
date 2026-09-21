@@ -191,7 +191,7 @@ async function loadReadingSummaries(userBookIds: string[]) {
       current.lastReadOn = (row as any).read_on;
     }
 
-    const endPage = Number((row as any).end_page);
+    const endPage = row.end_page == null ? NaN : Number((row as any).end_page);
     if (Number.isFinite(endPage)) {
       current.furthestPage =
         current.furthestPage == null ? endPage : Math.max(current.furthestPage, endPage);

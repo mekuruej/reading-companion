@@ -1,3 +1,5 @@
+import { useBookProgress } from "@/components/books/BookProgressProvider";
+import { progressLabels } from "@/lib/books/readingProgress";
 type ReadAlongTimerPanelProps = {
   isRunning: boolean;
   isPaused: boolean;
@@ -41,6 +43,8 @@ export default function ReadAlongTimerPanel({
   onSaveTimedSession,
   onCancelTimedSession,
 }: ReadAlongTimerPanelProps) {
+  const tracking = useBookProgress();
+  const labels = progressLabels(tracking.method);
   return (
     <div className={compact ? "rounded-xl border border-stone-200 bg-stone-50 px-3 py-2" : "rounded-xl border border-stone-200 bg-white px-3 py-3"}>
       {!compact ? (
@@ -53,7 +57,7 @@ export default function ReadAlongTimerPanel({
         {!isRunning && !isPaused ? (
           <button
             type="button"
-            onClick={onStartTimer}
+            onClick={() => { if (tracking.requireMethod()) onStartTimer(); }}
             className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
           >
             Start Timer
@@ -117,7 +121,7 @@ export default function ReadAlongTimerPanel({
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <div className="mb-1 text-sm text-stone-600">Start page or %</div>
+              <div className="mb-1 text-sm text-stone-600">{`Start ${labels.unit.toLowerCase()}`}</div>
               <input
                 type="text"
                 inputMode="decimal"
@@ -129,7 +133,7 @@ export default function ReadAlongTimerPanel({
             </div>
 
             <div>
-              <div className="mb-1 text-sm text-stone-600">End page or %</div>
+              <div className="mb-1 text-sm text-stone-600">{`End ${labels.unit.toLowerCase()}`}</div>
               <input
                 type="text"
                 inputMode="decimal"

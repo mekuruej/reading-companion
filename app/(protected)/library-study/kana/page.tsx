@@ -1,5 +1,6 @@
 "use client";
 
+import { useStudyModeRotation } from "@/lib/study/useStudyModeRotation";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -352,16 +353,11 @@ function createStudyDeck(mode: StudyMode, kanaPool: readonly KanaItem[]): StudyC
     return shuffleArray(kanaPool).map((item) => createStudyCard(mode, item));
 }
 
-function nextStudyMode(mode: StudyMode): StudyMode {
-    const currentIndex = STUDY_MODES.findIndex((option) => option.value === mode);
-    const nextOption = STUDY_MODES[(currentIndex + 1) % STUDY_MODES.length];
-
-    return nextOption?.value ?? STUDY_MODES[0].value;
-}
+const KANA_ROTATION_MODES = STUDY_MODES.map(option => option.value);
 
 export default function KanaStudyPage() {
     const router = useRouter();
-    const [studyMode, setStudyMode] = useState<StudyMode>("hiragana-to-katakana");
+    const [studyMode, setStudyMode, nextKanaMode] = useStudyModeRotation(KANA_ROTATION_MODES, "hiragana-to-katakana");
     const [includeBasic, setIncludeBasic] = useState(DEFAULT_KANA_SET.includeBasic);
     const [includeDakuten, setIncludeDakuten] = useState(DEFAULT_KANA_SET.includeDakuten);
     const [includeYoon, setIncludeYoon] = useState(DEFAULT_KANA_SET.includeYoon);
@@ -411,6 +407,18 @@ export default function KanaStudyPage() {
 
         return () => window.clearTimeout(timer);
     }, [isAnswered, autoAdvancePaused, deck.length]);
+
+    useEffect(() => {
+        const timer = window.setTimeout(() => {
+            setDeck(createStudyDeck(studyMode, activeKanaPool));
+            setCardIndex(0);
+            setSelectedChoice(null);
+            setAnsweredCount(0);
+            setCorrectCount(0);
+            setAutoAdvancePaused(false);
+        }, 0);
+        return () => window.clearTimeout(timer);
+    }, [studyMode, activeKanaPool]);
 
     function resetDeck(nextMode: StudyMode, kanaPool: readonly KanaItem[]) {
         setDeck(createStudyDeck(nextMode, kanaPool));
@@ -480,7 +488,7 @@ export default function KanaStudyPage() {
     }
 
     function handleNextMode() {
-        const nextMode = nextStudyMode(studyMode);
+        const nextMode = nextKanaMode;
 
         setStudyMode(nextMode);
         resetDeck(nextMode, activeKanaPool);

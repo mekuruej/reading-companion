@@ -1,5 +1,6 @@
 "use client";
 
+import { useStudyModeRotation } from "@/lib/study/useStudyModeRotation";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getComponentStrokeCount } from "@/components/KanjiComponentLookup";
@@ -287,6 +288,8 @@ async function loadComponentRows(kanji: string[]) {
   return rows;
 }
 
+const RADICAL_ROTATION_MODES: RadicalStudyMode[] = ["mainRadical", "radicalStrokeCount", "radicalName"];
+
 export default function RadicalFlashcardsPage() {
   const router = useRouter();
 
@@ -304,7 +307,7 @@ export default function RadicalFlashcardsPage() {
   const [completed, setCompleted] = useState(false);
   const [endedEarly, setEndedEarly] = useState(false);
   const [levelFilters, setLevelFilters] = useState<LevelFilter[]>([...KANJI_LEVEL_FILTER_VALUES]);
-  const [studyMode, setStudyMode] = useState<RadicalStudyMode>("mainRadical");
+  const [studyMode, setStudyMode, nextRadicalMode] = useStudyModeRotation(RADICAL_ROTATION_MODES, "mainRadical");
 
   const filteredBaseCards = useMemo(
     () => baseCards.filter((card) => matchesLevelFilters(card.jlptLevel, levelFilters)),
@@ -454,12 +457,6 @@ export default function RadicalFlashcardsPage() {
     restartDeck(filteredBaseCards, mode);
   }
 
-  function nextRadicalStudyMode() {
-    if (studyMode === "radicalStrokeCount") return "radicalName";
-    if (studyMode === "radicalName") return "mainRadical";
-    return "radicalStrokeCount";
-  }
-
   function nextCard() {
     setSelected(null);
     setChecked(null);
@@ -550,9 +547,9 @@ export default function RadicalFlashcardsPage() {
     return (
       <KanjiStudyCompleteState
         endedEarly={endedEarly}
-        nextModeLabel={studyModeLabel(nextRadicalStudyMode())}
+        nextModeLabel={studyModeLabel(nextRadicalMode)}
         onBackToFoundationSets={() => router.push("/library-study/characters")}
-        onNextMode={() => startStudyMode(nextRadicalStudyMode())}
+        onNextMode={() => startStudyMode(nextRadicalMode)}
         onRestart={() => restartDeck(filteredBaseCards)}
       />
     );

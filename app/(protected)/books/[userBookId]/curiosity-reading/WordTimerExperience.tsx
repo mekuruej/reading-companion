@@ -1,6 +1,9 @@
 // Curiosity Reading / Listening word timer experience
 //
 "use client";
+import { useBookProgress } from "@/components/books/BookProgressProvider";
+import { nextProgressStart, matchingTotal, progressLabels, parseProgressRange, sessionEnd } from "@/lib/books/readingProgress";
+
 
 import { isReadyForFlashcards } from "@/lib/wordSupportEligibility";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
@@ -141,47 +144,6 @@ function formatTimer(seconds: number) {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
-function percentToPage(percent: number | null, pageCount: number | null) {
-  if (percent == null || !pageCount || pageCount <= 0) return null;
-  const clamped = Math.max(0, Math.min(100, percent));
-  return Math.max(1, Math.min(pageCount, Math.round((clamped / 100) * pageCount)));
-}
-
-function pageToPercent(page: number | null, pageCount: number | null) {
-  if (page == null || !pageCount || pageCount <= 0) return null;
-  return Math.max(0, Math.min(100, Math.round((page / pageCount) * 100)));
-}
-
-function parseListeningEndpoint(value: string, pageCount: number | null) {
-  const trimmed = value.trim();
-  if (!trimmed) return { value: null, error: null };
-
-  const isPercent = trimmed.includes("%");
-  const normalized = trimmed
-    .replace(/%/g, "")
-    .replace(/^p(?:age)?\.?\s*/i, "")
-    .trim();
-  const numeric = Number(normalized);
-
-  if (!Number.isFinite(numeric)) {
-    return { value: null, error: "Enter a page number or percent, like 42, p. 42, or 18%." };
-  }
-
-  if (isPercent) {
-    if (numeric < 0 || numeric > 100) {
-      return { value: null, error: "Listening percent must be between 0 and 100." };
-    }
-
-    return { value: percentToPage(numeric, pageCount) ?? Math.round(numeric), error: null };
-  }
-
-  if (numeric <= 0) {
-    return { value: null, error: "Listening page must be greater than 0." };
-  }
-
-  return { value: Math.round(numeric), error: null };
 }
 
 function toNullableInt(value: string): number | null {
@@ -381,6 +343,9 @@ export function CuriosityReadingExperience({
     : "Search, adjust, and save from one place. Page and chapter stay ready for the next word.";
   const fullAccessFeature = isListeningMode ? "add_word" : "curiosity_reading";
   const [userBookId, setUserBookId] = useState(routeUserBookId);
+  const tracking = useBookProgress();
+  const progressTotal = matchingTotal(tracking.method, tracking.totals);
+  const labels = progressLabels(tracking.method);
   const [username, setUsername] = useState("");
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState("");
@@ -749,7 +714,7 @@ export function CuriosityReadingExperience({
   }, []);
 
   useEffect(() => {
-    if (!userBookId) return;
+    if (!userBookId || !tracking.loaded) return;
 
     skippedInitialPersistenceWriteRef.current = false;
     const persisted = readPersistedTimedSession(timedSessionMode, userBookId);
@@ -768,12 +733,12 @@ export function CuriosityReadingExperience({
       setShowTimedSessionForm(persisted.showTimedSessionForm);
       setHasFinishedTimer(persisted.showTimedSessionForm);
       setSessionDate(persisted.sessionDate);
-      setSessionStartPage(persisted.sessionStartPage);
-      setSessionEndPage(persisted.sessionEndPage);
+      setSessionStartPage(persisted.trackingUnit === tracking.method ? persisted.sessionStartPage : "");
+      setSessionEndPage(persisted.trackingUnit === tracking.method ? persisted.sessionEndPage : "");
     }
 
     setTimerPersistenceReady(true);
-  }, [timedSessionMode, userBookId]);
+  }, [timedSessionMode, userBookId, tracking.loaded, tracking.method]);
 
   useEffect(() => {
     if (isRunning && startTime) {
@@ -814,6 +779,7 @@ export function CuriosityReadingExperience({
     writePersistedTimedSession({
       version: 1,
       sessionMode: timedSessionMode,
+                trackingUnit: tracking.method,
       userBookId,
       startedAt: isRunning ? startTime : null,
       accumulatedElapsedMs,
@@ -834,6 +800,7 @@ export function CuriosityReadingExperience({
     showTimedSessionForm,
     startTime,
     timedSessionMode,
+    tracking.method,
     timerPersistenceReady,
     userBookId,
   ]);
@@ -847,6 +814,7 @@ export function CuriosityReadingExperience({
       writePersistedTimedSession({
         version: 1,
         sessionMode: timedSessionMode,
+                trackingUnit: tracking.method,
         userBookId,
         startedAt: isRunning ? startTime : null,
         accumulatedElapsedMs,
@@ -880,6 +848,7 @@ export function CuriosityReadingExperience({
     showTimedSessionForm,
     startTime,
     timedSessionMode,
+    tracking.method,
     timerPersistenceReady,
     userBookId,
   ]);
@@ -1675,7 +1644,8 @@ export function CuriosityReadingExperience({
 
     const { data, error } = await supabase
       .from("user_book_reading_sessions")
-      .select("end_page, read_on, created_at")
+      .select("end_page, end_position, tracking_unit, read_on, created_at")
+      .eq("tracking_unit", tracking.method ?? "page")
       .eq("user_book_id", userBookId)
       .order("read_on", { ascending: false })
       .order("created_at", { ascending: false })
@@ -1688,73 +1658,25 @@ export function CuriosityReadingExperience({
     }
 
     const latest = data?.[0];
-    const latestEndPage =
-      latest?.end_page != null && Number.isFinite(Number(latest.end_page))
-        ? Number(latest.end_page)
-        : null;
-    const latestPercent = pageToPercent(latestEndPage, bookPageCount);
-    const nextStart = latestEndPage != null ? String(latestEndPage + 1) : "";
-
-    setSessionStartPage(isListeningMode ? "" : nextStart);
-    setSessionEndPage(
-      isListeningMode
-        ? latestPercent != null
-          ? `${latestPercent}%`
-          : latestEndPage != null
-            ? `p. ${latestEndPage}`
-            : ""
-        : ""
-    );
+    const latestPosition = latest ? sessionEnd(latest) : null;
+    setSessionStartPage(isListeningMode ? "" : nextProgressStart(latestPosition, tracking.method, progressTotal));
+    setSessionEndPage("");
     setShowTimedSessionForm(true);
   }
 
   async function saveReadingSession() {
     if (!userBookId) return;
 
-    const startPageText = sessionStartPage.trim();
-    const endPageText = sessionEndPage.trim();
-    const hasPageInput = Boolean(startPageText || endPageText);
-    const start = Number(startPageText);
-    const end = Number(endPageText);
-    let startPage: number | null = null;
-    let endPage: number | null = null;
+    if (!tracking.requireMethod() || !tracking.method) return;
+    const parsed = parseProgressRange(isListeningMode ? "" : sessionStartPage, sessionEndPage, tracking.method, progressTotal);
+    if (parsed.error) { setMessage(parsed.error); return; }
     const minutes = Math.max(1, Math.round(elapsed / 60));
     const readOn = isListeningMode ? sessionDate || todayYmdAppTimeZone() : todayYmdAppTimeZone();
-
-    if (!isListeningMode && (!Number.isFinite(start) || !Number.isFinite(end))) {
-      setMessage("❌ Please fill in start page and end page.");
-      return;
-    }
-
-    if (isListeningMode) {
-      const parsedEndpoint = parseListeningEndpoint(endPageText, bookPageCount);
-      if (parsedEndpoint.error) {
-        setMessage(`❌ ${parsedEndpoint.error}`);
-        return;
-      }
-      endPage = parsedEndpoint.value;
-    }
-
-    if (!isListeningMode && hasPageInput && (start <= 0 || end <= 0)) {
-      setMessage("❌ Pages must be greater than 0.");
-      return;
-    }
-
-    if (!isListeningMode && hasPageInput && end < start) {
-      setMessage("❌ End page must be greater than or equal to start page.");
-      return;
-    }
-
-    if (!isListeningMode) {
-      startPage = start;
-      endPage = end;
-    }
 
     const { error } = await supabase.from("user_book_reading_sessions").insert({
       user_book_id: userBookId,
       read_on: readOn,
-      start_page: startPage,
-      end_page: endPage,
+      ...parsed.payload,
       minutes_read: minutes,
       session_mode: isListeningMode ? "listening" : "curiosity",
     });
@@ -1896,8 +1818,8 @@ export function CuriosityReadingExperience({
       title={timerTitle}
       description={timerDescription}
       saveTitle={saveSessionTitle}
-      startPageLabel={isListeningMode ? "Start page optional" : "Start page"}
-      endPageLabel={isListeningMode ? "End page optional" : "End page"}
+      startPageLabel={`Start ${labels.unit.toLowerCase()}`}
+      endPageLabel={`End ${labels.unit.toLowerCase()}`}
       listeningProgressOnly={isListeningMode}
       isRunning={isRunning}
       isPaused={isPaused}
@@ -1909,6 +1831,7 @@ export function CuriosityReadingExperience({
       formatTimer={formatTimer}
       compact={workspaceCompact || useCompactSessionBar}
       onStart={() => {
+        if (!tracking.requireMethod()) return;
         setSessionDate(todayYmdAppTimeZone());
         setStartTime(Date.now());
         setAccumulatedElapsedMs(0);

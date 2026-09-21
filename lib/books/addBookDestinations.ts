@@ -12,6 +12,7 @@ export type AddBookActorProfile = {
 } | null;
 
 export type AddBookDestinationInput = {
+  initialPersonalTrackingStatus?: "want_to_read" | "reading";
   mode?: string | null;
   destinations?: {
     catalogOnly?: boolean;
@@ -375,7 +376,7 @@ export async function applyAddBookDestinations({
       supabase,
       userId: authUserId,
       bookId,
-      initialPersonalTrackingStatus: "want_to_read",
+      initialPersonalTrackingStatus: input.initialPersonalTrackingStatus === "reading" ? "reading" : "want_to_read",
       enablePersonalTracking: true,
     });
     teacherUserBookId = teacherResult.userBookId;
@@ -387,7 +388,7 @@ export async function applyAddBookDestinations({
       supabase,
       userId: destinations.targetUserId,
       bookId,
-      initialPersonalTrackingStatus: "want_to_read",
+      initialPersonalTrackingStatus: destinations.targetUserId === authUserId && input.initialPersonalTrackingStatus === "reading" ? "reading" : "want_to_read",
       enablePersonalTracking: true,
     });
     studentUserBookId = studentResult.userBookId;

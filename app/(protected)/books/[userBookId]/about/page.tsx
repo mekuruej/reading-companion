@@ -34,6 +34,7 @@ type Book = {
   audience_category?: string | null;
   trigger_warnings: string | null;
   page_count: number | null;
+  kindle_location_count: number | null;
   series_number: number | null;
   series_total?: number | null;
   isbn: string | null;
@@ -481,6 +482,7 @@ export default function AboutBookPage() {
             audience_category,
             trigger_warnings,
             page_count,
+            kindle_location_count,
             series_number,
             series_total,
             isbn,
@@ -767,6 +769,8 @@ export default function AboutBookPage() {
             value={book.page_count ? `${book.page_count} pages` : null}
             tone="sky"
           />
+          <FormatHighlightCard label="Total Kindle Location" value={book.kindle_location_count ? String(book.kindle_location_count) : null} tone="sky" />
+          <FormatHighlightCard label="Edition note" value={book.edition_note} tone="stone" />
           <FormatHighlightCard
             label="ISBN"
             value={isbn}

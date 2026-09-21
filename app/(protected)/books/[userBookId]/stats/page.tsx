@@ -3,6 +3,8 @@
 
 "use client";
 
+import { useBookProgress } from "@/components/books/BookProgressProvider";
+import { progressSummary, progressLabels, type ProgressRecord } from "@/lib/books/readingProgress";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -44,7 +46,7 @@ type UserBook = {
     books: Book | null;
 };
 
-type ReadingSession = {
+type ReadingSession = ProgressRecord & {
     id: string;
     user_book_id: string;
     read_on: string;
@@ -342,6 +344,8 @@ export default function BookStatsPage() {
         };
     }, [userBookId]);
 
+    const tracking = useBookProgress();
+    const tracked = progressSummary(sessions, tracking.method, tracking.totals);
     const book = row?.books ?? null;
     const realSessions = useMemo(() => sessions.filter((s) => !s.is_filler), [sessions]);
 
@@ -449,7 +453,7 @@ export default function BookStatsPage() {
 
     const nativeAverageMinPerPage =
         nativeTimedReadingPages > 0 && nativeTimedReadingMinutes > 0
-            ? nativeTimedReadingMinutes / nativeTimedReadingPages
+            ? nativeTimedReadingPageSessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0) / nativeTimedReadingPages
             : null;
     const nativePagesPerHour = nativeAverageMinPerPage ? 60 / nativeAverageMinPerPage : null;
 
@@ -556,14 +560,20 @@ export default function BookStatsPage() {
                     }
                 />
 
+                <StatsSection title="Progress tracking">
+                    <StatCard label={progressLabels(tracking.method).current} value={tracked.position == null ? "—" : `${tracked.position}${tracking.method === "percent" ? "%" : ""}${tracked.total && tracking.method !== "percent" ? ` / ${tracked.total}` : ""}`} />
+                    <StatCard label="Complete" value={tracked.percent == null ? "—" : `${tracked.percent}%`} note={tracked.total == null ? "Matching total not available" : undefined} />
+                    <StatCard label={progressLabels(tracking.method).rate} value={tracked.rate == null ? "—" : tracked.rate.toFixed(1)} />
+                    <StatCard label="Estimated reading time remaining" value={tracked.remainingMinutes == null ? "—" : formatMinutes(Math.round(tracked.remainingMinutes))} />
+                </StatsSection>
                 {isEnglishNativeTrackerBook ? (
                     <>
                         <StatsSection title="Progress">
                             <StatCard label="Status" value={statusLabel(row)} />
                             <StatCard
                                 label="Current Progress"
-                                value={nativeCurrentProgress}
-                                note={nativeCurrentProgressNote}
+                                value={tracking.method !== "page" ? (tracked.position == null ? "—" : `${progressLabels(tracking.method).unit} ${tracked.position}${tracking.method === "percent" ? "%" : ""}`) : nativeCurrentProgress}
+                                note={tracking.method === "page" ? nativeCurrentProgressNote : undefined}
                             />
                             <StatCard
                                 label="Days Active"

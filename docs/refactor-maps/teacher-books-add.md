@@ -301,7 +301,7 @@ Current derived values:
   * missing author
   * missing publisher
   * missing published date
-  * missing page count
+  * missing progress total (neither pages nor Kindle Locations)
 * `showFindOrCreatePanel`
 * request title manual-research state through `requestTitleNeedsManualResearch(bookRequest)`
 * `metadataSourceLabel(...)` display
