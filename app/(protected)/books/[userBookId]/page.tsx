@@ -1174,7 +1174,7 @@ export default function BookHubPage() {
         ? "100%"
         : "0%";
   const bookHubProgressPercentLabel =
-    progressPercent != null ? `${progressPercent}% done` : "";
+    progressPercent != null ? `${Math.round(progressPercent)}% done` : "";
   const bookHubLastSavedWordLabel =
     canSeeVocabularySummary && lastSavedWord.trim() ? lastSavedWord.trim() : "";
   const bookHubLastChapterLabel =

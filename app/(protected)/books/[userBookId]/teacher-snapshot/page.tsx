@@ -503,7 +503,7 @@ export default function TeacherReadingSnapshotPage() {
     {
       label: progressLabels(tracking.method).current,
       value: tracked.position == null ? "—" : `${tracked.position}${tracking.method === "percent" ? "%" : ""}${tracked.total && tracking.method !== "percent" ? ` / ${tracked.total}` : ""}`,
-      note: percentComplete != null ? `${percentComplete}% complete` : undefined,
+      note: percentComplete != null ? `${Math.round(percentComplete)}% complete` : undefined,
     },
     { label: "Pages read", value: pagesRead > 0 ? String(pagesRead) : "—" },
     { label: "Days engaged", value: daysEngaged != null ? String(daysEngaged) : "—" },

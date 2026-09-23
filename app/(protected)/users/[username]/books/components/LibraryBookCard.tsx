@@ -95,7 +95,7 @@ export default function LibraryBookCard({
           <div className="space-y-1">
             <div className="text-[11px] text-gray-600">
               {stats?.progressPercent != null && stats?.furthestPage != null
-                ? `${stats.progressPercent}% · p.${stats.furthestPage}`
+                ? `${Math.round(stats.progressPercent)}% · p.${stats.furthestPage}`
                 : "In progress"}
             </div>
 

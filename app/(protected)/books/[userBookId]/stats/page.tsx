@@ -562,7 +562,7 @@ export default function BookStatsPage() {
 
                 <StatsSection title="Progress tracking">
                     <StatCard label={progressLabels(tracking.method).current} value={tracked.position == null ? "—" : `${tracked.position}${tracking.method === "percent" ? "%" : ""}${tracked.total && tracking.method !== "percent" ? ` / ${tracked.total}` : ""}`} />
-                    <StatCard label="Complete" value={tracked.percent == null ? "—" : `${tracked.percent}%`} note={tracked.total == null ? "Matching total not available" : undefined} />
+                    <StatCard label="Complete" value={tracked.percent == null ? "—" : `${Math.round(tracked.percent)}%`} note={tracked.total == null ? "Matching total not available" : undefined} />
                     <StatCard label={progressLabels(tracking.method).rate} value={tracked.rate == null ? "—" : tracked.rate.toFixed(1)} />
                     <StatCard label="Estimated reading time remaining" value={tracked.remainingMinutes == null ? "—" : formatMinutes(Math.round(tracked.remainingMinutes))} />
                 </StatsSection>
