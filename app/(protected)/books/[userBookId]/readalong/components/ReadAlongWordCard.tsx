@@ -44,11 +44,8 @@ type ReadAlongWordCardProps = {
 function normalizeJlptLabel(jlpt?: string | null) {
   const normalized = jlpt?.trim().toUpperCase();
 
-  if (!normalized || normalized === "NON-JLPT" || normalized === "NONE") {
-    return null;
-  }
-
-  return normalized.startsWith("N") ? normalized : `N${normalized}`;
+  const level = normalized?.match(/^N?([1-5])$/)?.[1];
+  return level ? `N${level}` : null;
 }
 
 function definitionLabel(index?: number | null) {
@@ -145,6 +142,12 @@ export default function ReadAlongWordCard({
           <div className="text-xl font-semibold leading-tight tracking-tight text-stone-900 sm:text-2xl">
             {displaySurface}
           </div>
+
+          {!colorInfo && normalizeJlptLabel(word.jlpt) ? (
+            <span className="rounded border border-stone-200 px-1.5 py-0.5 text-[10px] font-medium leading-none text-stone-500">
+              {normalizeJlptLabel(word.jlpt)}
+            </span>
+          ) : null}
 
           {(supportMode === "full" || supportMode === "reading") && (
             <div className="text-sm text-stone-500 sm:text-base">
