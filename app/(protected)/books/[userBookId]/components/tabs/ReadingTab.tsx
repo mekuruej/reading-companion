@@ -362,8 +362,8 @@ export default function ReadingTab({
             }
             className="w-full rounded border bg-white px-2 py-1 text-sm sm:w-auto"
           >
-            <option value="fluid">Fluid Reading</option>
-            <option value="curiosity">Curiosity Reading</option>
+            <option value="fluid">Fluid Reading (Read without saving words)</option>
+            <option value="curiosity">Curiosity Reading (Read and save words)</option>
             <option value="listening">
               {useListeningPercentMode ? "Listening (%)" : "Listening"}
             </option>
