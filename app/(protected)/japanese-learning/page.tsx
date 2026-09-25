@@ -67,7 +67,6 @@ const jlptLevelOptions = [
 ];
 
 const initialReadingSessionHref = "https://scheduler.zoom.us/mekuru/initial-japanese";
-const followUpSessionHref = "https://scheduler.zoom.us/mekuru/follow-up-japanese";
 
 function requestSourceFromParam(value: string | null) {
   if (value === "study_hub" || value === "book_hub") return value;
@@ -351,16 +350,14 @@ export default function JapaneseLearningPage() {
 
           {!loading && approvedRequest ? (
             <div className="mt-5 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-4 text-sm text-violet-950">
-              <h3 className="text-lg font-black">Book your Guided Japanese Trial sessions</h3>
+              <h3 className="text-lg font-black">Book your Guided Japanese Trial session</h3>
               <p className="mt-2 leading-6">
-                Please book both 30-minute sessions now. Schedule the initial reading
-                session first, then schedule the follow-up for approximately two weeks
-                after the initial session.
+                Please book your initial 30-minute reading session now. 
               </p>
               <p className="mt-2 leading-6">
-                Your 28-day app trial will begin after the initial reading/setup
-                session. The follow-up session is only available if you have used the
-                app before the appointment.
+                Your 28-day app trial will begin after the reading session.
+                If you use the app and have feedback to share, I’ll send you the link to schedule a follow-up session.
+
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
                 <a
@@ -370,14 +367,6 @@ export default function JapaneseLearningPage() {
                   className="inline-flex rounded-full bg-violet-700 px-4 py-2 text-sm font-black text-white transition hover:bg-violet-800"
                 >
                   Book Initial Reading Session
-                </a>
-                <a
-                  href={followUpSessionHref}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex rounded-full border border-violet-300 bg-white px-4 py-2 text-sm font-black text-violet-800 transition hover:bg-violet-100"
-                >
-                  Book Follow-Up Session
                 </a>
               </div>
             </div>
