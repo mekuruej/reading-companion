@@ -12,7 +12,8 @@ export default function AudioTimeInput({ value, onChange, label = "Audiobook len
     const number = Number(raw);
     if (!Number.isSafeInteger(number) || (part === "minutes" && number > 59)) return;
     if (raw === "" && (part === "hours" ? !minutes : !hours)) { onChange(""); return; }
-    onChange(String(part === "hours" ? number * 60 + Number(minutes) : Number(hours) * 60 + number));
+    const next = part === "hours" ? number * 60 + Number(minutes) : Number(hours) * 60 + number;
+    if (Number.isSafeInteger(next)) onChange(String(next));
   }
   return <fieldset disabled={disabled} className="space-y-1">
     <legend className="text-sm font-medium text-stone-600">{label}</legend>

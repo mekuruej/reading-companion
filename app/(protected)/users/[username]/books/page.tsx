@@ -640,6 +640,7 @@ export default function BooksPage() {
           page_count,
           kindle_location_count,
           audiobook_duration_minutes,
+          edition_format,
           book_type
         )
       `)
@@ -1191,7 +1192,7 @@ export default function BooksPage() {
 
     const { data, error } = await supabase
       .from("user_book_reading_sessions")
-      .select("user_book_id, tracking_unit, start_position, end_position, progress_total, start_page, end_page, minutes_read, read_on, session_mode")
+      .select("id, created_at, user_book_id, tracking_unit, start_position, end_position, progress_total, start_page, end_page, minutes_read, read_on, session_mode")
       .in("user_book_id", userBookIds);
 
     if (error) {

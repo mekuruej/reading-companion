@@ -4,6 +4,7 @@
 
 import type { DnfDetails } from "@/lib/books/dnf";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
+import AudiobookProgressControl from "@/components/books/AudiobookProgressControl";
 import { formatProgressPosition, formatAudioTime, timedReadingSummary, progressLabels, matchingTotal, parseProgressRange, sessionStart, sessionEnd, sessionProgressUnit, progressSummary, type ProgressRecord } from "@/lib/books/readingProgress";
 
 
@@ -55,6 +56,7 @@ import BookHubHero from "./components/BookHubHero";
 import BookHubStatusPanel from "./components/BookHubStatusPanel";
 import BookHubModeToggle from "./components/BookHubModeToggle";
 import BookHubTeachingOverview from "./components/BookHubTeachingOverview";
+import TeachingReflection from "./components/TeachingReflection";
 import BookHubTeachingTools from "./components/BookHubTeachingTools";
 import BookHubActionPrompt from "./components/BookHubActionPrompt";
 import WordExplorerModal from "./components/WordExplorerModal";
@@ -1147,7 +1149,7 @@ export default function BookHubPage() {
   }, [finished, book?.page_count, coverageReadingSessions.length, furthestTrackedPage, tracking.method]);
 
   const trackedProgress = progressSummary(readingSessions, tracking.method, tracking.totals);
-  const progressPercent = finished ? 100 : trackedProgress.percent ?? (isNativeAudiobook && tracking.method === "percent" ? percentFromProgressLocation(row?.current_location) : null);
+  const progressPercent = finished && tracking.method !== "audiobook_time" ? 100 : trackedProgress.percent ?? (isNativeAudiobook && tracking.method === "percent" ? percentFromProgressLocation(row?.current_location) : null);
 
   const savedWordsProgressCount =
     canSeeVocabularySummary && uniqueLookupCount != null ? uniqueLookupCount : 0;
@@ -1159,12 +1161,12 @@ export default function BookHubPage() {
 
   const bookHubProgressLabel = trackedProgress.position != null
     ? `${formatProgressPosition(trackedProgress.position, tracking.method)}${tracking.method === "percent" ? "" : trackedProgress.total ? ` / ${tracking.method === "audiobook_time" ? formatAudioTime(trackedProgress.total) : trackedProgress.total}` : ""}`
-    : isNativeAudiobook && row?.current_location?.trim() ? `Listening: ${row.current_location.trim()}` : started ? "In progress" : "Not started";
+    : tracking.method === "audiobook_time" ? "Audio position not recorded" : isNativeAudiobook && row?.current_location?.trim() ? `Listening: ${row.current_location.trim()}` : started ? "In progress" : "Not started";
 
   const bookHubProgressBarWidth =
     progressPercent != null
       ? `${progressPercent}%`
-      : finished
+      : finished && tracking.method !== "audiobook_time"
         ? "100%"
         : "0%";
   const bookHubProgressPercentLabel =
@@ -1175,7 +1177,7 @@ export default function BookHubPage() {
     canSeeVocabularySummary && lastSavedChapter.trim() ? lastSavedChapter.trim() : "";
   const bookHubLastPosition = trackedProgress.position ?? (tracking.method === "page" && canSeeVocabularySummary ? lastSavedWordPage : null);
   const bookHubLastPageLabel =
-    isNativeAudiobook || bookHubLastPosition == null ? "" : `${progressLabels(tracking.method).unit} ${bookHubLastPosition}${tracking.method === "percent" ? "%" : ""}`;
+    isNativeAudiobook || tracking.method === "audiobook_time" || bookHubLastPosition == null ? "" : `${progressLabels(tracking.method).unit} ${bookHubLastPosition}${tracking.method === "percent" ? "%" : ""}`;
 
   const bookHubDaysEngagedLabel = daysRead != null ? String(daysRead) : "—";
   const savedWordsPerPage =
@@ -5725,7 +5727,6 @@ export default function BookHubPage() {
                   canUseBulkAdd={!isEnglishBook && canUseBulkAdd}
                   canUseStoryNotes
                   onMyVocabulary={() => router.push(`/books/${row.id}/words?mode=teaching`)}
-                  onBookInfo={() => router.push(`/books/${row.id}/about?mode=teaching`)}
                   onBulkAdd={() => {
                     router.push(
                       `/vocab/bulk?userBookId=${encodeURIComponent(row.id)}&mode=teaching&from=book-hub`
@@ -5746,6 +5747,7 @@ export default function BookHubPage() {
                     router.push(`/books/${encodeURIComponent(studentUserBookId)}/words`);
                   }}
                 />
+                <TeachingReflection key={`${row.book_id}:${userId}`} bookId={row.book_id} teacherId={userId!} />
                 {managementActions}
               </div>
             ) : (
@@ -5774,6 +5776,13 @@ export default function BookHubPage() {
                 summaryStats={bookHubSummaryStats}
               />
 
+              <AudiobookProgressControl
+                userBookId={row.id}
+                position={trackedProgress.position}
+                onSaved={() => loadReadingSessions(row.id)}
+                canEditLength={canEditBookInfo}
+                onRequestLength={() => { if (canEditBookInfo) { router.push(`/teacher/books/add?bookId=${encodeURIComponent(row.book_id)}`); return; } setBookFlagNote("Please add/correct the total audiobook length for this edition: "); setShowBookFlagModal(true); }}
+              />
               <BookHubActionPrompt />
 
               <BookHubNotices

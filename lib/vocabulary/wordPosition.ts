@@ -13,7 +13,7 @@ export function wordPosition(row: WordPositionRecord) {
   return { unit: "page" as const, value: null };
 }
 export function positionLabel(unit: ProgressTrackingMethod) {
-  return unit === "kindle_location" ? "Location" : unit === "percent" ? "Percent" : "Page";
+  return unit === "audiobook_time" ? "Audio position (minutes)" : unit === "kindle_location" ? "Location" : unit === "percent" ? "Percent" : "Page";
 }
 export function wordPositionText(row: WordPositionRecord) {
   const { unit, value } = wordPosition(row);

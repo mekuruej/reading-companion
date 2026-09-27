@@ -1,7 +1,6 @@
 // Curiosity Reading / Listening word timer experience
 //
 "use client";
-import AudioTimeInput from "@/components/books/AudioTimeInput";
 import WordContextFields from "@/components/vocabulary/WordContextFields";
 import { wordContextPayload, type WordContext } from "@/lib/vocabulary/wordContext";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
@@ -307,6 +306,8 @@ async function generateVocabularyKanjiMap(vocabularyCacheId: number) {
 }
 
 export function CuriosityReadingExperience({
+  targetUserBookId,
+  wordCaptureOnly = false,
   experienceMode = "curiosity",
   embedded = false,
   workspaceCompact = false,
@@ -314,6 +315,8 @@ export function CuriosityReadingExperience({
   modeSwitchSlot,
   onReadingJournalContextChange,
 }: {
+  targetUserBookId?: string;
+  wordCaptureOnly?: boolean;
   experienceMode?: WordTimerExperienceMode;
   embedded?: boolean;
   workspaceCompact?: boolean;
@@ -323,7 +326,7 @@ export function CuriosityReadingExperience({
 }) {
   const router = useRouter();
   const params = useParams<{ userBookId: string }>();
-  const routeUserBookId = params.userBookId ?? "";
+  const routeUserBookId = targetUserBookId ?? params.userBookId ?? "";
   const isListeningMode = experienceMode === "listening";
   const timedSessionMode = isListeningMode ? "listening" : "curiosity";
   const pageTitle = isListeningMode ? "Listening" : "Curiosity Reading";
@@ -755,7 +758,7 @@ export function CuriosityReadingExperience({
   }, []);
 
   useEffect(() => {
-    if (!userBookId || !tracking.loaded) return;
+    if (wordCaptureOnly || !userBookId || !tracking.loaded) return;
     if (!tracking.timersEnabled) {
       setIsRunning(false);
       setIsPaused(false);
@@ -787,7 +790,7 @@ export function CuriosityReadingExperience({
     }
 
     setTimerPersistenceReady(true);
-  }, [timedSessionMode, userBookId, tracking.loaded, tracking.method]);
+  }, [timedSessionMode, userBookId, tracking.loaded, tracking.method, wordCaptureOnly]);
 
   useEffect(() => {
     if (isRunning && startTime) {

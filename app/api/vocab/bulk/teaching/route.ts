@@ -1,3 +1,4 @@
+import { loadContextualWordTargets } from "@/lib/teacher/contextualWordTargets";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
@@ -242,12 +243,12 @@ async function loadStudentDestinations(teacherId: string, bookId: string) {
     ])
   );
 
-  return rows.map((row) => {
+  const destinations = rows.map((row) => {
     const userBook = firstRow(row.user_books);
     const book = firstRow(userBook?.books);
     return {
       type: "student" as const,
-      lessonBookId: row.id,
+      lessonBookId: row.id as string | null,
       userBookId: row.user_book_id,
       studentId: row.student_id,
       label: namesById.get(row.student_id) ?? "Student",
@@ -255,20 +256,41 @@ async function loadStudentDestinations(teacherId: string, bookId: string) {
       pageCount: book?.page_count ?? null,
     };
   });
+  const { data: actor, error: actorError } = await supabaseAdmin.from("profiles")
+    .select("id, role, is_super_teacher").eq("id", teacherId).single();
+  if (actorError) throw actorError;
+  const trials = await loadContextualWordTargets(supabaseAdmin, bookId, actor, new Set());
+  for (const target of trials) {
+    if (!destinations.some(destination => destination.studentId === target.studentId)) {
+      destinations.push({ type: "student", lessonBookId: null, userBookId: target.studentUserBookId,
+        studentId: target.studentId, label: target.studentName, positionUnit: target.positionUnit, pageCount: null });
+    }
+  }
+  return destinations.sort((a, b) => a.label.localeCompare(b.label));
 }
 
 async function authorizeStudentDestination({
   teacherId,
   sourceUserBookId,
   lessonBookId,
+  targetUserBookId,
 }: {
   teacherId: string;
   sourceUserBookId: string;
   lessonBookId: string;
+  targetUserBookId?: string;
 }) {
   const source = await authorizeSourceBook(teacherId, sourceUserBookId);
   if (!source.ok) {
     return { ok: false as const, error: source.error, status: source.status };
+  }
+
+  if (targetUserBookId) {
+    // Rebuild eligibility at save time: expired trials and changed links fail closed.
+    const destinations = await loadStudentDestinations(teacherId, source.bookId);
+    const target = destinations.find(destination => destination.userBookId === targetUserBookId);
+    if (!target) return { ok: false as const, error: "This vocabulary destination is no longer available.", status: 403 };
+    return { ok: true as const, userBookId: target.userBookId, pageCount: target.pageCount, destinationName: target.label };
   }
 
   const { data, error } = await supabaseAdmin
@@ -388,7 +410,7 @@ export async function GET(req: Request) {
         {
           type: "teacher",
           userBookId: source.sourceUserBookId,
-          label: "My Teaching Vocabulary",
+          label: "My Vocabulary",
           positionUnit: sourceReader?.progress_tracking_method ?? "page",
         },
         ...students,
@@ -413,11 +435,12 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
     const sourceUserBookId = cleanString(body?.sourceUserBookId);
     const lessonBookId = cleanString(body?.lessonBookId);
+    const targetUserBookId = cleanString(body?.targetUserBookId);
     const rawItems = Array.isArray(body?.items) ? body.items : [];
 
-    if (!sourceUserBookId || !lessonBookId) {
+    if (!sourceUserBookId || (!lessonBookId && !targetUserBookId)) {
       return NextResponse.json(
-        { error: "sourceUserBookId and lessonBookId are required." },
+        { error: "sourceUserBookId and a vocabulary destination are required." },
         { status: 400 }
       );
     }
@@ -430,6 +453,7 @@ export async function POST(req: Request) {
       teacherId: auth.user.id,
       sourceUserBookId,
       lessonBookId,
+      targetUserBookId,
     });
 
     if ("error" in destination) {

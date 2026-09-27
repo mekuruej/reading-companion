@@ -1,3 +1,5 @@
+import { useBookProgress } from "@/components/books/BookProgressProvider";
+import AudioTimeInput from "@/components/books/AudioTimeInput";
 type CuriosityTimerPanelProps = {
   isRunning: boolean;
   isPaused: boolean;
@@ -49,6 +51,7 @@ export default function CuriosityTimerPanel({
   listeningProgressOnly = false,
   compact = false,
 }: CuriosityTimerPanelProps) {
+  const tracking = useBookProgress();
   return (
     <div className={compact ? "rounded-2xl" : "mb-6 rounded-2xl border border-stone-300 bg-white p-4"}>
       <div className={compact ? "mb-1 text-center text-xs font-black uppercase tracking-[0.16em] text-stone-500" : "mb-2 text-sm font-medium text-stone-900"}>
@@ -126,14 +129,14 @@ export default function CuriosityTimerPanel({
           {listeningProgressOnly ? (
             <div>
               <div className="mb-1 text-sm text-stone-600">{endPageLabel}</div>
-              <input
+              {tracking.method === "audiobook_time" ? <AudioTimeInput label="Current audiobook position (optional)" value={sessionEndPage} onChange={onSessionEndPageChange} /> : (<input
                 type="text"
                 inputMode="decimal"
                 value={sessionEndPage}
                 onChange={(event) => onSessionEndPageChange(event.target.value)}
                 placeholder={endPageLabel}
                 className="w-full rounded border px-3 py-2 text-sm"
-              />
+              />)}
               <div className="mt-1 text-xs text-stone-500">
                 Optional. Use the saved progress tracking method for this copy.
               </div>
@@ -142,7 +145,7 @@ export default function CuriosityTimerPanel({
             <div className={compact ? "grid grid-cols-1 gap-3" : "grid grid-cols-1 gap-3 sm:grid-cols-2"}>
               <div>
                 <div className="mb-1 text-sm text-stone-600">{startPageLabel}</div>
-                <input
+                {tracking.method === "audiobook_time" ? <AudioTimeInput label="Start audio position (optional)" value={sessionStartPage} onChange={onSessionStartPageChange} /> : (<input
                   type="number"
                   min={0} step="any"
                   value={sessionStartPage}
@@ -151,19 +154,19 @@ export default function CuriosityTimerPanel({
                   }
                   placeholder="e.g. 45"
                   className="w-full rounded border px-3 py-2 text-sm"
-                />
+                />)}
               </div>
 
               <div>
                 <div className="mb-1 text-sm text-stone-600">{endPageLabel}</div>
-                <input
+                {tracking.method === "audiobook_time" ? <AudioTimeInput label="Current audiobook position (optional)" value={sessionEndPage} onChange={onSessionEndPageChange} /> : (<input
                   type="number"
                   min={0} step="any"
                   value={sessionEndPage}
                   onChange={(event) => onSessionEndPageChange(event.target.value)}
                   placeholder="e.g. 52"
                   className="w-full rounded border px-3 py-2 text-sm"
-                />
+                />)}
               </div>
             </div>
           )}

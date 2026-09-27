@@ -1,3 +1,4 @@
+import { loadContextualWordTargets } from "@/lib/teacher/contextualWordTargets";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
@@ -362,19 +363,34 @@ export async function GET(
       ])
     );
 
-    const selectedStudentUserBookId = new URL(req.url).searchParams.get("studentUserBookId");
+    const queryParams = new URL(req.url).searchParams;
+    const isSaveWords = queryParams.get("view") === "curiosity";
+    const selectedStudentUserBookId = queryParams.get("studentUserBookId");
+    const saveWordTargets = isSaveWords
+      ? await loadContextualWordTargets(supabaseAdmin, loadedSourceBook.book_id, profile as ProfileRow, activeStudentIds)
+      : [];
     const students = lessonRows
       .map((row) => ({
-        lessonBookId: row.id,
+        lessonBookId: row.id as string | null,
         studentId: row.student_id,
         studentUserBookId: row.user_book_id,
         studentName: namesById.get(row.student_id) ?? "Student",
       }))
       .sort((a, b) => a.studentName.localeCompare(b.studentName));
 
+    if (!isSaveWords) {
+      const trialTargets = await loadContextualWordTargets(supabaseAdmin, loadedSourceBook.book_id, profile as ProfileRow, new Set());
+      for (const target of trialTargets) {
+        if (!students.some(student => student.studentId === target.studentId)) {
+          students.push({ ...target, lessonBookId: null });
+        }
+      }
+      students.sort((a, b) => a.studentName.localeCompare(b.studentName));
+    }
+
     if (
       selectedStudentUserBookId &&
-      !students.some((student) => student.studentUserBookId === selectedStudentUserBookId)
+      !(isSaveWords ? saveWordTargets : students).some((student) => student.studentUserBookId === selectedStudentUserBookId)
     ) {
       return NextResponse.json(
         { error: "This student is not actively connected to this book." },
@@ -382,13 +398,7 @@ export async function GET(
       );
     }
 
-    const hasValidSelectedStudent =
-      !selectedStudentUserBookId ||
-      students.some((student) => student.studentUserBookId === selectedStudentUserBookId);
-    const chapterSuggestions =
-      selectedStudentUserBookId && hasValidSelectedStudent
-        ? await loadTeacherChapterSuggestions(userBookId)
-        : [];
+    const chapterSuggestions = students.length ? await loadTeacherChapterSuggestions(userBookId) : [];
     const book = firstRow(loadedSourceBook.books);
     return NextResponse.json({
       teacherBookId,
@@ -399,6 +409,7 @@ export async function GET(
         coverUrl: book?.cover_url ?? null,
       },
       students,
+      ...(isSaveWords ? { saveWordTargets } : {}),
       chapterSuggestions,
     });
   } catch (error: any) {

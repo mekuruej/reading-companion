@@ -51,35 +51,59 @@ test('migration is repeatable and context survives PostgreSQL reload without cha
 });
 
 const lessonPath=path.join(root,'app/(protected)/books/[userBookId]/lesson/page.tsx');
-let lessonState=[],lessonCursor=0;
+let lessonState=[],lessonCursor=0,lessonQuery="",lastNavigation="";
 const StubFollow=()=>React.createElement('div',null,'Follow-Along reader');
 const StubLive=()=>React.createElement('div',null,'Student word capture');
-const StubCuriosity=()=>React.createElement('div',null,'Curiosity Reading');
+const StubCapture=()=>React.createElement('div',null,'Core Add Word');
+const StubProgress=({children})=>children;
 const StubJournal=()=>React.createElement('div',null,'Book Journal · Grammar · Phrases · Translation · Special Vocab · Lesson Notes');
 const lessonModule={exports:{}};
 new Function('require','module','exports',ts.transpileModule(fs.readFileSync(lessonPath,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText)(name=>{
  if(name==='react')return {...React,useState(initial){const index=lessonCursor++;if(!(index in lessonState))lessonState[index]=initial;return [lessonState[index],value=>lessonState[index]=typeof value==='function'?value(lessonState[index]):value]},useEffect(){},useMemo:fn=>fn()};
- if(name==='next/navigation')return {useParams:()=>({userBookId:'own-book'}),useRouter:()=>({replace(){}}),useSearchParams:()=>new URLSearchParams()};
+ if(name==='next/navigation')return {useParams:()=>({userBookId:'own-book'}),useRouter:()=>({replace(href){lastNavigation=href}}),useSearchParams:()=>new URLSearchParams(lessonQuery)};
  if(name==='next/link')return {default:({children,...props})=>React.createElement('a',props,children),__esModule:true};
  if(name.includes('StoryNotesExperience'))return {default:StubJournal,__esModule:true};
- if(name.includes('WordTimerExperience'))return {CuriosityReadingExperience:StubCuriosity};
+ if(name.includes('WordTimerExperience'))return {CuriosityReadingExperience:StubCapture};
+ if(name.includes('BookProgressProvider'))return {BookProgressProvider:StubProgress};
  if(name.includes('TeacherFollowAlongPanel'))return {TeacherFollowAlongPanel:StubFollow};
  if(name.includes('LiveLessonQuickAddPanel'))return {default:StubLive,__esModule:true};
  if(name.includes('supabaseClient'))return {supabase:{}};
  return require(name);
 },lessonModule,lessonModule.exports);
-function lesson(students=[]){lessonState=[0,'follow',false,false,false,'',{teacherBookId:'teacher-book',sourceUserBookId:'own-book',book:{title:'Sample book'},students,chapterSuggestions:[]}];}
+function lesson(students=[],view='follow',query=''){lessonQuery=`view=${view}&${query}`;lessonState=[false,'',{teacherBookId:'teacher-book',sourceUserBookId:'own-book',book:{title:'Sample book'},students,chapterSuggestions:[]}];}
 function renderLesson(){lessonCursor=0;return lessonModule.exports.default()}
 function nodes(tree){if(!tree||typeof tree!=='object')return [];if(Array.isArray(tree))return tree.flatMap(nodes);return [tree,...nodes(tree.props?.children)]}
 function label(tree){return typeof tree==='string'?tree:Array.isArray(tree)?tree.map(label).join(''):label(tree?.props?.children??'')}
-const clickMode=name=>nodes(renderLesson()).find(n=>n.type==='button'&&label(n)===name).props.onClick();
-test('workspace supports no-student Follow-Along and linked capture; mode switches retain shared mounted panels',()=>{
+test('separate workspaces keep own capture, journal, and Follow-Along independent',()=>{
  lesson();let tree=renderLesson();assert.ok(nodes(tree).some(n=>n.type===StubFollow));assert.ok(!nodes(tree).some(n=>n.type===StubLive));
- clickMode('Curiosity Read');tree=renderLesson();assert.equal(nodes(tree).filter(n=>n.type===StubJournal).length,1);assert.ok(nodes(tree).some(n=>n.type===StubCuriosity));
- clickMode('Teacher Journal');tree=renderLesson();assert.equal(nodes(tree).filter(n=>n.type===StubJournal).length,1);assert.ok(nodes(tree).some(n=>n.type===StubCuriosity));assert.ok(nodes(tree).some(n=>n.type===StubFollow));
- clickMode('Follow-Along');assert.equal(lessonState[0],1);assert.ok(nodes(renderLesson()).some(n=>n.type===StubJournal));
- lesson([{studentId:'student',studentUserBookId:'student-book',lessonBookId:'link',studentName:'Learner'}]);const live=nodes(renderLesson()).find(n=>n.type===StubLive);assert.equal(live.props.userBookId,'student-book');assert.equal(live.props.sourceUserBookId,'own-book');
+ lesson([],'curiosity');tree=renderLesson();
+ const capture=nodes(tree).find(n=>n.type===StubCapture);assert.equal(capture.props.targetUserBookId,'own-book');
+ assert.equal(capture.props.workspaceCompact,true);assert.equal(capture.props.wordCaptureOnly,true);
+ assert.equal(nodes(tree).find(n=>n.type===StubProgress).props.readOnly,true);
+ assert.deepEqual(nodes(tree).filter(n=>n.type==='option').map(label),['Me / My Book']);
+ assert.ok(!nodes(tree).some(n=>n.type===StubJournal||n.type==='nav'));
+ lesson([],'journal','studentUserBookId=unrelated-book');tree=renderLesson();
+ assert.ok(nodes(tree).some(n=>n.type===StubJournal&&n.props.teaching));
+ assert.ok(!nodes(tree).some(n=>n.type===StubCapture||n.type==='select'||n.type===StubLive));
 });
+const studentA={studentId:'student-a',studentUserBookId:'student-book-a',lessonBookId:'link-a',studentName:'Learner A'};
+const studentB={studentId:'student-b',studentUserBookId:'student-book-b',lessonBookId:'link-b',studentName:'Learner B'};
+for(const students of [[studentA],[studentA,studentB]])test(`${students.length} students: same full form targets words only; Follow-Along stays mine`,()=>{
+ lesson(students,'curiosity');let tree=renderLesson();
+ assert.equal(nodes(tree).find(n=>n.type===StubCapture).props.targetUserBookId,'own-book');
+ assert.ok(!nodes(tree).some(n=>n.type===StubLive));
+ const select=nodes(tree).find(n=>n.type==='select');assert.equal(select.props.value,'');
+ const selected=students.at(-1);select.props.onChange({target:{value:selected.studentUserBookId}});assert.ok(lastNavigation.includes('view=curiosity'));assert.ok(lastNavigation.includes(selected.studentUserBookId));
+ lesson(students,'curiosity',`studentUserBookId=${selected.studentUserBookId}`);tree=renderLesson();
+ assert.equal(nodes(tree).find(n=>n.type===StubCapture).props.targetUserBookId,selected.studentUserBookId);
+ const provider=nodes(tree).find(n=>n.type===StubProgress);assert.equal(provider.props.userBookId,selected.studentUserBookId);assert.equal(provider.key,selected.studentUserBookId);
+ lesson(students,'follow',`studentUserBookId=${selected.studentUserBookId}`);tree=renderLesson();
+ const live=nodes(tree).find(n=>n.type===StubLive);assert.equal(live.props.userBookId,selected.studentUserBookId);assert.equal(live.props.sourceUserBookId,'own-book');
+ assert.equal(nodes(tree).find(n=>n.type===StubFollow).props.teacherBookId,'teacher-book');assert.ok(!nodes(tree).some(n=>n.type===StubCapture));
+ const quickPane=nodes(tree).find(n=>n.type==='div'&&nodes(n).some(child=>child.type===StubLive)&&nodes(n).some(child=>child.type==='select')&&!nodes(n).some(child=>child.type===StubFollow));assert.ok(quickPane);
+ lesson(students,'journal',`studentUserBookId=${selected.studentUserBookId}`);tree=renderLesson();assert.ok(!nodes(tree).some(n=>n.type==='select'));assert.ok(nodes(tree).some(n=>n.type===StubJournal));
+});
+
 if(process.env.UI_FIXTURE){
  const css=fs.readdirSync(path.join(root,'.next/static/css')).filter(n=>n.endsWith('.css')).map(n=>fs.readFileSync(path.join(root,'.next/static/css',n),'utf8')).join('\n');
  const fields=renderToStaticMarkup(React.createElement(Fields,{value:sample,teacher:true,onChange(){}}));
@@ -88,3 +112,28 @@ if(process.env.UI_FIXTURE){
  const escaped=doc.replaceAll('&','&amp;').replaceAll('"','&quot;');
  fs.writeFileSync(process.env.UI_FIXTURE,`<!doctype html><h2>Mobile 390px</h2><iframe width="390" height="630" srcdoc="${escaped}"></iframe><h2>Desktop 1100px</h2><iframe width="1100" height="450" srcdoc="${escaped}"></iframe>`);
 }
+
+test('Save Words targets do not replace the independently authorized Quick Add list or Journal',()=>{
+ const trial={studentId:'trial-user',studentUserBookId:'trial-copy',studentName:'Trial Reader'};
+ lesson([studentA],'curiosity','studentUserBookId=trial-copy');
+ lessonState[2].saveWordTargets=[studentA,trial];
+ let tree=renderLesson();
+ assert.deepEqual(nodes(tree).filter(n=>n.type==='option').map(label),['Me / My Book','Learner A','Trial Reader']);
+ assert.equal(nodes(tree).find(n=>n.type===StubCapture).props.targetUserBookId,'trial-copy');
+ lesson([studentA],'follow');lessonState[2].saveWordTargets=[studentA,trial];tree=renderLesson();
+ assert.deepEqual(nodes(tree).filter(n=>n.type==='option').map(label),['Choose a student','Learner A']);
+ assert.equal(nodes(tree).find(n=>n.type===StubLive).props.userBookId,studentA.studentUserBookId);
+ lesson([studentA],'journal','studentUserBookId=trial-copy');lessonState[2].saveWordTargets=[studentA,trial];tree=renderLesson();
+ assert.ok(!nodes(tree).some(n=>n.type==='select'));assert.ok(nodes(tree).some(n=>n.type===StubJournal));
+});
+
+
+test('Follow-Along Quick Add accepts an authorized trial target without a lesson assignment',()=>{
+ const trial={lessonBookId:null,studentId:'trial-user',studentUserBookId:'trial-copy',studentName:'Trial Reader'};
+ lesson([studentA,trial],'follow','studentUserBookId=trial-copy');
+ const tree=renderLesson();
+ assert.ok(nodes(tree).filter(n=>n.type==='option').map(label).includes('Trial Reader'));
+ const quick=nodes(tree).find(n=>n.type===StubLive);
+ assert.equal(quick.props.studentId,'trial-user');assert.equal(quick.props.userBookId,'trial-copy');
+ assert.equal(nodes(tree).find(n=>n.type===StubFollow).props.teacherBookId,'teacher-book');
+});

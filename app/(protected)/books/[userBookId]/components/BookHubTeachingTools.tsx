@@ -1,5 +1,6 @@
 "use client";
 
+import { SAVE_WORDS_COPY } from "@/lib/books/saveWordsCopy";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -21,7 +22,6 @@ type BookHubTeachingToolsProps = {
   canUseBulkAdd: boolean;
   canUseStoryNotes: boolean;
   onMyVocabulary: () => void;
-  onBookInfo: () => void;
   onBulkAdd: () => void;
   onFollowAlongLesson: () => void;
   onStoryNotes: () => void;
@@ -48,7 +48,7 @@ function TeachingToolButton({
 }: {
   title: string;
   subtitle?: string;
-  description: string;
+  description: string | string[];
   size?: "primary" | "small";
   className: string;
   onClick: () => void;
@@ -83,7 +83,7 @@ function TeachingToolButton({
       ) : null}
 
       <div className="mt-2 text-xs leading-5 text-stone-700">
-        {description}
+        {Array.isArray(description) ? description.map(line => <div key={line}>{line}</div>) : description}
       </div>
     </button>
   );
@@ -148,7 +148,6 @@ export default function BookHubTeachingTools({
   canUseBulkAdd,
   canUseStoryNotes,
   onMyVocabulary,
-  onBookInfo,
   onBulkAdd,
   onFollowAlongLesson,
   onStoryNotes,
@@ -429,19 +428,13 @@ export default function BookHubTeachingTools({
     <div className="space-y-6 pb-2">
       <TeachingActionSection
         title="Teaching Tools"
-        description="ページをめくって、話しまくろう！"
+        description="ページをめくって、教えよう！"
       >
         <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          <TeachingToolButton
-            title="Follow-Along"
-            subtitle="Add Words"
-            description="Teach from your prepared list while saving new words for one student."
-            className="bg-violet-50 hover:bg-violet-100"
-            size="primary"
-            onClick={onFollowAlongLesson}
-          />
-          <TeachingToolButton title="Curiosity Read" description="Prepare words alongside your Book Journal and Teaching Notes."
+          <TeachingToolButton {...SAVE_WORDS_COPY}
             className="bg-violet-50 hover:bg-violet-100" size="primary" onClick={onCuriosityRead} />
+          <TeachingToolButton title="Follow-Along" description="Teach from your prepared words with Student Quick Add beside you."
+            className="bg-blue-50 hover:bg-blue-100" size="primary" onClick={onFollowAlongLesson} />
           {canUseStoryNotes ? (
             <TeachingToolButton
               title="Teacher Journal"
@@ -455,7 +448,6 @@ export default function BookHubTeachingTools({
 
         <div className="flex flex-wrap gap-2 pt-1">
           <TeachingUtilityButton title="My Vocabulary List" description="Review and correct your saved words for this book." onClick={onMyVocabulary} />
-          <TeachingUtilityButton title="Book Information" description="View this edition’s details." onClick={onBookInfo} />
           {canUseBulkAdd ? (
             <TeachingUtilityButton
               title="Bulk Add"

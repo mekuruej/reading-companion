@@ -2,7 +2,7 @@
 //
 // Fluid Reading-style lesson support backed by the teacher's linked Reader Vocab
 // plus teacher_book_items extras. This route must not write reading sessions,
-// stats, user_book_words, or study progress.
+// stats or study progress. Explicit Add Word saves use the owner’s shared vocabulary.
 
 "use client";
 import SavedWordContextEditor from "@/components/vocabulary/SavedWordContextEditor";
@@ -464,13 +464,13 @@ export function TeacherFollowAlongPanel({
         readerVocabItems = nextVocabularyPool
           .filter(shouldShowInLessonDisplay)
           .map(sharedVocabularyToFollowAlongItem);
-      } else if (loadedTeacherBook.user_book_id) {
+      } else if (nextTeacherVocabContext.personalUserBookId) {
         const { data: wordRows, error: wordError } = await supabase
           .from("user_book_words")
           .select(
             "id, surface, reading, meaning, jlpt, meaning_choice_index, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, created_at"
           )
-          .eq("user_book_id", loadedTeacherBook.user_book_id)
+          .eq("user_book_id", nextTeacherVocabContext.personalUserBookId)
           .eq("hidden", false)
           .order("page_number", { ascending: true, nullsFirst: false })
           .order("page_order", { ascending: true, nullsFirst: false })

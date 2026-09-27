@@ -1,8 +1,8 @@
 // Teacher Follow-Along Reading
 //
 // Standalone wrapper around the reusable Teacher Follow-Along panel. The panel
-// remains read-only and must not write reading sessions, stats, user_book_words,
-// or study progress.
+// does not write reading sessions, stats or study progress. Explicit prep edits
+// use the teacher’s own shared saved vocabulary.
 
 "use client";
 

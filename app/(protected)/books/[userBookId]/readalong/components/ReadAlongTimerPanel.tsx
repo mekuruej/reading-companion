@@ -1,3 +1,4 @@
+import AudioTimeInput from "@/components/books/AudioTimeInput";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
 import { progressLabels } from "@/lib/books/readingProgress";
 type ReadAlongTimerPanelProps = {
@@ -122,26 +123,26 @@ export default function ReadAlongTimerPanel({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <div className="mb-1 text-sm text-stone-600">{`Start ${labels.unit.toLowerCase()}`}</div>
-              <input
+              {tracking.method === "audiobook_time" ? <AudioTimeInput label="Start audio position (optional)" value={sessionStartPage} onChange={onSessionStartPageChange} /> : (<input
                 type="text"
                 inputMode="decimal"
                 value={sessionStartPage}
                 onChange={(e) => onSessionStartPageChange(e.target.value)}
                 placeholder="e.g. 45 or 18%"
                 className="w-full rounded border px-3 py-2 text-sm"
-              />
+              />)}
             </div>
 
             <div>
               <div className="mb-1 text-sm text-stone-600">{`End ${labels.unit.toLowerCase()}`}</div>
-              <input
+              {tracking.method === "audiobook_time" ? <AudioTimeInput label="Current audiobook position (optional)" value={sessionEndPage} onChange={onSessionEndPageChange} /> : (<input
                 type="text"
                 inputMode="decimal"
                 value={sessionEndPage}
                 onChange={(e) => onSessionEndPageChange(e.target.value)}
                 placeholder="e.g. 52 or 21%"
                 className="w-full rounded border px-3 py-2 text-sm"
-              />
+              />)}
             </div>
           </div>
 

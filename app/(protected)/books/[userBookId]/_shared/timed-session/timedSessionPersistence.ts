@@ -6,7 +6,7 @@ export type PersistedTimedSessionState = {
   accumulatedElapsedMs: number;
   isPaused: boolean;
   sessionDate: string;
-  trackingUnit?: "page" | "kindle_location" | "percent" | null;
+  trackingUnit?: "page" | "kindle_location" | "percent" | "audiobook_time" | null;
   sessionStartPage: string;
   sessionEndPage: string;
   showTimedSessionForm: boolean;

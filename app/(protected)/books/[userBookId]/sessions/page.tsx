@@ -299,6 +299,10 @@ export default function ReadingSessionsPage() {
   const entryTotal = editingProgressRecord ? editingProgressRecord.progress_total ?? null : matchingTotal(entryMethod, tracking.totals);
   const entryLabels = progressLabels(entryMethod);
 
+  useEffect(() => {
+    if (tracking.method === "audiobook_time" && !editingSessionId) setSessionMode("listening");
+  }, [tracking.method, editingSessionId]);
+
   function startEditingSession(session: ReadingSession) {
     setEditingSessionId(session.id);
     setSessionDate(session.read_on);
@@ -315,7 +319,7 @@ export default function ReadingSessionsPage() {
   function clearForm() {
     setEditingSessionId(null);
     setSessionDate(todayYmdAppTimeZone());
-    setSessionMode("fluid");
+    setSessionMode(tracking.method === "audiobook_time" ? "listening" : "fluid");
     setSessionStartPage("");
     setSessionEndPage("");
     setSessionMinutesRead("");
@@ -634,7 +638,7 @@ export default function ReadingSessionsPage() {
 
             {sessionMode !== "listening" ? (
               <>
-                <label className="rounded border bg-white p-3 text-sm">
+                <div className="rounded border bg-white p-3 text-sm">
                   <span className="block text-stone-600">
                     {`Start ${entryLabels.unit.toLowerCase()}`}
                   </span>
@@ -646,9 +650,9 @@ export default function ReadingSessionsPage() {
                     placeholder={`Enter ${entryLabels.unit.toLowerCase()}`}
                     className="mt-1 w-full rounded border px-2 py-1"
                   />)}
-                </label>
+                </div>
 
-                <label className="rounded border bg-white p-3 text-sm">
+                <div className="rounded border bg-white p-3 text-sm">
                   <span className="block text-stone-600">
                     {`End ${entryLabels.unit.toLowerCase()}`}
                   </span>
@@ -660,10 +664,10 @@ export default function ReadingSessionsPage() {
                     placeholder={`Enter ${entryLabels.unit.toLowerCase()}`}
                     className="mt-1 w-full rounded border px-2 py-1"
                   />)}
-                </label>
+                </div>
               </>
             ) : (
-              <label className="rounded border bg-white p-3 text-sm">
+              <div className="rounded border bg-white p-3 text-sm">
                 <span className="block text-stone-600">{`${entryLabels.current} (optional)`}</span>
                 {entryMethod === "audiobook_time" ? <AudioTimeInput label="Current audiobook position (optional)" value={sessionEndPage} onChange={setSessionEndPage} /> : (<input
                   type="text"
@@ -673,7 +677,7 @@ export default function ReadingSessionsPage() {
                   placeholder={`Enter ${entryLabels.unit.toLowerCase()}`}
                   className="mt-1 w-full rounded border px-2 py-1"
                 />)}
-              </label>
+              </div>
             )}
           </div>
 

@@ -141,7 +141,6 @@ export default function ManualEditionForm({
       </p>
 
       <div className="mt-4 grid gap-3">
-        {editionFormat === "audiobook" ? <AudioTimeInput value={audiobookDuration} onChange={onAudiobookDurationChange} /> : null}
         <label className="block">
           <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-stone-500">
             Title
@@ -199,6 +198,7 @@ export default function ManualEditionForm({
             </label>
           )}
 
+          {editionFormat === "audiobook" ? <AudioTimeInput value={audiobookDuration} onChange={onAudiobookDurationChange} /> : <>
           <label className="block">Total Kindle Location (optional)
             <input value={kindleLocationCount} onChange={(event) => onKindleLocationCountChange(event.target.value)} inputMode="numeric" className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3" placeholder="e.g. 4200" />
           </label>
@@ -217,6 +217,7 @@ export default function ManualEditionForm({
               Recommended for pacing and page-based stats.
             </p>
           </div>
+          </>}
         </div>
 
         <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3">

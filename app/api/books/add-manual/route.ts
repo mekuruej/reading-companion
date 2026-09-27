@@ -477,8 +477,8 @@ export async function POST(request: Request) {
           edition_format: editionFormat,
           edition_note: editionNote,
           page_count: pageCountResult.value,
-        audiobook_duration_minutes: editionFormat === "audiobook" ? audioTotal : null,
-        kindle_location_count: locationTotal,
+          audiobook_duration_minutes: editionFormat === "audiobook" ? audioTotal : null,
+          kindle_location_count: locationTotal,
         })
         .select("id")
         .single();

@@ -1,5 +1,7 @@
 "use client";
 
+import { getOrCreateUserBook, hasValidTeacherOwnedWorkspace } from "@/lib/books/userBookWorkspace";
+import { isReadyForFlashcards } from "@/lib/wordSupportEligibility";
 import { wordContextPayload, type WordContext } from "@/lib/vocabulary/wordContext";
 type SupabaseClientLike = any;
 import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
@@ -236,7 +238,7 @@ async function findMatchingPersonalWord(
         sameNullableText(row.reading, values.reading) &&
         sameCapturedMeaning(row.meaning, values.meaning);
 
-      return cacheMatches || textMatches;
+      return (cacheMatches && sameCapturedMeaning(row.meaning, values.meaning)) || textMatches;
     }) ?? null
   );
 }
@@ -425,8 +427,10 @@ export async function loadTeacherBookContext(
     .limit(1);
 
   if (personalError) throw personalError;
+  const validLinked = await hasValidTeacherOwnedWorkspace({ supabase, teacherId: currentUserId, bookId: data.book_id, userBookId: data.user_book_id });
+  const ownUserBookId = validLinked ? data.user_book_id : personalRows?.[0]?.id ?? null;
   let readerMethod = personalRows?.[0]?.progress_tracking_method ?? "page";
-  if (data.user_book_id && data.user_book_id !== personalRows?.[0]?.id) {
+  if (validLinked && data.user_book_id !== personalRows?.[0]?.id) {
     const { data: linkedReader, error: linkedError } = await supabase.from("user_books").select("progress_tracking_method").eq("id", data.user_book_id).single();
     if (linkedError) throw linkedError;
     readerMethod = linkedReader.progress_tracking_method ?? "page";
@@ -437,8 +441,8 @@ export async function loadTeacherBookContext(
     teacherBookId: data.id,
     teacherId: data.teacher_id,
     bookId: data.book_id,
-    linkedUserBookId: data.user_book_id ?? null,
-    personalUserBookId: data.user_book_id ?? personalRows?.[0]?.id ?? null,
+    linkedUserBookId: validLinked ? data.user_book_id : null,
+    personalUserBookId: ownUserBookId,
     pageCount: Array.isArray((data as any).books)
       ? (data as any).books[0]?.page_count ?? null
       : (data as any).books?.page_count ?? null,
@@ -525,6 +529,9 @@ export async function saveTeacherVocabularyAndInclude(
 ): Promise<TeacherVocabularySaveResult> {
   const surface = normalizedNullableText(values.surface);
   if (!surface) throw new Error("Add a word first.");
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || auth?.user?.id !== context.teacherId) throw new Error("Teacher ownership could not be verified.");
+  context = await loadTeacherBookContext(supabase, context.teacherBookId, auth.user.id);
 
   const reading = normalizedNullableText(values.reading);
   const meaning = normalizedNullableText(values.meaning);
@@ -535,6 +542,10 @@ export async function saveTeacherVocabularyAndInclude(
       : null;
   const parsedPageNumber = parseWordPosition(values.pageNumber, context.positionUnit ?? "page");
   if (parsedPageNumber.error) throw new Error(parsedPageNumber.error);
+  if (!context.personalUserBookId) {
+    const own = await getOrCreateUserBook({ supabase, userId: auth.user.id, bookId: context.bookId, initialPersonalTrackingStatus: "not_tracking", enablePersonalTracking: false });
+    context = { ...context, personalUserBookId: own.userBookId };
+  }
   const pageNumber = parsedPageNumber.value;
   const chapterNumber = toNullableInt(values.chapterNumber);
   const chapterName = normalizedNullableText(values.chapterName);
@@ -546,12 +557,35 @@ export async function saveTeacherVocabularyAndInclude(
     reading,
     Boolean(values.isManual)
   );
-  const personalWord = await findMatchingPersonalWord(supabase, context, {
+  let personalWord = await findMatchingPersonalWord(supabase, context, {
     surface,
     reading,
     meaning,
     vocabularyCacheId,
   });
+  {
+    const personalPayload = {
+      user_book_id: context.personalUserBookId,
+      vocabulary_cache_id: vocabularyCacheId, surface, base_form: surface, reading, meaning,
+      meaning_choices: meaningChoices, meaning_choice_index: meaningChoiceIndex,
+      ...wordPositionPayload(pageNumber, context.positionUnit ?? "page"),
+      chapter_number: chapterNumber, chapter_name: chapterName,
+      ...wordContextPayload(values), follow_along_support_note: supportNote,
+      excluded_from_flashcards: !isReadyForFlashcards({ surface, reading, meaning }),
+    };
+    // Existing personal words keep their study state; only the teacher-specific
+    // context is updated here. A retry reuses the same personal word.
+    const write = personalWord?.id
+      ? supabase.from("user_book_words").update({
+          book_form: values.book_form === undefined ? personalWord.book_form ?? null : values.book_form?.trim() || null,
+          book_form_description: values.book_form_description === undefined ? personalWord.book_form_description ?? null : values.book_form_description?.trim() || null,
+          follow_along_support_note: supportNote ?? personalWord.follow_along_support_note ?? null,
+        }).eq("id", personalWord.id).eq("user_book_id", context.personalUserBookId)
+      : supabase.from("user_book_words").insert(personalPayload);
+    const { data: savedPersonal, error: personalSaveError } = await write.select("id, book_form, book_form_description, follow_along_support_note").single();
+    if (personalSaveError) throw personalSaveError;
+    personalWord = savedPersonal;
+  }
   const existing = await findMatchingTeachingVocabulary(supabase, context, {
     linkedUserBookWordId: personalWord?.id ?? null,
     surface,
@@ -567,6 +601,7 @@ export async function saveTeacherVocabularyAndInclude(
   const nextSupportNote = supportNote ?? existing?.follow_along_support_note ?? null;
 
   const updatePayload = {
+    linked_user_book_word_id: personalWord?.id ?? null,
     vocabulary_cache_id: vocabularyCacheId,
     surface,
     reading,

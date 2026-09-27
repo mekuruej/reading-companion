@@ -54,6 +54,7 @@ async function lookupExistingMekuruBook(isbn13: string) {
     published_date: data.published_date,
     page_count: data.page_count,
     kindle_location_count: data.kindle_location_count,
+    audiobook_duration_minutes: data.audiobook_duration_minutes,
     language_code: data.language_code,
   });
 }

@@ -1,3 +1,4 @@
+import { loadContextualWordTargets } from "@/lib/teacher/contextualWordTargets";
 import { wordContextPayload } from "@/lib/vocabulary/wordContext";
 import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
 import { parseWordPosition, wordPosition, wordPositionPayload } from "@/lib/vocabulary/wordPosition";
@@ -243,6 +244,16 @@ async function authorizeTeacherForStudentBook({
       error: "This book does not belong to that student.",
       status: 403,
     };
+  }
+
+  if (profile && isSuperTeacher(profile)) {
+    const trialTargets = await loadContextualWordTargets(supabaseAdmin, loadedUserBook.book_id, profile, new Set());
+    if (trialTargets.some(target => target.studentUserBookId === userBookId && target.studentId === studentId)) {
+      const { data: ownBooks, error: ownBookError } = await supabaseAdmin.from("user_books")
+        .select("id").eq("user_id", actorId).eq("book_id", loadedUserBook.book_id).limit(1);
+      if (ownBookError) throw ownBookError;
+      if (ownBooks?.length) return { ok: true as const, profile, userBook: loadedUserBook };
+    }
   }
 
   const { data: link, error: linkError } = await supabaseAdmin

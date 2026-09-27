@@ -1,0 +1,78 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+const mod={exports:{}};
+new Function('exports',ts.transpileModule(fs.readFileSync('lib/teacher/teachingReflection.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(mod.exports);
+const {validateTeachingReflection:validate}=mod.exports;
+const valid={student_level:'Level 6',student_difficulty:4,teaching_difficulty:2,difficulties:'Vocabulary density',comments:''};
+test('reflection requires canonical level and separate valid difficulty ratings',()=>{
+ assert.equal(validate(valid),null);
+ for(const level of ['N3','Level 0','Level 11',''])assert.ok(validate({...valid,student_level:level}));
+ for(const rating of [0,6,2.5,NaN])assert.ok(validate({...valid,teaching_difficulty:rating}));
+ assert.ok(validate({...valid,comments:'a'.repeat(2001)}));
+ assert.equal(validate({...valid,difficulties:'',comments:''}),null);
+});
+test('database preserves separate levels, validates ratings, and enforces teacher ownership', {skip:!process.env.PGLITE_MODULE},async()=>{
+ const {PGlite}=await import(process.env.PGLITE_MODULE);const db=new PGlite();
+ const teacher='00000000-0000-4000-8000-000000000001',other='00000000-0000-4000-8000-000000000002',member='00000000-0000-4000-8000-000000000003',book='00000000-0000-4000-8000-000000000004';
+ try{
+  await db.exec(`create role anon;create role authenticated;create schema auth;
+  create table auth.users(id uuid primary key);
+  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+  grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;
+  create table books(id uuid primary key);
+  create table profiles(id uuid primary key,role text,is_super_teacher boolean);
+  grant select on profiles to authenticated;
+  insert into auth.users values('${teacher}'),('${other}'),('${member}');
+  insert into profiles values('${teacher}','teacher',false),('${other}','teacher',false),('${member}','member',false);
+  insert into books values('${book}');`);
+  const sql=fs.readFileSync('sql/20260927_teaching_reflections.sql','utf8');await db.exec(sql);await db.exec(sql);
+  await db.exec(`set role authenticated;set request.jwt.claim.sub='${teacher}';`);
+  await db.query("insert into book_teaching_reflections values($1,$2,'Level 6',4,2,'Vocabulary','')",[teacher,book]);
+  await db.query("insert into book_teaching_reflections values($1,$2,'Level 8',2,1,'','')",[teacher,book]);
+  await db.query("insert into book_teaching_reflections values($1,$2,'Level 6',3,2,'Updated','') on conflict(teacher_id,book_id,student_level) do update set student_difficulty=excluded.student_difficulty,difficulties=excluded.difficulties",[teacher,book]);
+  let rows=(await db.query('select * from book_teaching_reflections order by student_level')).rows;
+  assert.equal(rows.length,2);assert.equal(rows[0].student_difficulty,3);assert.equal(rows[0].teaching_difficulty,2);assert.equal(rows[0].difficulties,'Updated');
+  await assert.rejects(db.query("insert into book_teaching_reflections values($1,$2,'Level 5',2,1,'','')",[other,book]),/row-level security/);
+  await assert.rejects(db.exec("update book_teaching_reflections set student_difficulty=6"),/check constraint/);
+  await db.exec(`set request.jwt.claim.sub='${other}';`);
+  assert.equal((await db.query('select * from book_teaching_reflections')).rows.length,0);
+  assert.equal((await db.query("update book_teaching_reflections set comments='overwrite' returning *")).rows.length,0);
+  await db.exec(`set request.jwt.claim.sub='${member}';`);
+  await assert.rejects(db.query("insert into book_teaching_reflections values($1,$2,'Level 6',2,1,'','')",[member,book]),/row-level security/);
+  await db.exec('reset role');
+  rows=(await db.query('select * from book_teaching_reflections order by student_level')).rows;
+  assert.equal(rows.length,2);assert.equal(rows[0].comments,'');
+ }finally{await db.close()}
+});
+test('form saves, edits and retains drafts on failure; level guide does not discard answers',async()=>{
+ const {createRequire}=await import('node:module');const require=createRequire(import.meta.url);
+ const values=[];let cursor=0,effect,rows=[],fail=false,opened=0;
+ const query={select(){return this},eq(){return this},then(resolve){resolve({data:rows,error:null})},upsert(payload){this.payload=payload;return this},async single(){if(fail)return {error:new Error('offline')};rows=[this.payload];return {data:this.payload,error:null}}};
+ const component={exports:{}};
+ const code=ts.transpileModule(fs.readFileSync('app/(protected)/books/[userBookId]/components/TeachingReflection.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2020}}).outputText;
+ new Function('require','exports',code)(name=>{
+  if(name==='react')return {useState(initial){const i=cursor++;if(!(i in values))values[i]=initial;return [values[i],next=>values[i]=typeof next==='function'?next(values[i]):next]},useEffect(fn){effect??=fn},useRef(){return {current:{showModal(){opened++},close(){}}}}};
+  if(name==='@/lib/supabaseClient')return {supabase:{from:()=>query}};
+  if(name==='@/lib/teacher/teachingReflection')return mod.exports;
+  if(name==='@/components/profile/MekuruReadingLevelGuide')return {default:()=>null,MEKURU_READING_LEVEL_GROUPS:[{title:'Intermediate',levels:[{value:'Level 6',plain:'Intermediate 1'},{value:'Level 7',plain:'Intermediate 2'}]}]};
+  return require(name);
+ },component.exports);
+ const nodes=t=>!t||typeof t!=='object'?[]:Array.isArray(t)?t.flatMap(nodes):[t,...nodes(t.props?.children)];
+ const render=()=>{cursor=0;return nodes(component.exports.default({bookId:'book',teacherId:'teacher'}))};
+ const control=id=>render().find(n=>n.props?.id===id);
+ const button=label=>render().find(n=>n.type==='button'&&n.props.children===label);
+ render();effect();await new Promise(resolve=>setImmediate(resolve));
+ control('teaching-reflection-level').props.onChange({target:{value:'Level 6'}});
+ control('teaching-student_difficulty').props.onChange({target:{value:'4'}});
+ control('teaching-teaching_difficulty').props.onChange({target:{value:'2'}});
+ control('teaching-difficulties').props.onChange({target:{value:'Long sentences'}});
+ button('View levels').props.onClick();assert.equal(opened,1);assert.equal(control('teaching-difficulties').props.value,'Long sentences');
+ fail=true;button('Save reflection').props.onClick();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(control('teaching-difficulties').props.value,'Long sentences');assert.ok(button('Save reflection'));
+ fail=false;button('Save reflection').props.onClick();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(rows[0].student_difficulty,4);assert.equal(rows[0].teaching_difficulty,2);assert.ok(button('Edit reflection'));
+ button('Edit reflection').props.onClick();control('teaching-difficulties').props.onChange({target:{value:'Unsaved'}});button('Cancel').props.onClick();
+ button('Edit reflection').props.onClick();assert.equal(control('teaching-difficulties').props.value,'Long sentences');
+});

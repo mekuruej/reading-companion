@@ -142,7 +142,7 @@ type TeachingBulkDestination =
     }
   | {
       type: "student";
-      lessonBookId: string;
+      lessonBookId: string | null;
       userBookId: string;
       studentId: string;
       label: string;
@@ -205,7 +205,7 @@ export default function BulkVocabPage() {
     return teachingDestinations.find((destination) =>
       destination.type === "teacher"
         ? selectedTeachingDestination === "teacher"
-        : selectedTeachingDestination === `student:${destination.lessonBookId}`
+        : selectedTeachingDestination === `student:${destination.userBookId}`
     ) ?? null;
   }, [selectedTeachingDestination, teachingDestinations]);
 
@@ -591,7 +591,7 @@ export default function BulkVocabPage() {
     const destination = teachingDestinations.find((item) =>
       item.type === "teacher"
         ? value === "teacher"
-        : value === `student:${item.lessonBookId}`
+        : value === `student:${item.userBookId}`
     );
 
     setSelectedTeachingDestination(value);
@@ -988,7 +988,7 @@ export default function BulkVocabPage() {
           },
           body: JSON.stringify({
             sourceUserBookId: userBookId,
-            lessonBookId: selectedDestination.lessonBookId,
+            targetUserBookId: selectedDestination.userBookId,
             positionUnit,
             items,
           }),
@@ -1257,14 +1257,14 @@ export default function BulkVocabPage() {
                     <option value="teacher">
                       {teachingDestinationsLoading
                         ? "Loading destinations..."
-                        : "My Teaching Vocabulary"}
+                        : "My Vocabulary"}
                     </option>
                   ) : (
                     teachingDestinations.map((destination) => {
                       const value =
                         destination.type === "teacher"
                           ? "teacher"
-                          : `student:${destination.lessonBookId}`;
+                          : `student:${destination.userBookId}`;
                       return (
                         <option key={value} value={value}>
                           {destination.label}

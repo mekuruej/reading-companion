@@ -775,36 +775,9 @@ export default function LiveLessonQuickAddPanel({
         return;
       }
 
-      const { data: link, error: linkError } = await supabase
-        .from("teacher_students")
-        .select("id")
-        .eq("teacher_id", user.id)
-        .eq("student_id", studentId)
-        .is("archived_at", null)
-        .maybeSingle();
-
-      if (linkError) throw linkError;
-
-      if (!link) {
-        setMessage("You do not have access to this student's book.");
-        return;
-      }
-
-      const { data: lessonBook, error: lessonBookError } = await supabase
-        .from("teacher_student_lesson_books")
-        .select("id")
-        .eq("teacher_id", user.id)
-        .eq("student_id", studentId)
-        .eq("user_book_id", userBookId)
-        .eq("status", "active")
-        .maybeSingle();
-
-      if (lessonBookError) throw lessonBookError;
-
-      if (!lessonBook) {
-        setMessage("This student is not actively connected to this book.");
-        return;
-      }
+      // The session endpoint applies the same recipient policy to reads and writes,
+      // including super-teacher trial recipients without a lesson assignment.
+      let restored = await loadSessionFromApi(requestedSessionId);
 
       const { data: studentProfile, error: studentError } = await supabase
         .from("profiles")
@@ -828,8 +801,6 @@ export default function LiveLessonQuickAddPanel({
       setStudentBook(loadedStudentBook);
       setBookPageCount(firstBook(loadedStudentBook.books)?.page_count ?? null);
       void loadTeacherFollowAlongMatch(nextTeacherId, loadedStudentBook.book_id);
-
-      let restored = await loadSessionFromApi(requestedSessionId);
 
       if (!restored.session && persisted && persisted.capturedRowIds.length > 0) {
         restored = await migrateLocalSession(persisted, nextKey);

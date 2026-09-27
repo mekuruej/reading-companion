@@ -334,7 +334,7 @@ export default function TeacherAddBookPage() {
         if (!isbn13.trim() && !normalizedAsin && !allowMissingIsbn) missing.push("ISBN-13 or ASIN");
         if (!publisher.trim() && !allowMissingPublisher) missing.push("Publisher");
         if (!publishedDate.trim()) missing.push("Published date");
-        if (!hasUsableProgressTotal({ page_count: pageCount, kindle_location_count: kindleLocationCount })) missing.push("Progress Total");
+        if (!hasUsableProgressTotal({ page_count: pageCount, kindle_location_count: kindleLocationCount, audiobook_duration_minutes: audiobookDuration, edition_format: editionFormat })) missing.push("Progress Total");
 
         return missing;
     }, [
@@ -349,6 +349,8 @@ export default function TeacherAddBookPage() {
         publishedDate,
         pageCount,
         kindleLocationCount,
+        audiobookDuration,
+        editionFormat,
     ]);
 
     useEffect(() => {

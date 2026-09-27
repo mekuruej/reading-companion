@@ -16,13 +16,18 @@ for(const [file,mode,start,save] of files){
   ts.forEachChild(node,visit);
  }visit(ast);
  test(`${file}: Teaching Only stops and clears timer draft instead of restoring it`,()=>{
-  const calls=[];const env={tracking:{loaded:true,timersEnabled:false},userBookId:'copy',[mode]:'fluid',
+  const calls=[];const env={wordCaptureOnly:false,tracking:{loaded:true,timersEnabled:false},userBookId:'copy',[mode]:'fluid',
    setIsRunning:v=>calls.push(['running',v]),setIsPaused:v=>calls.push(['paused',v]),setStartTime:v=>calls.push(['start',v]),setShowTimedSessionForm:v=>calls.push(['form',v]),clearPersistedTimedSession:(...args)=>calls.push(['clear',...args]),
    readPersistedTimedSession:()=>{throw Error('Must not restore teaching-only timer')},
   };
   const code=ts.transpileModule(`const restore = ${restore};`,{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText;
   new Function(...Object.keys(env),code+';restore();')(...Object.values(env));
   assert.deepEqual(calls,[['running',false],['paused',false],['start',null],['form',false],['clear','fluid','copy']]);
+  if(file.includes('WordTimerExperience')) {
+   calls.length=0;env.wordCaptureOnly=true;
+   new Function(...Object.keys(env),code+';restore();')(...Object.values(env));
+   assert.deepEqual(calls,[], 'teacher capture must not touch reader timer drafts');
+  }
  });
  test(`${file}: disabled timer callbacks cannot start or save`,async()=>{
   for(const name of [start,save].filter(Boolean)){

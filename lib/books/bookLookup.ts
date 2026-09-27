@@ -214,6 +214,7 @@ export function normalizedLookupFromExistingBook({
   published_date: string | null | undefined;
   page_count: number | string | null | undefined;
   kindle_location_count?: number | string | null;
+  audiobook_duration_minutes?: number | string | null;
   language_code: string | null | undefined;
 }): NormalizedBookLookupResult {
   const authors = cleanAuthors([author]);
@@ -229,6 +230,7 @@ export function normalizedLookupFromExistingBook({
     published_date: published_date?.trim() || null,
     page_count: cleanNumber(page_count),
     kindle_location_count: cleanNumber(kindle_location_count),
+    audiobook_duration_minutes: cleanNumber(audiobook_duration_minutes),
     description: null,
     metadata_source: "mekuru",
     source_id: id ?? null,

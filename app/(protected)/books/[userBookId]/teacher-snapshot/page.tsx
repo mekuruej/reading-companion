@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
-import { progressSummary, progressLabels, type ProgressRecord } from "@/lib/books/readingProgress";
+import { formatAudioTime, progressSummary, progressLabels, type ProgressRecord } from "@/lib/books/readingProgress";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
@@ -496,13 +496,13 @@ export default function TeacherReadingSnapshotPage() {
   const averageMinutesPerPage =
     timedPages > 0 ? timedPageMinutes / timedPages : null;
   const tracked = progressSummary(sessions, tracking.method, tracking.totals);
-  const percentComplete = row?.finished_at ? 100 : tracked.percent;
+  const percentComplete = row?.finished_at && tracking.method !== "audiobook_time" ? 100 : tracked.percent;
 
   const progressStats: TeacherSnapshotStat[] = [
     { label: "Reader status", value: readerStatusLabel(row) },
     {
       label: progressLabels(tracking.method).current,
-      value: tracked.position == null ? "—" : `${tracked.position}${tracking.method === "percent" ? "%" : ""}${tracked.total && tracking.method !== "percent" ? ` / ${tracked.total}` : ""}`,
+      value: tracked.position == null ? "—" : tracking.method === "audiobook_time" ? `${formatAudioTime(tracked.position)}${tracked.total ? ` / ${formatAudioTime(tracked.total)}` : ""}` : `${tracked.position}${tracking.method === "percent" ? "%" : ""}${tracked.total && tracking.method !== "percent" ? ` / ${tracked.total}` : ""}`,
       note: percentComplete != null ? `${Math.round(percentComplete)}% complete` : undefined,
     },
     { label: "Pages read", value: pagesRead > 0 ? String(pagesRead) : "—" },

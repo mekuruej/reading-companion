@@ -2,6 +2,7 @@
 
 import StoryNotesExperience from "../story/StoryNotesExperience";
 import { CuriosityReadingExperience } from "../curiosity-reading/WordTimerExperience";
+import { BookProgressProvider } from "@/components/books/BookProgressProvider";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -10,7 +11,7 @@ import { TeacherFollowAlongPanel } from "../../../teacher/library/[teacherBookId
 import LiveLessonQuickAddPanel from "../../../teacher/students/[studentId]/books/[userBookId]/lesson-add/LiveLessonQuickAddPanel";
 
 type LessonStudent = {
-  lessonBookId: string;
+  lessonBookId: string | null;
   studentId: string;
   studentUserBookId: string;
   studentName: string;
@@ -37,6 +38,7 @@ type LessonContext = {
     coverUrl: string | null;
   };
   students: LessonStudent[];
+  saveWordTargets?: Omit<LessonStudent, "lessonBookId">[];
   chapterSuggestions: ChapterSuggestion[];
 };
 
@@ -45,12 +47,10 @@ export default function TeachingLessonPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const userBookId = params.userBookId ?? "";
-  const selectedStudentUserBookId = searchParams.get("studentUserBookId") ?? "";
-
-  const [followRefreshKey, setFollowRefreshKey] = useState(0);
-  const [view, setView] = useState<"follow" | "curiosity" | "journal">(searchParams.get("view") === "curiosity" ? "curiosity" : searchParams.get("view") === "journal" ? "journal" : "follow");
-  const [openedCuriosity, setOpenedCuriosity] = useState(searchParams.get("view") === "curiosity");
-  const [openedJournal, setOpenedJournal] = useState(searchParams.get("view") === "curiosity" || searchParams.get("view") === "journal");
+  const requestedView = searchParams.get("view");
+  const view = requestedView === "curiosity" ? "curiosity" : requestedView === "journal" ? "journal" : "follow";
+  // Journal ownership and loading never depend on a vocabulary recipient.
+  const selectedStudentUserBookId = view === "journal" ? "" : searchParams.get("studentUserBookId") ?? "";
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [lessonContext, setLessonContext] = useState<LessonContext | null>(null);
@@ -68,6 +68,7 @@ export default function TeachingLessonPage() {
         } = await supabase.auth.getSession();
 
         const query = new URLSearchParams();
+        if (view === "curiosity") query.set("view", "curiosity");
         if (selectedStudentUserBookId) {
           query.set("studentUserBookId", selectedStudentUserBookId);
         }
@@ -108,34 +109,32 @@ export default function TeachingLessonPage() {
     return () => {
       cancelled = true;
     };
-  }, [router, selectedStudentUserBookId, userBookId]);
+  }, [router, selectedStudentUserBookId, userBookId, view]);
+
+  const wordTargets = lessonContext?.saveWordTargets ?? lessonContext?.students ?? [];
 
   const selectedStudent = useMemo(() => {
     if (!lessonContext) return null;
     if (selectedStudentUserBookId) {
       return (
-        lessonContext.students.find(
+        (view === "curiosity" ? wordTargets : lessonContext.students).find(
           (student) => student.studentUserBookId === selectedStudentUserBookId
         ) ?? null
       );
     }
-    return lessonContext.students.length === 1 ? lessonContext.students[0] : null;
-  }, [lessonContext, selectedStudentUserBookId]);
+    return null;
+  }, [lessonContext, selectedStudentUserBookId, view, wordTargets]);
 
   const returnHref = `/books/${encodeURIComponent(userBookId)}?mode=teaching`;
 
   function selectStudent(studentUserBookId: string) {
-    if (!studentUserBookId) {
-      router.replace(`/books/${encodeURIComponent(userBookId)}/lesson`);
-      return;
-    }
-
-    router.replace(
-      `/books/${encodeURIComponent(userBookId)}/lesson?studentUserBookId=${encodeURIComponent(
-        studentUserBookId
-      )}`
-    );
+    const query = new URLSearchParams(searchParams.toString());
+    query.set("view", view);
+    if (studentUserBookId) query.set("studentUserBookId", studentUserBookId);
+    else query.delete("studentUserBookId");
+    router.replace(`/books/${encodeURIComponent(userBookId)}/lesson?${query}`);
   }
+  const quickAddStudent = selectedStudent ?? (lessonContext?.students.length === 1 ? lessonContext.students[0] : null);
 
   if (loading) {
     return (
@@ -187,7 +186,7 @@ export default function TeachingLessonPage() {
                   Teaching Lesson
                 </p>
                 <h1 className="mt-1 truncate text-2xl font-black text-stone-950">
-                  Teacher Book Workspace
+                  {view === "curiosity" ? "Save Words" : view === "journal" ? "Teacher Journal" : "Follow-Along"}
                 </h1>
                 <p className="mt-1 truncate text-sm font-semibold text-stone-500">
                   {lessonContext.book.title ?? "Book"}{lessonContext.book.author ? ` - ${lessonContext.book.author}` : ""}
@@ -195,62 +194,48 @@ export default function TeachingLessonPage() {
               </div>
             </div>
 
-            {lessonContext.students.length > 1 ? (
-              <label className="block w-full md:w-64">
-                <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-500">
-                  Student
-                </span>
-                <select
-                  value={selectedStudent?.studentUserBookId ?? ""}
-                  onChange={(event) => selectStudent(event.target.value)}
-                  className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-bold text-stone-900 shadow-sm"
-                >
-                  <option value="">Choose a student</option>
-                  {lessonContext.students.map((student) => (
-                    <option key={student.lessonBookId} value={student.studentUserBookId}>
-                      {student.studentName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : selectedStudent ? (
-              <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-black text-blue-900">
-                {selectedStudent.studentName}
-              </div>
-            ) : null}
+            {view === "curiosity" ? <label className="block w-full md:w-64">
+              <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-500">Save words for</span>
+              <select value={selectedStudent?.studentUserBookId ?? ""} onChange={event => selectStudent(event.target.value)}
+                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-bold text-stone-900 shadow-sm">
+                <option value="">Me / My Book</option>
+                {wordTargets.map(student => <option key={student.studentUserBookId} value={student.studentUserBookId}>{student.studentName}</option>)}
+              </select>
+            </label> : null}
           </div>
         </section>
 
-        <nav className="my-4 flex flex-wrap gap-2" aria-label="Teacher book modes">
-          {([['follow', 'Follow-Along'], ['curiosity', 'Curiosity Read'], ['journal', 'Teacher Journal']] as const).map(([key, label]) => (
-            <button key={key} type="button" aria-pressed={view === key}
-              onClick={() => { setView(key); if (key === "follow" && view !== "follow") setFollowRefreshKey(value => value + 1); if (key === "curiosity") setOpenedCuriosity(true); if (key !== "follow") setOpenedJournal(true); }}
-              className={`rounded-xl px-3 py-2 text-sm font-bold ${view === key ? "bg-stone-900 text-white" : "bg-white text-stone-700"}`}>{label}</button>
-          ))}
-        </nav>
-        <section className={view === "follow" ? `grid min-w-0 gap-4 ${selectedStudent ? "xl:grid-cols-2" : ""}` : "hidden"}>
+        {view === "follow" ? <section className="mt-4 grid min-w-0 gap-4 xl:grid-cols-2">
           <aside className="min-w-0">
-            <TeacherFollowAlongPanel refreshKey={followRefreshKey} teacherBookId={lessonContext.teacherBookId} presentation="embedded" lessonDisplayOnly hideHeader
+            <h2 className="mb-3 text-lg font-bold">My Follow-Along</h2>
+            <TeacherFollowAlongPanel teacherBookId={lessonContext.teacherBookId} presentation="embedded" lessonDisplayOnly hideHeader
               emptyMessage="No Follow-Along words have been prepared for this book yet." />
           </aside>
-          {selectedStudent ? (
-            <div className="min-w-0 overflow-hidden rounded-2xl border border-stone-200 bg-white">
-              <LiveLessonQuickAddPanel key={selectedStudent.studentUserBookId} studentId={selectedStudent.studentId}
-                userBookId={selectedStudent.studentUserBookId} sourceUserBookId={userBookId}
-                chapterSuggestions={lessonContext.chapterSuggestions ?? []} embedded />
-            </div>
-          ) : lessonContext.students.length > 0 ? (
-            <p className="text-sm text-stone-600">Choose a student to add words to their lesson list.</p>
-          ) : null}
-        </section>
-        <section className={view === "follow" ? "hidden" : `grid min-w-0 gap-4 ${view === "curiosity" ? "xl:grid-cols-2" : ""}`}>
-          <div className={view === "curiosity" ? "min-w-0" : "hidden"}>
-            {openedCuriosity ? <CuriosityReadingExperience embedded workspaceCompact /> : null}
+          <div className="min-w-0 overflow-hidden rounded-2xl border border-stone-200 bg-white p-3">
+            <h2 className="mb-3 text-lg font-bold">Student Quick Add</h2>
+            <label className="mb-3 block">
+              <span className="mb-1 block text-xs font-bold text-stone-500">Student Quick Add for</span>
+              <select value={quickAddStudent?.studentUserBookId ?? ""} onChange={event => selectStudent(event.target.value)}
+                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-bold text-stone-900">
+                <option value="">Choose a student</option>
+                {lessonContext.students.map(student => <option key={student.studentUserBookId} value={student.studentUserBookId}>{student.studentName}</option>)}
+              </select>
+            </label>
+            {quickAddStudent ? <LiveLessonQuickAddPanel key={quickAddStudent.studentUserBookId}
+              studentId={quickAddStudent.studentId} userBookId={quickAddStudent.studentUserBookId}
+              sourceUserBookId={lessonContext.sourceUserBookId} chapterSuggestions={lessonContext.chapterSuggestions ?? []} embedded />
+              : <p className="text-sm text-stone-600">{lessonContext.students.length ? "Choose a student to add words to their vocabulary." : "No students are assigned to this book yet. My Follow-Along is ready to use on its own."}</p>}
           </div>
-          <div className="min-w-0">
-            {openedJournal ? <StoryNotesExperience teaching embedded /> : null}
-          </div>
-        </section>
+        </section> : view === "curiosity" ? (
+          <section className="mt-4 min-w-0">
+            <BookProgressProvider key={selectedStudent?.studentUserBookId ?? userBookId}
+              userBookId={selectedStudent?.studentUserBookId ?? userBookId} readOnly>
+              <CuriosityReadingExperience targetUserBookId={selectedStudent?.studentUserBookId ?? userBookId}
+                embedded workspaceCompact wordCaptureOnly />
+            </BookProgressProvider>
+          </section>
+        ) : <section className="mt-4 min-w-0"><StoryNotesExperience teaching embedded /></section>}
+
       </div>
     </main>
   );

@@ -36,7 +36,7 @@ function suggestedMethod(totals: ProgressTotals) {
   return locations && !pages ? "kindle_location" : pages && !locations ? "page" : null;
 }
 
-export function BookProgressProvider({ userBookId, children }: { userBookId: string; children: ReactNode }) {
+export function BookProgressProvider({ userBookId, children, readOnly = false }: { userBookId: string; children: ReactNode; readOnly?: boolean }) {
   const pathname = usePathname();
   const isBookHub = pathname?.replace(/\/$/, "") === `/books/${userBookId}`;
   const dialogRef = useRef<HTMLElement>(null);
@@ -59,19 +59,19 @@ export function BookProgressProvider({ userBookId, children }: { userBookId: str
       const book = Array.isArray(data.books) ? data.books[0] : data.books;
       const next = effectiveProgressMethod(data.progress_tracking_method, book ?? {});
       const own = auth.data.user?.id === data.user_id;
-      setOwnerId(own ? data.user_id : null);
+      setOwnerId(own && !readOnly ? data.user_id : null);
       setTeachingOnly(data.personal_tracking_status === "not_tracking");
       setMethod(next);
       setTotals(book ?? {});
       setLoaded(true);
       setError(null);
-      const prompt = own && !next && shouldPromptProgress(data);
+      const prompt = !readOnly && own && !next && shouldPromptProgress(data);
       setOpen(prompt);
       if (prompt) setChoice(suggestedMethod(book ?? {}));
     } catch {
       setError("Could not load progress tracking. Please reload to try again.");
     }
-  }, [userBookId]);
+  }, [userBookId, readOnly]);
 
   useEffect(() => { void refresh(); }, [refresh, pathname]);
   useEffect(() => {
@@ -114,7 +114,7 @@ export function BookProgressProvider({ userBookId, children }: { userBookId: str
     }
   }
   return <Context.Provider value={{
-    method, totals, loaded, timersEnabled: loaded && !teachingOnly, canChoose: !!ownerId, editorOpen: open, choice, saving, error,
+    method, totals, loaded, timersEnabled: loaded && !teachingOnly && !readOnly, canChoose: !!ownerId, editorOpen: open, choice, saving, error,
     choose: setChoice, saveMethod, closeEditor: () => setOpen(false), refresh, changeMethod,
     requireMethod: () => {
       if (!loaded) return false;

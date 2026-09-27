@@ -3,6 +3,8 @@
 
 "use client";
 
+import { SAVE_WORDS_COPY } from "@/lib/books/saveWordsCopy";
+
 import JapaneseLearningPromoCard from "@/components/japanese-learning/JapaneseLearningPromoCard";
 
 type BookHubActionGridProps = {
@@ -229,9 +231,7 @@ export default function BookHubActionGrid({
           <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
             {canUseCuriosityReading ? (
               <ActionButton
-                title="Save Words"
-                subtitle="Look up Words and Read"
-                description={["Curiosity Reading: save vocab", "while logging a slower session."]}
+                {...SAVE_WORDS_COPY}
                 className="bg-violet-50 hover:bg-violet-100"
                 onClick={onCuriosityReading}
                 size="primary"

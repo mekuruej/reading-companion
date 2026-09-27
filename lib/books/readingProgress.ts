@@ -35,13 +35,13 @@ export function completionPercent(position: number | null | undefined, method: P
 export function parseProgressPosition(raw: string, method: ProgressTrackingMethod, total: number | null) {
   const text = raw.trim();
   if (!text) return { value: null, error: null };
-  const cleaned = method === "percent" ? text.replace(/%$/, "").trim() : method === "page" ? text.replace(/^(?:p(?:age)?\.?\s*)/i, "") : text.replace(/^(?:loc(?:ation)?\.?\s*)/i, "");
+  const cleaned = method === "audiobook_time" ? text : method === "percent" ? text.replace(/%$/, "").trim() : method === "page" ? text.replace(/^(?:p(?:age)?\.?\s*)/i, "") : text.replace(/^(?:loc(?:ation)?\.?\s*)/i, "");
   const value = /^\d+(?:\.\d+)?$/.test(cleaned) ? Number(cleaned) : NaN;
   if (!Number.isFinite(value) || value < 0 || (method !== "percent" && !Number.isSafeInteger(value))) {
     return { value: null, error: method === "percent" ? "Enter a percentage between 0 and 100." : `${progressLabels(method).unit} must be a nonnegative whole number.` };
   }
   const limit = method === "percent" ? 100 : total;
-  if (limit != null && value > limit) return { value: null, error: `${progressLabels(method).unit} cannot exceed ${limit}. Check this copy’s tracking method and total.` };
+  if (limit != null && value > limit) return { value: null, error: `${progressLabels(method).unit} cannot exceed ${method === "audiobook_time" ? formatAudioTime(limit) : limit}. Check this copy’s tracking method and total.` };
   return { value, error: null };
 }
 export function sessionProgressUnit(session: ProgressRecord): ProgressTrackingMethod | null {

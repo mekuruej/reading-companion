@@ -4,7 +4,7 @@
 "use client";
 
 import { useBookProgress } from "@/components/books/BookProgressProvider";
-import { timedReadingSummary, progressSummary, progressLabels, type ProgressRecord } from "@/lib/books/readingProgress";
+import { formatAudioTime, timedReadingSummary, progressSummary, progressLabels, type ProgressRecord } from "@/lib/books/readingProgress";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -536,10 +536,10 @@ export default function BookStatsPage() {
                 />
 
                 <StatsSection title="Progress tracking">
-                    <StatCard label={progressLabels(tracking.method).current} value={tracked.position == null ? "—" : `${tracked.position}${tracking.method === "percent" ? "%" : ""}${tracked.total && tracking.method !== "percent" ? ` / ${tracked.total}` : ""}`} />
+                    <StatCard label={progressLabels(tracking.method).current} value={tracked.position == null ? "—" : tracking.method === "audiobook_time" ? `${formatAudioTime(tracked.position)}${tracked.total ? ` / ${formatAudioTime(tracked.total)}` : ""}` : `${tracked.position}${tracking.method === "percent" ? "%" : ""}${tracked.total && tracking.method !== "percent" ? ` / ${tracked.total}` : ""}`} />
                     <StatCard label="Complete" value={tracked.percent == null ? "—" : `${Math.round(tracked.percent)}%`} note={tracked.total == null ? "Matching total not available" : undefined} />
-                    <StatCard label={progressLabels(tracking.method).rate} value={tracked.rate == null ? "—" : tracked.rate.toFixed(1)} />
-                    <StatCard label="Estimated reading time remaining" value={tracked.remainingMinutes == null ? "—" : formatMinutes(Math.round(tracked.remainingMinutes))} />
+                    {tracking.method !== "audiobook_time" ? <><StatCard label={progressLabels(tracking.method).rate} value={tracked.rate == null ? "—" : tracked.rate.toFixed(1)} />
+                    <StatCard label="Estimated reading time remaining" value={tracked.remainingMinutes == null ? "—" : formatMinutes(Math.round(tracked.remainingMinutes))} /></> : null}
                 </StatsSection>
                 {isEnglishNativeTrackerBook ? (
                     <>
@@ -547,7 +547,7 @@ export default function BookStatsPage() {
                             <StatCard label="Status" value={statusLabel(row)} />
                             <StatCard
                                 label="Current Progress"
-                                value={tracking.method !== "page" ? (tracked.position == null ? "—" : `${progressLabels(tracking.method).unit} ${tracked.position}${tracking.method === "percent" ? "%" : ""}`) : nativeCurrentProgress}
+                                value={tracking.method !== "page" ? (tracked.position == null ? "—" : tracking.method === "audiobook_time" ? formatAudioTime(tracked.position) : `${progressLabels(tracking.method).unit} ${tracked.position}${tracking.method === "percent" ? "%" : ""}`) : nativeCurrentProgress}
                                 note={tracking.method === "page" ? nativeCurrentProgressNote : undefined}
                             />
                             <StatCard

@@ -515,7 +515,7 @@ export default function SimpleTimedSessionPage({
             bookPatch.started_at = readOn;
         }
 
-        if (isNativeListeningMode) {
+        if (isNativeListeningMode && tracking.method !== "audiobook_time") {
             bookPatch.current_location = trimmedEndPage || null;
         }
 
@@ -665,7 +665,7 @@ export default function SimpleTimedSessionPage({
             bookPatch.started_at = readOn;
         }
 
-        if (activeSessionMode === "listening") {
+        if (activeSessionMode === "listening" && tracking.method !== "audiobook_time") {
             bookPatch.current_location = trimmedLocation;
         }
 
@@ -948,7 +948,7 @@ export default function SimpleTimedSessionPage({
                         </p>
                     </div>
 
-                    <label className="block">
+                    <div className="block">
                         <span className="text-xs font-semibold text-stone-600">
                             {activeSessionMode === "listening" ? "Listening position" : labels.current}
                         </span>
@@ -960,7 +960,7 @@ export default function SimpleTimedSessionPage({
                             placeholder={activeSessionMode === "listening" ? "e.g. Chapter 8, 37%, or 3:12:45" : "e.g. 84"}
                             className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-stone-300"
                         />)}
-                    </label>
+                    </div>
 
                     <div className="flex flex-wrap gap-2">
                         <button
