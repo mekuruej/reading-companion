@@ -872,33 +872,41 @@ export default function BooksPage() {
     }
   }
 
-  async function loadPendingBookRequests() {
-    const { data, error } = await supabase
-      .from("book_requests")
-      .select(`
-        id,
-        title,
-        author,
-        isbn13,
-        asin,
-        status,
-        created_at,
-        user_id,
-        profiles:user_id (
-          display_name,
-          username
-        )
-      `)
-      .or("status.eq.pending,status.is.null")
-      .order("created_at", { ascending: false });
+  async function loadPendingBookRequests(isCancelled: () => boolean = () => false) {
+    try {
+      const { data, error } = await supabase
+        .from("book_requests")
+        .select(`
+          id,
+          title,
+          author,
+          isbn13,
+          asin,
+          status,
+          created_at,
+          user_id,
+          profiles:user_id (
+            display_name,
+            username
+          )
+        `)
+        .or("status.eq.pending,status.is.null")
+        .order("created_at", { ascending: false });
 
-    if (error) {
+      if (isCancelled()) return;
+
+      if (error) {
+        logSbError("Error loading book requests:", error);
+        setBookRequests([]);
+        return;
+      }
+
+      setBookRequests((data as any[]) ?? []);
+    } catch (error) {
+      if (isCancelled()) return;
       logSbError("Error loading book requests:", error);
       setBookRequests([]);
-      return;
     }
-
-    setBookRequests((data as any[]) ?? []);
   }
 
   async function handleApproveRequest(requestId: string) {
@@ -1391,7 +1399,8 @@ export default function BooksPage() {
       );
 
       if (role === "super_teacher" || superTeacherFlag) {
-        await loadPendingBookRequests();
+        // Administrative alerts must not delay resolving and loading the library.
+        void loadPendingBookRequests(() => cancelled);
       }
 
       if (routeUsername) {
