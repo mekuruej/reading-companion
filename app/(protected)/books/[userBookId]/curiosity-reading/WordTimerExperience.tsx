@@ -1,6 +1,7 @@
 // Curiosity Reading / Listening word timer experience
 //
 "use client";
+import { useSessionEndingPhrase, SessionEndingPhraseField, LatestEndingPhrase } from "@/components/books/SessionEndingPhrase";
 import WordContextFields from "@/components/vocabulary/WordContextFields";
 import { wordContextPayload, type WordContext } from "@/lib/vocabulary/wordContext";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
@@ -347,6 +348,7 @@ export function CuriosityReadingExperience({
     : `Search, adjust, and save from one place. ${positionLabel(tracking.method ?? "page")} and chapter stay ready for the next word.`;
   const fullAccessFeature = isListeningMode ? "add_word" : "curiosity_reading";
   const [userBookId, setUserBookId] = useState(routeUserBookId);
+  const { sessionEndingPhrase, setSessionEndingPhrase, latestEndingPhrase, markPhraseSaved } = useSessionEndingPhrase(userBookId, timedSessionMode);
 
   const progressTotal = matchingTotal(tracking.method, tracking.totals);
   const labels = progressLabels(tracking.method);
@@ -787,6 +789,7 @@ export function CuriosityReadingExperience({
       setSessionDate(persisted.sessionDate);
       setSessionStartPage(persisted.trackingUnit === tracking.method ? persisted.sessionStartPage : "");
       setSessionEndPage(persisted.trackingUnit === tracking.method ? persisted.sessionEndPage : "");
+      setSessionEndingPhrase(typeof persisted.sessionEndingPhrase === "string" ? persisted.sessionEndingPhrase.slice(0, 500) : "");
     }
 
     setTimerPersistenceReady(true);
@@ -839,6 +842,7 @@ export function CuriosityReadingExperience({
       sessionDate,
       sessionStartPage,
       sessionEndPage,
+      sessionEndingPhrase,
       showTimedSessionForm,
       savedAt: Date.now(),
     });
@@ -848,6 +852,7 @@ export function CuriosityReadingExperience({
     isRunning,
     sessionDate,
     sessionEndPage,
+    sessionEndingPhrase,
     sessionStartPage,
     showTimedSessionForm,
     startTime,
@@ -875,6 +880,7 @@ export function CuriosityReadingExperience({
         sessionDate,
         sessionStartPage,
         sessionEndPage,
+        sessionEndingPhrase,
         showTimedSessionForm,
         savedAt: Date.now(),
       });
@@ -897,6 +903,7 @@ export function CuriosityReadingExperience({
     isRunning,
     sessionDate,
     sessionEndPage,
+    sessionEndingPhrase,
     sessionStartPage,
     showTimedSessionForm,
     startTime,
@@ -1709,6 +1716,7 @@ export function CuriosityReadingExperience({
       ...parsed.payload,
       minutes_read: minutes,
       session_mode: isListeningMode ? "listening" : "curiosity",
+      ...(sessionEndingPhrase.trim() ? { ending_phrase: sessionEndingPhrase.trim() } : {}),
     });
 
     if (error) {
@@ -1760,6 +1768,7 @@ export function CuriosityReadingExperience({
     );
     window.setTimeout(() => setTimerSaveMessage(""), 4000);
 
+    markPhraseSaved();
     setSessionStartPage("");
     setSessionEndPage("");
     setShowTimedSessionForm(false);
@@ -1857,6 +1866,8 @@ export function CuriosityReadingExperience({
       showTimedSessionForm={showTimedSessionForm}
       sessionStartPage={sessionStartPage}
       sessionEndPage={sessionEndPage}
+      endingPhraseField={<SessionEndingPhraseField value={sessionEndingPhrase} onChange={setSessionEndingPhrase} listening={isListeningMode} />}
+      latestEndingPhrase={<LatestEndingPhrase phrase={latestEndingPhrase} />}
       timerSaveMessage={timerSaveMessage}
       formatTimer={formatTimer}
       compact={workspaceCompact || useCompactSessionBar}
@@ -1903,6 +1914,7 @@ export function CuriosityReadingExperience({
       }}
       onSaveSession={() => void saveReadingSession()}
       onCancelSession={() => {
+        setSessionEndingPhrase("");
         setShowTimedSessionForm(false);
         setElapsed(0);
         setAccumulatedElapsedMs(0);

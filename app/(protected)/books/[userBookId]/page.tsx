@@ -182,6 +182,7 @@ type LookupRow = {
 };
 
 type ReadingSession = ProgressRecord & {
+  ending_phrase?: string | null;
   id: string;
   user_book_id: string;
   read_on: string;
@@ -1879,7 +1880,7 @@ export default function BookHubPage() {
   async function loadReadingSessions(userBookIdValue: string) {
     const { data, error } = await supabase
       .from("user_book_reading_sessions")
-      .select("id, user_book_id, read_on, start_page, end_page, tracking_unit, start_position, end_position, progress_total, minutes_read, is_filler, created_at, session_mode")
+      .select("*")
       .eq("user_book_id", userBookIdValue)
       .order("read_on", { ascending: false })
       .order("created_at", { ascending: false });
@@ -5706,6 +5707,7 @@ export default function BookHubPage() {
                     progressBarWidth={bookHubProgressBarWidth}
                     progressPercentLabel={bookHubProgressPercentLabel}
                     lastSavedWordLabel={bookHubLastSavedWordLabel}
+                    lastReadPhrase={readingSessions.find((session) => session.session_mode !== "listening" && session.ending_phrase?.trim())?.ending_phrase ?? undefined}
                     lastChapterLabel={bookHubLastChapterLabel}
                     lastPageLabel={bookHubLastPageLabel}
                     daysEngagedLabel={bookHubDaysEngagedLabel}
@@ -5765,6 +5767,7 @@ export default function BookHubPage() {
                 progressBarWidth={bookHubProgressBarWidth}
                 progressPercentLabel={bookHubProgressPercentLabel}
                 lastSavedWordLabel={bookHubLastSavedWordLabel}
+                    lastReadPhrase={readingSessions.find((session) => session.session_mode !== "listening" && session.ending_phrase?.trim())?.ending_phrase ?? undefined}
                 lastChapterLabel={bookHubLastChapterLabel}
                 lastPageLabel={bookHubLastPageLabel}
                 daysEngagedLabel={bookHubDaysEngagedLabel}

@@ -149,11 +149,12 @@ test('timer storage round-trips the draft unit with elapsed time',()=> {
   const storage=new Map();
   globalThis.window={localStorage:{getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)}};
   try {
-    const state={version:1,sessionMode:'fluid',userBookId:'reader-copy',trackingUnit:'kindle_location',startedAt:null,accumulatedElapsedMs:120000,isPaused:true,sessionDate:'2026-09-21',sessionStartPage:'100',sessionEndPage:'200',showTimedSessionForm:true,savedAt:0};
+    const state={version:1,sessionMode:'fluid',userBookId:'reader-copy',trackingUnit:'kindle_location',startedAt:null,accumulatedElapsedMs:120000,isPaused:true,sessionDate:'2026-09-21',sessionStartPage:'100',sessionEndPage:'200',sessionEndingPhrase:'そして、次のページへ。',showTimedSessionForm:true,savedAt:0};
     timer.writePersistedTimedSession(state);
     const restored=timer.readPersistedTimedSession('fluid','reader-copy');
     assert.equal(restored.trackingUnit,'kindle_location');
     assert.equal(restored.sessionEndPage,'200');
+    assert.equal(restored.sessionEndingPhrase,'そして、次のページへ。');
     assert.equal(timer.elapsedMsForPersistedTimedSession(restored),120000);
     assert.equal(timer.readPersistedTimedSession('fluid','another-copy'),null);
   } finally { delete globalThis.window; }

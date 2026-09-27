@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
 import AudioTimeInput from "@/components/books/AudioTimeInput";
 type CuriosityTimerPanelProps = {
@@ -8,6 +9,8 @@ type CuriosityTimerPanelProps = {
   sessionStartPage: string;
   sessionEndPage: string;
   timerSaveMessage: string;
+  endingPhraseField: ReactNode;
+  latestEndingPhrase: ReactNode;
   formatTimer: (seconds: number) => string;
   onStart: () => void;
   onPause: () => void;
@@ -34,6 +37,8 @@ export default function CuriosityTimerPanel({
   sessionStartPage,
   sessionEndPage,
   timerSaveMessage,
+  endingPhraseField,
+  latestEndingPhrase,
   formatTimer,
   onStart,
   onPause,
@@ -120,6 +125,7 @@ export default function CuriosityTimerPanel({
         </div>
       </div>
 
+      {latestEndingPhrase}
       {showTimedSessionForm && !isRunning ? (
         <div className={compact ? "mt-3 rounded-2xl border border-stone-300 bg-stone-50 p-3" : "mt-4 rounded-2xl border border-stone-300 bg-stone-50 p-4"}>
           <div className="mb-3 text-sm font-medium text-stone-700">
@@ -171,6 +177,7 @@ export default function CuriosityTimerPanel({
             </div>
           )}
 
+          {endingPhraseField}
           <div className="mt-3 text-sm text-stone-500">
             Time: {formatTimer(elapsed)}
           </div>

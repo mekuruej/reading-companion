@@ -9,6 +9,7 @@ export type PersistedTimedSessionState = {
   trackingUnit?: "page" | "kindle_location" | "percent" | "audiobook_time" | null;
   sessionStartPage: string;
   sessionEndPage: string;
+  sessionEndingPhrase?: string;
   showTimedSessionForm: boolean;
   savedAt: number;
 };

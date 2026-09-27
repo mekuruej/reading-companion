@@ -2,6 +2,7 @@
 //
 
 "use client";
+import { useSessionEndingPhrase, SessionEndingPhraseField, LatestEndingPhrase } from "@/components/books/SessionEndingPhrase";
 import AudioTimeInput from "@/components/books/AudioTimeInput";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
 import { nextProgressStart, matchingTotal, progressLabels, parseProgressRange, progressPayload, sessionEnd } from "@/lib/books/readingProgress";
@@ -103,6 +104,7 @@ export default function SimpleTimedSessionPage({
     const [hasFinishedTimer, setHasFinishedTimer] = useState(false);
     const [timerPersistenceReady, setTimerPersistenceReady] = useState(false);
     const [activeSessionMode, setActiveSessionMode] = useState<SessionMode>(sessionMode);
+    const { sessionEndingPhrase, setSessionEndingPhrase, latestEndingPhrase, markPhraseSaved } = useSessionEndingPhrase(userBookId, activeSessionMode);
     const [showProgressUpdateForm, setShowProgressUpdateForm] = useState(false);
     const [progressUpdateLocation, setProgressUpdateLocation] = useState("");
     const [progressUpdateMessage, setProgressUpdateMessage] = useState("");
@@ -306,6 +308,7 @@ export default function SimpleTimedSessionPage({
             setSessionDate(persisted.sessionDate);
             setSessionStartPage(persisted.trackingUnit === tracking.method ? persisted.sessionStartPage : "");
             setSessionEndPage(persisted.trackingUnit === tracking.method ? persisted.sessionEndPage : "");
+            setSessionEndingPhrase(typeof persisted.sessionEndingPhrase === "string" ? persisted.sessionEndingPhrase.slice(0, 500) : "");
         }
 
         setTimerPersistenceReady(true);
@@ -358,6 +361,7 @@ export default function SimpleTimedSessionPage({
             sessionDate,
             sessionStartPage,
             sessionEndPage,
+            sessionEndingPhrase,
             showTimedSessionForm,
             savedAt: Date.now(),
         });
@@ -367,6 +371,7 @@ export default function SimpleTimedSessionPage({
         isRunning,
         sessionDate,
         sessionEndPage,
+        sessionEndingPhrase,
         activeSessionMode,
         sessionStartPage,
         showTimedSessionForm,
@@ -394,6 +399,7 @@ export default function SimpleTimedSessionPage({
                 sessionDate,
                 sessionStartPage,
                 sessionEndPage,
+                sessionEndingPhrase,
                 showTimedSessionForm,
                 savedAt: Date.now(),
             });
@@ -416,6 +422,7 @@ export default function SimpleTimedSessionPage({
         isRunning,
         sessionDate,
         sessionEndPage,
+        sessionEndingPhrase,
         activeSessionMode,
         sessionStartPage,
         showTimedSessionForm,
@@ -482,6 +489,7 @@ export default function SimpleTimedSessionPage({
             ...positionPayload,
             minutes_read: minutesNum,
             session_mode: activeSessionMode,
+            ...(sessionEndingPhrase.trim() ? { ending_phrase: sessionEndingPhrase.trim() } : {}),
         });
 
         if (error) {
@@ -490,6 +498,7 @@ export default function SimpleTimedSessionPage({
             return;
         }
 
+        markPhraseSaved();
         setShowTimedSessionForm(false);
         setElapsed(0);
         setAccumulatedElapsedMs(0);
@@ -826,6 +835,7 @@ export default function SimpleTimedSessionPage({
                 </p>
             ) : null}
 
+            <LatestEndingPhrase phrase={latestEndingPhrase} />
             {timerSaveMessage ? (
                 <p className="mt-3 text-xs text-emerald-600">{timerSaveMessage}</p>
             ) : null}
@@ -885,6 +895,7 @@ export default function SimpleTimedSessionPage({
                 </div>
             )}
 
+            <SessionEndingPhraseField value={sessionEndingPhrase} onChange={setSessionEndingPhrase} listening={activeSessionMode === "listening"} />
             <div className="mt-3 space-y-1 text-sm text-stone-500">
                 <div>Time: {formatTimer(elapsed)}</div>
                 <div className="text-xs">
@@ -907,6 +918,7 @@ export default function SimpleTimedSessionPage({
                 <button
                     type="button"
                     onClick={() => {
+                        setSessionEndingPhrase("");
                         setShowTimedSessionForm(false);
                         setElapsed(0);
                         setAccumulatedElapsedMs(0);

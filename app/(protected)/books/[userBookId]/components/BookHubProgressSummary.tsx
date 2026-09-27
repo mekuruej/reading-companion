@@ -7,6 +7,7 @@ type BookHubProgressSummaryProps = {
   progressBarWidth: string;
   progressPercentLabel?: string;
   lastSavedWordLabel?: string;
+  lastReadPhrase?: string;
   lastChapterLabel?: string;
   lastPageLabel?: string;
   daysEngagedLabel: string;
@@ -29,6 +30,7 @@ export default function BookHubProgressSummary({
   progressBarWidth,
   progressPercentLabel,
   lastSavedWordLabel,
+  lastReadPhrase,
   lastChapterLabel,
   lastPageLabel,
   daysEngagedLabel,
@@ -89,6 +91,11 @@ export default function BookHubProgressSummary({
                   Position reached: <span className="text-stone-800">{lastPageLabel}</span>
                 </>
               ) : null}
+            </div>
+          ) : null}
+          {lastReadPhrase ? (
+            <div className="mt-1 whitespace-pre-wrap break-words text-stone-600">
+              Last read phrase: <span className="text-stone-800">{lastReadPhrase}</span>
             </div>
           ) : null}
         </div>
