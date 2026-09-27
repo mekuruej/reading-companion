@@ -9,6 +9,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
+import { getAppAccessStatus } from "@/lib/access/appAccess";
+import { getFeatureAccess } from "@/lib/access/featureAccess";
 import { getBookIdentity } from "@/lib/books/bookIdentity";
 import { isNativeLanguageBook } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
@@ -131,6 +133,7 @@ export default function ReadingSessionsPage() {
   const [sessionMinutesRead, setSessionMinutesRead] = useState("");
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [isNativeBook, setIsNativeBook] = useState(false);
+  const [canUseCuriosityReading, setCanUseCuriosityReading] = useState(false);
 
   const book = row?.books ?? null;
   const realSessions = useMemo(() => sessions.filter((session) => !session.is_filler), [sessions]);
@@ -141,6 +144,7 @@ export default function ReadingSessionsPage() {
     async function load() {
       setLoading(true);
       setAccessMessage("");
+      setCanUseCuriosityReading(false);
 
       const {
         data: { user },
@@ -157,13 +161,23 @@ export default function ReadingSessionsPage() {
 
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("role, is_super_teacher")
+        .select("role, is_super_teacher, app_access_type, app_access_expires_at")
         .eq("id", user.id)
         .maybeSingle();
 
       if (profileError) {
         console.error("Error loading Reading Sessions profile:", profileError);
       }
+
+      if (cancelled) return;
+      const appAccess = getAppAccessStatus(profile ?? {});
+      const featureAccess = getFeatureAccess({
+        role: profile?.role,
+        isSuperTeacher: profile?.is_super_teacher,
+        hasFullAccess: appAccess.hasFullAccess,
+        isTrialActive: appAccess.isTrialActive,
+      });
+      setCanUseCuriosityReading(featureAccess.canUseCuriosityReading);
 
       const role = (profile?.role as ProfileRole | null) ?? "member";
       const isSuperTeacher = role === "super_teacher" || role === "admin" || isSuperTeacherFlag(profile?.is_super_teacher);
@@ -284,6 +298,9 @@ export default function ReadingSessionsPage() {
   }
 
   const editingProgressRecord = sessions.find((session) => session.id === editingSessionId);
+  // Preserve an existing Curiosity record without allowing it on other/new sessions.
+  const canSelectCuriosity = (!isNativeBook && canUseCuriosityReading) ||
+    editingProgressRecord?.session_mode === "curiosity";
   const entryMethod = editingProgressRecord ? sessionProgressUnit(editingProgressRecord) ?? tracking.method : tracking.method;
   const entryTotal = editingProgressRecord ? editingProgressRecord.progress_total ?? null : matchingTotal(entryMethod, tracking.totals);
   const entryLabels = progressLabels(entryMethod);
@@ -312,6 +329,10 @@ export default function ReadingSessionsPage() {
 
   async function saveSession() {
     if (!row?.id) return;
+    if (sessionMode === "curiosity" && !canSelectCuriosity) {
+      alert("Choose Fluid Reading or Listening for this session.");
+      return;
+    }
 
     if (!entryMethod) { tracking.requireMethod(); return; }
     const parsed = parseProgressRange(sessionMode === "listening" ? "" : sessionStartPage, sessionEndPage, entryMethod, entryTotal);
@@ -587,11 +608,8 @@ export default function ReadingSessionsPage() {
                 onChange={(event) => setSessionMode(event.target.value as "fluid" | "curiosity" | "listening")}
                 className="mt-1 w-full rounded border px-2 py-1"
               >
-                <option value="fluid">{isNativeBook ? "Reading" : "Fluid Reading"}</option>
-                {isNativeBook && sessionMode === "curiosity" ? (
-                  <option value="curiosity">Reading (historical)</option>
-                ) : null}
-                {!isNativeBook ? <option value="curiosity">Curiosity Reading</option> : null}
+                <option value="fluid">Fluid Reading (reading without saving words)</option>
+                {canSelectCuriosity ? <option value="curiosity">Curiosity Reading</option> : null}
                 <option value="listening">Listening</option>
               </select>
             </label>
@@ -700,6 +718,9 @@ export default function ReadingSessionsPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="font-medium">{session.read_on}</div>
+                        {session.session_mode === "curiosity" ? (
+                          <div className="mt-1 text-stone-500">Curiosity Reading</div>
+                        ) : null}
                         <div className="mt-1">{sessionProgressLabel(session)}</div>
                         <div className="mt-1 text-stone-500">
                           {session.minutes_read != null ? `${session.minutes_read} min` : "Untimed"}
