@@ -1,9 +1,11 @@
+import { useState } from "react";
+
 type RemoveFromLibraryDialogProps = {
   retainForTeaching?: boolean;
   error: string | null;
   isRemoving: boolean;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: (teachingChoice?: "keep" | "remove") => void;
 };
 
 export default function RemoveFromLibraryDialog({
@@ -13,9 +15,10 @@ export default function RemoveFromLibraryDialog({
   onCancel,
   onConfirm,
 }: RemoveFromLibraryDialogProps) {
+  const [choice, setChoice] = useState<"keep" | "remove" | null>(null);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/40 px-4">
-      <div className="w-full max-w-lg rounded-3xl border border-stone-200 bg-white p-6 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/40 px-4 py-6">
+      <div className="max-h-full w-full max-w-lg overflow-y-auto rounded-3xl border border-stone-200 bg-white p-6 shadow-xl">
         <div className="text-sm font-semibold uppercase tracking-[0.22em] text-rose-700">
           Library Action
         </div>
@@ -26,9 +29,25 @@ export default function RemoveFromLibraryDialog({
 
         <p className="mt-3 text-sm leading-6 text-stone-700">
           {retainForTeaching
-            ? "This book will remain in My Library under Teaching Only. Your reading history, journal, vocabulary, and other personal data will be preserved, along with all teaching work."
+            ? "Do you want to keep this book in My Teaching Books?"
             : "This will remove the book from your Mekuru library, including your saved words, reading sessions, and stats for this book. The shared book record will stay in Mekuru."}
         </p>
+
+        {retainForTeaching ? (
+          <fieldset className="mt-4 space-y-3 text-sm text-stone-700" disabled={isRemoving}>
+            <legend className="sr-only">Teaching book choice</legend>
+            <label className="block rounded-xl border border-stone-200 p-3">
+              <input type="radio" name="teaching-removal" checked={choice === "keep"} onChange={() => setChoice("keep")} className="mr-2" />
+              <span className="font-semibold">Keep in My Teaching Books</span>
+              <span className="mt-1 block text-xs leading-5">Stop personal tracking and preserve reading history, journal, vocabulary, and teaching work.</span>
+            </label>
+            <label className="block rounded-xl border border-stone-200 p-3">
+              <input type="radio" name="teaching-removal" checked={choice === "remove"} onChange={() => setChoice("remove")} className="mr-2" />
+              <span className="font-semibold">Remove from both</span>
+              <span className="mt-1 block text-xs leading-5">Delete this personal copy, its saved words, reading history and journal, plus your teaching-book entry, prep items and teaching vocabulary for this edition. Private Teacher Notebook notes and lists, student copies, and the shared catalog book remain.</span>
+            </label>
+          </fieldset>
+        ) : null}
 
         {error ? (
           <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
@@ -48,11 +67,11 @@ export default function RemoveFromLibraryDialog({
 
           <button
             type="button"
-            onClick={onConfirm}
-            disabled={isRemoving}
+            onClick={() => onConfirm(retainForTeaching ? choice ?? undefined : undefined)}
+            disabled={isRemoving || (retainForTeaching && !choice)}
             className="rounded-full bg-rose-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-800 disabled:cursor-wait disabled:bg-rose-500 disabled:opacity-90"
           >
-            {isRemoving ? "Saving..." : "Remove from My Library"}
+            {isRemoving ? "Saving..." : choice === "keep" ? "Keep teaching book" : retainForTeaching ? "Remove from both" : "Remove from My Library"}
           </button>
         </div>
       </div>

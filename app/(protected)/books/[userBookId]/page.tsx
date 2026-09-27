@@ -661,6 +661,7 @@ export default function BookHubPage() {
   const [isSavingBookFlag, setIsSavingBookFlag] = useState(false);
   const [retainedForTeaching, setRetainedForTeaching] = useState(false);
   useEffect(() => { setRetainedForTeaching(false); }, [userBookId]);
+  const [removalNeedsTeachingChoice, setRemovalNeedsTeachingChoice] = useState(false);
   const [showRemoveLibraryConfirm, setShowRemoveLibraryConfirm] = useState(false);
   const [isRemovingFromLibrary, setIsRemovingFromLibrary] = useState(false);
   const [removeLibraryError, setRemoveLibraryError] = useState<string | null>(null);
@@ -5064,7 +5065,7 @@ export default function BookHubPage() {
     setSaveNotice("Book flagged for review.");
   }
 
-  async function removeFromMyLibrary() {
+  async function removeFromMyLibrary(teachingChoice?: "keep" | "remove") {
     if (!row?.id || !userId) return;
 
     if (row.user_id !== userId) {
@@ -5084,6 +5085,7 @@ export default function BookHubPage() {
 
       const response = await fetch(`/api/books/${row.id}/remove-from-library`, {
         method: "POST",
+        body: JSON.stringify({ teachingChoice }),
         headers: {
           "Content-Type": "application/json",
           ...(session?.access_token
@@ -5093,6 +5095,12 @@ export default function BookHubPage() {
       });
 
       const data = await response.json().catch(() => null);
+
+      if (data?.requiresTeachingChoice) {
+        setRemovalNeedsTeachingChoice(true);
+        setRemoveLibraryError(null);
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(data?.error ?? "Could not remove this book from your library yet.");
@@ -5541,7 +5549,7 @@ export default function BookHubPage() {
 
       {showRemoveLibraryConfirm ? (
         <RemoveFromLibraryDialog
-          retainForTeaching={retainForTeaching}
+          retainForTeaching={retainForTeaching || removalNeedsTeachingChoice}
           error={removeLibraryError}
           isRemoving={isRemovingFromLibrary}
           onCancel={() => {
@@ -5909,21 +5917,18 @@ export default function BookHubPage() {
                     Flag a problem
                   </button>
 
-                  {canRemoveFromMyLibrary && alreadyTeachingOnly ? (
-                    <p className="px-4 py-2 text-sm font-semibold text-stone-600">
-                      Teaching Only · Retained for teaching. Your data is preserved.
-                    </p>
-                  ) : canRemoveFromMyLibrary ? (
+                  {canRemoveFromMyLibrary ? (
                     <button
                       type="button"
                       onClick={() => {
                         if (!confirmLeaveIfTimerActive()) return;
                         setRemoveLibraryError(null);
+                        setRemovalNeedsTeachingChoice(false);
                         setShowRemoveLibraryConfirm(true);
                       }}
                       className="rounded-full border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50"
                     >
-                      Remove from My Library
+                      {alreadyTeachingOnly ? "Remove book" : "Remove from My Library"}
                     </button>
                   ) : null}
                 </div>

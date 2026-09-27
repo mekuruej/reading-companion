@@ -25,11 +25,6 @@ async function getAuthenticatedUser(req: Request) {
   return { user };
 }
 
-async function deleteRows(table: string, column: string, value: string) {
-  const { error } = await supabaseAdmin.from(table).delete().eq(column, value);
-  return error;
-}
-
 export async function POST(
   request: Request,
   context: { params: Promise<{ userBookId: string }> }
@@ -76,65 +71,44 @@ export async function POST(
     );
   }
 
-  // No destructive work is allowed until dependency checking has succeeded.
+  const body = await request.json().catch(() => ({}));
+  const choice = body?.teachingChoice;
+  if (choice != null && choice !== "keep" && choice !== "remove") {
+    return NextResponse.json({ error: "Choose whether to keep this teaching book." }, { status: 400 });
+  }
+
   try {
-    if (await requiresTeachingRetention(supabaseAdmin, auth.user.id, userBook.book_id, userBookId)) {
-      const { data: retained, error } = await supabaseAdmin
-        .from("user_books")
+    const hasTeachingData = await requiresTeachingRetention(supabaseAdmin, auth.user.id, userBook.book_id, userBookId);
+    if (hasTeachingData && !choice) {
+      return NextResponse.json({
+        error: "This book has teaching connections. Choose whether to keep it in My Teaching Books.",
+        requiresTeachingChoice: true,
+      }, { status: 409 });
+    }
+
+    if (choice === "keep") {
+      // Retention requires an explicit choice; never silently create a teaching book.
+      if (!hasTeachingData) {
+        return NextResponse.json({ error: "This book no longer has a teaching connection. Please reload." }, { status: 409 });
+      }
+      const { data: retained, error } = await supabaseAdmin.from("user_books")
         .update({ personal_tracking_status: "not_tracking" })
-        .eq("id", userBookId)
-        .eq("user_id", auth.user.id)
-        .eq("book_id", userBook.book_id)
-        .select("id")
-        .single();
+        .eq("id", userBookId).eq("user_id", auth.user.id).eq("book_id", userBook.book_id)
+        .select("id").single();
       if (error || !retained) throw error ?? new Error("Workspace no longer exists.");
       return NextResponse.json({ success: true, outcome: "retained_as_teaching_only" });
     }
+
+    // One database transaction prevents partial deletion if any dependency fails.
+    const { error } = await supabaseAdmin.rpc("remove_owned_library_book", {
+      p_actor_id: auth.user.id,
+      p_user_book_id: userBookId,
+      p_remove_teaching: choice === "remove",
+    });
+    if (error) throw error;
+    return NextResponse.json({ success: true, outcome: "removed" });
   } catch (error) {
-    console.error("Could not safely resolve teaching retention:", error);
-    return NextResponse.json(
-      { error: "Could not safely update this library book. Nothing was removed." },
-      { status: 500 }
-    );
+    console.error("Could not safely remove library book:", error);
+    return NextResponse.json({ error: "Could not safely remove this book. Nothing was removed. Please reload and try again." }, { status: 500 });
   }
-
-  const deleteSteps: Array<[table: string, column: string, value: string]> = [
-    ["user_word_collocations", "user_book_id", userBookId],
-    ["study_logs", "user_book_id", userBookId],
-    ["user_study_events", "user_book_id", userBookId],
-    ["user_alerts", "user_book_id", userBookId],
-    ["user_book_detective_entries", "user_book_id", userBookId],
-    ["user_book_characters", "user_book_id", userBookId],
-    ["user_book_chapter_summaries", "user_book_id", userBookId],
-    ["user_book_reading_sessions", "user_book_id", userBookId],
-    ["learning_tasks", "user_book_id", userBookId],
-    ["user_book_words", "user_book_id", userBookId],
-  ];
-
-  for (const [table, column, value] of deleteSteps) {
-    const error = await deleteRows(table, column, value);
-    if (error) {
-      console.error(`Error deleting ${table} for removed library book:`, error);
-      return NextResponse.json(
-        { error: "Could not safely remove this book from your library yet." },
-        { status: 500 }
-      );
-    }
-  }
-
-  const { error: deleteUserBookError } = await supabaseAdmin
-    .from("user_books")
-    .delete()
-    .eq("id", userBookId)
-    .eq("user_id", auth.user.id);
-
-  if (deleteUserBookError) {
-    console.error("Error deleting user_books row:", deleteUserBookError);
-    return NextResponse.json(
-      { error: "Could not remove this book from your library yet." },
-      { status: 500 }
-    );
-  }
-
-  return NextResponse.json({ success: true, outcome: "removed" });
 }
