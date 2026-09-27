@@ -491,6 +491,7 @@ export default function Header() {
                 <button
                   type="button"
 	                  onClick={() => {
+	                    if (!showTeacherMenu) setHeaderRefreshToken((current) => current + 1);
 	                    setShowTeacherMenu((prev) => !prev);
 	                    setShowLibraryMenu(false);
 	                    setShowStudyMenu(false);
@@ -541,9 +542,29 @@ export default function Header() {
                     </Link>
 
                     {getFeatureAccess({ role: profileRole, isSuperTeacher: profileIsSuperTeacher }).isAdmin ? (
-                      <Link href="/teacher/admin" onClick={() => setShowTeacherMenu(false)} className="block rounded-xl px-3 py-2 text-sm text-stone-700 hover:bg-stone-50">
-                        Admin Hub
-                      </Link>
+                      <>
+                        <Link
+                          href="/teacher/japanese-learning-requests"
+                          onClick={() => setShowTeacherMenu(false)}
+                          className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm transition ${pathname === "/teacher/japanese-learning-requests"
+                            ? "bg-stone-100 font-medium text-stone-900"
+                            : "text-stone-700 hover:bg-stone-50"
+                          }`}
+                        >
+                          <span>Japanese Learning Requests</span>
+                          {pendingJapaneseLearningRequestCount > 0 ? (
+                            <span
+                              className="inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-900"
+                              aria-label={`${pendingJapaneseLearningRequestCount} pending request${pendingJapaneseLearningRequestCount === 1 ? "" : "s"}`}
+                            >
+                              {pendingJapaneseLearningRequestCount}
+                            </span>
+                          ) : null}
+                        </Link>
+                        <Link href="/teacher/admin" onClick={() => setShowTeacherMenu(false)} className="block rounded-xl px-3 py-2 text-sm text-stone-700 hover:bg-stone-50">
+                          Admin Hub
+                        </Link>
+                      </>
                     ) : null}
                   </div>
                 ) : null}
