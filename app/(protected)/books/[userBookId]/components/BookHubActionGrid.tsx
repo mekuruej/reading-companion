@@ -227,16 +227,13 @@ export default function BookHubActionGrid({
           description="ページをめくって、日本語を深めよう。"
         >
           <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
-            {canUseSavedWordReading ? (
+            {canUseCuriosityReading ? (
               <ActionButton
-                title="Follow-Along"
-                subtitle="Supported Reading"
-                description={[
-                  "Fluid Reading: review with light support",
-                  "from words you already saved.",
-                ]}
+                title="Save Words"
+                subtitle="Look up Words and Read"
+                description={["Curiosity Reading: save vocab", "while logging a slower session."]}
                 className="bg-violet-50 hover:bg-violet-100"
-                onClick={onFluidReadingExtensive}
+                onClick={onCuriosityReading}
                 size="primary"
               />
             ) : null}
@@ -252,13 +249,16 @@ export default function BookHubActionGrid({
               />
             ) : null}
 
-            {canUseCuriosityReading ? (
+            {canUseSavedWordReading ? (
               <ActionButton
-                title="Save Words"
-                subtitle="Look up Words and Read"
-                description={["Curiosity Reading: save vocab", "while logging a slower session."]}
+                title="Follow-Along"
+                subtitle="Supported Reading"
+                description={[
+                  "Fluid Reading: review with light support",
+                  "from words you already saved.",
+                ]}
                 className="bg-violet-50 hover:bg-violet-100"
-                onClick={onCuriosityReading}
+                onClick={onFluidReadingExtensive}
                 size="primary"
               />
             ) : null}
