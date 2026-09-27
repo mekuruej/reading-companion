@@ -2,6 +2,7 @@
 //
 
 "use client";
+import AudioTimeInput from "@/components/books/AudioTimeInput";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
 import { nextProgressStart, matchingTotal, progressLabels, parseProgressRange, progressPayload, sessionEnd } from "@/lib/books/readingProgress";
 
@@ -468,7 +469,7 @@ export default function SimpleTimedSessionPage({
         if (!tracking.requireMethod() || !tracking.method) return;
         const trimmedEndPage = sessionEndPage.trim();
         const parsed = parseProgressRange(activeSessionMode === "listening" ? "" : sessionStartPage, trimmedEndPage, tracking.method, progressTotal);
-        if (parsed.error && (!isNativeListeningMode || (!/^\d+:\d{2}(?::\d{2})?$/.test(trimmedEndPage) && /^[\d.+-]|^(?:p(?:age)?|loc(?:ation)?)\.?\s*\d/i.test(trimmedEndPage)))) { alert(parsed.error); return; }
+        if (parsed.error && (tracking.method === "audiobook_time" || !isNativeListeningMode || (!/^\d+:\d{2}(?::\d{2})?$/.test(trimmedEndPage) && /^[\d.+-]|^(?:p(?:age)?|loc(?:ation)?)\.?\s*\d/i.test(trimmedEndPage)))) { alert(parsed.error); return; }
         const positionPayload = parsed.error ? progressPayload(tracking.method, null, null, progressTotal) : parsed.payload;
 
         const minutesNum = Number(sessionMinutesRead || Math.max(1, Math.round(elapsed / 60)));
@@ -628,7 +629,7 @@ export default function SimpleTimedSessionPage({
 
         if (!tracking.requireMethod() || !tracking.method) return;
         const parsed = parseProgressRange("", trimmedLocation, tracking.method, progressTotal);
-        if (parsed.error && (!isNativeListeningMode || (!/^\d+:\d{2}(?::\d{2})?$/.test(trimmedLocation) && /^[\d.+-]|^(?:p(?:age)?|loc(?:ation)?)\.?\s*\d/i.test(trimmedLocation)))) { setProgressUpdateMessage(parsed.error); return; }
+        if (parsed.error && (tracking.method === "audiobook_time" || !isNativeListeningMode || (!/^\d+:\d{2}(?::\d{2})?$/.test(trimmedLocation) && /^[\d.+-]|^(?:p(?:age)?|loc(?:ation)?)\.?\s*\d/i.test(trimmedLocation)))) { setProgressUpdateMessage(parsed.error); return; }
         const positionPayload = parsed.error ? progressPayload(tracking.method, null, null, progressTotal) : parsed.payload;
 
         setSavingProgressUpdate(true);
@@ -842,14 +843,14 @@ export default function SimpleTimedSessionPage({
                     <div className="mb-1 text-sm text-stone-600">
                         {isNativeListeningMode ? "Listening position" : labels.current}
                     </div>
-                    <input
+                    {tracking.method === "audiobook_time" ? <AudioTimeInput label="Current audiobook position (optional)" value={sessionEndPage} onChange={setSessionEndPage} /> : (<input
                         type="text"
                         inputMode="decimal"
                         value={sessionEndPage}
                         onChange={(e) => setSessionEndPage(e.target.value)}
                         placeholder={isNativeListeningMode ? "e.g. Chapter 8, 37%, or 3:12:45" : `Enter ${labels.unit.toLowerCase()}`}
                         className="w-full rounded-xl border px-3 py-2 text-sm"
-                    />
+                    />)}
                     <div className="mt-1 text-xs text-stone-500">
                         {isNativeListeningMode
                             ? "Optional. This updates your audiobook position without adding page data."
@@ -860,26 +861,26 @@ export default function SimpleTimedSessionPage({
                 <div className={workspaceCompact ? "grid grid-cols-1 gap-3" : "grid grid-cols-1 gap-3 sm:grid-cols-2"}>
                     <div>
                         <div className="mb-1 text-sm text-stone-600">{`Start ${labels.unit.toLowerCase()} (optional)`}</div>
-                        <input
+                        {tracking.method === "audiobook_time" ? <AudioTimeInput label="Start audio position (optional)" value={sessionStartPage} onChange={setSessionStartPage} /> : (<input
                             type="text"
                             inputMode="decimal"
                             value={sessionStartPage}
                             onChange={(e) => setSessionStartPage(e.target.value)}
                             placeholder={labels.unit}
                             className="w-full rounded-xl border px-3 py-2 text-sm"
-                        />
+                        />)}
                     </div>
 
                     <div>
                         <div className="mb-1 text-sm text-stone-600">{`End ${labels.unit.toLowerCase()} (optional)`}</div>
-                        <input
+                        {tracking.method === "audiobook_time" ? <AudioTimeInput label="Current audiobook position (optional)" value={sessionEndPage} onChange={setSessionEndPage} /> : (<input
                             type="text"
                             inputMode="decimal"
                             value={sessionEndPage}
                             onChange={(e) => setSessionEndPage(e.target.value)}
                             placeholder={labels.unit}
                             className="w-full rounded-xl border px-3 py-2 text-sm"
-                        />
+                        />)}
                     </div>
                 </div>
             )}
@@ -887,7 +888,7 @@ export default function SimpleTimedSessionPage({
             <div className="mt-3 space-y-1 text-sm text-stone-500">
                 <div>Time: {formatTimer(elapsed)}</div>
                 <div className="text-xs">
-                    {isNativeListeningMode ? listeningLocationNote : `Positions are optional. Entries are saved in ${labels.plural}.`}
+                    {tracking.method === "audiobook_time" ? "Position follows the audio timeline; session minutes record your actual listening time." : isNativeListeningMode ? listeningLocationNote : `Positions are optional. Entries are saved in ${labels.plural}.`}
                 </div>
             </div>
 
@@ -951,14 +952,14 @@ export default function SimpleTimedSessionPage({
                         <span className="text-xs font-semibold text-stone-600">
                             {activeSessionMode === "listening" ? "Listening position" : labels.current}
                         </span>
-                        <input
+                        {tracking.method === "audiobook_time" ? <AudioTimeInput label="Current audiobook position (optional)" value={progressUpdateLocation} onChange={setProgressUpdateLocation} /> : (<input
                             type="text"
                             inputMode={activeSessionMode === "listening" ? "text" : "numeric"}
                             value={progressUpdateLocation}
                             onChange={(event) => setProgressUpdateLocation(event.target.value)}
                             placeholder={activeSessionMode === "listening" ? "e.g. Chapter 8, 37%, or 3:12:45" : "e.g. 84"}
                             className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-stone-300"
-                        />
+                        />)}
                     </label>
 
                     <div className="flex flex-wrap gap-2">

@@ -4,7 +4,7 @@
 
 import type { DnfDetails } from "@/lib/books/dnf";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
-import { timedReadingSummary, progressLabels, matchingTotal, parseProgressRange, sessionStart, sessionEnd, sessionProgressUnit, progressSummary, type ProgressRecord } from "@/lib/books/readingProgress";
+import { formatProgressPosition, formatAudioTime, timedReadingSummary, progressLabels, matchingTotal, parseProgressRange, sessionStart, sessionEnd, sessionProgressUnit, progressSummary, type ProgressRecord } from "@/lib/books/readingProgress";
 
 
 import Link from "next/link";
@@ -46,6 +46,8 @@ import {
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import JapaneseLearningPromoCard from "@/components/japanese-learning/JapaneseLearningPromoCard";
 import BookHubLoadingState from "./components/BookHubLoadingState";
+import BookHubManagementActions from "./components/BookHubManagementActions";
+import { resolveBookHubMode } from "@/lib/books/bookHubMode";
 import RemoveFromLibraryDialog from "./components/RemoveFromLibraryDialog";
 import BookHubProgressSummary from "./components/BookHubProgressSummary";
 import BookHubNotices from "./components/BookHubNotices";
@@ -109,6 +111,7 @@ type Book = {
   trigger_warnings: string | null;
   page_count: number | null;
   kindle_location_count?: number | null;
+  audiobook_duration_minutes?: number | null;
   series_number: number | null;
   series_total: number | null;
   isbn: string | null;
@@ -1155,7 +1158,7 @@ export default function BookHubPage() {
       : "";
 
   const bookHubProgressLabel = trackedProgress.position != null
-    ? `${progressLabels(tracking.method).unit} ${trackedProgress.position}${tracking.method === "percent" ? "%" : trackedProgress.total ? ` / ${trackedProgress.total}` : ""}`
+    ? `${formatProgressPosition(trackedProgress.position, tracking.method)}${tracking.method === "percent" ? "" : trackedProgress.total ? ` / ${tracking.method === "audiobook_time" ? formatAudioTime(trackedProgress.total) : trackedProgress.total}` : ""}`
     : isNativeAudiobook && row?.current_location?.trim() ? `Listening: ${row.current_location.trim()}` : started ? "In progress" : "Not started";
 
   const bookHubProgressBarWidth =
@@ -1183,7 +1186,7 @@ export default function BookHubPage() {
     savedWordsPerPage != null ? savedWordsPerPage.toFixed(1) : "—";
   const bookHubAverageMinutesPerPageLabel =
     averageMinutesPerPage != null ? averageMinutesPerPage.toFixed(1) : "—";
-  const bookHubSummaryStats = isEnglishNativeTrackerBook ? [] : tracking.method === "kindle_location" ? [
+  const bookHubSummaryStats = isEnglishNativeTrackerBook || tracking.method === "audiobook_time" ? [] : tracking.method === "kindle_location" ? [
     { label: "Days Engaged", value: bookHubDaysEngagedLabel, caption: "Reading or listening" },
     ...(canSeeVocabularySummary ? [{
       label: "Saved Words/Location",
@@ -1208,7 +1211,9 @@ export default function BookHubPage() {
   }, [visualReadingSessions]);
 
   const bookHubProgressSummaryLabel = (
-    isNativeAudiobook
+    tracking.method === "audiobook_time"
+      ? [trackedProgress.total ? `Audiobook length: ${formatAudioTime(trackedProgress.total)}` : "Audiobook length unknown. Add it through the catalog editor or Flag a problem to request it."]
+      : isNativeAudiobook
       ? [row?.current_location?.trim() ? `Listening progress ${row.current_location.trim()}` : null]
       : isEnglishNativeTrackerBook
       ? [formatMinutes(totalTimedMinutes)]
@@ -3757,6 +3762,7 @@ export default function BookHubPage() {
           trigger_warnings,
           page_count,
           kindle_location_count,
+          audiobook_duration_minutes,
           series_number,
           series_total,
           isbn,
@@ -5496,7 +5502,7 @@ export default function BookHubPage() {
   const isViewingStudentBookHub =
     isTeacherContext && !!row.user_id && !!userId && row.user_id !== userId;
   const retainForTeaching = Boolean(teacherBookRelationship?.id) || retainedForTeaching;
-  const alreadyTeachingOnly = retainForTeaching && personalTrackingStatus === "not_tracking";
+  const alreadyTeachingOnly = personalTrackingStatus === "not_tracking";
   const canRemoveFromMyLibrary = !!userId && row.user_id === userId;
   const canUseBookHubTeachingMode =
     isOwnBookHub &&
@@ -5504,10 +5510,11 @@ export default function BookHubPage() {
     (isTeacherContext || isAdmin || isSuperTeacher) &&
     canUseWideTeachingMode;
   const requestedBookHubMode = searchParams.get("mode");
-  const bookHubMode: BookHubMode =
-    canUseBookHubTeachingMode && requestedBookHubMode === "teaching"
-      ? "teaching"
-      : "reader";
+  const bookHubMode: BookHubMode = resolveBookHubMode({
+    canUseTeachingMode: canUseBookHubTeachingMode,
+    teachingOnly: alreadyTeachingOnly,
+    requestedMode: requestedBookHubMode,
+  });
   const teachingModeReturnQuery = "?mode=teaching";
   const teachingModeStoryHref = `/books/${encodeURIComponent(row.id)}/story${teachingModeReturnQuery}`;
 
@@ -5527,6 +5534,36 @@ export default function BookHubPage() {
   const backToLibraryHref = bookHubOwnerUsername
     ? `/users/${encodeURIComponent(bookHubOwnerUsername)}/books`
     : "/dashboard";
+
+  async function moveToMyLibrary() {
+    if (!canRemoveFromMyLibrary || !alreadyTeachingOnly || savingBookStatus) return;
+    try {
+      const saved = await savePersonalTrackingStatus("want_to_read");
+      if (!saved) return;
+      await tracking.refresh();
+      router.replace(`/books/${encodeURIComponent(row!.id)}`);
+    } catch (error) {
+      console.error("Error moving book to My Library:", error);
+      setBookStatusError("Could not finish moving this book to My Library. Please refresh and try again.");
+    }
+  }
+
+  const managementActions = (
+    <BookHubManagementActions
+      canRemove={canRemoveFromMyLibrary}
+      teachingOnly={alreadyTeachingOnly}
+      saving={savingBookStatus || isRemovingFromLibrary}
+      error={alreadyTeachingOnly ? bookStatusError : null}
+      onMoveToLibrary={() => void moveToMyLibrary()}
+      onFlag={() => { setBookFlagNote(""); setShowBookFlagModal(true); }}
+      onRemove={() => {
+        if (!confirmLeaveIfTimerActive()) return;
+        setRemoveLibraryError(null);
+        setRemovalNeedsTeachingChoice(false);
+        setShowRemoveLibraryConfirm(true);
+      }}
+    />
+  );
 
   const showBookHubStartButton = !started && realReadingSessions.length === 0;
   const showUpperProgressSummary = isJapaneseLearningBook(book.language_code ?? null);
@@ -5549,6 +5586,7 @@ export default function BookHubPage() {
 
       {showRemoveLibraryConfirm ? (
         <RemoveFromLibraryDialog
+          teachingOnly={alreadyTeachingOnly}
           retainForTeaching={retainForTeaching || removalNeedsTeachingChoice}
           error={removeLibraryError}
           isRemoving={isRemovingFromLibrary}
@@ -5578,7 +5616,7 @@ export default function BookHubPage() {
             ← Back to Library
           </Link>
         </nav>
-        {canUseBookHubTeachingMode ? (
+        {canUseBookHubTeachingMode && !alreadyTeachingOnly ? (
           <BookHubModeToggle mode={bookHubMode} onModeChange={changeBookHubMode} />
         ) : null}
 
@@ -5590,14 +5628,10 @@ export default function BookHubPage() {
                 displayedCoverUrl={book.cover_url}
                 bookHubContextLabel={bookHubContextLabel}
                 isViewingStudentBookHub={isViewingStudentBookHub}
-                onAboutBook={
-                  bookHubMode === "teaching"
-                    ? undefined
-                    : () => {
-                        if (!confirmLeaveIfTimerActive()) return;
-                        router.push(`/books/${row.id}/about`);
-                      }
-                }
+                onAboutBook={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  router.push(`/books/${row.id}/about${bookHubMode === "teaching" ? "?mode=teaching" : ""}`);
+                }}
               />
 
               <div className={showUpperProgressSummary && bookHubMode !== "teaching" ? "md:row-span-2" : ""}>
@@ -5690,6 +5724,8 @@ export default function BookHubPage() {
                   userBookId={row.id}
                   canUseBulkAdd={!isEnglishBook && canUseBulkAdd}
                   canUseStoryNotes
+                  onMyVocabulary={() => router.push(`/books/${row.id}/words?mode=teaching`)}
+                  onBookInfo={() => router.push(`/books/${row.id}/about?mode=teaching`)}
                   onBulkAdd={() => {
                     router.push(
                       `/vocab/bulk?userBookId=${encodeURIComponent(row.id)}&mode=teaching&from=book-hub`
@@ -5710,6 +5746,7 @@ export default function BookHubPage() {
                     router.push(`/books/${encodeURIComponent(studentUserBookId)}/words`);
                   }}
                 />
+                {managementActions}
               </div>
             ) : (
               <>
@@ -5904,35 +5941,7 @@ export default function BookHubPage() {
                 />
               ) : null}
 
-              <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-4 text-center">
-                <div className="flex flex-wrap justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setBookFlagNote("");
-                      setShowBookFlagModal(true);
-                    }}
-                    className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
-                  >
-                    Flag a problem
-                  </button>
-
-                  {canRemoveFromMyLibrary ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!confirmLeaveIfTimerActive()) return;
-                        setRemoveLibraryError(null);
-                        setRemovalNeedsTeachingChoice(false);
-                        setShowRemoveLibraryConfirm(true);
-                      }}
-                      className="rounded-full border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50"
-                    >
-                      {alreadyTeachingOnly ? "Remove book" : "Remove from My Library"}
-                    </button>
-                  ) : null}
-                </div>
-              </div>
+              {managementActions}
 
                 </div>
               </>

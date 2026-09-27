@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 type RemoveFromLibraryDialogProps = {
+  teachingOnly?: boolean;
   retainForTeaching?: boolean;
   error: string | null;
   isRemoving: boolean;
@@ -9,6 +10,7 @@ type RemoveFromLibraryDialogProps = {
 };
 
 export default function RemoveFromLibraryDialog({
+  teachingOnly = false,
   retainForTeaching = false,
   error,
   isRemoving,
@@ -24,16 +26,18 @@ export default function RemoveFromLibraryDialog({
         </div>
 
         <h2 className="mt-2 text-2xl font-bold text-stone-950">
-          Remove this book from My Library?
+          {teachingOnly ? "Remove this teaching book?" : "Remove this book from My Library?"}
         </h2>
 
         <p className="mt-3 text-sm leading-6 text-stone-700">
-          {retainForTeaching
+          {teachingOnly
+            ? "Delete this copy, its saved words, reading history and journal, plus your teaching-book entry, prep items and teaching vocabulary for this edition. Private Teacher Notebook notes and lists, student copies, and the shared catalog book remain."
+            : retainForTeaching
             ? "Do you want to keep this book in My Teaching Books?"
             : "This will remove the book from your Mekuru library, including your saved words, reading sessions, and stats for this book. The shared book record will stay in Mekuru."}
         </p>
 
-        {retainForTeaching ? (
+        {retainForTeaching && !teachingOnly ? (
           <fieldset className="mt-4 space-y-3 text-sm text-stone-700" disabled={isRemoving}>
             <legend className="sr-only">Teaching book choice</legend>
             <label className="block rounded-xl border border-stone-200 p-3">
@@ -67,11 +71,11 @@ export default function RemoveFromLibraryDialog({
 
           <button
             type="button"
-            onClick={() => onConfirm(retainForTeaching ? choice ?? undefined : undefined)}
-            disabled={isRemoving || (retainForTeaching && !choice)}
+            onClick={() => onConfirm(teachingOnly ? "remove" : retainForTeaching ? choice ?? undefined : undefined)}
+            disabled={isRemoving || (!teachingOnly && retainForTeaching && !choice)}
             className="rounded-full bg-rose-700 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-800 disabled:cursor-wait disabled:bg-rose-500 disabled:opacity-90"
           >
-            {isRemoving ? "Saving..." : choice === "keep" ? "Keep teaching book" : retainForTeaching ? "Remove from both" : "Remove from My Library"}
+            {isRemoving ? "Saving..." : teachingOnly ? "Remove book" : choice === "keep" ? "Keep teaching book" : retainForTeaching ? "Remove from both" : "Remove from My Library"}
           </button>
         </div>
       </div>

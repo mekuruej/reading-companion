@@ -1,6 +1,9 @@
-export type ProgressTrackingMethod = "page" | "kindle_location" | "percent";
-export type ProgressTotals = { page_count?: number | null; kindle_location_count?: number | null };
+export type ProgressTrackingMethod = "page" | "kindle_location" | "percent" | "audiobook_time";
+export type ProgressTotals = { page_count?: number | null; kindle_location_count?: number | null; audiobook_duration_minutes?: number | null; edition_format?: string | null };
 export type ProgressRecord = {
+  read_on?: string | null;
+  created_at?: string | null;
+  id?: string | number;
   tracking_unit?: ProgressTrackingMethod | null;
   start_position?: number | null;
   end_position?: number | null;
@@ -12,15 +15,16 @@ export type ProgressRecord = {
   session_mode?: string | null;
 };
 export function progressMethod(value: unknown): ProgressTrackingMethod | null {
-  return value === "page" || value === "kindle_location" || value === "percent" ? value : null;
+  return value === "page" || value === "kindle_location" || value === "percent" || value === "audiobook_time" ? value : null;
 }
 export function progressLabels(method: ProgressTrackingMethod | null) {
+  if (method === "audiobook_time") return { name: "Audiobook time", unit: "Audio position", plural: "audio minutes", current: "Current audiobook position", rate: "audio minutes per hour" };
   if (method === "kindle_location") return { name: "Kindle Location", unit: "Location", plural: "locations", current: "Current location", rate: "locations per hour" };
   if (method === "percent") return { name: "Percentage", unit: "Percent", plural: "percentage points", current: "Current percentage", rate: "percentage points per hour" };
   return { name: "Page number", unit: "Page", plural: "pages", current: "Current page", rate: "pages per hour" };
 }
 export function matchingTotal(method: ProgressTrackingMethod | null, book: ProgressTotals): number | null {
-  const total = method === "percent" ? 100 : method === "kindle_location" ? book.kindle_location_count : method === "page" ? book.page_count : null;
+  const total = method === "audiobook_time" ? book.audiobook_duration_minutes : method === "percent" ? 100 : method === "kindle_location" ? book.kindle_location_count : method === "page" ? book.page_count : null;
   return total != null && Number.isFinite(total) && total > 0 ? total : null;
 }
 export function completionPercent(position: number | null | undefined, method: ProgressTrackingMethod | null, book: ProgressTotals) {
@@ -48,6 +52,7 @@ export function sessionEnd(session: ProgressRecord) { return session.end_positio
 export function sessionProgressLabel(session: ProgressRecord) {
   const unit = sessionProgressUnit(session), start = sessionStart(session), end = sessionEnd(session);
   if (!unit || end == null) return "Position not recorded";
+  if (unit === "audiobook_time") return start == null ? `Audio position: ${formatAudioTime(end)}` : `${formatAudioTime(start)} → ${formatAudioTime(end)}`;
   const label = progressLabels(unit).unit;
   const suffix = unit === "percent" ? "%" : "";
   return start == null ? `${label}: ${end}${suffix}` : `${label}: ${start}${suffix} → ${end}${suffix}`;
@@ -64,6 +69,7 @@ export function progressPayload(method: ProgressTrackingMethod, start: number | 
 // Pace pairs distance and time from the same valid timed reading sessions.
 // Untimed history still belongs in progress and total-distance calculations.
 export function timedReadingSummary(sessions: ProgressRecord[], method: ProgressTrackingMethod) {
+  if (method === "audiobook_time") return { distance: 0, minutes: 0, rate: null, averageMinutesPerUnit: null };
   let distance = 0;
   let minutes = 0;
   for (const session of sessions) {
@@ -80,8 +86,14 @@ export function timedReadingSummary(sessions: ProgressRecord[], method: Progress
 export function progressSummary(sessions: ProgressRecord[], method: ProgressTrackingMethod | null, book: ProgressTotals) {
   const matching = method ? sessions.filter((s) => sessionProgressUnit(s) === method) : [];
   const positions = matching.map(sessionEnd).filter((p): p is number => p != null);
-  const position = positions.length ? Math.max(...positions) : null;
-  const reading = matching.filter((s) => !s.is_filler && s.session_mode !== "listening" && sessionDistance(s) != null);
+  // Audio position can move backwards after a rewind. Use the latest dated
+  // position entry, not the furthest position ever reached.
+  const latestAudio = method === "audiobook_time" ? [...matching].filter(s => sessionEnd(s) != null).sort((a, b) =>
+    String(b.read_on ?? "").localeCompare(String(a.read_on ?? "")) ||
+    String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")) ||
+    String(b.id ?? "").localeCompare(String(a.id ?? ""))) [0] : null;
+  const position = method === "audiobook_time" ? latestAudio ? sessionEnd(latestAudio) : null : positions.length ? Math.max(...positions) : null;
+  const reading = (method === "audiobook_time" ? [] : matching).filter((s) => !s.is_filler && s.session_mode !== "listening" && sessionDistance(s) != null);
   const totalDistance = reading.reduce((sum, s) => sum + (sessionDistance(s) ?? 0), 0);
   const timed = method ? timedReadingSummary(matching, method) : null;
   const total = matchingTotal(method, book);
@@ -106,4 +118,14 @@ export function nextProgressStart(position: number | null, method: ProgressTrack
   if (position == null) return "";
   const next = method === "page" ? position + 1 : position;
   return String(total == null ? next : Math.min(next, total));
+}
+
+export function formatAudioTime(minutes: number): string {
+  return `${Math.floor(minutes / 60)} hr ${minutes % 60} min`;
+}
+export function formatProgressPosition(position: number, method: ProgressTrackingMethod | null): string {
+  return method === "audiobook_time" ? formatAudioTime(position) : `${progressLabels(method).unit} ${position}${method === "percent" ? "%" : ""}`;
+}
+export function effectiveProgressMethod(method: unknown, book: ProgressTotals): ProgressTrackingMethod | null {
+  return book.edition_format === "audiobook" ? "audiobook_time" : progressMethod(method);
 }

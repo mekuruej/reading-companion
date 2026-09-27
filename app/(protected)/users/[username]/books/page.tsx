@@ -2,7 +2,7 @@
 //
 "use client";
 
-import { progressSummary, type ProgressTrackingMethod, type ProgressTotals } from "@/lib/books/readingProgress";
+import { effectiveProgressMethod, progressSummary, type ProgressTrackingMethod, type ProgressTotals } from "@/lib/books/readingProgress";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -80,6 +80,7 @@ type Book = {
   cover_url: string | null;
   page_count: number | null;
   kindle_location_count?: number | null;
+  audiobook_duration_minutes?: number | null;
   book_type: string | null;
 };
 
@@ -638,6 +639,7 @@ export default function BooksPage() {
           cover_url,
           page_count,
           kindle_location_count,
+          audiobook_duration_minutes,
           book_type
         )
       `)
@@ -732,7 +734,7 @@ export default function BooksPage() {
       formatTypeByUserBookId[r.id] = r.format_type ?? null;
     }
 
-    await loadReadingStatsForBooks(userBookIds, formatTypeByUserBookId, Object.fromEntries(rowsWithTeachingBadges.map(r => [r.id, { method: r.progress_tracking_method, totals: r.books ?? {} }])));
+    await loadReadingStatsForBooks(userBookIds, formatTypeByUserBookId, Object.fromEntries(rowsWithTeachingBadges.map(r => [r.id, { method: effectiveProgressMethod(r.progress_tracking_method, r.books ?? {}), totals: r.books ?? {} }])));
 
     if (isTeacher && targetUserId === meId) {
       const studentAlertUserIds = isSuperTeacher

@@ -29,6 +29,7 @@ type GlobalBookRow = {
   published_date: string | null;
   page_count: number | null;
   kindle_location_count?: number | null;
+  audiobook_duration_minutes?: number | null;
   allow_missing_isbn?: boolean | null;
   allow_missing_publisher?: boolean | null;
   missing_info_cleared_at?: string | null;
@@ -331,7 +332,7 @@ export default function TeacherNeedsAttentionPage() {
             supabase
               .from("books")
               .select(
-                "title, isbn13, asin, cover_url, book_type, author, publisher, published_date, page_count, kindle_location_count, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at"
+                "title, isbn13, asin, cover_url, book_type, author, publisher, published_date, page_count, kindle_location_count, audiobook_duration_minutes, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at"
               ),
             supabase
               .from("user_book_words")

@@ -48,6 +48,7 @@ type BookRow = {
   cover_url: string | null;
   page_count: number | null;
   kindle_location_count?: number | null;
+  audiobook_duration_minutes?: number | null;
   book_type: string | null;
   isbn13: string | null;
   asin: string | null;
@@ -266,7 +267,7 @@ export default function AssignBookPage() {
         // Load books
         const { data: bookRows, error: bErr } = await supabase
           .from("books")
-          .select("id, title, author, cover_url, page_count, kindle_location_count, book_type, isbn13, asin, publisher, allow_missing_isbn, allow_missing_publisher")
+          .select("id, title, author, cover_url, page_count, kindle_location_count, audiobook_duration_minutes, book_type, isbn13, asin, publisher, allow_missing_isbn, allow_missing_publisher")
           .order("title", { ascending: true });
 
         if (bErr) throw bErr;
@@ -294,7 +295,7 @@ export default function AssignBookPage() {
               title,
               author,
               cover_url,
-              page_count, kindle_location_count,
+              page_count, kindle_location_count, audiobook_duration_minutes,
               book_type,
               isbn13,
               asin,
@@ -368,7 +369,7 @@ export default function AssignBookPage() {
               title,
               author,
               cover_url,
-              page_count, kindle_location_count,
+              page_count, kindle_location_count, audiobook_duration_minutes,
               book_type,
               isbn13,
               asin,

@@ -31,6 +31,7 @@ type Book = {
   trigger_warnings: string | null;
   page_count: number | null;
   kindle_location_count?: number | null;
+  audiobook_duration_minutes?: number | null;
   series_number: number | null;
   series_total?: number | null;
   isbn: string | null;
@@ -121,6 +122,8 @@ type BookInfoTabProps = {
   setEditionNote: (value: string) => void;
   publishedDate: string;
   setPublishedDate: (value: string) => void;
+  audiobookDuration?: string;
+  setAudiobookDuration?: (value: string) => void;
   kindleLocationCount?: string;
   setKindleLocationCount?: (value: string) => void;
   pageCount: string;
@@ -264,6 +267,8 @@ export default function BookInfoTab({
   setEditionNote,
   publishedDate,
   setPublishedDate,
+  audiobookDuration = "",
+  setAudiobookDuration = () => {},
   kindleLocationCount = "",
   setKindleLocationCount = () => {},
   pageCount,
@@ -1035,6 +1040,8 @@ export default function BookInfoTab({
         setEditionNote={setEditionNote}
         publishedDate={publishedDate}
         setPublishedDate={setPublishedDate}
+        audiobookDuration={audiobookDuration}
+        setAudiobookDuration={setAudiobookDuration}
         kindleLocationCount={kindleLocationCount}
         setKindleLocationCount={setKindleLocationCount}
         pageCount={pageCount}

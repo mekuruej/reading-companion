@@ -263,7 +263,7 @@ async function findPossibleMatches({
 }) {
   const { data, error } = await supabaseAdmin
     .from("books")
-    .select("id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, kindle_location_count, language_code")
+    .select("id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, kindle_location_count, audiobook_duration_minutes, language_code")
     .ilike("title", title)
     .eq("language_code", languageCode)
     .eq("edition_format", editionFormat)
@@ -296,6 +296,9 @@ export async function POST(request: Request) {
     const languageCode = normalizeBookLanguageCode(body?.languageCode ?? body?.language_code);
     const editionFormat = cleanOptionalText(body?.editionFormat ?? body?.edition_format);
     const editionNote = cleanOptionalText(body?.editionNote ?? body?.edition_note);
+    const audioRaw = body?.audiobook_duration_minutes;
+    const audioTotal = audioRaw == null || audioRaw === "" ? null : Number(audioRaw);
+    if (audioTotal !== null && (!isValidProgressTotal(audioRaw) || audioTotal > 2147483647)) return NextResponse.json({ error: "Audiobook length must be positive whole minutes." }, { status: 400 });
     const locationRaw = body?.kindleLocationCount ?? body?.kindle_location_count;
     const locationTotal = locationRaw == null || locationRaw === "" ? null : Number(locationRaw);
     if (locationTotal !== null && !isValidProgressTotal(locationRaw)) return NextResponse.json({ error: "Total Kindle Location must be a positive whole number." }, { status: 400 });
@@ -454,6 +457,7 @@ export async function POST(request: Request) {
         edition_format: editionFormat,
         edition_note: editionNote,
         page_count: pageCountResult.value,
+        audiobook_duration_minutes: editionFormat === "audiobook" ? audioTotal : null,
         kindle_location_count: locationTotal,
         allow_missing_isbn: !isbn13 && !asin,
         needs_review: true,
@@ -473,6 +477,7 @@ export async function POST(request: Request) {
           edition_format: editionFormat,
           edition_note: editionNote,
           page_count: pageCountResult.value,
+        audiobook_duration_minutes: editionFormat === "audiobook" ? audioTotal : null,
         kindle_location_count: locationTotal,
         })
         .select("id")

@@ -70,6 +70,7 @@ type BookRow = {
     published_date: string | null;
     page_count: number | null;
   kindle_location_count?: number | null;
+  audiobook_duration_minutes?: number | null;
     series_number: number | null;
     series_total: number | null;
     related_links: any | null;
@@ -299,6 +300,7 @@ export default function TeacherAddBookPage() {
     const [publishedDate, setPublishedDate] = useState("");
     const [editionFormat, setEditionFormat] = useState("");
     const [editionNote, setEditionNote] = useState("");
+    const [audiobookDuration, setAudiobookDuration] = useState("");
     const [kindleLocationCount, setKindleLocationCount] = useState("");
     const [pageCount, setPageCount] = useState("");
     const [seriesNumber, setSeriesNumber] = useState("");
@@ -431,6 +433,7 @@ export default function TeacherAddBookPage() {
         published_date,
         page_count,
         kindle_location_count,
+        audiobook_duration_minutes,
         series_number,
         series_total,
         related_links,
@@ -497,6 +500,7 @@ export default function TeacherAddBookPage() {
         }
 
         setPublishedDate(data.published_date ?? "");
+        setAudiobookDuration(data.audiobook_duration_minutes == null ? "" : String(data.audiobook_duration_minutes));
         setKindleLocationCount(data.kindle_location_count == null ? "" : String(data.kindle_location_count));
         setPageCount(data.page_count == null ? "" : String(data.page_count));
         setSeriesNumber(data.series_number == null ? "" : String(data.series_number));
@@ -647,6 +651,7 @@ export default function TeacherAddBookPage() {
         setPublishedDate("");
         setPageCount("");
         setKindleLocationCount("");
+        setAudiobookDuration("");
         setSeriesNumber("");
         setSeriesTotal("");
         setLinksText("");
@@ -723,6 +728,7 @@ export default function TeacherAddBookPage() {
             return;
         }
 
+        if (audiobookDuration.trim() && (!isValidProgressTotal(audiobookDuration) || Number(audiobookDuration) > 2147483647)) { setMessage("Audiobook length must be positive whole minutes."); return; }
         if (pageCount.trim() && !isValidProgressTotal(pageCount)) { setMessage("Page count must be a positive whole number."); return; }
         if (kindleLocationCount.trim() && !isValidProgressTotal(kindleLocationCount)) { setMessage("Total Kindle Location must be a positive whole number."); return; }
         setSaving(true);
@@ -777,6 +783,7 @@ export default function TeacherAddBookPage() {
                     asin: normalizedAsin,
                     edition_format: cleanText(editionFormat),
                     edition_note: cleanText(editionNote),
+                    audiobook_duration_minutes: editionFormat === "audiobook" && audiobookDuration.trim() ? Number(audiobookDuration) : null,
                     kindle_location_count: kindleLocationCount.trim() ? Number(kindleLocationCount) : null,
                     page_count: pageCount.trim() ? Number(pageCount) : null,
                 })
@@ -869,6 +876,7 @@ export default function TeacherAddBookPage() {
             return;
         }
 
+        if (audiobookDuration.trim() && (!isValidProgressTotal(audiobookDuration) || Number(audiobookDuration) > 2147483647)) { setMessage("Audiobook length must be positive whole minutes."); return; }
         if (pageCount.trim() && !isValidProgressTotal(pageCount)) { setMessage("Page count must be a positive whole number."); return; }
         if (kindleLocationCount.trim() && !isValidProgressTotal(kindleLocationCount)) { setMessage("Total Kindle Location must be a positive whole number."); return; }
         setSaving(true);
@@ -904,6 +912,7 @@ export default function TeacherAddBookPage() {
                     cover_url: cleanText(isbnLookupPreview.cover_url ?? ""),
                     publisher: cleanText(isbnLookupPreview.publisher ?? ""),
                     published_date: cleanText(isbnLookupPreview.published_date ?? ""),
+                    audiobook_duration_minutes: editionFormat === "audiobook" && audiobookDuration.trim() ? Number(audiobookDuration) : null,
                     kindle_location_count: kindleLocationCount.trim() ? Number(kindleLocationCount) : null,
                     page_count: cleanPageCount,
                     edition_format: cleanText(editionFormat),
@@ -968,6 +977,7 @@ export default function TeacherAddBookPage() {
             : null;
         const relatedLinks = linksText.trim() ? parseLinks(linksText) : null;
 
+        if (audiobookDuration.trim() && (!isValidProgressTotal(audiobookDuration) || Number(audiobookDuration) > 2147483647)) { setMessage("Audiobook length must be positive whole minutes."); return; }
         if (pageCount.trim() && !isValidProgressTotal(pageCount)) { setMessage("Page count must be a positive whole number."); return; }
         if (kindleLocationCount.trim() && !isValidProgressTotal(kindleLocationCount)) { setMessage("Total Kindle Location must be a positive whole number."); return; }
         setSaving(true);
@@ -1009,6 +1019,7 @@ export default function TeacherAddBookPage() {
                     published_date: cleanText(publishedDate),
                     edition_format: cleanText(editionFormat),
                     edition_note: cleanText(editionNote),
+                    audiobook_duration_minutes: editionFormat === "audiobook" && audiobookDuration.trim() ? Number(audiobookDuration) : null,
                     kindle_location_count: kindleLocationCount.trim() ? Number(kindleLocationCount) : null,
                     page_count: cleanPageCount,
                     series_number: cleanSeriesNumber,
@@ -1146,6 +1157,8 @@ export default function TeacherAddBookPage() {
                         setEditionNote={setEditionNote}
                         publishedDate={publishedDate}
                         setPublishedDate={setPublishedDate}
+                        audiobookDuration={audiobookDuration}
+                        setAudiobookDuration={setAudiobookDuration}
                         kindleLocationCount={kindleLocationCount}
                         setKindleLocationCount={setKindleLocationCount}
                         pageCount={pageCount}

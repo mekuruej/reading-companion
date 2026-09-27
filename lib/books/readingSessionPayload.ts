@@ -1,9 +1,9 @@
-import { progressMethod, parseProgressRange, matchingTotal, type ProgressTotals } from "./readingProgress";
+import { effectiveProgressMethod, progressMethod, parseProgressRange, matchingTotal, type ProgressTotals } from "./readingProgress";
 type SessionInput = { tracking_unit?: string | null; start_position?: number | null; end_position?: number | null; start_page?: number | null; end_page?: number | null; minutes_read?: number | null; read_on?: string | null; session_mode?: string | null };
 type ReaderBook = { progress_tracking_method?: string | null; books?: ProgressTotals | ProgressTotals[] | null };
 export function normalizeSessionPayload(body: SessionInput, book: ReaderBook, existing?: { tracking_unit?: string | null; progress_total?: number | null }) {
   const method = progressMethod(existing?.tracking_unit) ?? progressMethod(body?.tracking_unit) ??
-    (body?.start_page != null || body?.end_page != null ? "page" : progressMethod(book.progress_tracking_method));
+    (body?.start_page != null || body?.end_page != null ? "page" : effectiveProgressMethod(book.progress_tracking_method, (Array.isArray(book.books) ? book.books[0] : book.books) ?? {}));
   if (existing?.tracking_unit && body?.tracking_unit && existing.tracking_unit !== body.tracking_unit) {
     throw Object.assign(new Error("Existing history must retain its original unit."), { status: 400 });
   }

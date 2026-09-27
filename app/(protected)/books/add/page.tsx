@@ -70,6 +70,7 @@ type BookSearchResult = {
     published_date: string | null;
     page_count: number | null;
   kindle_location_count?: number | null;
+  audiobook_duration_minutes?: number | null;
     allow_missing_isbn?: boolean | null;
     allow_missing_publisher?: boolean | null;
     missing_info_cleared_at?: string | null;
@@ -168,6 +169,7 @@ export default function AddBookPage() {
     const [manualEditionFormat, setManualEditionFormat] = useState("");
     const [manualEditionNote, setManualEditionNote] = useState("");
     const [manualLanguageCode, setManualLanguageCode] = useState("");
+    const [manualAudiobookDuration, setManualAudiobookDuration] = useState("");
     const [manualKindleLocationCount, setManualKindleLocationCount] = useState("");
     const [manualPageCount, setManualPageCount] = useState("");
     const [manualAddError, setManualAddError] = useState("");
@@ -699,6 +701,7 @@ export default function AddBookPage() {
         setManualLanguageCode("");
         setManualPageCount("");
         setManualKindleLocationCount("");
+        setManualAudiobookDuration("");
         setManualAddError("");
         setManualPossibleMatches([]);
     }
@@ -715,6 +718,7 @@ export default function AddBookPage() {
         setManualLanguageCode("");
         setManualPageCount("");
         setManualKindleLocationCount("");
+        setManualAudiobookDuration("");
         setManualAddError("");
         setManualPossibleMatches([]);
     }
@@ -882,7 +886,7 @@ export default function AddBookPage() {
             const { data, error: asinSearchError } = await supabase
                 .from("books")
                 .select(
-                    "id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, kindle_location_count, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at, language_code, edition_format, edition_note"
+                    "id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, kindle_location_count, audiobook_duration_minutes, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at, language_code, edition_format, edition_note"
                 )
                 .ilike("asin", normalizedAsin)
                 .limit(1)
@@ -1117,6 +1121,7 @@ export default function AddBookPage() {
                     author: manualAuthor,
                     editionFormat: manualEditionFormat || null,
                     editionNote: manualEditionNote || null,
+                    audiobook_duration_minutes: manualEditionFormat === "audiobook" ? manualAudiobookDuration || null : null,
                     kindleLocationCount: manualKindleLocationCount || null,
                     languageCode: manualLanguageCode,
                     pageCount: manualPageCount || null,
@@ -1945,6 +1950,8 @@ export default function AddBookPage() {
                         editionNote={manualEditionNote}
                         languageCode={manualLanguageCode}
                         pageCount={manualPageCount}
+                        audiobookDuration={manualAudiobookDuration}
+                        onAudiobookDurationChange={setManualAudiobookDuration}
                         kindleLocationCount={manualKindleLocationCount}
                         onKindleLocationCountChange={setManualKindleLocationCount}
                         error={manualAddError}

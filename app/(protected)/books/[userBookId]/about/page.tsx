@@ -3,6 +3,7 @@
 
 "use client";
 
+import { formatAudioTime } from "@/lib/books/readingProgress";
 import Link from "next/link";
 import BookAwardsSection from "@/components/books/BookAwardsSection";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -35,6 +36,7 @@ type Book = {
   trigger_warnings: string | null;
   page_count: number | null;
   kindle_location_count: number | null;
+  audiobook_duration_minutes?: number | null;
   series_number: number | null;
   series_total?: number | null;
   isbn: string | null;
@@ -483,6 +485,7 @@ export default function AboutBookPage() {
             trigger_warnings,
             page_count,
             kindle_location_count,
+            audiobook_duration_minutes,
             series_number,
             series_total,
             isbn,
@@ -769,6 +772,7 @@ export default function AboutBookPage() {
             value={book.page_count ? `${book.page_count} pages` : null}
             tone="sky"
           />
+          {book.edition_format === "audiobook" ? <FormatHighlightCard label="Audiobook length" value={book.audiobook_duration_minutes ? formatAudioTime(book.audiobook_duration_minutes) : "Unknown"} tone="sky" /> : null}
           <FormatHighlightCard label="Total Kindle Location" value={book.kindle_location_count ? String(book.kindle_location_count) : null} tone="sky" />
           <FormatHighlightCard label="Edition note" value={book.edition_note} tone="stone" />
           <FormatHighlightCard

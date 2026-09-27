@@ -1,6 +1,7 @@
 // Curiosity Reading / Listening word timer experience
 //
 "use client";
+import AudioTimeInput from "@/components/books/AudioTimeInput";
 import WordContextFields from "@/components/vocabulary/WordContextFields";
 import { wordContextPayload, type WordContext } from "@/lib/vocabulary/wordContext";
 import { useBookProgress } from "@/components/books/BookProgressProvider";

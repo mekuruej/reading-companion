@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { progressMethod, shouldPromptProgress, progressLabels, matchingTotal, type ProgressTrackingMethod, type ProgressTotals } from "@/lib/books/readingProgress";
+import { effectiveProgressMethod, formatAudioTime, progressMethod, shouldPromptProgress, progressLabels, matchingTotal, type ProgressTrackingMethod, type ProgressTotals } from "@/lib/books/readingProgress";
 import type { PersonalTrackingStatus } from "@/lib/personalTracking";
 
 type ContextValue = {
@@ -52,12 +52,12 @@ export function BookProgressProvider({ userBookId, children }: { userBookId: str
   const refresh = useCallback(async () => {
     try {
       const [{ data, error: loadError }, auth] = await Promise.all([
-        supabase.from("user_books").select("user_id, progress_tracking_method, personal_tracking_status, status, started_at, finished_at, dnf_at, books(page_count,kindle_location_count)").eq("id", userBookId).single(),
+        supabase.from("user_books").select("user_id, progress_tracking_method, personal_tracking_status, status, started_at, finished_at, dnf_at, books(page_count,kindle_location_count,audiobook_duration_minutes,edition_format)").eq("id", userBookId).single(),
         supabase.auth.getUser(),
       ]);
       if (loadError) throw loadError;
       const book = Array.isArray(data.books) ? data.books[0] : data.books;
-      const next = progressMethod(data.progress_tracking_method);
+      const next = effectiveProgressMethod(data.progress_tracking_method, book ?? {});
       const own = auth.data.user?.id === data.user_id;
       setOwnerId(own ? data.user_id : null);
       setTeachingOnly(data.personal_tracking_status === "not_tracking");
@@ -65,7 +65,7 @@ export function BookProgressProvider({ userBookId, children }: { userBookId: str
       setTotals(book ?? {});
       setLoaded(true);
       setError(null);
-      const prompt = own && shouldPromptProgress(data);
+      const prompt = own && !next && shouldPromptProgress(data);
       setOpen(prompt);
       if (prompt) setChoice(suggestedMethod(book ?? {}));
     } catch {
@@ -144,15 +144,15 @@ function ProgressTrackingEditor({ allowDismiss = false }: { allowDismiss?: boole
   const tracking = useBookProgress();
   return <div className="min-w-0 space-y-3">
     <h3 id="progress-method-title" className="text-sm font-semibold leading-5 text-stone-900">How will you track your progress in this copy?</h3>
-    <p className="text-xs leading-5 text-stone-600">Kindle Locations are the position numbers shown by Kindle, separate from printed pages.</p>
+    <p className="text-xs leading-5 text-stone-600">{tracking.method === "audiobook_time" ? "Use the published audio timeline. Minutes listened are recorded separately." : "Kindle Locations are the position numbers shown by Kindle, separate from printed pages."}</p>
     {tracking.method ? <p className="text-xs leading-5 text-amber-800">Earlier entries keep their original units. Record your next position in the new unit when you log your reading.</p> : null}
     <fieldset disabled={tracking.saving} className="space-y-2">
       <legend className="sr-only">Progress tracking method</legend>
-      {(["page", "kindle_location", "percent"] as const).map((value) => <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 ${tracking.choice === value ? "border-violet-400 bg-violet-50" : "border-violet-100 bg-white"}`}>
+      {(tracking.totals.edition_format === "audiobook" ? ["audiobook_time"] as const : ["page", "kindle_location", "percent"] as const).map((value) => <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 ${tracking.choice === value ? "border-violet-400 bg-violet-50" : "border-violet-100 bg-white"}`}>
         <input type="radio" name="progress-method" checked={tracking.choice === value} onChange={() => tracking.choose(value)} className="shrink-0 accent-violet-700" />
         <span className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-2 text-sm text-stone-800">
           <span>{progressLabels(value).name}</span>
-          {value !== "percent" && matchingTotal(value, tracking.totals) ? <span className="text-xs text-stone-500">Total {matchingTotal(value, tracking.totals)}</span> : null}
+          {value !== "percent" && matchingTotal(value, tracking.totals) ? <span className="text-xs text-stone-500">Total {value === "audiobook_time" ? formatAudioTime(matchingTotal(value, tracking.totals)!) : matchingTotal(value, tracking.totals)}</span> : null}
         </span>
       </label>)}
     </fieldset>

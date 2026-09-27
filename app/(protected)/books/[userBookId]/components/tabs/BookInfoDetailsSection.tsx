@@ -1,3 +1,5 @@
+import AudioTimeInput from "@/components/books/AudioTimeInput";
+import { formatAudioTime } from "@/lib/books/readingProgress";
 import type { ComponentType } from "react";
 import { normalizeBookLanguageCode } from "@/lib/books/bookLanguage";
 
@@ -9,6 +11,7 @@ type BookDetails = {
   edition_note?: string | null;
   published_date?: string | null;
   kindle_location_count?: number | null;
+  audiobook_duration_minutes?: number | null;
   page_count?: number | string | null;
   series_number?: number | string | null;
   series_total?: number | string | null;
@@ -41,6 +44,8 @@ type BookInfoDetailsSectionProps = {
   setEditionNote: (value: string) => void;
   publishedDate: string;
   setPublishedDate: (value: string) => void;
+  audiobookDuration?: string;
+  setAudiobookDuration?: (value: string) => void;
   kindleLocationCount?: string;
   setKindleLocationCount?: (value: string) => void;
   pageCount: string;
@@ -89,6 +94,8 @@ export default function BookInfoDetailsSection({
   setEditionNote,
   publishedDate,
   setPublishedDate,
+  audiobookDuration = "",
+  setAudiobookDuration = () => {},
   kindleLocationCount = "",
   setKindleLocationCount = () => {},
   pageCount,
@@ -245,6 +252,10 @@ export default function BookInfoDetailsSection({
           placeholder="e.g. 2005"
         />
 
+        {(isEditingBookInfo ? editionFormat : book.edition_format) === "audiobook" ? (
+          isEditingBookInfo ? <AudioTimeInput value={audiobookDuration} onChange={setAudiobookDuration} disabled={saving} /> :
+          <div className="text-sm"><div className="text-stone-500">Audiobook length</div>{book.audiobook_duration_minutes ? formatAudioTime(book.audiobook_duration_minutes) : "Unknown"}</div>
+        ) : null}
         <Detail
           label="Total Kindle Location"
           value={book.kindle_location_count}

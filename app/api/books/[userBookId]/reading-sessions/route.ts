@@ -60,7 +60,7 @@ async function authorizeBookAccess(actorId: string, userBookId: string) {
   const [{ data: userBook, error: userBookError }, profile] = await Promise.all([
     supabaseAdmin
       .from("user_books")
-      .select("id, user_id, started_at, progress_tracking_method, books(page_count,kindle_location_count)")
+      .select("id, user_id, started_at, progress_tracking_method, books(page_count,kindle_location_count,audiobook_duration_minutes,edition_format)")
       .eq("id", userBookId)
       .maybeSingle(),
     getProfile(actorId),

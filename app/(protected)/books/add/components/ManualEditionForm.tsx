@@ -1,3 +1,4 @@
+import AudioTimeInput from "@/components/books/AudioTimeInput";
 import AddBookCatalogResult from "./AddBookCatalogResult";
 import {
   COMMON_BOOK_LANGUAGE_OPTIONS,
@@ -25,6 +26,7 @@ type ManualEditionCandidate = {
     published_date: string | null;
     page_count: number | null;
     kindle_location_count?: number | null;
+  audiobook_duration_minutes?: number | null;
     allow_missing_isbn?: boolean | null;
     allow_missing_publisher?: boolean | null;
     missing_info_cleared_at?: string | null;
@@ -47,6 +49,8 @@ type ManualEditionFormProps = {
   editionNote: string;
   languageCode: string;
   pageCount: string;
+  audiobookDuration: string;
+  onAudiobookDurationChange: (value: string) => void;
   kindleLocationCount: string;
   onKindleLocationCountChange: (value: string) => void;
   error: string;
@@ -85,6 +89,8 @@ export default function ManualEditionForm({
   editionNote,
   languageCode,
   pageCount,
+  audiobookDuration,
+  onAudiobookDurationChange,
   kindleLocationCount,
   onKindleLocationCountChange,
   error,
@@ -131,11 +137,11 @@ export default function ManualEditionForm({
         {manualEditionTitle(mode)}
       </h2>
       <p className="mt-2 text-sm leading-6 text-stone-600">
-        Add the details you know. A total page count or Kindle Location is recommended for pacing and
-        page-based stats, but it is optional.
+        Add the details you know. Total pages, Kindle Locations, or audiobook length help track progress, but are optional.
       </p>
 
       <div className="mt-4 grid gap-3">
+        {editionFormat === "audiobook" ? <AudioTimeInput value={audiobookDuration} onChange={onAudiobookDurationChange} /> : null}
         <label className="block">
           <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-stone-500">
             Title

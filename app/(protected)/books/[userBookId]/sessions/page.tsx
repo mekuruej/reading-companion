@@ -2,6 +2,7 @@
 //
 "use client";
 
+import AudioTimeInput from "@/components/books/AudioTimeInput";
 import { DNF_REASON_OPTIONS } from "@/lib/books/dnf";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
 import { progressLabels, matchingTotal, parseProgressRange, sessionStart, sessionEnd, sessionProgressUnit, sessionProgressLabel as formatSessionProgress, sessionDistance, type ProgressRecord } from "@/lib/books/readingProgress";
@@ -637,41 +638,41 @@ export default function ReadingSessionsPage() {
                   <span className="block text-stone-600">
                     {`Start ${entryLabels.unit.toLowerCase()}`}
                   </span>
-                  <input
+                  {entryMethod === "audiobook_time" ? <AudioTimeInput label="Start audio position (optional)" value={sessionStartPage} onChange={setSessionStartPage} /> : (<input
                     type="text"
                     inputMode="decimal"
                     value={sessionStartPage}
                     onChange={(event) => setSessionStartPage(event.target.value)}
                     placeholder={`Enter ${entryLabels.unit.toLowerCase()}`}
                     className="mt-1 w-full rounded border px-2 py-1"
-                  />
+                  />)}
                 </label>
 
                 <label className="rounded border bg-white p-3 text-sm">
                   <span className="block text-stone-600">
                     {`End ${entryLabels.unit.toLowerCase()}`}
                   </span>
-                  <input
+                  {entryMethod === "audiobook_time" ? <AudioTimeInput label="Current audiobook position (optional)" value={sessionEndPage} onChange={setSessionEndPage} /> : (<input
                     type="text"
                     inputMode="decimal"
                     value={sessionEndPage}
                     onChange={(event) => setSessionEndPage(event.target.value)}
                     placeholder={`Enter ${entryLabels.unit.toLowerCase()}`}
                     className="mt-1 w-full rounded border px-2 py-1"
-                  />
+                  />)}
                 </label>
               </>
             ) : (
               <label className="rounded border bg-white p-3 text-sm">
                 <span className="block text-stone-600">{`${entryLabels.current} (optional)`}</span>
-                <input
+                {entryMethod === "audiobook_time" ? <AudioTimeInput label="Current audiobook position (optional)" value={sessionEndPage} onChange={setSessionEndPage} /> : (<input
                   type="text"
                   inputMode="decimal"
                   value={sessionEndPage}
                   onChange={(event) => setSessionEndPage(event.target.value)}
                   placeholder={`Enter ${entryLabels.unit.toLowerCase()}`}
                   className="mt-1 w-full rounded border px-2 py-1"
-                />
+                />)}
               </label>
             )}
           </div>

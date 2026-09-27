@@ -13,7 +13,7 @@ const supabaseAdmin = createClient(
 );
 
 const BOOK_BASE_SELECT =
-  "id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, kindle_location_count, language_code";
+  "id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, kindle_location_count, audiobook_duration_minutes, language_code";
 const BOOK_REVIEW_SELECT = `${BOOK_BASE_SELECT}, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at`;
 
 function isMissingColumnError(error: any) {

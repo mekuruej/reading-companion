@@ -20,6 +20,8 @@ type BookHubTeachingToolsProps = {
   userBookId: string;
   canUseBulkAdd: boolean;
   canUseStoryNotes: boolean;
+  onMyVocabulary: () => void;
+  onBookInfo: () => void;
   onBulkAdd: () => void;
   onFollowAlongLesson: () => void;
   onStoryNotes: () => void;
@@ -145,6 +147,8 @@ export default function BookHubTeachingTools({
   userBookId,
   canUseBulkAdd,
   canUseStoryNotes,
+  onMyVocabulary,
+  onBookInfo,
   onBulkAdd,
   onFollowAlongLesson,
   onStoryNotes,
@@ -450,6 +454,8 @@ export default function BookHubTeachingTools({
         </div>
 
         <div className="flex flex-wrap gap-2 pt-1">
+          <TeachingUtilityButton title="My Vocabulary List" description="Review and correct your saved words for this book." onClick={onMyVocabulary} />
+          <TeachingUtilityButton title="Book Information" description="View this edition’s details." onClick={onBookInfo} />
           {canUseBulkAdd ? (
             <TeachingUtilityButton
               title="Bulk Add"

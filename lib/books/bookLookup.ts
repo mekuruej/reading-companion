@@ -40,6 +40,7 @@ export type NormalizedBookLookupResult = {
   published_date: string | null;
   page_count: number | null;
   kindle_location_count?: number | null;
+  audiobook_duration_minutes?: number | null;
   description: string | null;
   metadata_source: BookMetadataSource;
   source_id: string | null;
@@ -200,6 +201,7 @@ export function normalizedLookupFromExistingBook({
   published_date,
   page_count,
   kindle_location_count,
+  audiobook_duration_minutes,
   language_code,
 }: {
   id: string | null | undefined;
