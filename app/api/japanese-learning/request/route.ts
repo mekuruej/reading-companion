@@ -187,18 +187,13 @@ export async function POST(request: Request) {
       });
     }
 
-    const { data, error } = await supabaseAdmin
-      .from("japanese_learning_access_requests")
-      .insert({
-        user_id: auth.user.id,
-        status: "pending",
-        note,
-        reading_experience: readingExperience,
-        jlpt_level: jlptLevel,
-        request_source: requestSource,
-      })
-      .select("id, status, note, reading_experience, jlpt_level, request_source, requested_at, reviewed_at")
-      .maybeSingle();
+    const { data, error } = await supabaseAdmin.rpc("submit_japanese_learning_request", {
+      student_id: auth.user.id,
+      request_note: note,
+      experience: readingExperience,
+      jlpt: jlptLevel,
+      source: requestSource,
+    });
 
     if (error) throw error;
 

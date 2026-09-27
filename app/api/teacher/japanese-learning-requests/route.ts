@@ -316,6 +316,7 @@ export async function PATCH(request: Request) {
         review_note: reviewNote,
       })
       .eq("id", requestId)
+      .eq("status", "pending")
       .select("id, status, reviewed_at")
       .maybeSingle();
 

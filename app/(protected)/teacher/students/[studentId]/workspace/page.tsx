@@ -74,6 +74,7 @@ type WorkspacePayload = {
     relationship_status?: string | null;
   } | null;
   managedRelationships: { teacher_id: string; teacherName: string; archived_at: string | null; archive_reason: string | null }[];
+  guidedTrialStatus: "none" | "pending" | "approved" | "existing_access";
   canAccessAllUsers: boolean;
   lastEngagedAt: string | null;
   activeLessonBooks: LessonBook[];
@@ -298,6 +299,26 @@ export default function StudentWorkspacePage() {
         app_access_expires_at: data.student.app_access_expires_at,
       })
     : null;
+
+  const [approvingGuidedTrial, setApprovingGuidedTrial] = useState(false);
+  const [guidedTrialMessage, setGuidedTrialMessage] = useState("");
+
+  async function approveGuidedTrial() {
+    if (!window.confirm("Approve this student for Guided Trial scheduling? Their 28-day trial will not start yet.")) return;
+    setApprovingGuidedTrial(true);
+    setGuidedTrialMessage("");
+    try {
+      const result = await apiFetch("PATCH", { studentId, action: "approve-guided-trial" });
+      setData((current) => current ? { ...current, guidedTrialStatus: result.status } : current);
+      setGuidedTrialMessage(result.status === "approved"
+        ? "Approved. Scheduling is available; the trial has not started."
+        : "Existing access preserved. Refresh to see the latest access details.");
+    } catch (error: unknown) {
+      setGuidedTrialMessage(error instanceof Error ? error.message : "Could not approve Guided Trial.");
+    } finally {
+      setApprovingGuidedTrial(false);
+    }
+  }
 
   async function apiFetch(method = "GET", body?: Record<string, unknown>) {
     const { data: sessionData } = await supabase.auth.getSession();
@@ -833,13 +854,20 @@ export default function StudentWorkspacePage() {
                   Access
                 </p>
                 <p className="mt-1 text-lg font-black text-stone-950">
-                  {studentAccess?.label ?? "Learner"}
+                  {data.guidedTrialStatus === "approved" ? "Guided Trial Approved" : studentAccess?.label ?? "Learner"}
                 </p>
-                {studentAccess?.detail ? (
+                {data.guidedTrialStatus !== "approved" && studentAccess?.detail ? (
                   <p className="mt-1 text-xs font-semibold text-stone-500">
                     {studentAccess.detail}
                   </p>
                 ) : null}
+                {data.canAccessAllUsers && (data.guidedTrialStatus === "none" || data.guidedTrialStatus === "pending") ? (
+                  <button type="button" onClick={() => void approveGuidedTrial()} disabled={approvingGuidedTrial}
+                    className="mt-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-900 hover:bg-violet-100 disabled:opacity-50">
+                    {approvingGuidedTrial ? "Approving..." : "Approve for Guided Trial"}
+                  </button>
+                ) : null}
+                {guidedTrialMessage ? <p role="status" className="mt-2 text-xs text-stone-600">{guidedTrialMessage}</p> : null}
                 {studentAccess?.effectiveAccessLabel ? (
                   <p className="mt-1 text-xs font-semibold text-stone-500">
                     {studentAccess.effectiveAccessLabel}

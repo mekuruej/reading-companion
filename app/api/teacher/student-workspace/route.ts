@@ -1,3 +1,4 @@
+import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
@@ -249,7 +250,7 @@ export async function GET(request: Request) {
 
     const { data: student, error: studentError } = await supabaseAdmin
       .from("profiles")
-      .select("id, display_name, username, level, lesson_day, app_access_type, app_access_expires_at")
+      .select("id, display_name, username, level, lesson_day, role, is_super_teacher, app_access_type, app_access_expires_at")
       .eq("id", studentId)
       .maybeSingle();
 
@@ -258,6 +259,18 @@ export async function GET(request: Request) {
     if (!student) {
       return NextResponse.json({ error: "Student could not be found." }, { status: 404 });
     }
+
+    const { data: guidedRequests, error: guidedError } = await supabaseAdmin
+      .from("japanese_learning_access_requests")
+      .select("id, status")
+      .eq("user_id", studentId)
+      .in("status", ["pending", "approved"]);
+    if (guidedError) throw guidedError;
+    const preserveAccess = getAppAccessStatus(student).hasFullAccess ||
+      student.app_access_type?.trim().toLowerCase() === "trial";
+    const guidedTrialStatus = preserveAccess ? "existing_access" :
+      guidedRequests?.some(row => row.status === "approved") ? "approved" :
+      guidedRequests?.some(row => row.status === "pending") ? "pending" : "none";
 
     let relationshipsQuery = supabaseAdmin.from("teacher_students")
       .select("teacher_id, relationship_status, archived_at, archive_reason")
@@ -502,6 +515,7 @@ export async function GET(request: Request) {
       student,
       relationship: relationship ?? null,
       managedRelationships,
+      guidedTrialStatus,
       canAccessAllUsers: isSuperTeacher(authorization.profile),
       lastEngagedAt,
       activeLessonBooks,
@@ -618,6 +632,18 @@ export async function PATCH(request: Request) {
         { error: authorization.error },
         { status: authorization.status }
       );
+    }
+
+    if (action === "approve-guided-trial") {
+      if (!isSuperTeacher(authorization.profile)) {
+        return NextResponse.json({ error: "Super teacher access is required." }, { status: 403 });
+      }
+      const { data, error } = await supabaseAdmin.rpc("approve_student_guided_trial", {
+        student_id: studentId,
+        reviewer_id: auth.user.id,
+      });
+      if (error) throw error;
+      return NextResponse.json({ ok: true, ...data });
     }
 
     if (action === "archive-relationship" || action === "restore-relationship") {
