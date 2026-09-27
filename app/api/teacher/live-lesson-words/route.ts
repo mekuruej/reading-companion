@@ -1,3 +1,4 @@
+import { wordContextPayload } from "@/lib/vocabulary/wordContext";
 import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
 import { parseWordPosition, wordPosition, wordPositionPayload } from "@/lib/vocabulary/wordPosition";
 import { NextResponse } from "next/server";
@@ -323,6 +324,7 @@ function wordSelect() {
     id,
     vocabulary_cache_id,
     surface,
+    book_form, book_form_description, follow_along_support_note,
     reading,
     meaning,
     page_number, position_unit, position_value, percent_location,
@@ -606,7 +608,7 @@ async function saveReviewWords({
     const id = cleanString(word.id);
     if (!id || !allowedIds.has(id)) continue;
 
-    const { data: savedWord, error: savedError } = await supabaseAdmin.from("user_book_words").select("position_unit,position_value,page_number,percent_location").eq("id", id).eq("user_book_id", userBookId).single();
+    const { data: savedWord, error: savedError } = await supabaseAdmin.from("user_book_words").select("position_unit,position_value,page_number,percent_location,surface,base_form,lookup_surface").eq("id", id).eq("user_book_id", userBookId).single();
     if (savedError) throw savedError;
     const unit = word.positionUnit ?? wordPosition(savedWord).unit;
     if (!["page", "kindle_location", "percent"].includes(unit)) throw new Error("Invalid position unit");
@@ -619,9 +621,10 @@ async function saveReviewWords({
     const payload: Record<string, unknown> = {
       surface,
       encountered_surface: surface,
-      base_form: surface,
-      lookup_surface: surface,
+      base_form: surface === savedWord.surface ? savedWord.base_form || surface : surface,
+      lookup_surface: surface === savedWord.surface ? savedWord.lookup_surface || surface : surface,
       reading: nullableText(word.reading),
+      ...(Object.prototype.hasOwnProperty.call(word, "book_form") ? wordContextPayload(word) : {}),
       meaning: nullableText(word.meaning),
       meaning_choices: stringArray(word.meaning_choices ?? word.meaningChoices),
       meaning_choice_index: nullableNonNegativeInt(
@@ -847,7 +850,8 @@ export async function POST(req: Request) {
     const payload = {
       user_book_id: userBookId,
       vocabulary_cache_id: null,
-      surface,
+      surface: cleanString(body?.alternativeSurface) || surface,
+      ...wordContextPayload(body),
       encountered_surface: surface,
       base_form: surface,
       lookup_surface: surface,

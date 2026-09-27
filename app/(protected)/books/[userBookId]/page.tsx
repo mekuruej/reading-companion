@@ -5697,9 +5697,8 @@ export default function BookHubPage() {
                   onFollowAlongLesson={() => {
                     router.push(`/books/${encodeURIComponent(row.id)}/lesson`);
                   }}
-                  onStoryNotes={() => {
-                    router.push(teachingModeStoryHref);
-                  }}
+                  onCuriosityRead={() => router.push(`/books/${row.id}/lesson?view=curiosity`)}
+                  onStoryNotes={() => router.push(`/books/${row.id}/lesson?view=journal`)}
                   onTeacherSnapshot={() => {
                     router.push(`/books/${row.id}/teacher-snapshot`);
                   }}

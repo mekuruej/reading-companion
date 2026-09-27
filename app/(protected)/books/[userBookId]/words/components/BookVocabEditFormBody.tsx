@@ -65,12 +65,12 @@ export default function BookVocabEditFormBody({
 
       <label className="flex flex-col gap-1">
         <span className="text-xs text-gray-600">
-          Word (book form)
+          {cacheSurface ? "Alternative spelling / kanji" : "Word"}
         </span>
         <input
           value={editSurface}
           onChange={(e) => onEditSurfaceChange(e.target.value)}
-          placeholder={cacheSurface ? "Book form, if different" : "Word as it appears in the book"}
+          placeholder={cacheSurface ? "Optional spelling / kanji" : "Word as it appears in the book"}
           className="border p-2 rounded"
         />
 

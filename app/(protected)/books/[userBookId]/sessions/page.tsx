@@ -609,7 +609,7 @@ export default function ReadingSessionsPage() {
                 className="mt-1 w-full rounded border px-2 py-1"
               >
                 <option value="fluid">Fluid Reading (reading without saving words)</option>
-                {canSelectCuriosity ? <option value="curiosity">Curiosity Reading</option> : null}
+                {canSelectCuriosity ? <option value="curiosity">Curiosity Reading (reading while saving words)</option> : null}
                 <option value="listening">Listening</option>
               </select>
             </label>

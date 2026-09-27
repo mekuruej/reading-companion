@@ -612,7 +612,7 @@ export default function ReadAlongPage() {
                     page_order,
                     chapter_number,
                     chapter_name,
-                    hide_kanji_in_reading_support
+                    hide_kanji_in_reading_support, book_form, book_form_description, follow_along_support_note
                     `)
                 .eq("user_book_id", userBookId)
                 .eq("hidden", false)

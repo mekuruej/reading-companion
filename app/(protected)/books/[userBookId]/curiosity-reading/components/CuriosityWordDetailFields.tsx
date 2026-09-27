@@ -23,6 +23,7 @@ type CuriosityWordDetailFieldsProps = {
   savedQuickNotice: string;
   quickWordFieldsRef: RefObject<HTMLDivElement | null>;
   onReadingChange: (value: string) => void;
+  contextFields?: React.ReactNode;
   onAlternateSurfaceChange: (value: string) => void;
   onMeaningChoiceChange: (index: number, meaning: string) => void;
   onCustomMeaningChange: (value: string) => void;
@@ -43,6 +44,7 @@ export default function CuriosityWordDetailFields({
   savedQuickNotice,
   quickWordFieldsRef,
   onReadingChange,
+  contextFields,
   onAlternateSurfaceChange,
   onMeaningChoiceChange,
   onCustomMeaningChange,
@@ -78,17 +80,19 @@ export default function CuriosityWordDetailFields({
 
           <div>
             <label className="mb-1 block text-sm font-medium text-stone-700">
-              Alternate surface
+              Alternative spelling / kanji
             </label>
             <input
               value={quickPreview.alternateSurface}
               onChange={(event) => onAlternateSurfaceChange(event.target.value)}
-              placeholder="Book form, if different"
+              placeholder="Optional spelling / kanji"
               className="w-full rounded border bg-white px-3 py-2 text-sm"
             />
           </div>
         </div>
       </div>
+
+      {contextFields}
 
       <div>
         <label className="mb-2 block text-sm font-medium text-stone-700">

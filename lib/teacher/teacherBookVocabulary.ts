@@ -1,12 +1,14 @@
 "use client";
 
+import { wordContextPayload, type WordContext } from "@/lib/vocabulary/wordContext";
 type SupabaseClientLike = any;
 import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
 import { parseWordPosition, wordPosition, wordPositionPayload } from "@/lib/vocabulary/wordPosition";
 
 
 export type SharedVocabularyOrigin = "my_library" | "teaching";
-export type SharedTeacherVocabularyWord = {
+export type SharedTeacherVocabularyWord = WordContext & {
+  alternativeSurface?: string | null;
   id: string;
   source: "personal" | "teaching" | "both";
   personalWordId: string | null;
@@ -42,7 +44,8 @@ export type TeacherBookContext = {
   pageCount: number | null;
 };
 
-export type TeacherVocabularyCaptureInput = {
+export type TeacherVocabularyCaptureInput = WordContext & {
+  alternativeSurface?: string;
   surface: string;
   cacheSurface?: string;
   reading?: string;
@@ -217,7 +220,7 @@ async function findMatchingPersonalWord(
 
   const { data, error } = await supabase
     .from("user_book_words")
-    .select("id, surface, reading, meaning, meaning_choices, meaning_choice_index, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, vocabulary_cache_id, created_at")
+    .select("id, surface, reading, meaning, meaning_choices, meaning_choice_index, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, vocabulary_cache_id, book_form, book_form_description, follow_along_support_note, created_at")
     .eq("user_book_id", personalUserBookId);
 
   if (error) throw error;
@@ -252,7 +255,7 @@ async function findMatchingTeachingVocabulary(
   if (values.linkedUserBookWordId) {
     const { data: linked, error: linkedError } = await supabase
       .from("teacher_book_vocabulary")
-      .select("id, origin_my_library, origin_teaching, hidden_from_teaching, included_in_follow_along, follow_along_order, follow_along_support_note")
+      .select("id, origin_my_library, origin_teaching, hidden_from_teaching, included_in_follow_along, follow_along_order, follow_along_support_note, book_form, book_form_description, alternative_surface")
       .eq("teacher_book_id", context.teacherBookId)
       .eq("linked_user_book_word_id", values.linkedUserBookWordId)
       .limit(1)
@@ -264,7 +267,7 @@ async function findMatchingTeachingVocabulary(
 
   const { data, error } = await supabase
     .from("teacher_book_vocabulary")
-    .select("id, linked_user_book_word_id, vocabulary_cache_id, surface, reading, meaning, origin_my_library, origin_teaching, hidden_from_teaching, included_in_follow_along, follow_along_order, follow_along_support_note")
+    .select("id, linked_user_book_word_id, vocabulary_cache_id, surface, reading, meaning, origin_my_library, origin_teaching, hidden_from_teaching, included_in_follow_along, follow_along_order, follow_along_support_note, book_form, book_form_description, alternative_surface")
     .eq("teacher_book_id", context.teacherBookId);
 
   if (error) throw error;
@@ -290,7 +293,9 @@ function personalToShared(row: any): SharedTeacherVocabularyWord {
     source: "personal",
     personalWordId: row.id,
     teacherVocabularyId: null,
-    surface: row.surface ?? "",
+    ...wordContextPayload(row),
+    alternativeSurface: row.alternative_surface ?? null,
+    surface: row.alternative_surface?.trim() || row.surface || "",
     reading: row.reading ?? null,
     meaning: row.meaning ?? null,
     meaningChoices: asStringArray(row.meaning_choices),
@@ -306,7 +311,7 @@ function personalToShared(row: any): SharedTeacherVocabularyWord {
     hiddenFromTeaching: false,
     includedInFollowAlong: false,
     followAlongOrder: null,
-    followAlongSupportNote: null,
+    followAlongSupportNote: row.follow_along_support_note ?? null,
     origins: ["my_library"],
     createdAt: row.created_at ?? null,
   };
@@ -318,7 +323,9 @@ function teachingToShared(row: any): SharedTeacherVocabularyWord {
     source: "teaching",
     personalWordId: row.linked_user_book_word_id ?? null,
     teacherVocabularyId: row.id,
-    surface: row.surface ?? "",
+    ...wordContextPayload(row),
+    alternativeSurface: row.alternative_surface ?? null,
+    surface: row.alternative_surface?.trim() || row.surface || "",
     reading: row.reading ?? null,
     meaning: row.meaning ?? null,
     meaningChoices: asStringArray(row.meaning_choices),
@@ -373,7 +380,11 @@ function mergeSharedVocabulary(personalRows: any[], teachingRows: any[]) {
       hiddenFromTeaching: word.hiddenFromTeaching,
       includedInFollowAlong: word.includedInFollowAlong,
       followAlongOrder: word.followAlongOrder,
-      followAlongSupportNote: word.followAlongSupportNote,
+      book_form: word.book_form ?? existing.book_form,
+      book_form_description: word.book_form_description ?? existing.book_form_description,
+      alternativeSurface: word.alternativeSurface ?? existing.alternativeSurface,
+      surface: word.alternativeSurface?.trim() || existing.surface,
+      followAlongSupportNote: word.followAlongSupportNote ?? existing.followAlongSupportNote,
       origins: Array.from(new Set([...existing.origins, ...word.origins])),
     });
   }
@@ -443,7 +454,7 @@ export async function loadSharedTeacherVocabulary(
   const personalRows = personalUserBookId
     ? await supabase
         .from("user_book_words")
-        .select("id, user_book_id, surface, reading, meaning, jlpt, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, created_at, hidden, meaning_choices, meaning_choice_index, target_language_code, vocabulary_cache_id")
+        .select("id, user_book_id, surface, reading, meaning, jlpt, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, created_at, hidden, meaning_choices, meaning_choice_index, target_language_code, vocabulary_cache_id, book_form, book_form_description, follow_along_support_note")
         .eq("user_book_id", personalUserBookId)
         .or("target_language_code.is.null,target_language_code.eq.ja")
         .then((result: any) => {
@@ -454,7 +465,7 @@ export async function loadSharedTeacherVocabulary(
 
   const teachingResult = await supabase
     .from("teacher_book_vocabulary")
-    .select("id, linked_user_book_word_id, source_teacher_book_item_id, vocabulary_cache_id, surface, reading, meaning, meaning_choices, meaning_choice_index, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, origin_my_library, origin_teaching, hidden_from_my_library, hidden_from_teaching, included_in_follow_along, follow_along_order, follow_along_support_note, created_at")
+    .select("id, linked_user_book_word_id, source_teacher_book_item_id, vocabulary_cache_id, surface, reading, meaning, meaning_choices, meaning_choice_index, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, origin_my_library, origin_teaching, hidden_from_my_library, hidden_from_teaching, included_in_follow_along, follow_along_order, follow_along_support_note, book_form, book_form_description, alternative_surface, created_at")
     .eq("teacher_book_id", context.teacherBookId);
 
   if (teachingResult.error) {
@@ -571,6 +582,9 @@ export async function saveTeacherVocabularyAndInclude(
     included_in_follow_along: true,
     follow_along_order: nextOrder,
     follow_along_support_note: nextSupportNote,
+    book_form: values.book_form === undefined ? existing?.book_form ?? personalWord?.book_form ?? null : values.book_form?.trim() || null,
+    book_form_description: values.book_form_description === undefined ? existing?.book_form_description ?? personalWord?.book_form_description ?? null : values.book_form_description?.trim() || null,
+    alternative_surface: values.alternativeSurface === undefined ? existing?.alternative_surface ?? null : values.alternativeSurface.trim() || null,
   };
 
   if (existing?.id) {
@@ -664,6 +678,7 @@ export async function ensureTeachingVocabularyAssociationForPersonalWord(
       book_id: context.bookId,
       linked_user_book_word_id: word.personalWordId,
       vocabulary_cache_id: word.vocabularyCacheId,
+      ...wordContextPayload(word),
       surface: word.surface,
       reading: word.reading,
       meaning: word.meaning,
@@ -719,6 +734,9 @@ export async function updateTeachingVocabularyVisibility(
     hidden_from_teaching: boolean;
     included_in_follow_along: boolean;
     follow_along_order: number | null;
+    alternative_surface: string | null;
+    book_form: string | null;
+    book_form_description: string | null;
     follow_along_support_note: string | null;
   }>,
   context?: TeacherBookContext

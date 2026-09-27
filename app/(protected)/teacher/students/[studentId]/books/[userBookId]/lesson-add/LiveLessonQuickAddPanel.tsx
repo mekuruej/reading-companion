@@ -4,6 +4,8 @@
 // student's existing user_book_words rows.
 
 "use client";
+import WordContextFields from "@/components/vocabulary/WordContextFields";
+import { wordContextPayload, type WordContext } from "@/lib/vocabulary/wordContext";
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
@@ -64,7 +66,7 @@ type LiveLessonSession = {
   updated_at: string | null;
 };
 
-type CapturedWord = {
+type CapturedWord = WordContext & {
   position_unit?: ProgressTrackingMethod | null;
   position_value?: number | null;
   percent_location?: number | null;
@@ -89,7 +91,7 @@ type CapturedWord = {
   created_at: string | null;
 };
 
-type ReviewDraft = {
+type ReviewDraft = WordContext & {
   positionUnit: ProgressTrackingMethod;
   id: string;
   surface: string;
@@ -368,6 +370,7 @@ function clearPersistedSession(key: string) {
 
 function wordToDraft(word: CapturedWord): ReviewDraft {
   return {
+    ...wordContextPayload(word),
     id: word.id,
     surface: word.surface ?? "",
     reading: word.reading ?? "",
@@ -427,6 +430,8 @@ export default function LiveLessonQuickAddPanel({
   const [bookPageCount, setBookPageCount] = useState<number | null>(null);
   const [session, setSession] = useState<LiveLessonSession | null>(null);
   const [word, setWord] = useState("");
+  const [alternativeSurface, setAlternativeSurface] = useState("");
+  const [wordContext, setWordContext] = useState<WordContext>({});
   const [currentPage, setCurrentPage] = useState("");
   const [chapterNumber, setChapterNumber] = useState("");
   const [chapterName, setChapterName] = useState("");
@@ -911,6 +916,8 @@ export default function LiveLessonQuickAddPanel({
           userBookId,
           sessionId: session?.id,
           surface: cleanWord,
+          alternativeSurface,
+          ...wordContextPayload(wordContext),
           page: currentPage,
           positionUnit,
           chapterNumber,
@@ -931,6 +938,8 @@ export default function LiveLessonQuickAddPanel({
       setReviewDrafts((nextWords.length ? nextWords : [...capturedWords, capturedWord]).map(wordToDraft));
       setBulkSelectedIds((prev) => uniqueStrings([...prev, capturedWord.id]));
       setWord("");
+      setAlternativeSurface("");
+      setWordContext({});
       setNotice(`Saved ${capturedWord.surface ?? cleanWord}`);
       window.setTimeout(() => {
         wordInputRef.current?.focus({ preventScroll: true });
@@ -1564,6 +1573,12 @@ export default function LiveLessonQuickAddPanel({
                   </div>
                 </label>
 
+                <div className="mt-2 space-y-2">
+                  <label className="block text-xs font-medium text-stone-600">Alternative spelling / kanji
+                    <input className="w-full rounded-lg border px-2 py-1.5 text-sm" value={alternativeSurface} onChange={event => setAlternativeSurface(event.target.value)} placeholder="Optional" />
+                  </label>
+                  <WordContextFields teacher value={wordContext} onChange={setWordContext} />
+                </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-stone-600">
                   <span className="rounded-full bg-amber-100 px-3 py-1 font-semibold text-amber-900">
                     {positionLabel(positionUnit)} {currentPage.trim() || "not set"}

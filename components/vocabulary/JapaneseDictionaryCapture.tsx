@@ -1,4 +1,6 @@
 "use client";
+import WordContextFields from "./WordContextFields";
+import type { WordContext } from "@/lib/vocabulary/wordContext";
 
 import WordPositionField from "@/components/vocabulary/WordPositionField";
 import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
@@ -9,7 +11,8 @@ import {
   type JapaneseDictionaryCandidate,
 } from "@/lib/vocabulary/japaneseDictionaryCandidates";
 
-export type JapaneseDictionaryCaptureValue = {
+export type JapaneseDictionaryCaptureValue = WordContext & {
+  alternativeSurface?: string;
   surface: string;
   cacheSurface: string;
   reading: string;
@@ -100,6 +103,9 @@ export default function JapaneseDictionaryCapture({
       chapterNumber: current.chapterNumber,
       chapterName: current.chapterName,
       followAlongSupportNote: current.followAlongSupportNote,
+      alternativeSurface: current.alternativeSurface,
+      book_form: current.book_form,
+      book_form_description: current.book_form_description,
     }));
     setShowManualFields(false);
     setMessage("");
@@ -180,13 +186,13 @@ export default function JapaneseDictionaryCapture({
         <p className="mt-1 max-w-3xl text-sm leading-6 text-stone-600">{description}</p>
       </div>
 
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={handleSearchKeyDown}
           placeholder="Enter a word or phrase"
-          className="min-h-12 min-w-0 flex-1 rounded-2xl border border-stone-300 bg-white px-4 py-2 text-base text-stone-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+          className="min-h-9 min-w-0 flex-1 rounded-2xl border border-stone-300 bg-white px-4 py-2 text-base text-stone-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
         />
         <button
           type="button"
@@ -213,19 +219,19 @@ export default function JapaneseDictionaryCapture({
       </div>
 
       {error ? (
-        <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+        <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
           {error}
         </p>
       ) : null}
 
       {message ? (
-        <p className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-900">
+        <p className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-900">
           {message}
         </p>
       ) : null}
 
       {candidates.length > 0 ? (
-        <div className="mt-4 grid gap-2 md:grid-cols-2">
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
           {candidates.map((candidate) => {
             const selected = selectedCandidateId === candidate.id;
 
@@ -234,7 +240,7 @@ export default function JapaneseDictionaryCapture({
                 key={candidate.id}
                 type="button"
                 onClick={() => selectCandidate(candidate)}
-                className={`rounded-2xl border px-4 py-3 text-left transition ${
+                className={`rounded-2xl border px-3 py-2 text-left transition ${
                   selected
                     ? "border-blue-400 bg-blue-50 shadow-sm ring-2 ring-blue-100"
                     : "border-stone-200 bg-white hover:bg-stone-50"
@@ -263,7 +269,7 @@ export default function JapaneseDictionaryCapture({
       ) : null}
 
       {selectedCandidate && selectedCandidate.meaningChoices.length > 1 ? (
-        <label className="mt-4 block">
+        <label className="mt-3 block">
           <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-400">
             Meaning to save
           </span>
@@ -277,7 +283,7 @@ export default function JapaneseDictionaryCapture({
                 meaningChoiceIndex: index,
               }));
             }}
-            className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-900"
+            className="w-full rounded-2xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900"
           >
             {selectedCandidate.meaningChoices.map((meaning, index) => (
               <option key={`${meaning}-${index}`} value={index}>
@@ -289,25 +295,34 @@ export default function JapaneseDictionaryCapture({
       ) : null}
 
       {showManualFields ? (
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="mt-3 grid gap-3 md:grid-cols-3">
           <label className="block">
             <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-400">Word</span>
-            <input value={draft.surface} onChange={(event) => setDraft((current) => ({ ...current, surface: event.target.value, isManual: true }))} className="w-full rounded-2xl border border-stone-300 px-4 py-3 text-sm" />
+            <input value={draft.surface} onChange={(event) => setDraft((current) => ({ ...current, surface: event.target.value, isManual: true }))} className="w-full rounded-2xl border border-stone-300 px-3 py-2 text-sm" />
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-400">Reading</span>
-            <input value={draft.reading} onChange={(event) => setDraft((current) => ({ ...current, reading: event.target.value, isManual: true }))} className="w-full rounded-2xl border border-stone-300 px-4 py-3 text-sm" />
+            <input value={draft.reading} onChange={(event) => setDraft((current) => ({ ...current, reading: event.target.value, isManual: true }))} className="w-full rounded-2xl border border-stone-300 px-3 py-2 text-sm" />
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-400">Meaning</span>
-            <input value={draft.meaning} onChange={(event) => setDraft((current) => ({ ...current, meaning: event.target.value, meaningChoices: [], meaningChoiceIndex: null, isManual: true }))} className="w-full rounded-2xl border border-stone-300 px-4 py-3 text-sm" />
+            <input value={draft.meaning} onChange={(event) => setDraft((current) => ({ ...current, meaning: event.target.value, meaningChoices: [], meaningChoiceIndex: null, isManual: true }))} className="w-full rounded-2xl border border-stone-300 px-3 py-2 text-sm" />
           </label>
         </div>
       ) : null}
 
-      <details className="mt-4 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3">
+      <div className="mt-3 space-y-2">
+        <label className="block text-xs font-medium text-stone-600">Alternative spelling / kanji
+          <input className="w-full rounded-lg border px-2 py-1.5 text-sm" value={draft.alternativeSurface ?? ""}
+            onChange={event => setDraft(current => ({ ...current, alternativeSurface: event.target.value }))} placeholder="Optional" />
+        </label>
+        <WordContextFields teacher value={{ ...draft, follow_along_support_note: draft.followAlongSupportNote }}
+          onChange={value => setDraft(current => ({ ...current, ...value, followAlongSupportNote: value.follow_along_support_note ?? "" }))} />
+      </div>
+
+      <details className="mt-3 rounded-2xl border border-stone-200 bg-stone-50 px-3 py-2">
         <summary className="cursor-pointer text-sm font-black text-stone-700">
-          Optional location and Follow-Along note
+          Location (optional)
         </summary>
         <div className="mt-3 grid gap-3 md:grid-cols-[120px_140px_minmax(0,1fr)]">
           <WordPositionField unit={positionUnit} value={draft.pageNumber} onChange={value => setDraft(current => ({ ...current, pageNumber: value }))} />
@@ -320,22 +335,14 @@ export default function JapaneseDictionaryCapture({
             <input value={draft.chapterName} onChange={(event) => setDraft((current) => ({ ...current, chapterName: event.target.value }))} className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm" />
           </label>
         </div>
-        <label className="mt-3 block">
-          <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-400">Follow-Along note</span>
-          <textarea
-            value={draft.followAlongSupportNote}
-            onChange={(event) => setDraft((current) => ({ ...current, followAlongSupportNote: event.target.value }))}
-            rows={2}
-            className="w-full resize-y rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
-          />
-        </label>
+
       </details>
 
       <button
         type="button"
         onClick={() => void save()}
         disabled={!canSave || saving}
-        className="mt-4 rounded-2xl border border-stone-900 bg-stone-900 px-5 py-3 text-sm font-black text-white hover:bg-black disabled:opacity-50"
+        className="mt-3 rounded-2xl border border-stone-900 bg-stone-900 px-5 py-3 text-sm font-black text-white hover:bg-black disabled:opacity-50"
       >
         {saving ? savingLabel : saveLabel}
       </button>

@@ -1,5 +1,7 @@
 "use client";
 
+import StoryNotesExperience from "../story/StoryNotesExperience";
+import { CuriosityReadingExperience } from "../curiosity-reading/WordTimerExperience";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -45,6 +47,10 @@ export default function TeachingLessonPage() {
   const userBookId = params.userBookId ?? "";
   const selectedStudentUserBookId = searchParams.get("studentUserBookId") ?? "";
 
+  const [followRefreshKey, setFollowRefreshKey] = useState(0);
+  const [view, setView] = useState<"follow" | "curiosity" | "journal">(searchParams.get("view") === "curiosity" ? "curiosity" : searchParams.get("view") === "journal" ? "journal" : "follow");
+  const [openedCuriosity, setOpenedCuriosity] = useState(searchParams.get("view") === "curiosity");
+  const [openedJournal, setOpenedJournal] = useState(searchParams.get("view") === "curiosity" || searchParams.get("view") === "journal");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [lessonContext, setLessonContext] = useState<LessonContext | null>(null);
@@ -86,14 +92,7 @@ export default function TeachingLessonPage() {
         const nextContext = data as LessonContext;
         setLessonContext(nextContext);
 
-        if (!selectedStudentUserBookId && nextContext.students.length === 1) {
-          const onlyStudent = nextContext.students[0];
-          router.replace(
-            `/books/${encodeURIComponent(userBookId)}/lesson?studentUserBookId=${encodeURIComponent(
-              onlyStudent.studentUserBookId
-            )}`
-          );
-        }
+
       } catch (error: any) {
         if (!cancelled) {
           setMessage(error?.message ?? "Could not load this teaching lesson.");
@@ -142,7 +141,7 @@ export default function TeachingLessonPage() {
     return (
       <main className="min-h-screen bg-slate-100 px-4 py-8">
         <div className="mx-auto max-w-5xl rounded-2xl border border-stone-200 bg-white p-6 text-sm font-semibold text-stone-500 shadow-sm">
-          Loading Follow-Along + Add Words...
+          Loading Teacher Book Workspace...
         </div>
       </main>
     );
@@ -156,7 +155,7 @@ export default function TeachingLessonPage() {
             &lt;- Back to Teaching Mode
           </Link>
           <section className="mt-4 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-            <h1 className="text-2xl font-black text-stone-950">Follow-Along + Add Words</h1>
+            <h1 className="text-2xl font-black text-stone-950">Teacher Book Workspace</h1>
             <p className="mt-3 text-sm leading-6 text-stone-600">
               {message || "This teaching lesson could not be loaded."}
             </p>
@@ -188,7 +187,7 @@ export default function TeachingLessonPage() {
                   Teaching Lesson
                 </p>
                 <h1 className="mt-1 truncate text-2xl font-black text-stone-950">
-                  Follow-Along + Add Words
+                  Teacher Book Workspace
                 </h1>
                 <p className="mt-1 truncate text-sm font-semibold text-stone-500">
                   {lessonContext.book.title ?? "Book"}{lessonContext.book.author ? ` - ${lessonContext.book.author}` : ""}
@@ -197,7 +196,7 @@ export default function TeachingLessonPage() {
             </div>
 
             {lessonContext.students.length > 1 ? (
-              <label className="block min-w-[16rem]">
+              <label className="block w-full md:w-64">
                 <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-500">
                   Student
                 </span>
@@ -222,53 +221,36 @@ export default function TeachingLessonPage() {
           </div>
         </section>
 
-        <section className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-950 md:hidden">
-          Teaching lesson tools are available on tablet and desktop. Return to the Book Hub to use Reader mode on this screen size.
-        </section>
-
-        {lessonContext.students.length === 0 ? (
-          <section className="mt-4 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-black text-stone-950">No connected students yet</h2>
-            <p className="mt-2 text-sm leading-6 text-stone-600">
-              This book does not have an active matching student lesson workspace. No student workspace or relationship was created.
-            </p>
-            <Link
-              href={returnHref}
-              className="mt-4 inline-flex rounded-xl bg-stone-950 px-4 py-2 text-sm font-black text-white hover:bg-stone-800"
-            >
-              Back to Teaching Mode
-            </Link>
-          </section>
-        ) : !selectedStudent ? (
-          <section className="mt-4 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-black text-stone-950">Choose a student</h2>
-            <p className="mt-2 text-sm leading-6 text-stone-600">
-              Select one active student workspace to load that student's current lesson list.
-            </p>
-          </section>
-        ) : (
-          <section className="mt-4 hidden gap-4 md:grid md:grid-cols-[minmax(360px,0.92fr)_minmax(560px,1.08fr)] md:items-start">
-            <aside className="min-w-0 rounded-2xl border border-stone-200 bg-stone-50 p-3 shadow-sm">
-              <TeacherFollowAlongPanel
-                teacherBookId={lessonContext.teacherBookId}
-                presentation="embedded"
-                lessonDisplayOnly
-                emptyMessage="No Follow-Along words have been prepared for this book yet."
-                hideHeader
-              />
-            </aside>
-            <div className="min-w-0 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
-              <LiveLessonQuickAddPanel
-                key={selectedStudent.studentUserBookId}
-                studentId={selectedStudent.studentId}
-                userBookId={selectedStudent.studentUserBookId}
-                sourceUserBookId={userBookId}
-                chapterSuggestions={lessonContext.chapterSuggestions ?? []}
-                embedded
-              />
+        <nav className="my-4 flex flex-wrap gap-2" aria-label="Teacher book modes">
+          {([['follow', 'Follow-Along'], ['curiosity', 'Curiosity Read'], ['journal', 'Teacher Journal']] as const).map(([key, label]) => (
+            <button key={key} type="button" aria-pressed={view === key}
+              onClick={() => { setView(key); if (key === "follow" && view !== "follow") setFollowRefreshKey(value => value + 1); if (key === "curiosity") setOpenedCuriosity(true); if (key !== "follow") setOpenedJournal(true); }}
+              className={`rounded-xl px-3 py-2 text-sm font-bold ${view === key ? "bg-stone-900 text-white" : "bg-white text-stone-700"}`}>{label}</button>
+          ))}
+        </nav>
+        <section className={view === "follow" ? `grid min-w-0 gap-4 ${selectedStudent ? "xl:grid-cols-2" : ""}` : "hidden"}>
+          <aside className="min-w-0">
+            <TeacherFollowAlongPanel refreshKey={followRefreshKey} teacherBookId={lessonContext.teacherBookId} presentation="embedded" lessonDisplayOnly hideHeader
+              emptyMessage="No Follow-Along words have been prepared for this book yet." />
+          </aside>
+          {selectedStudent ? (
+            <div className="min-w-0 overflow-hidden rounded-2xl border border-stone-200 bg-white">
+              <LiveLessonQuickAddPanel key={selectedStudent.studentUserBookId} studentId={selectedStudent.studentId}
+                userBookId={selectedStudent.studentUserBookId} sourceUserBookId={userBookId}
+                chapterSuggestions={lessonContext.chapterSuggestions ?? []} embedded />
             </div>
-          </section>
-        )}
+          ) : lessonContext.students.length > 0 ? (
+            <p className="text-sm text-stone-600">Choose a student to add words to their lesson list.</p>
+          ) : null}
+        </section>
+        <section className={view === "follow" ? "hidden" : `grid min-w-0 gap-4 ${view === "curiosity" ? "xl:grid-cols-2" : ""}`}>
+          <div className={view === "curiosity" ? "min-w-0" : "hidden"}>
+            {openedCuriosity ? <CuriosityReadingExperience embedded workspaceCompact /> : null}
+          </div>
+          <div className="min-w-0">
+            {openedJournal ? <StoryNotesExperience teaching embedded /> : null}
+          </div>
+        </section>
       </div>
     </main>
   );

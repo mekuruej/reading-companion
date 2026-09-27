@@ -23,6 +23,7 @@ type BookHubTeachingToolsProps = {
   onBulkAdd: () => void;
   onFollowAlongLesson: () => void;
   onStoryNotes: () => void;
+  onCuriosityRead: () => void;
   onTeacherSnapshot: () => void;
   onStudentFlashcards: (studentUserBookId: string) => void;
   onStudentVocabularyList: (studentUserBookId: string) => void;
@@ -147,6 +148,7 @@ export default function BookHubTeachingTools({
   onBulkAdd,
   onFollowAlongLesson,
   onStoryNotes,
+  onCuriosityRead,
   onTeacherSnapshot,
   onStudentFlashcards,
   onStudentVocabularyList,
@@ -425,7 +427,7 @@ export default function BookHubTeachingTools({
         title="Teaching Tools"
         description="ページをめくって、話しまくろう！"
       >
-        <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
           <TeachingToolButton
             title="Follow-Along"
             subtitle="Add Words"
@@ -434,6 +436,8 @@ export default function BookHubTeachingTools({
             size="primary"
             onClick={onFollowAlongLesson}
           />
+          <TeachingToolButton title="Curiosity Read" description="Prepare words alongside your Book Journal and Teaching Notes."
+            className="bg-violet-50 hover:bg-violet-100" size="primary" onClick={onCuriosityRead} />
           {canUseStoryNotes ? (
             <TeachingToolButton
               title="Teacher Journal"

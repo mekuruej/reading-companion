@@ -1,4 +1,4 @@
-import type { KeyboardEvent, RefObject } from "react";
+import type { KeyboardEvent, RefObject, ReactNode } from "react";
 
 type MobileQuickCaptureCandidate = {
   id: string;
@@ -19,6 +19,7 @@ type MobileQuickCaptureWord = {
 };
 
 type MobileQuickCaptureProps = {
+  contextFields?: ReactNode;
   title: string;
   description: string;
   surface: string;
@@ -44,8 +45,8 @@ type MobileQuickCaptureProps = {
 };
 
 export default function MobileQuickCapture({
-  title,
-  description,
+  contextFields,
+  title,  description,
   surface,
   meanings,
   selectedMeaningIndex,
@@ -173,6 +174,8 @@ export default function MobileQuickCapture({
             </select>
           </label>
         ) : null}
+
+        {hasSelectedResult ? <div className="mt-3">{contextFields}</div> : null}
 
         <p className="mt-2 text-xs leading-5 text-stone-500">
           Add page and chapter details later on computer or tablet.

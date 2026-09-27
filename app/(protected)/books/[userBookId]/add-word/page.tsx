@@ -1,6 +1,8 @@
 //Single Add 
 // 
 "use client";
+import WordContextFields from "@/components/vocabulary/WordContextFields";
+import { wordContextPayload, type WordContext } from "@/lib/vocabulary/wordContext";
 
 import { isReadyForFlashcards } from "@/lib/wordSupportEligibility";
 import { useEffect, useMemo, useState, useRef } from "react";
@@ -59,7 +61,8 @@ type JishoCandidate = JishoChoice & {
   id: string;
 };
 
-type SessionWord = {
+type SessionWord = WordContext & {
+  base_form?: string | null;
   id: string;
   surface: string;
   reading: string | null;
@@ -229,6 +232,7 @@ export default function AddWordPage() {
 
   const [word, setWord] = useState("");
   const [scratchWord, setScratchWord] = useState("");
+  const [wordContext, setWordContext] = useState<WordContext>({});
   const [alternateSurface, setAlternateSurface] = useState("");
   const [useAlternateSurface, setUseAlternateSurface] = useState(false);
 
@@ -648,6 +652,7 @@ export default function AddWordPage() {
     options: { preserveSavedNotice?: boolean } = {}
   ) {
     setWord("");
+    setWordContext({});
     setAlternateSurface("");
     setUseAlternateSurface(false);
     setReading("");
@@ -686,9 +691,10 @@ export default function AddWordPage() {
 
   function loadSessionWordIntoForm(sessionWord: SessionWord) {
     setEditingSessionWordId(sessionWord.id);
-    setWord(sessionWord.surface);
-    setAlternateSurface("");
-    setUseAlternateSurface(false);
+    setWord(sessionWord.base_form || sessionWord.surface);
+    setWordContext(wordContextPayload(sessionWord));
+    setAlternateSurface(sessionWord.base_form && sessionWord.base_form !== sessionWord.surface ? sessionWord.surface : "");
+    setUseAlternateSurface(Boolean(sessionWord.base_form && sessionWord.base_form !== sessionWord.surface));
     setReading(sessionWord.reading ?? "");
     setMeaning(sessionWord.meaning ?? "");
     setJlpt(sessionWord.jlpt || "NON-JLPT");
@@ -893,6 +899,7 @@ export default function AddWordPage() {
         if (error) throw error;
 
         const newSessionWord: SessionWord = {
+          ...wordContextPayload(insertedRow),
           id: insertedRow.id,
           surface: insertedRow.surface ?? cleanSource,
           reading: insertedRow.reading ?? null,
@@ -944,6 +951,7 @@ export default function AddWordPage() {
         if (error) throw error;
 
         const updatedSessionWord: SessionWord = {
+          ...wordContextPayload(updatedRow),
           id: updatedRow.id,
           surface: updatedRow.surface ?? cleanSource,
           reading: updatedRow.reading ?? null,
@@ -1259,6 +1267,8 @@ export default function AddWordPage() {
         user_book_id: userBookId,
         vocabulary_cache_id: vocabularyCacheId,
         surface: finalSurface,
+        base_form: cleanWord,
+        ...wordContextPayload(wordContext),
         reading: cleanReading,
         meaning: cleanMeaning,
         other_definition: meaningChoiceIndex == null ? cleanMeaning : null,
@@ -1300,6 +1310,7 @@ export default function AddWordPage() {
             page_number, position_unit, position_value, percent_location,
             chapter_number,
             chapter_name,
+            base_form, book_form, book_form_description, follow_along_support_note,
             hide_kanji_in_reading_support,
             page_order,
             vocabulary_cache_id
@@ -1310,7 +1321,9 @@ export default function AddWordPage() {
         if (error) throw error;
 
         const newSessionWord: SessionWord = {
+          ...wordContextPayload(insertedRow),
           id: insertedRow.id,
+          base_form: insertedRow.base_form ?? cleanWord,
           surface: insertedRow.surface ?? finalSurface,
           reading: insertedRow.reading ?? cleanReading,
           meaning: insertedRow.meaning ?? cleanMeaning,
@@ -1365,6 +1378,7 @@ export default function AddWordPage() {
             page_number, position_unit, position_value, percent_location,
             chapter_number,
             chapter_name,
+            base_form, book_form, book_form_description, follow_along_support_note,
             hide_kanji_in_reading_support,
             page_order,
             vocabulary_cache_id
@@ -1375,7 +1389,9 @@ export default function AddWordPage() {
         if (error) throw error;
 
         const updatedSessionWord: SessionWord = {
+          ...wordContextPayload(updatedRow),
           id: updatedRow.id,
+          base_form: updatedRow.base_form ?? cleanWord,
           surface: updatedRow.surface ?? finalSurface,
           reading: updatedRow.reading ?? cleanReading,
           meaning: updatedRow.meaning ?? cleanMeaning,
@@ -1616,6 +1632,7 @@ export default function AddWordPage() {
             <AddWordDetailFields
               wordFieldsRef={wordFieldsRef}
               reading={reading}
+              contextFields={<WordContextFields value={wordContext} onChange={setWordContext} teacher={isSuperTeacher || superTeacherRole === "teacher" || superTeacherRole === "admin"} />}
               alternateSurface={alternateSurface}
               meaning={meaning}
               meaningChoices={meaningChoices}

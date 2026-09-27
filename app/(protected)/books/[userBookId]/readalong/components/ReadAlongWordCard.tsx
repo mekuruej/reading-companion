@@ -1,3 +1,4 @@
+import { followAlongSurface, type WordContext } from "@/lib/vocabulary/wordContext";
 import type { ComponentProps, ReactNode } from "react";
 
 import LibraryColorBadge from "@/components/LibraryColorBadge";
@@ -11,7 +12,7 @@ type WordColorInfo = {
   stageLabel: LibraryColorBadgeProps["stageLabel"];
 };
 
-type ReadAlongWord = {
+type ReadAlongWord = WordContext & {
   id: string;
   surface: string | null;
   reading: string | null;
@@ -115,7 +116,7 @@ export default function ReadAlongWordCard({
   const displaySurface =
     (word.hide_kanji_in_reading_support
       ? word.reading || word.surface
-      : word.surface) || "—";
+      : followAlongSurface(word)) || "—";
 
   return (
     <div
@@ -156,11 +157,13 @@ export default function ReadAlongWordCard({
           )}
         </div>
 
+        {word.book_form_description ? <p className="mt-1 text-xs text-stone-500">{word.book_form_description}</p> : null}
         {word.meaning?.trim() && (supportMode === "full" || supportMode === "meaning") && (
           <div className="mt-2 text-sm leading-6 text-stone-700 sm:text-base">
             {word.meaning || "—"}
           </div>
         )}
+        {word.follow_along_support_note ? <p className="mt-1 text-xs leading-5 text-stone-500">{word.follow_along_support_note}</p> : null}
       </div>
 
       {canAddAfter || canAddBefore ? (

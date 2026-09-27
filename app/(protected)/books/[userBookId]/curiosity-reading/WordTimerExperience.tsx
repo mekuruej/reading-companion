@@ -1,6 +1,8 @@
 // Curiosity Reading / Listening word timer experience
 //
 "use client";
+import WordContextFields from "@/components/vocabulary/WordContextFields";
+import { wordContextPayload, type WordContext } from "@/lib/vocabulary/wordContext";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
 import { nextProgressStart, matchingTotal, progressLabels, parseProgressRange, sessionEnd } from "@/lib/books/readingProgress";
 
@@ -58,7 +60,7 @@ import {
 
 type EnglishItemType = "word" | "phrase";
 
-type QuickPreview = {
+type QuickPreview = WordContext & {
   id: string | null;
   surface: string;
   cacheSurface: string;
@@ -76,7 +78,7 @@ type QuickPreview = {
   pageOrder: number | null;
 };
 
-type QuickSessionWord = {
+type QuickSessionWord = WordContext & {
   id: string;
   surface: string;
   reading: string;
@@ -351,6 +353,7 @@ export function CuriosityReadingExperience({
   const [message, setMessage] = useState("");
   const [accessChecked, setAccessChecked] = useState(false);
   const [canAccessBook, setCanAccessBook] = useState(false);
+  const [canTeachWordForms, setCanTeachWordForms] = useState(false);
   const [canUseCuriosityReading, setCanUseCuriosityReading] = useState(false);
   const [accessMessage, setAccessMessage] = useState("");
 
@@ -558,6 +561,7 @@ export function CuriosityReadingExperience({
         isTrialActive: appAccessStatus.reason === "trial",
       });
 
+      setCanTeachWordForms(featureAccess.isTeacher);
       setCanUseCuriosityReading(canUseFullAccessFeature(featureAccess, fullAccessFeature));
 
       const { data: userBook, error: userBookError } = await supabase
@@ -1078,7 +1082,7 @@ export function CuriosityReadingExperience({
     invalidateQuickLookup();
     setQuickPreview({
       id: item.id,
-      surface: item.surface,
+      surface: item.useAlternateSurface ? item.cacheSurface || item.surface : item.surface,
       cacheSurface: item.cacheSurface,
       reading: item.reading,
       meanings: item.meanings,
@@ -1086,6 +1090,7 @@ export function CuriosityReadingExperience({
         item.selectedMeaningIndex == null ? 0 : item.selectedMeaningIndex,
       meaning: item.meaning,
       isCustomMeaning: item.isCustomMeaning,
+      ...wordContextPayload(item),
       useAlternateSurface: item.useAlternateSurface,
       alternateSurface: item.alternateSurface,
       page: item.page,
@@ -1311,6 +1316,8 @@ export function CuriosityReadingExperience({
       user_book_id: userBookId,
       vocabulary_cache_id: vocabularyCacheId,
       surface: normalizedSurface || null,
+      base_form: quickPreview.surface,
+      ...wordContextPayload(quickPreview),
       reading: quickPreview.reading || null,
       meaning: selectedMeaning || null,
       meaning_choices: quickPreview.meanings,
@@ -1338,7 +1345,7 @@ export function CuriosityReadingExperience({
         .from("user_book_words")
         .insert(payload)
         .select(
-          "id, surface, reading, meaning, meaning_choices, meaning_choice_index, position_unit, position_value, percent_location, page_number, page_order, chapter_number, chapter_name, hide_kanji_in_reading_support"
+          "id, surface, reading, meaning, meaning_choices, meaning_choice_index, position_unit, position_value, percent_location, page_number, page_order, chapter_number, chapter_name, hide_kanji_in_reading_support, book_form, book_form_description, follow_along_support_note"
         )
         .single();
 
@@ -1349,6 +1356,7 @@ export function CuriosityReadingExperience({
       }
 
       const newItem: QuickSessionWord = {
+        ...wordContextPayload(data),
         id: String(data.id),
         surface: data.surface ?? "",
         reading: data.reading ?? "",
@@ -1389,7 +1397,7 @@ export function CuriosityReadingExperience({
         .eq("id", editingExisting.id)
         .eq("user_book_id", userBookId)
         .select(
-          "id, surface, reading, meaning, meaning_choices, meaning_choice_index, position_unit, position_value, percent_location, page_number, page_order, chapter_number, chapter_name, hide_kanji_in_reading_support"
+          "id, surface, reading, meaning, meaning_choices, meaning_choice_index, position_unit, position_value, percent_location, page_number, page_order, chapter_number, chapter_name, hide_kanji_in_reading_support, book_form, book_form_description, follow_along_support_note"
         )
         .single();
 
@@ -1400,6 +1408,7 @@ export function CuriosityReadingExperience({
       }
 
       const updatedItem: QuickSessionWord = {
+        ...wordContextPayload(data),
         id: String(data.id),
         surface: data.surface ?? "",
         reading: data.reading ?? "",
@@ -1525,6 +1534,7 @@ export function CuriosityReadingExperience({
       }
 
       const newItem: QuickSessionWord = {
+        ...wordContextPayload(data),
         id: String(data.id),
         surface: data.surface ?? cleanSource,
         reading: data.reading ?? "",
@@ -1577,6 +1587,7 @@ export function CuriosityReadingExperience({
       }
 
       const updatedItem: QuickSessionWord = {
+        ...wordContextPayload(data),
         id: String(data.id),
         surface: data.surface ?? cleanSource,
         reading: data.reading ?? "",
@@ -1998,7 +2009,7 @@ export function CuriosityReadingExperience({
           </>
         )}
 
-        <div className="md:hidden">
+        <div className={workspaceCompact ? "hidden" : "md:hidden"}>
           {isEnglishBook ? (
             <CuriosityAddEditWordCard
               title="Save English Word / Phrase"
@@ -2069,6 +2080,13 @@ export function CuriosityReadingExperience({
             </CuriosityAddEditWordCard>
           ) : (
             <MobileQuickCapture
+              contextFields={<div className="space-y-2">
+                <label className="block text-xs font-medium text-stone-600">Alternative spelling / kanji
+                  <input className="w-full min-w-0 rounded-lg border border-stone-300 px-2 py-1.5 text-sm" value={quickPreview.alternateSurface}
+                    onChange={e => setQuickPreview(current => ({ ...current, alternateSurface: e.target.value, useAlternateSurface: Boolean(e.target.value.trim()) }))} placeholder="Optional" />
+                </label>
+                <WordContextFields value={quickPreview} onChange={value => setQuickPreview(current => ({ ...current, ...value }))} teacher={canTeachWordForms} />
+              </div>}
               title={isListeningMode ? "Save a heard word" : "Save a word"}
               description={
                 isListeningMode
@@ -2151,7 +2169,7 @@ export function CuriosityReadingExperience({
           className={
             workspaceCompact && workspaceAside
               ? "hidden md:grid md:grid-cols-[minmax(0,1fr)_minmax(24rem,30rem)] md:items-start md:gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(26rem,32rem)]"
-              : "hidden md:block"
+              : workspaceCompact ? "block" : "hidden md:block"
           }
         >
         <div className="min-w-0">
@@ -2303,6 +2321,7 @@ export function CuriosityReadingExperience({
               onReadingChange={(value) =>
                 setQuickPreview((prev) => ({ ...prev, reading: value }))
               }
+              contextFields={<WordContextFields value={quickPreview} onChange={value => setQuickPreview(current => ({ ...current, ...value }))} teacher={canTeachWordForms} />}
               onAlternateSurfaceChange={(value) =>
                 setQuickPreview((prev) => ({
                   ...prev,

@@ -22,6 +22,7 @@ type AddWordDetailFieldsProps = {
   word: string;
   savedNotice: string;
   onReadingChange: (value: string) => void;
+  contextFields?: React.ReactNode;
   onAlternateSurfaceChange: (value: string) => void;
   onMeaningChoiceChange: (index: number, choice: string) => void;
   onCustomMeaningChange: (value: string) => void;
@@ -52,6 +53,7 @@ export default function AddWordDetailFields({
   word,
   savedNotice,
   onReadingChange,
+  contextFields,
   onAlternateSurfaceChange,
   onMeaningChoiceChange,
   onCustomMeaningChange,
@@ -85,17 +87,19 @@ export default function AddWordDetailFields({
 
           <div>
             <label className="mb-1 block text-sm font-medium text-stone-700">
-              Alternate surface
+              Alternative spelling / kanji
             </label>
             <input
               value={alternateSurface}
               onChange={(event) => onAlternateSurfaceChange(event.target.value)}
-              placeholder="Book form, if different"
+              placeholder="Optional spelling / kanji"
               className="w-full rounded border bg-white px-3 py-2 text-sm"
             />
           </div>
         </div>
       </div>
+
+      {contextFields}
 
       <div>
         <label className="mb-2 block text-sm font-medium text-stone-700">

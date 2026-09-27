@@ -53,6 +53,8 @@ type ManualEditionFormProps = {
   loading: boolean;
   addLabel?: string;
   addDisabled?: boolean;
+  differentEditionDisabled?: boolean;
+  hideCandidates?: boolean;
   candidates: ManualEditionCandidate[];
   editionFormatOptions: EditionFormatOption[];
   onTitleChange: (value: string) => void;
@@ -90,6 +92,8 @@ export default function ManualEditionForm({
   addLabel = "Add to Library",
   addDisabled = false,
   candidates,
+  hideCandidates = false,
+  differentEditionDisabled = addDisabled,
   editionFormatOptions,
   onTitleChange,
   onAuthorChange,
@@ -245,7 +249,7 @@ export default function ManualEditionForm({
         </div>
       ) : null}
 
-      {candidates.length > 0 ? (
+      {!hideCandidates && candidates.length > 0 ? (
         <div className="mt-5 space-y-3 rounded-2xl border border-stone-200 bg-stone-50 p-4">
           <p className="text-sm font-bold text-stone-800">
             We found a possible existing edition. Use it if it matches, or
@@ -280,7 +284,7 @@ export default function ManualEditionForm({
           <button
             type="button"
             onClick={onSubmitDifferentEdition}
-            disabled={loading || addDisabled}
+            disabled={loading || differentEditionDisabled}
             className="rounded-2xl border border-stone-200 bg-white px-5 py-3 text-sm font-bold text-stone-700 shadow-sm transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             This Is a Different Edition

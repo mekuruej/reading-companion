@@ -172,6 +172,7 @@ export default function AddBookPage() {
     const [manualPageCount, setManualPageCount] = useState("");
     const [manualAddError, setManualAddError] = useState("");
     const [manualAddLoading, setManualAddLoading] = useState(false);
+    const [selectedManualEditionId, setSelectedManualEditionId] = useState<string | null>(null);
     const [manualPossibleMatches, setManualPossibleMatches] = useState<BookSearchResult[]>([]);
     const [book, setBook] = useState<LookupBook | null>(null);
     const [currentUserId, setCurrentUserId] = useState("");
@@ -211,6 +212,11 @@ export default function AddBookPage() {
     const [bookSearch, setBookSearch] = useState("");
     const [bookSearchAuthor, setBookSearchAuthor] = useState("");
     const [bookSearchResults, setBookSearchResults] = useState<BookSearchResult[]>([]);
+    useEffect(() => { setSelectedManualEditionId(null); }, [manualPossibleMatches]);
+    const [selectedCatalogEditionId, setSelectedCatalogEditionId] = useState<string | null>(null);
+    useEffect(() => {
+        setSelectedCatalogEditionId(bookSearchResults.length === 1 ? bookSearchResults[0].id : null);
+    }, [bookSearchResults]);
     const [bookSearchLoading, setBookSearchLoading] = useState(false);
     const [lastBookSearchQuery, setLastBookSearchQuery] = useState("");
     const [bookSearchHadNoResults, setBookSearchHadNoResults] = useState(false);
@@ -1712,7 +1718,71 @@ export default function AddBookPage() {
             </section>
 
             <section className="mt-5 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                {book ? (
+                    <LookupBookPreviewCard
+                        title={book.title ?? "Untitled book"}
+                        subtitle={book.subtitle}
+                        coverUrl={coverUrl}
+                        displayAuthor={displayAuthor}
+                        publisher={book.publisher}
+                        publishedDate={publishedDate}
+                        pageCount={pageCount}
+                        isbn13={book.isbn13}
+                        languageCode={book.language_code}
+                        isNewToMekuru={isNewToMekuru}
+                        libraryLabel={targetLibraryLabel}
+                    >
+                    </LookupBookPreviewCard>
+                ) : null}
+
+                {!manualAddMode && bookSearchResults.length > 0 ? (
+                    <div className="mt-4 space-y-3">
+                        {bookSearchResults.map((result) => {
+                            const missingFields = missingGlobalBookFields(result);
+                            const resultActionKey = `book:${result.id}`;
+                            const resultSatisfiedMessages = satisfiedDestinationMessages(resultActionKey);
+
+                            return (
+                                <div key={result.id}>
+                                    <AddBookCatalogResult
+                                        result={result}
+                                        missingFields={missingFields}
+                                        adding={false}
+                                        requestLoading={requestLoading && requestingBookId === result.id}
+                                        addLabel={selectedCatalogEditionId === result.id ? "Selected edition" : "Select edition"}
+                                        disabled={selectedCatalogEditionId === result.id}
+                                        onAdd={() => setSelectedCatalogEditionId(result.id)}
+                                        onRequestReview={() => void handleRequestBookDetails(result)}
+                                    />
+                                    {resultSatisfiedMessages.length > 0 ? (
+                                        <div className="mt-2 space-y-1 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-800">
+                                            {resultSatisfiedMessages.map((message) => (
+                                                <p key={message}>✓ {message}</p>
+                                            ))}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : null}
+
+                {manualAddMode && manualPossibleMatches.length > 0 ? (
+                    <div className="mt-4 space-y-3">
+                        <p className="text-sm text-stone-600">We found a possible existing edition. Select it if it matches, or confirm a different edition below.</p>
+                        {manualPossibleMatches.map(result => (
+                            <AddBookCatalogResult key={result.id} result={result}
+                                missingFields={missingGlobalBookFields(result)} adding={false}
+                                requestLoading={requestLoading && requestingBookId === result.id}
+                                addLabel={selectedManualEditionId === result.id ? "Selected edition" : "Select edition"}
+                                disabled={selectedManualEditionId === result.id}
+                                onAdd={() => setSelectedManualEditionId(result.id)}
+                                onRequestReview={() => void handleRequestBookDetails(result)} />
+                        ))}
+                    </div>
+                ) : null}
+
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
                             Results / Edition
@@ -1816,19 +1886,7 @@ export default function AddBookPage() {
                 ) : null}
 
                 {book ? (
-                    <LookupBookPreviewCard
-                        title={book.title ?? "Untitled book"}
-                        subtitle={book.subtitle}
-                        coverUrl={coverUrl}
-                        displayAuthor={displayAuthor}
-                        publisher={book.publisher}
-                        publishedDate={publishedDate}
-                        pageCount={pageCount}
-                        isbn13={book.isbn13}
-                        languageCode={book.language_code}
-                        isNewToMekuru={isNewToMekuru}
-                        libraryLabel={targetLibraryLabel}
-                    >
+                    <div className="mt-4">
                         {needsEditionLanguageConfirmation ? (
                             <AddBookEditionLanguageConfirmation
                                 selectedCommonEditionLanguageCode={selectedCommonEditionLanguageCode}
@@ -1858,7 +1916,7 @@ export default function AddBookPage() {
                                 ))}
                             </div>
                         ) : null}
-                    </LookupBookPreviewCard>
+                    </div>
                 ) : null}
 
                 {bookSearchHadNoResults ? (
@@ -1877,6 +1935,8 @@ export default function AddBookPage() {
 
                 {manualAddMode ? (
                     <ManualEditionForm
+                        hideCandidates
+                        differentEditionDisabled={manualButtonState.disabled}
                         mode={manualAddMode}
                         identifierLabel={manualIdentifierLabel}
                         title={manualTitle}
@@ -1888,9 +1948,9 @@ export default function AddBookPage() {
                         kindleLocationCount={manualKindleLocationCount}
                         onKindleLocationCountChange={setManualKindleLocationCount}
                         error={manualAddError}
-                        loading={manualAddLoading}
-                        addLabel={manualButtonState.label}
-                        addDisabled={manualButtonState.disabled}
+                        loading={manualAddLoading || Boolean(selectedManualEditionId && addingExistingBookId === selectedManualEditionId)}
+                        addLabel={selectedManualEditionId ? addButtonState(`book:${selectedManualEditionId}`).label : manualButtonState.label}
+                        addDisabled={selectedManualEditionId ? addButtonState(`book:${selectedManualEditionId}`).disabled : manualButtonState.disabled}
                         candidates={manualPossibleMatches.map((result) => ({
                             result,
                             missingFields: missingGlobalBookFields(result),
@@ -1929,7 +1989,7 @@ export default function AddBookPage() {
                             setManualPageCount(value);
                             setManualAddError("");
                         }}
-                        onSubmit={() => void handleManualAdd(manualActionKey, false)}
+                        onSubmit={() => selectedManualEditionId ? void handleAddExistingBook(selectedManualEditionId, `book:${selectedManualEditionId}`) : void handleManualAdd(manualActionKey, false)}
                         onSubmitDifferentEdition={() => void handleManualAdd(manualActionKey, true)}
                         onCancel={resetManualAdd}
                         onUseExistingEdition={(bookId) => void handleAddExistingBook(bookId, `book:${bookId}`)}
@@ -1951,37 +2011,15 @@ export default function AddBookPage() {
                     </div>
                 ) : null}
 
-                {bookSearchResults.length > 0 ? (
-                    <div className="mt-4 space-y-3">
-                        {bookSearchResults.map((result) => {
-                            const missingFields = missingGlobalBookFields(result);
-                            const resultActionKey = `book:${result.id}`;
-                            const resultButtonState = addButtonState(resultActionKey);
-                            const resultSatisfiedMessages = satisfiedDestinationMessages(resultActionKey);
 
-                            return (
-                                <div key={result.id}>
-                                    <AddBookCatalogResult
-                                        result={result}
-                                        missingFields={missingFields}
-                                        adding={addingExistingBookId === result.id}
-                                        requestLoading={requestLoading && requestingBookId === result.id}
-                                        addLabel={resultButtonState.label}
-                                        disabled={resultButtonState.disabled}
-                                        onAdd={() => void handleAddExistingBook(result.id, resultActionKey)}
-                                        onRequestReview={() => void handleRequestBookDetails(result)}
-                                    />
-                                    {resultSatisfiedMessages.length > 0 ? (
-                                        <div className="mt-2 space-y-1 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-800">
-                                            {resultSatisfiedMessages.map((message) => (
-                                                <p key={message}>✓ {message}</p>
-                                            ))}
-                                        </div>
-                                    ) : null}
-                                </div>
-                            );
-                        })}
-                    </div>
+                {!book && !manualAddMode && selectedCatalogEditionId && bookSearchResults.some(result => result.id === selectedCatalogEditionId) ? (
+                    <AddBookActionRow
+                        addLoading={addingExistingBookId === selectedCatalogEditionId}
+                        disabled={addButtonState(`book:${selectedCatalogEditionId}`).disabled}
+                        addLabel={addButtonState(`book:${selectedCatalogEditionId}`).label}
+                        onAdd={() => void handleAddExistingBook(selectedCatalogEditionId, `book:${selectedCatalogEditionId}`)}
+                        onCancel={() => router.push(targetLibraryHref)}
+                    />
                 ) : null}
 
                 {!book && !manualAddMode && bookSearchResults.length === 0 && !bookSearchError ? (

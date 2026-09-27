@@ -9,6 +9,7 @@ type TeacherFollowAlongPrepItem = {
   id: string;
   source?: "reader_vocab" | "teaching_vocab" | "teacher_support";
   item_type: ItemType;
+  book_form_description?: string | null;
   surface_text: string | null;
   reading: string | null;
   meaning: string | null;
@@ -271,11 +272,13 @@ export function TeacherFollowAlongPrepItemCard({
             ) : null}
           </div>
 
+          {item.book_form_description ? <p className="mt-1 text-xs text-stone-500">{item.book_form_description}</p> : null}
           {item.meaning?.trim() && (supportMode === "full" || supportMode === "meaning") ? (
             <div className="mt-2 text-sm leading-6 text-stone-700 sm:text-base">
               {item.meaning}
             </div>
           ) : null}
+          {item.teacher_note ? <p className="mt-1 text-xs leading-5 text-stone-500">{item.teacher_note}</p> : null}
         </div>
       </article>
     );
@@ -311,6 +314,7 @@ export function TeacherFollowAlongPrepItemCard({
           ) : null}
         </div>
 
+        {item.book_form_description ? <p className="mt-1 text-xs text-stone-500">{item.book_form_description}</p> : null}
         {showMeaning ? (
           <div className="mt-2 text-sm leading-6 text-stone-700 sm:text-base">
             {item.meaning}
@@ -319,12 +323,7 @@ export function TeacherFollowAlongPrepItemCard({
 
         <SupportBlock label="Explanation" value={item.explanation} tone="stone" />
         <SupportBlock label="Translation" value={item.translation} tone="teal" />
-        <SupportBlock
-          label="Teacher Note"
-          value={item.teacher_note}
-          tone="amber"
-          collapseByDefault
-        />
+        <SupportBlock label="Teacher Note" value={item.teacher_note} tone="amber" collapseByDefault />
         <SupportUrlBlock value={item.support_url} />
       </div>
     </article>

@@ -1,6 +1,8 @@
 // Vocab List
 //
 "use client";
+import WordContextFields from "@/components/vocabulary/WordContextFields";
+import { wordContextPayload, type WordContext } from "@/lib/vocabulary/wordContext";
 
 import { isReadyForFlashcards } from "@/lib/wordSupportEligibility";
 import { useEffect, useMemo, useState } from "react";
@@ -62,7 +64,7 @@ const DEFAULT_LEARNING_SETTINGS = {
 
 const GLOBAL_ENCOUNTER_PAGE_SIZE = 1000;
 
-type WordRow = {
+type WordRow = WordContext & {
   id: string;
   user_book_id: string;
   surface: string;
@@ -324,6 +326,8 @@ export default function BookWordsPage() {
   const [editSaving, setEditSaving] = useState(false);
   const [editErr, setEditErr] = useState<string | null>(null);
 
+  const [editContext, setEditContext] = useState<WordContext>({});
+  const [canTeachWordForms, setCanTeachWordForms] = useState(false);
   const [editSurface, setEditSurface] = useState("");
   const [editReading, setEditReading] = useState("");
   const [editMeaning, setEditMeaning] = useState("");
@@ -421,6 +425,7 @@ export default function BookWordsPage() {
     setEditErr(null);
     setEditing(w);
 
+    setEditContext(wordContextPayload(w));
     setEditSurface(w.cache_surface && w.surface === w.cache_surface ? "" : w.surface ?? "");
     setEditReading(w.reading ?? "");
     setEditMeaning(w.meaning ?? "");
@@ -511,6 +516,7 @@ export default function BookWordsPage() {
     }
 
     const patch: any = {
+      ...wordContextPayload(editContext),
       surface: editSurface.trim() || editing.cache_surface?.trim() || "",
       reading: editReading.trim() ? editReading.trim() : null,
       meaning: editMeaning.trim() ? editMeaning.trim() : null,
@@ -704,6 +710,7 @@ export default function BookWordsPage() {
           hasFullAccess: appAccessStatus.hasFullAccess,
           isTrialActive: appAccessStatus.reason === "trial",
         });
+      setCanTeachWordForms(featureAccess.isTeacher);
 
         const canUseVocabularyList = canUseFullAccessFeature(
           featureAccess,
@@ -905,7 +912,7 @@ export default function BookWordsPage() {
               hidden,
               meaning_choices,
               meaning_choice_index,
-              hide_kanji_in_reading_support,
+              hide_kanji_in_reading_support, book_form, book_form_description, follow_along_support_note,
               target_language_code,
               vocabulary_cache_id,
               vocabulary_cache: vocabulary_cache_id (
@@ -1326,6 +1333,7 @@ export default function BookWordsPage() {
               setEditHideKanjiInReadingSupport
             }
           />
+            <div className="mt-3"><WordContextFields value={editContext} onChange={setEditContext} teacher={canTeachWordForms} /></div>
 
         </BookVocabEditModalShell>
       ) : null}

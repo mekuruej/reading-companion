@@ -5,6 +5,8 @@
 // stats, user_book_words, or study progress.
 
 "use client";
+import SavedWordContextEditor from "@/components/vocabulary/SavedWordContextEditor";
+import { followAlongSurface } from "@/lib/vocabulary/wordContext";
 
 import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
 import { wordPosition, wordPositionPayload, wordPositionText } from "@/lib/vocabulary/wordPosition";
@@ -51,6 +53,7 @@ type TeacherFollowAlongItem = {
   source: "reader_vocab" | "teaching_vocab" | "teacher_support";
   source_id: string;
   item_type: ItemType;
+  book_form_description?: string | null;
   surface_text: string | null;
   reading: string | null;
   meaning: string | null;
@@ -263,7 +266,8 @@ function sharedVocabularyToFollowAlongItem(word: SharedTeacherVocabularyWord): T
     source: word.teacherVocabularyId ? "teaching_vocab" : "reader_vocab",
     source_id: word.teacherVocabularyId ?? word.personalWordId ?? word.id,
     item_type: "word",
-    surface_text: word.surface,
+    surface_text: followAlongSurface(word),
+    book_form_description: word.book_form_description,
     reading: word.reading,
     meaning: word.meaning,
     ...wordPositionPayload(word.pageNumber, word.positionUnit),
@@ -330,6 +334,7 @@ function teacherSupportToFollowAlongItem(item: TeacherBookItem): TeacherFollowAl
 
 type TeacherFollowAlongPanelProps = {
   teacherBookId: string;
+  refreshKey?: number;
   presentation?: "standalone" | "embedded";
   ownerTeacherId?: string;
   contextLabel?: string;
@@ -345,6 +350,7 @@ type TeacherFollowAlongPanelProps = {
 
 export function TeacherFollowAlongPanel({
   teacherBookId,
+  refreshKey = 0,
   presentation = "standalone",
   ownerTeacherId,
   contextLabel = "Teacher Prep",
@@ -378,8 +384,12 @@ export function TeacherFollowAlongPanel({
     void loadFollowAlong();
   }, [teacherBookId]);
 
-  async function loadFollowAlong() {
-    setLoading(true);
+  useEffect(() => {
+    if (refreshKey > 0) void loadFollowAlong(true);
+  }, [refreshKey]);
+
+  async function loadFollowAlong(background = false) {
+    if (!background) setLoading(true);
     setMessage("");
     setMissingReaderLink(false);
 
@@ -560,7 +570,7 @@ export function TeacherFollowAlongPanel({
   }
 
   async function refreshFollowAlong() {
-    await loadFollowAlong();
+    await loadFollowAlong(true);
   }
 
   async function saveCapturedFollowAlongWord(value: JapaneseDictionaryCaptureValue) {
@@ -606,14 +616,26 @@ export function TeacherFollowAlongPanel({
   }, [items]);
 
   const currentPage = pages[pageIndex] ?? null;
+  const previousPages = useRef(pages);
+  const preservingPage = useRef(false);
 
   useEffect(() => {
     setPageIndex(0);
     setJumpPageInput("");
     setFadedThroughIndex(-1);
-  }, [items]);
+  }, [teacherBookId]);
 
   useEffect(() => {
+    const previousLabel = previousPages.current[pageIndex]?.label;
+    const matchingIndex = pages.findIndex(page => page.label === previousLabel);
+    const nextIndex = matchingIndex >= 0 ? matchingIndex : Math.min(pageIndex, Math.max(0, pages.length - 1));
+    preservingPage.current = matchingIndex >= 0 && nextIndex !== pageIndex;
+    previousPages.current = pages;
+    setPageIndex(nextIndex);
+  }, [pages]);
+
+  useEffect(() => {
+    if (preservingPage.current) { preservingPage.current = false; return; }
     setFadedThroughIndex(-1);
     if (scrollAnimationFrame.current) {
       cancelAnimationFrame(scrollAnimationFrame.current);
@@ -825,21 +847,13 @@ export function TeacherFollowAlongPanel({
                       <button type="button" disabled={wordIndex === 0} onClick={() => void updateFollowAlongWord(word, { follow_along_order: Math.max(0, wordIndex - 1) })} className="rounded-xl border border-stone-300 bg-white px-3 py-1.5 text-xs font-black text-stone-700 disabled:opacity-40">Up</button>
                       <button type="button" disabled={wordIndex === includedVocabulary.length - 1} onClick={() => void updateFollowAlongWord(word, { follow_along_order: wordIndex + 1 })} className="rounded-xl border border-stone-300 bg-white px-3 py-1.5 text-xs font-black text-stone-700 disabled:opacity-40">Down</button>
                     </div>
-                    {word.teacherVocabularyId ? (
-                      <label className="mt-2 block">
-                        <span className="mb-1 block text-xs font-black uppercase tracking-[0.12em] text-stone-400">Support note</span>
-                        <textarea
-                          defaultValue={word.followAlongSupportNote ?? ""}
-                          rows={2}
-                          onBlur={(event) =>
-                            void updateFollowAlongWord(word, {
-                              follow_along_support_note: event.target.value.trim() || null,
-                            })
-                          }
-                          className="w-full resize-y rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm leading-5 text-stone-900"
-                        />
-                      </label>
-                    ) : null}
+                    <SavedWordContextEditor value={{ ...word, follow_along_support_note: word.followAlongSupportNote }}
+                      alternativeSurface={word.alternativeSurface}
+                      onSave={async patch => {
+                        if (!teacherVocabContext) throw new Error("Book context is not loaded.");
+                        await updateTeachingVocabularyVisibility(supabase, word, patch, teacherVocabContext);
+                        await refreshFollowAlong();
+                      }} />
                   </div>
                 ))
               )}
