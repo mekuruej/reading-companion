@@ -356,7 +356,7 @@ export default function JapaneseLearningPage() {
               </p>
               <p className="mt-2 leading-6">
                 Your 28-day app trial will begin after the reading session.
-                If you use the app and have feedback to share, I’ll send you the link to schedule a follow-up session.
+                If you use the app and have feedback to share, you can request a follow-up session.
 
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
