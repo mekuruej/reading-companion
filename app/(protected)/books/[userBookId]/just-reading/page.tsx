@@ -227,6 +227,7 @@ export default function JustReadingPage() {
     const standaloneTimer = (
         <SimpleTimedSessionPage
             sessionMode="fluid"
+            showFluidReadingExplanation
             allowNativeReadListenToggle={isNativeBook}
             onActiveSessionModeChange={setNativeSessionMode}
             eyebrow="Fluid Reading"
@@ -245,6 +246,7 @@ export default function JustReadingPage() {
     const timedSession = (
         <SimpleTimedSessionPage
             sessionMode="fluid"
+            showFluidReadingExplanation
             allowNativeReadListenToggle={isNativeBook}
             onActiveSessionModeChange={setNativeSessionMode}
             eyebrow="Fluid Reading"

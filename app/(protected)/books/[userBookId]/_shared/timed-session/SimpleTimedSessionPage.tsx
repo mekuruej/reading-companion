@@ -37,6 +37,7 @@ type SimpleTimedSessionPageProps = {
     listeningLocationNote?: string;
     embedded?: boolean;
     workspaceCompact?: boolean;
+    showFluidReadingExplanation?: boolean;
 };
 
 function formatTimer(totalSeconds: number) {
@@ -65,6 +66,7 @@ export default function SimpleTimedSessionPage({
     listeningLocationNote = "Optional. Add an audiobook position like Chapter 8, 37%, or 3:12:45. Listening time stays separate from reading pace.",
     embedded = false,
     workspaceCompact = false,
+    showFluidReadingExplanation = false,
 }: SimpleTimedSessionPageProps) {
     const tracking = useBookProgress();
     const labels = progressLabels(tracking.method);
@@ -976,6 +978,13 @@ export default function SimpleTimedSessionPage({
         </div>
     ) : null;
 
+    const fluidReadingExplanation = showFluidReadingExplanation && activeSessionMode === "fluid" ? (
+        <div className="mt-3">
+            <h2 className="text-sm font-semibold text-stone-700">Fluid Reading</h2>
+            <p className="mt-1 text-sm text-stone-500">Read without stopping to save words.</p>
+        </div>
+    ) : null;
+
     const content = workspaceCompact ? (
         <>
             {errorMessage ? (
@@ -1053,6 +1062,7 @@ export default function SimpleTimedSessionPage({
                         <p className="mt-3 text-sm leading-7 text-stone-600">
                             {activeDescription}
                         </p>
+                        {fluidReadingExplanation}
                     </div>
 
                     <div className="grid items-start gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
@@ -1179,6 +1189,7 @@ export default function SimpleTimedSessionPage({
                             <p className="mt-4 text-sm leading-7 text-stone-600">
                                 {activeDescription}
                             </p>
+                            {fluidReadingExplanation}
 
                             {timerPanel}
 
