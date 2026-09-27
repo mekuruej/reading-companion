@@ -10,6 +10,7 @@ type ContextValue = {
   method: ProgressTrackingMethod | null;
   totals: ProgressTotals;
   loaded: boolean;
+  timersEnabled: boolean;
   canChoose: boolean;
   editorOpen: boolean;
   choice: ProgressTrackingMethod | null;
@@ -23,7 +24,7 @@ type ContextValue = {
   refresh: () => Promise<void>;
 };
 const Context = createContext<ContextValue>({
-  method: null, totals: {}, loaded: false, canChoose: false, editorOpen: false,
+  method: null, totals: {}, loaded: false, timersEnabled: false, canChoose: false, editorOpen: false,
   choice: null, saving: false, error: null, choose: () => {}, saveMethod: async () => {},
   closeEditor: () => {}, requireMethod: () => false, changeMethod: () => {}, refresh: async () => {},
 });
@@ -47,6 +48,7 @@ export function BookProgressProvider({ userBookId, children }: { userBookId: str
   const [choice, setChoice] = useState<ProgressTrackingMethod | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [teachingOnly, setTeachingOnly] = useState(false);
   const refresh = useCallback(async () => {
     try {
       const [{ data, error: loadError }, auth] = await Promise.all([
@@ -58,6 +60,7 @@ export function BookProgressProvider({ userBookId, children }: { userBookId: str
       const next = progressMethod(data.progress_tracking_method);
       const own = auth.data.user?.id === data.user_id;
       setOwnerId(own ? data.user_id : null);
+      setTeachingOnly(data.personal_tracking_status === "not_tracking");
       setMethod(next);
       setTotals(book ?? {});
       setLoaded(true);
@@ -111,7 +114,7 @@ export function BookProgressProvider({ userBookId, children }: { userBookId: str
     }
   }
   return <Context.Provider value={{
-    method, totals, loaded, canChoose: !!ownerId, editorOpen: open, choice, saving, error,
+    method, totals, loaded, timersEnabled: loaded && !teachingOnly, canChoose: !!ownerId, editorOpen: open, choice, saving, error,
     choose: setChoice, saveMethod, closeEditor: () => setOpen(false), refresh, changeMethod,
     requireMethod: () => {
       if (!loaded) return false;

@@ -371,7 +371,7 @@ export function CuriosityReadingExperience({
   useEffect(() => {
     if (!tracking.loaded) return;
     setQuickPreview(prev => prev.id || prev.positionUnit === (tracking.method ?? "page") ? prev : { ...prev, page: "", positionUnit: tracking.method ?? "page" });
-  }, [tracking.loaded, tracking.method]);
+  }, [tracking.loaded, tracking.method, tracking.timersEnabled]);
   const [quickSessionWords, setQuickSessionWords] = useState<QuickSessionWord[]>([]);
   const [chapterNameOptions, setChapterNameOptions] = useState<string[]>([]);
   const [chapterNumberByName, setChapterNumberByName] = useState<Record<string, string>>({});
@@ -755,6 +755,14 @@ export function CuriosityReadingExperience({
 
   useEffect(() => {
     if (!userBookId || !tracking.loaded) return;
+    if (!tracking.timersEnabled) {
+      setIsRunning(false);
+      setIsPaused(false);
+      setStartTime(null);
+      setShowTimedSessionForm(false);
+      clearPersistedTimedSession(timedSessionMode, userBookId);
+      return;
+    }
 
     skippedInitialPersistenceWriteRef.current = false;
     const persisted = readPersistedTimedSession(timedSessionMode, userBookId);
@@ -804,7 +812,7 @@ export function CuriosityReadingExperience({
   }, [accumulatedElapsedMs, isRunning, startTime]);
 
   useEffect(() => {
-    if (!timerPersistenceReady || !userBookId) return;
+    if (!timerPersistenceReady || !userBookId || !tracking.timersEnabled) return;
 
     if (!skippedInitialPersistenceWriteRef.current) {
       skippedInitialPersistenceWriteRef.current = true;
@@ -841,12 +849,13 @@ export function CuriosityReadingExperience({
     startTime,
     timedSessionMode,
     tracking.method,
+    tracking.timersEnabled,
     timerPersistenceReady,
     userBookId,
   ]);
 
   useEffect(() => {
-    if (!timerPersistenceReady || !userBookId) return;
+    if (!timerPersistenceReady || !userBookId || !tracking.timersEnabled) return;
 
     const persistCurrentTimer = () => {
       if (!isRunning && !isPaused && !showTimedSessionForm && accumulatedElapsedMs <= 0) return;
@@ -889,6 +898,7 @@ export function CuriosityReadingExperience({
     startTime,
     timedSessionMode,
     tracking.method,
+    tracking.timersEnabled,
     timerPersistenceReady,
     userBookId,
   ]);
@@ -1680,6 +1690,7 @@ export function CuriosityReadingExperience({
   }
 
   async function saveReadingSession() {
+    if (!tracking.timersEnabled) return;
     if (!userBookId) return;
 
     if (!tracking.requireMethod() || !tracking.method) return;
@@ -1828,7 +1839,7 @@ export function CuriosityReadingExperience({
 
   const useCompactSessionBar = !isListeningMode;
 
-  const timerPanel = (
+  const timerPanel = tracking.timersEnabled ? (
     <CuriosityTimerPanel
       title={timerTitle}
       description={timerDescription}
@@ -1846,6 +1857,7 @@ export function CuriosityReadingExperience({
       formatTimer={formatTimer}
       compact={workspaceCompact || useCompactSessionBar}
       onStart={() => {
+        if (!tracking.timersEnabled) return;
         if (!tracking.requireMethod()) return;
         setSessionDate(todayYmdAppTimeZone());
         setStartTime(Date.now());
@@ -1880,6 +1892,7 @@ export function CuriosityReadingExperience({
         void openTimedSessionFormWithDefaults();
       }}
       onResume={() => {
+        if (!tracking.timersEnabled) return;
         setStartTime(Date.now());
         setIsPaused(false);
         setIsRunning(true);
@@ -1899,7 +1912,7 @@ export function CuriosityReadingExperience({
       onSessionStartPageChange={setSessionStartPage}
       onSessionEndPageChange={setSessionEndPage}
     />
-  );
+  ) : null;
 
   const sessionBar = (
     <>

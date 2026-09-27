@@ -1027,6 +1027,14 @@ export default function ReadAlongPage() {
 
     useEffect(() => {
         if (!userBookId || !tracking.loaded) return;
+    if (!tracking.timersEnabled) {
+      setIsRunning(false);
+      setIsPaused(false);
+      setStartTime(null);
+      setShowTimedSessionForm(false);
+      clearPersistedTimedSession(READ_ALONG_TIMED_SESSION_MODE, userBookId);
+      return;
+    }
 
         skippedInitialPersistenceWriteRef.current = false;
         const persisted = readPersistedTimedSession(READ_ALONG_TIMED_SESSION_MODE, userBookId);
@@ -1054,10 +1062,10 @@ export default function ReadAlongPage() {
         }
 
         setTimerPersistenceReady(true);
-    }, [userBookId, tracking.loaded, tracking.method]);
+    }, [userBookId, tracking.loaded, tracking.method, tracking.timersEnabled]);
 
     useEffect(() => {
-        if (!timerPersistenceReady || !userBookId) return;
+        if (!timerPersistenceReady || !userBookId || !tracking.timersEnabled) return;
 
         if (!skippedInitialPersistenceWriteRef.current) {
             skippedInitialPersistenceWriteRef.current = true;
@@ -1093,12 +1101,13 @@ export default function ReadAlongPage() {
         showTimedSessionForm,
         startTime,
         tracking.method,
+    tracking.timersEnabled,
     timerPersistenceReady,
         userBookId,
     ]);
 
     useEffect(() => {
-        if (!timerPersistenceReady || !userBookId) return;
+        if (!timerPersistenceReady || !userBookId || !tracking.timersEnabled) return;
 
         const persistCurrentTimer = () => {
             if (!isRunning && !isPaused && !showTimedSessionForm && elapsed <= 0) return;
@@ -1140,6 +1149,7 @@ export default function ReadAlongPage() {
         showTimedSessionForm,
         startTime,
         tracking.method,
+    tracking.timersEnabled,
     timerPersistenceReady,
         userBookId,
     ]);
@@ -1323,6 +1333,7 @@ export default function ReadAlongPage() {
     }
 
     function handleStartTimer() {
+    if (!tracking.timersEnabled) return;
         if (!tracking.requireMethod()) return;
         const today = todayYmdAppTimeZone();
 
@@ -1358,6 +1369,7 @@ export default function ReadAlongPage() {
     }
 
     function handleResumeTimer() {
+    if (!tracking.timersEnabled) return;
         setStartTime(Date.now() - elapsed * 1000);
         setIsRunning(true);
         setIsPaused(false);
@@ -1371,6 +1383,7 @@ export default function ReadAlongPage() {
     }
 
     async function handleSaveTimedSessionFromTimer() {
+    if (!tracking.timersEnabled) return;
         setSessionMinutesRead(String(Math.max(1, Math.round(elapsed / 60))));
         await saveReadingSession();
     }
@@ -2289,7 +2302,7 @@ export default function ReadAlongPage() {
                         bookCover={bookCover}
                         bookHubHref={`/books/${encodeURIComponent(userBookId)}${contextSuffix}`}
                         vocabListHref={`/books/${encodeURIComponent(userBookId)}/words${contextSuffix}`}
-                        timerSlot={
+                        timerSlot={tracking.timersEnabled ?
                             <ReadAlongTimerPanel
                                 isRunning={isRunning}
                                 isPaused={isPaused}
@@ -2308,7 +2321,7 @@ export default function ReadAlongPage() {
                                 onSessionEndPageChange={setSessionEndPage}
                                 onSaveTimedSession={handleSaveTimedSessionFromTimer}
                                 onCancelTimedSession={handleCancelTimedSession}
-                            />
+                            /> : null
                         }
                     />
                 ) : null}

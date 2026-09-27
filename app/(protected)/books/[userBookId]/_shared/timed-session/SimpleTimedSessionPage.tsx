@@ -277,6 +277,14 @@ export default function SimpleTimedSessionPage({
 
     useEffect(() => {
         if (!userBookId || !tracking.loaded) return;
+    if (!tracking.timersEnabled) {
+      setIsRunning(false);
+      setIsPaused(false);
+      setStartTime(null);
+      setShowTimedSessionForm(false);
+      clearPersistedTimedSession(activeSessionMode, userBookId);
+      return;
+    }
 
         skippedInitialPersistenceWriteRef.current = false;
         const persisted = readPersistedTimedSession(activeSessionMode, userBookId);
@@ -300,7 +308,7 @@ export default function SimpleTimedSessionPage({
         }
 
         setTimerPersistenceReady(true);
-    }, [activeSessionMode, userBookId, tracking.loaded, tracking.method]);
+    }, [activeSessionMode, userBookId, tracking.loaded, tracking.method, tracking.timersEnabled]);
 
     useEffect(() => {
         if (isRunning && startTime) {
@@ -326,7 +334,7 @@ export default function SimpleTimedSessionPage({
     }, [accumulatedElapsedMs, isRunning, startTime]);
 
     useEffect(() => {
-        if (!timerPersistenceReady || !userBookId) return;
+        if (!timerPersistenceReady || !userBookId || !tracking.timersEnabled) return;
 
         if (!skippedInitialPersistenceWriteRef.current) {
             skippedInitialPersistenceWriteRef.current = true;
@@ -363,12 +371,13 @@ export default function SimpleTimedSessionPage({
         showTimedSessionForm,
         startTime,
         tracking.method,
+    tracking.timersEnabled,
     timerPersistenceReady,
         userBookId,
     ]);
 
     useEffect(() => {
-        if (!timerPersistenceReady || !userBookId) return;
+        if (!timerPersistenceReady || !userBookId || !tracking.timersEnabled) return;
 
         const persistCurrentTimer = () => {
             if (!isRunning && !isPaused && !showTimedSessionForm && accumulatedElapsedMs <= 0) return;
@@ -411,6 +420,7 @@ export default function SimpleTimedSessionPage({
         showTimedSessionForm,
         startTime,
         tracking.method,
+    tracking.timersEnabled,
     timerPersistenceReady,
         userBookId,
     ]);
@@ -447,6 +457,7 @@ export default function SimpleTimedSessionPage({
     }
 
     async function saveTimedSession() {
+    if (!tracking.timersEnabled) return;
         if (!userBookId) return;
 
         if (!canAccessBook) {
@@ -527,6 +538,7 @@ export default function SimpleTimedSessionPage({
         }, 4000);
     }
     function startTimer() {
+    if (!tracking.timersEnabled) return;
         if (!tracking.requireMethod()) return;
         const today = todayYmdAppTimeZone();
 
@@ -558,6 +570,7 @@ export default function SimpleTimedSessionPage({
     }
 
     function resumeTimer() {
+    if (!tracking.timersEnabled) return;
         setStartTime(Date.now());
         setIsRunning(true);
         setIsPaused(false);
@@ -1079,7 +1092,7 @@ export default function SimpleTimedSessionPage({
                                 </div>
                             )}
                         </div>
-                        {timerPanel}
+                        {tracking.timersEnabled ? timerPanel : null}
                     </div>
 
                     <div className="space-y-3">
@@ -1191,7 +1204,7 @@ export default function SimpleTimedSessionPage({
                             </p>
                             {fluidReadingExplanation}
 
-                            {timerPanel}
+                            {tracking.timersEnabled ? timerPanel : null}
 
                             {saveSessionForm}
                             {progressUpdatePanel}
