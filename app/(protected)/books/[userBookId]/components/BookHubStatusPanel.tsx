@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { DNF_REASON_OPTIONS, type DnfDetails } from "@/lib/books/dnf";
 import { ProgressTrackingSettings } from "@/components/books/BookProgressProvider";
 import {
   PERSONAL_TRACKING_STATUSES,
@@ -32,6 +34,7 @@ type BookHubStatusPanelProps = {
   progressPercent: number | null;
 
 
+  onSaveDnf: (details: DnfDetails) => Promise<boolean>;
   onStartToday: () => void;
   onPersonalTrackingStatusChange: (value: PersonalTrackingStatus) => void;
   onOpenReview: () => void;
@@ -41,24 +44,7 @@ type BookHubStatusPanelProps = {
 };
 
 function dnfReasonLabel(value: string) {
-  switch (value) {
-    case "too_difficult_right_now":
-      return "Too difficult right now";
-    case "wrong_timing_mood":
-      return "Wrong timing or mood";
-    case "too_much_unknown_vocabulary":
-      return "Too much unknown vocabulary";
-    case "too_dense_slow":
-      return "Too dense or slow";
-    case "lost_interest":
-      return "Lost interest";
-    case "did_not_like_it":
-      return "Did not like it";
-    case "other":
-      return "Other";
-    default:
-      return "";
-  }
+  return DNF_REASON_OPTIONS.find(option => option.value === value)?.label ?? "";
 }
 
 function wouldRetryLabel(value: string) {
@@ -96,6 +82,7 @@ export default function BookHubStatusPanel({
   furthestTrackedPage,
   pageCount,
   progressPercent,
+  onSaveDnf,
   onStartToday,
   onPersonalTrackingStatusChange,
   onOpenReview,
@@ -103,6 +90,38 @@ export default function BookHubStatusPanel({
   onFillBeginningPages,
   onFillEndingPages,
 }: BookHubStatusPanelProps) {
+  const [dnfPromptOpen, setDnfPromptOpen] = useState(false);
+  const [reasonDraft, setReasonDraft] = useState("");
+  const [noteDraft, setNoteDraft] = useState("");
+  const [dnfSaving, setDnfSaving] = useState(false);
+  const [dnfError, setDnfError] = useState<string | null>(null);
+  const busy = isSavingStatus || dnfSaving;
+
+  function selectStatus(value: PersonalTrackingStatus) {
+    if (value === "dnf" && personalTrackingStatus !== "dnf") {
+      setReasonDraft(dnfReason);
+      setNoteDraft(dnfNote);
+      setDnfError(null);
+      setDnfPromptOpen(true);
+      return;
+    }
+    setDnfPromptOpen(false);
+    onPersonalTrackingStatusChange(value);
+  }
+
+  async function saveDnf() {
+    if (busy) return;
+    setDnfSaving(true);
+    setDnfError(null);
+    try {
+      if (await onSaveDnf({ reason: reasonDraft, note: noteDraft })) setDnfPromptOpen(false);
+    } catch {
+      setDnfError("Could not save DNF. Please try again.");
+    } finally {
+      setDnfSaving(false);
+    }
+  }
+
   const shouldNudgeFinishBook =
     !finishedAt &&
     !dnfAt &&
@@ -122,11 +141,11 @@ export default function BookHubStatusPanel({
         <label className="block">
           <span className="mb-1 block font-medium">Reading Status</span>
           <select
-            value={personalTrackingStatus}
+            value={dnfPromptOpen ? "dnf" : personalTrackingStatus}
             onChange={(event) =>
-              onPersonalTrackingStatusChange(event.target.value as PersonalTrackingStatus)
+              selectStatus(event.target.value as PersonalTrackingStatus)
             }
-            disabled={isSavingStatus}
+            disabled={busy}
             className="w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm font-semibold text-stone-800 shadow-sm"
           >
             {showNotTrackingOption ? (
@@ -149,7 +168,29 @@ export default function BookHubStatusPanel({
             <span className="mt-1 block text-xs font-semibold text-red-700">{statusError}</span>
           ) : null}
         </label>
-        <ProgressTrackingSettings readingStatus={personalTrackingStatus} />
+        {dnfPromptOpen ? (
+          <section aria-label="DNF reason" className="rounded-xl border border-violet-200 bg-white p-3">
+            <label className="block text-sm font-semibold text-stone-900">
+              Why did you stop reading?
+              <select autoFocus value={reasonDraft} onChange={event => setReasonDraft(event.target.value)} disabled={busy}
+                className="mt-2 w-full min-w-0 rounded-lg border border-stone-300 bg-white px-2 py-2 text-sm font-normal">
+                {DNF_REASON_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+            <details className="mt-2" open={noteDraft ? true : undefined}>
+              <summary className="cursor-pointer text-xs font-medium text-stone-600">Add a note (optional)</summary>
+              <textarea aria-label="DNF note" value={noteDraft} onChange={event => setNoteDraft(event.target.value)} disabled={busy}
+                rows={2} className="mt-2 w-full rounded-lg border border-stone-300 px-2 py-1.5 text-sm" />
+            </details>
+            {dnfError ? <p role="alert" className="mt-2 text-xs text-red-700">{dnfError}</p> : null}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" onClick={() => void saveDnf()} disabled={busy}
+                className="rounded-lg bg-violet-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? "Saving..." : "Save DNF"}</button>
+              <button type="button" onClick={() => setDnfPromptOpen(false)} disabled={busy}
+                className="rounded-lg border border-stone-300 px-3 py-2 text-sm font-medium disabled:opacity-50">Cancel</button>
+            </div>
+          </section>
+        ) : <ProgressTrackingSettings readingStatus={personalTrackingStatus} />}
         <div>
           <span className="font-medium">Started:</span> {startedAt || "—"}
         </div>
@@ -169,7 +210,7 @@ export default function BookHubStatusPanel({
           <button
             type="button"
             onClick={() => onPersonalTrackingStatusChange("finished")}
-            disabled={isSavingStatus}
+            disabled={busy}
             className="mt-3 rounded-2xl bg-emerald-700 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 motion-safe:animate-pulse disabled:animate-none disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSavingStatus ? "Saving..." : "Finish book"}
@@ -203,7 +244,7 @@ export default function BookHubStatusPanel({
           <button
             type="button"
             onClick={onStartToday}
-            disabled={isSavingStatus}
+            disabled={busy}
             className={`rounded-2xl border px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-200 ${
               isSavingStatus
                 ? "cursor-not-allowed border-stone-300 bg-stone-100 opacity-60"

@@ -1,6 +1,8 @@
 // Single Book Hub
 //
 "use client";
+
+import type { DnfDetails } from "@/lib/books/dnf";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
 import { timedReadingSummary, progressLabels, matchingTotal, parseProgressRange, sessionStart, sessionEnd, sessionProgressUnit, progressSummary, type ProgressRecord } from "@/lib/books/readingProgress";
 
@@ -3196,15 +3198,16 @@ export default function BookHubPage() {
   async function saveBookStatusDates(
     nextStartedAt: string,
     nextFinishedAt: string,
-    nextDnfAt: string
+    nextDnfAt: string,
+    dnfDetails?: DnfDetails
   ) {
     if (!row?.id) return false;
 
     const started_at = nextStartedAt.trim() ? nextStartedAt.trim() : null;
     const finished_at = nextFinishedAt.trim() ? nextFinishedAt.trim() : null;
     const dnf_at = nextDnfAt.trim() ? nextDnfAt.trim() : null;
-    const nextDnfReason = dnf_at && dnfReason.trim() ? dnfReason.trim() : null;
-    const nextDnfNote = dnf_at && dnfNote.trim() ? dnfNote.trim() : null;
+    const nextDnfReason = dnf_at ? (dnfDetails?.reason ?? dnfReason).trim() || null : null;
+    const nextDnfNote = dnf_at ? (dnfDetails?.note ?? dnfNote).trim() || null : null;
     const nextWouldRetry = dnf_at && wouldRetry.trim() ? wouldRetry.trim() : null;
 
     const status =
@@ -3310,14 +3313,14 @@ export default function BookHubPage() {
     return true;
   }
 
-  async function savePersonalTrackingStatus(nextStatus: PersonalTrackingStatus) {
-    if (!row?.id || savingBookStatus) return;
-    if (nextStatus === personalTrackingStatus) return;
+  async function savePersonalTrackingStatus(nextStatus: PersonalTrackingStatus, dnfDetails?: DnfDetails) {
+    if (!row?.id || savingBookStatus) return false;
+    if (nextStatus === personalTrackingStatus) return false;
 
     const canUseNotTracking = isOwnBookHub && isTeacherContext;
     if (nextStatus === "not_tracking" && !canUseNotTracking) {
       setBookStatusError("Teaching Only is only available on your own teacher Book Hub.");
-      return;
+      return false;
     }
 
     setSavingBookStatus(true);
@@ -3339,12 +3342,13 @@ export default function BookHubPage() {
           openReadingReflection();
         }
       } else if (nextStatus === "dnf") {
-        saved = await saveBookStatusDates(startedAt || today, "", dnfAt || today);
+        saved = await saveBookStatusDates(startedAt || today, "", dnfAt || today, dnfDetails);
       }
 
       if (!saved) {
         setPersonalTrackingStatus(resolvePersonalTrackingStatus(row));
       }
+      return saved;
     } finally {
       setSavingBookStatus(false);
     }
@@ -5634,6 +5638,7 @@ export default function BookHubPage() {
                     furthestTrackedPage={furthestTrackedPage}
                     pageCount={book.page_count}
                     progressPercent={trackedProgress.percent}
+                    onSaveDnf={(details) => savePersonalTrackingStatus("dnf", details)}
                     onStartToday={() => void markStartedToday()}
                     onPersonalTrackingStatusChange={(value) =>
                       void savePersonalTrackingStatus(value)

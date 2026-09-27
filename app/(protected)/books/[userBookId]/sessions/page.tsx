@@ -1,6 +1,8 @@
 // Reading Sessions Page
 //
 "use client";
+
+import { DNF_REASON_OPTIONS } from "@/lib/books/dnf";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
 import { progressLabels, matchingTotal, parseProgressRange, sessionStart, sessionEnd, sessionProgressUnit, sessionProgressLabel as formatSessionProgress, sessionDistance, type ProgressRecord } from "@/lib/books/readingProgress";
 
@@ -54,16 +56,7 @@ type ReadingSession = ProgressRecord & {
   session_mode: string | null;
 };
 
-const DNF_REASON_OPTIONS = [
-  { value: "", label: "Choose a reason" },
-  { value: "too_difficult_right_now", label: "Too difficult right now" },
-  { value: "wrong_timing_mood", label: "Wrong timing or mood" },
-  { value: "too_much_unknown_vocabulary", label: "Too much unknown vocabulary" },
-  { value: "too_dense_slow", label: "Too dense or slow" },
-  { value: "lost_interest", label: "Lost interest" },
-  { value: "did_not_like_it", label: "Did not like it" },
-  { value: "other", label: "Other" },
-];
+
 
 const WOULD_RETRY_OPTIONS = [
   { value: "", label: "Choose retry intent" },
