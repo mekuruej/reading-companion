@@ -202,3 +202,31 @@ test('location hub averages use matching reading distances and only paired timed
     assert.equal(p.progressSummary(entries, 'kindle_location', totals).averageMinutesPerUnit, null);
   }
 });
+
+test('untimed history contributes progress and page totals without inflating pace', () => {
+  const timed = {session_mode:'fluid', start_page:101, end_page:110, minutes_read:20};
+  const untimed = {session_mode:'fluid', start_page:1, end_page:100, minutes_read:null};
+  const summary = p.progressSummary([untimed,timed], 'page', totals);
+  assert.equal(summary.totalDistance,110);
+  assert.equal(summary.position,110);
+  assert.equal(summary.percent,55);
+  assert.equal(summary.rate,30);
+  assert.equal(summary.averageMinutesPerUnit,2);
+  assert.equal(summary.remainingMinutes,180);
+  assert.deepEqual(p.timedReadingSummary([timed,untimed], 'page'),p.timedReadingSummary([timed], 'page'));
+  const onlyUntimed=p.progressSummary([untimed], 'page', totals);
+  assert.equal(onlyUntimed.position,100);assert.equal(onlyUntimed.totalDistance,100);
+  assert.equal(onlyUntimed.rate,null);assert.equal(onlyUntimed.remainingMinutes,null);
+});
+
+test('pace requires paired positive time and distance, excludes listening/fillers and keeps units separate', () => {
+  for (const unit of ['page','kindle_location','percent']) {
+    const timed={session_mode:'curiosity',tracking_unit:unit,start_position:10,end_position:19,minutes_read:30};
+    const irrelevant=[null,undefined,0,-1,NaN,Infinity].map(minutes_read=>({...timed,minutes_read}));
+    irrelevant.push({...timed,is_filler:true},{...timed,session_mode:'listening'},
+      {...timed,start_position:null,end_position:null},{...timed,end_position:5},
+      {...timed,end_position:Infinity},{...timed,tracking_unit:unit==='page'?'percent':'page'});
+    assert.deepEqual(p.timedReadingSummary([timed,...irrelevant],unit),p.timedReadingSummary([timed],unit));
+    assert.equal(p.timedReadingSummary(irrelevant,unit).rate,null);
+  }
+});

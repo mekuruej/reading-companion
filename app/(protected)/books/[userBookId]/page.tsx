@@ -2,7 +2,7 @@
 //
 "use client";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
-import { progressLabels, matchingTotal, parseProgressRange, sessionStart, sessionEnd, sessionProgressUnit, progressSummary, type ProgressRecord } from "@/lib/books/readingProgress";
+import { timedReadingSummary, progressLabels, matchingTotal, parseProgressRange, sessionStart, sessionEnd, sessionProgressUnit, progressSummary, type ProgressRecord } from "@/lib/books/readingProgress";
 
 
 import Link from "next/link";
@@ -1105,11 +1105,6 @@ export default function BookHubPage() {
     return visualReadingSessions.filter((s) => s.minutes_read != null && s.minutes_read > 0);
   }, [visualReadingSessions]);
 
-  const timedPageTrackedSessions = useMemo(() => {
-    return timedSessions.filter(
-      (s) => s.start_page != null && s.end_page != null
-    );
-  }, [timedSessions]);
 
   const totalPagesRead = useMemo(() => {
     return pageTrackedReadingSessions.reduce((sum, s) => {
@@ -1121,17 +1116,10 @@ export default function BookHubPage() {
     return timedSessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
   }, [timedSessions]);
 
-  const totalTimedPages = useMemo(() => {
-    return timedPageTrackedSessions.reduce((sum, s) => {
-      return sum + ((s.end_page ?? 0) - (s.start_page ?? 0) + 1);
-    }, 0);
-  }, [timedPageTrackedSessions]);
 
   const averageMinutesPerPage = useMemo(() => {
-    const pageMinutes = timedPageTrackedSessions.reduce((sum, session) => sum + (session.minutes_read ?? 0), 0);
-    if (!totalTimedPages || !pageMinutes) return null;
-    return pageMinutes / totalTimedPages;
-  }, [timedPageTrackedSessions, totalTimedPages]);
+    return timedReadingSummary(visualReadingSessions, "page").averageMinutesPerUnit;
+  }, [visualReadingSessions]);
 
   const furthestPage = useMemo(() => {
     const sessionsWithEndPage = realReadingSessions.filter(

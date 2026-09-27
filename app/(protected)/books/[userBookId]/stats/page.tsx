@@ -4,7 +4,7 @@
 "use client";
 
 import { useBookProgress } from "@/components/books/BookProgressProvider";
-import { progressSummary, progressLabels, type ProgressRecord } from "@/lib/books/readingProgress";
+import { timedReadingSummary, progressSummary, progressLabels, type ProgressRecord } from "@/lib/books/readingProgress";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -357,13 +357,7 @@ export default function BookStatsPage() {
         return visualReadingSessions.filter((s) => s.start_page != null && s.end_page != null);
     }, [visualReadingSessions]);
 
-    const timedSessions = useMemo(() => {
-        return visualReadingSessions.filter((s) => s.minutes_read != null && s.minutes_read > 0);
-    }, [visualReadingSessions]);
 
-    const timedPageTrackedSessions = useMemo(() => {
-        return timedSessions.filter((s) => s.start_page != null && s.end_page != null);
-    }, [timedSessions]);
 
     const curiositySessions = useMemo(() => {
         return realSessions.filter((s) => s.session_mode === "curiosity");
@@ -407,16 +401,7 @@ export default function BookStatsPage() {
         }, 0);
     }, [pageTrackedSessions]);
 
-    const timedPages = useMemo(() => {
-        return timedPageTrackedSessions.reduce((sum, s) => {
-            if (s.start_page == null || s.end_page == null) return sum;
-            return sum + (s.end_page - s.start_page + 1);
-        }, 0);
-    }, [timedPageTrackedSessions]);
 
-    const timedPageMinutes = useMemo(() => {
-        return timedPageTrackedSessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
-    }, [timedPageTrackedSessions]);
 
     const daysEngaged = useMemo(() => {
         if (engagementSessions.length === 0) return null;
@@ -425,8 +410,9 @@ export default function BookStatsPage() {
 
     const lastEngaged = engagementSessions[0]?.read_on ?? null;
 
-    const overallMinPerPage = timedPages > 0 ? timedPageMinutes / timedPages : null;
-    const pagesPerHour = overallMinPerPage ? 60 / overallMinPerPage : null;
+    const readingPace = timedReadingSummary(visualReadingSessions, "page");
+    const overallMinPerPage = readingPace.averageMinutesPerUnit;
+    const pagesPerHour = readingPace.rate;
 
     const nativeActivitySessions = useMemo(() => {
         return realSessions.filter((s) => s.session_mode === "fluid" || s.session_mode === "listening");
@@ -436,26 +422,15 @@ export default function BookStatsPage() {
         return fluidSessions.filter((s) => s.minutes_read != null && s.minutes_read > 0);
     }, [fluidSessions]);
 
-    const nativeTimedReadingPageSessions = useMemo(() => {
-        return nativeTimedReadingSessions.filter((s) => s.start_page != null && s.end_page != null);
-    }, [nativeTimedReadingSessions]);
 
     const nativeTimedReadingMinutes = useMemo(() => {
         return nativeTimedReadingSessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
     }, [nativeTimedReadingSessions]);
 
-    const nativeTimedReadingPages = useMemo(() => {
-        return nativeTimedReadingPageSessions.reduce((sum, s) => {
-            if (s.start_page == null || s.end_page == null) return sum;
-            return sum + (s.end_page - s.start_page + 1);
-        }, 0);
-    }, [nativeTimedReadingPageSessions]);
 
-    const nativeAverageMinPerPage =
-        nativeTimedReadingPages > 0 && nativeTimedReadingMinutes > 0
-            ? nativeTimedReadingPageSessions.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0) / nativeTimedReadingPages
-            : null;
-    const nativePagesPerHour = nativeAverageMinPerPage ? 60 / nativeAverageMinPerPage : null;
+    const nativeReadingPace = timedReadingSummary(fluidSessions, "page");
+    const nativeAverageMinPerPage = nativeReadingPace.averageMinutesPerUnit;
+    const nativePagesPerHour = nativeReadingPace.rate;
 
     const nativeTimedListeningSessions = useMemo(() => {
         return listeningSessions.filter((s) => s.minutes_read != null && s.minutes_read > 0);

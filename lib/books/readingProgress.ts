@@ -61,19 +61,33 @@ export function progressPayload(method: ProgressTrackingMethod, start: number | 
   return { tracking_unit: method, start_position: start, end_position: end, progress_total: total,
     start_page: method === "page" ? start : null, end_page: method === "page" ? end : null };
 }
+// Pace pairs distance and time from the same valid timed reading sessions.
+// Untimed history still belongs in progress and total-distance calculations.
+export function timedReadingSummary(sessions: ProgressRecord[], method: ProgressTrackingMethod) {
+  let distance = 0;
+  let minutes = 0;
+  for (const session of sessions) {
+    if (session.is_filler || session.session_mode === "listening" || sessionProgressUnit(session) !== method) continue;
+    const duration = session.minutes_read;
+    const amount = sessionDistance(session);
+    if (duration == null || !Number.isFinite(duration) || duration <= 0 || amount == null || !Number.isFinite(amount) || amount <= 0) continue;
+    distance += amount;
+    minutes += duration;
+  }
+  return { distance, minutes, rate: minutes > 0 ? distance / minutes * 60 : null,
+    averageMinutesPerUnit: distance > 0 ? minutes / distance : null };
+}
 export function progressSummary(sessions: ProgressRecord[], method: ProgressTrackingMethod | null, book: ProgressTotals) {
   const matching = method ? sessions.filter((s) => sessionProgressUnit(s) === method) : [];
   const positions = matching.map(sessionEnd).filter((p): p is number => p != null);
   const position = positions.length ? Math.max(...positions) : null;
   const reading = matching.filter((s) => !s.is_filler && s.session_mode !== "listening" && sessionDistance(s) != null);
   const totalDistance = reading.reduce((sum, s) => sum + (sessionDistance(s) ?? 0), 0);
-  const timed = reading.filter((s) => (s.minutes_read ?? 0) > 0);
-  const distance = timed.reduce((sum, s) => sum + (sessionDistance(s) ?? 0), 0);
-  const minutes = timed.reduce((sum, s) => sum + (s.minutes_read ?? 0), 0);
+  const timed = method ? timedReadingSummary(matching, method) : null;
   const total = matchingTotal(method, book);
-  const rate = minutes > 0 && distance > 0 ? distance / minutes * 60 : null;
+  const rate = timed?.rate ?? null;
   return { position, total, percent: completionPercent(position, method, book), rate,
-    totalDistance, averageMinutesPerUnit: minutes > 0 && distance > 0 ? minutes / distance : null,
+    totalDistance, averageMinutesPerUnit: timed?.averageMinutesPerUnit ?? null,
     remainingMinutes: position != null && total != null && position <= total && rate ? (total - position) / rate * 60 : null };
 }
 export function parseProgressRange(startText: string, endText: string, method: ProgressTrackingMethod, total: number | null) {
