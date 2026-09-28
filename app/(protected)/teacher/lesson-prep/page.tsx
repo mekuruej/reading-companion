@@ -41,10 +41,10 @@ const prepCards: PrepCard[] = [
     description: "Open student cards, libraries, follow-up areas, and learner-specific teacher tools.",
   },
   {
-    title: "Teaching Books",
+    title: "Find Your Next Teaching Book",
     href: "/teacher/library?from=lesson-prep",
     eyebrow: "Book materials",
-    description: "Manage books, notes, vocabulary, and reusable reading support for teaching.",
+    description: "Discover teaching books across the catalog and contribute your Overall Teaching Assessment.",
   },
 ];
 

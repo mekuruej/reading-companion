@@ -204,9 +204,6 @@ export default function Header() {
     pathname === "/discovery/find-books";
   const teacherSectionActive = pathname.startsWith("/teacher");
   const teacherStudentsActive = pathname === "/teacher/students" || pathname.startsWith("/teacher/students/");
-  const teacherTeachingBooksActive =
-    pathname.startsWith("/teacher/library") ||
-    pathname.startsWith("/teacher/clubs");
   const teacherNeedsAttentionActive =
     pathname === "/teacher/needs-attention" ||
     pathname === "/teacher/books" ||
@@ -529,17 +526,6 @@ export default function Header() {
                       Students
                     </Link>
                     ) : null}
-
-                    <Link
-                      href="/teacher/library"
-                      className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${teacherTeachingBooksActive
-                        ? "bg-stone-100 font-medium text-stone-900"
-                        : "text-stone-700 hover:bg-stone-50"
-                        }`}
-                      onClick={() => setShowTeacherMenu(false)}
-                    >
-                      Teaching Books
-                    </Link>
 
                     {getFeatureAccess({ role: profileRole, isSuperTeacher: profileIsSuperTeacher }).isAdmin ? (
                       <>

@@ -25,7 +25,7 @@ export function getTeacherBackLink(source: string | null | undefined): TeacherBa
   }
 
   if (source === "teacher-library") {
-    return { href: "/teacher/library", label: "← Back to Teaching Books" };
+    return { href: "/teacher/library", label: "← Back to Find Your Next Teaching Book" };
   }
 
   return { href: "/teacher", label: "← Back to Teacher Hub" };

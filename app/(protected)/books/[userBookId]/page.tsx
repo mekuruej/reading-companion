@@ -50,13 +50,13 @@ import BookHubLoadingState from "./components/BookHubLoadingState";
 import BookHubManagementActions from "./components/BookHubManagementActions";
 import { resolveBookHubMode } from "@/lib/books/bookHubMode";
 import RemoveFromLibraryDialog from "./components/RemoveFromLibraryDialog";
+import BookProgressSummaryBar from "@/components/books/BookProgressSummaryBar";
 import BookHubProgressSummary from "./components/BookHubProgressSummary";
 import BookHubNotices from "./components/BookHubNotices";
 import BookHubHero from "./components/BookHubHero";
 import BookHubStatusPanel from "./components/BookHubStatusPanel";
 import BookHubModeToggle from "./components/BookHubModeToggle";
 import BookHubTeachingOverview from "./components/BookHubTeachingOverview";
-import TeachingReflection from "./components/TeachingReflection";
 import BookHubTeachingTools from "./components/BookHubTeachingTools";
 import BookHubActionPrompt from "./components/BookHubActionPrompt";
 import WordExplorerModal from "./components/WordExplorerModal";
@@ -1892,6 +1892,7 @@ export default function BookHubPage() {
     }
 
     setReadingSessions((data as ReadingSession[]) ?? []);
+    void tracking.refreshSummary();
   }
 
   async function loadCharacters(userBookIdValue: string) {
@@ -5357,6 +5358,7 @@ export default function BookHubPage() {
     setHideKanjiInReadingSupport(false);
 
     await loadUniqueLookupCount(row.id);
+    void tracking.refreshSummary();
     quickWordInputRef.current?.focus();
   }
 
@@ -5427,6 +5429,7 @@ export default function BookHubPage() {
 
     if (row?.id) {
       await loadUniqueLookupCount(row.id);
+    void tracking.refreshSummary();
     }
   }
 
@@ -5701,23 +5704,7 @@ export default function BookHubPage() {
 
               {showUpperProgressSummary && bookHubMode !== "teaching" ? (
                 <div className="md:col-span-2">
-                  <BookHubProgressSummary
-                    progressLabel={bookHubProgressLabel}
-                    progressSummaryLabel={bookHubProgressSummaryLabel}
-                    progressBarWidth={bookHubProgressBarWidth}
-                    progressPercentLabel={bookHubProgressPercentLabel}
-                    lastSavedWordLabel={bookHubLastSavedWordLabel}
-                    lastReadPhrase={readingSessions.find((session) => session.session_mode !== "listening" && session.ending_phrase?.trim())?.ending_phrase ?? undefined}
-                    lastChapterLabel={bookHubLastChapterLabel}
-                    lastPageLabel={bookHubLastPageLabel}
-                    daysEngagedLabel={bookHubDaysEngagedLabel}
-                    daysEngagedCaption={isEnglishNativeTrackerBook ? "Reading dates" : undefined}
-                    savedWordsPerPageLabel={bookHubSavedWordsPerPageLabel}
-                    averageMinutesPerPageLabel={bookHubAverageMinutesPerPageLabel}
-                    showVocabularyStats={canSeeVocabularySummary}
-                    showProgressSection={false}
-                    summaryStats={bookHubSummaryStats}
-                  />
+                  <BookProgressSummaryBar userBookId={row.id} showVocabulary={canSeeVocabularySummary} />
                 </div>
               ) : null}
             </div>
@@ -5725,6 +5712,9 @@ export default function BookHubPage() {
             {bookHubMode === "teaching" ? (
               <div className="mt-6 space-y-4">
                 <BookHubTeachingTools
+                  onReadingExperiences={(personId) => {
+                    router.push(`/teacher/reading-experiences/${row.book_id}${personId ? `?person=${encodeURIComponent(personId)}` : ""}`);
+                  }}
                   userBookId={row.id}
                   canUseBulkAdd={!isEnglishBook && canUseBulkAdd}
                   canUseStoryNotes
@@ -5749,7 +5739,6 @@ export default function BookHubPage() {
                     router.push(`/books/${encodeURIComponent(studentUserBookId)}/words`);
                   }}
                 />
-                <TeachingReflection key={`${row.book_id}:${userId}`} bookId={row.book_id} teacherId={userId!} />
                 {managementActions}
               </div>
             ) : (

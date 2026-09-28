@@ -464,7 +464,7 @@ export default function AddBookPage() {
             : sourceParam === "teacher-books"
             ? { href: "/teacher/books", label: "← Back to Teaching Books" }
             : sourceParam === "teacher-library"
-            ? { href: "/teacher/library", label: "← Back to Teaching Books" }
+            ? { href: "/teacher/library", label: "← Back to Find Your Next Teaching Book" }
             : { href: "/teacher/books", label: "← Back to Teaching Books" };
     const pageBackLink = isTeacherGlobalContext
         ? teacherGlobalBackLink

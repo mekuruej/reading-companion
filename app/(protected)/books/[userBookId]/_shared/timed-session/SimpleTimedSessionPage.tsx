@@ -2,6 +2,7 @@
 //
 
 "use client";
+import BookProgressSummaryBar from "@/components/books/BookProgressSummaryBar";
 import { useSessionEndingPhrase, SessionEndingPhraseField, LatestEndingPhrase } from "@/components/books/SessionEndingPhrase";
 import AudioTimeInput from "@/components/books/AudioTimeInput";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
@@ -543,6 +544,7 @@ export default function SimpleTimedSessionPage({
             }
         }
 
+        void tracking.refreshSummary();
         setTimeout(() => {
             setTimerSaveMessage("");
         }, 4000);
@@ -686,6 +688,7 @@ export default function SimpleTimedSessionPage({
             .maybeSingle();
 
         setSavingProgressUpdate(false);
+        void tracking.refreshSummary();
 
         if (updateError) {
             console.error("Error updating book progress:", updateError);
@@ -1228,12 +1231,13 @@ export default function SimpleTimedSessionPage({
     );
 
     if (embedded) {
-        return <div className="space-y-5">{content}</div>;
+        return <div className="space-y-5"><BookProgressSummaryBar userBookId={userBookId} listening={activeSessionMode === "listening"} />{content}</div>;
     }
 
     return (
         <main className="min-h-screen bg-stone-50 p-6">
             <div className="mx-auto max-w-4xl space-y-5">
+                <BookProgressSummaryBar userBookId={userBookId} listening={activeSessionMode === "listening"} />
                 {content}
             </div>
         </main>

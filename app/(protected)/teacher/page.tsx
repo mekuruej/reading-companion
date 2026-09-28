@@ -91,11 +91,11 @@ const teachingCards: TeacherHubCard[] = [
       "Open student workspaces, libraries, lesson books, and follow-up actions.",
   },
   {
-    title: "Teaching Books",
+    title: "Find Your Next Teaching Book",
     href: "/teacher/library?from=teacher-hub",
     eyebrow: "Book prep",
     description:
-      "Search your professional teaching collection, assess lesson fit, and open book workspaces.",
+      "Discover books using teacher-contributed assessments and assess books from your library.",
   },
 
 ];

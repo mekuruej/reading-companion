@@ -25,6 +25,7 @@ type BookHubTeachingToolsProps = {
   onBulkAdd: () => void;
   onFollowAlongLesson: () => void;
   onStoryNotes: () => void;
+  onReadingExperiences: (personId?: string) => void;
   onCuriosityRead: () => void;
   onTeacherSnapshot: () => void;
   onStudentFlashcards: (studentUserBookId: string) => void;
@@ -151,6 +152,7 @@ export default function BookHubTeachingTools({
   onBulkAdd,
   onFollowAlongLesson,
   onStoryNotes,
+  onReadingExperiences,
   onCuriosityRead,
   onTeacherSnapshot,
   onStudentFlashcards,
@@ -435,18 +437,17 @@ export default function BookHubTeachingTools({
             className="bg-violet-50 hover:bg-violet-100" size="primary" onClick={onCuriosityRead} />
           <TeachingToolButton title="Follow-Along" description="Teach from your prepared words with Student Quick Add beside you."
             className="bg-blue-50 hover:bg-blue-100" size="primary" onClick={onFollowAlongLesson} />
-          {canUseStoryNotes ? (
-            <TeachingToolButton
-              title="Teacher Journal"
-              description="Your book knowledge and private teaching prep: Book Journal and Teaching Notes."
-              className="bg-blue-50 hover:bg-blue-100"
-              size="primary"
-              onClick={onStoryNotes}
-            />
-          ) : null}
+          <TeachingToolButton
+            title="Reading Experiences"
+            description="Your overall book assessment and reflections from reading with people."
+            className="bg-blue-50 hover:bg-blue-100"
+            size="primary"
+            onClick={() => onReadingExperiences()}
+          />
         </div>
 
         <div className="flex flex-wrap gap-2 pt-1">
+          {canUseStoryNotes ? <TeachingUtilityButton title="Teacher Journal" description="Your book knowledge and private teaching prep." onClick={onStoryNotes} /> : null}
           <TeachingUtilityButton title="My Vocabulary List" description="Review and correct your saved words for this book." onClick={onMyVocabulary} />
           {canUseBulkAdd ? (
             <TeachingUtilityButton
@@ -563,6 +564,9 @@ export default function BookHubTeachingTools({
                   </div>
 
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <button type="button" onClick={() => onReadingExperiences(student.studentId)} className="inline-flex min-h-11 items-center justify-center rounded-full border border-violet-200 bg-white px-4 py-2 text-sm font-semibold text-violet-800 hover:bg-violet-50">
+                      Add Reading Experience
+                    </button>
                     {student.isAttached && student.userBookId ? (
                       <>
                         <button

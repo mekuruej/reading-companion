@@ -4,9 +4,14 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { effectiveProgressMethod, formatAudioTime, progressMethod, shouldPromptProgress, progressLabels, matchingTotal, type ProgressTrackingMethod, type ProgressTotals } from "@/lib/books/readingProgress";
+import { loadBookProgressSummary, type BookProgressSummaryData } from "@/lib/books/bookProgressSummary";
 import type { PersonalTrackingStatus } from "@/lib/personalTracking";
 
 type ContextValue = {
+  userBookId: string | null;
+  summaryData: BookProgressSummaryData | null;
+  summaryError: string | null;
+  refreshSummary: () => Promise<void>;
   method: ProgressTrackingMethod | null;
   totals: ProgressTotals;
   loaded: boolean;
@@ -24,6 +29,7 @@ type ContextValue = {
   refresh: () => Promise<void>;
 };
 const Context = createContext<ContextValue>({
+  userBookId: null, summaryData: null, summaryError: null, refreshSummary: async () => {},
   method: null, totals: {}, loaded: false, timersEnabled: false, canChoose: false, editorOpen: false,
   choice: null, saving: false, error: null, choose: () => {}, saveMethod: async () => {},
   closeEditor: () => {}, requireMethod: () => false, changeMethod: () => {}, refresh: async () => {},
@@ -38,6 +44,22 @@ function suggestedMethod(totals: ProgressTotals) {
 
 export function BookProgressProvider({ userBookId, children, readOnly = false }: { userBookId: string; children: ReactNode; readOnly?: boolean }) {
   const pathname = usePathname();
+  const [summaryData, setSummaryData] = useState<BookProgressSummaryData | null>(null);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const summaryRequest = useRef(0);
+  const refreshSummary = useCallback(async () => {
+    const request = ++summaryRequest.current;
+    try {
+      const next = await loadBookProgressSummary(supabase, userBookId);
+      if (request === summaryRequest.current) { setSummaryData(next); setSummaryError(null); }
+    } catch {
+      if (request === summaryRequest.current) setSummaryError("Could not update your progress.");
+    }
+  }, [userBookId]);
+  useEffect(() => {
+    setSummaryData(null); setSummaryError(null);
+    return () => { summaryRequest.current++; };
+  }, [userBookId]);
   const isBookHub = pathname?.replace(/\/$/, "") === `/books/${userBookId}`;
   const dialogRef = useRef<HTMLElement>(null);
   const [method, setMethod] = useState<ProgressTrackingMethod | null>(null);
@@ -75,10 +97,10 @@ export function BookProgressProvider({ userBookId, children, readOnly = false }:
 
   useEffect(() => { void refresh(); }, [refresh, pathname]);
   useEffect(() => {
-    const update = () => { void refresh(); };
+    const update = () => { void refresh(); void refreshSummary(); };
     window.addEventListener("book-progress-changed", update);
     return () => window.removeEventListener("book-progress-changed", update);
-  }, [refresh]);
+  }, [refresh, refreshSummary]);
 
   // Standalone timers/history retain a chooser when no Book Status card is present.
   // On the hub, the editor is rendered only inside that card, even while it loads.
@@ -114,6 +136,7 @@ export function BookProgressProvider({ userBookId, children, readOnly = false }:
     }
   }
   return <Context.Provider value={{
+    userBookId, summaryData, summaryError, refreshSummary,
     method, totals, loaded, timersEnabled: loaded && !teachingOnly && !readOnly, canChoose: !!ownerId, editorOpen: open, choice, saving, error,
     choose: setChoice, saveMethod, closeEditor: () => setOpen(false), refresh, changeMethod,
     requireMethod: () => {

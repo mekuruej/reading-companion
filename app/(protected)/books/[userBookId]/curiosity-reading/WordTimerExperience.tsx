@@ -1,6 +1,7 @@
 // Curiosity Reading / Listening word timer experience
 //
 "use client";
+import BookProgressSummaryBar from "@/components/books/BookProgressSummaryBar";
 import { useSessionEndingPhrase, SessionEndingPhraseField, LatestEndingPhrase } from "@/components/books/SessionEndingPhrase";
 import WordContextFields from "@/components/vocabulary/WordContextFields";
 import { wordContextPayload, type WordContext } from "@/lib/vocabulary/wordContext";
@@ -397,6 +398,8 @@ export function CuriosityReadingExperience({
   );
 
   const curiosityProgressLine = useMemo(() => {
+    // Capture-only workspaces do not render the shared Your Progress bar.
+    if (!wordCaptureOnly) return "";
     const parts = [];
     const currentPage = quickPreview.page.trim() || (lastSavedWordContext?.positionUnit === positionUnit ? lastSavedWordContext.page : "") || "";
 
@@ -406,7 +409,7 @@ export function CuriosityReadingExperience({
     }
 
     return parts.join(" · ");
-  }, [quickPreview.page, lastSavedWordContext, positionUnit]);
+  }, [wordCaptureOnly, quickPreview.page, lastSavedWordContext, positionUnit]);
 
   const quickWordInputRef = useRef<HTMLInputElement | null>(null);
   const quickWordFieldsRef = useRef<HTMLDivElement | null>(null);
@@ -1398,6 +1401,7 @@ export function CuriosityReadingExperience({
       };
 
       setQuickSessionWords((prev) => upsertAndSortQuickSessionWords(prev, newItem));
+      void tracking.refreshSummary();
       setChapterNameOptions((current) => addChapterNameOption(current, data.chapter_name));
       if (data.chapter_name && data.chapter_number != null) {
         setChapterNumberByName((current) => ({
@@ -1450,6 +1454,7 @@ export function CuriosityReadingExperience({
       };
 
       setQuickSessionWords((prev) => upsertAndSortQuickSessionWords(prev, updatedItem));
+      void tracking.refreshSummary();
       setChapterNameOptions((current) => addChapterNameOption(current, data.chapter_name));
       if (data.chapter_name && data.chapter_number != null) {
         setChapterNumberByName((current) => ({
@@ -1576,6 +1581,7 @@ export function CuriosityReadingExperience({
       };
 
       setQuickSessionWords((prev) => upsertAndSortQuickSessionWords(prev, newItem));
+      void tracking.refreshSummary();
       setChapterNameOptions((current) => addChapterNameOption(current, data.chapter_name));
       if (data.chapter_name && data.chapter_number != null) {
         setChapterNumberByName((current) => ({
@@ -1629,6 +1635,7 @@ export function CuriosityReadingExperience({
       };
 
       setQuickSessionWords((prev) => upsertAndSortQuickSessionWords(prev, updatedItem));
+      void tracking.refreshSummary();
       setChapterNameOptions((current) => addChapterNameOption(current, data.chapter_name));
       if (data.chapter_name && data.chapter_number != null) {
         setChapterNumberByName((current) => ({
@@ -1663,6 +1670,7 @@ export function CuriosityReadingExperience({
     }
 
     setQuickSessionWords((prev) => prev.filter((item) => item.id !== id));
+    void tracking.refreshSummary();
     void loadLastSavedWordContext();
 
     if (quickPreview.id === id) {
@@ -1768,6 +1776,7 @@ export function CuriosityReadingExperience({
     );
     window.setTimeout(() => setTimerSaveMessage(""), 4000);
 
+    void tracking.refreshSummary();
     markPhraseSaved();
     setSessionStartPage("");
     setSessionEndPage("");
@@ -1867,7 +1876,7 @@ export function CuriosityReadingExperience({
       sessionStartPage={sessionStartPage}
       sessionEndPage={sessionEndPage}
       endingPhraseField={<SessionEndingPhraseField value={sessionEndingPhrase} onChange={setSessionEndingPhrase} listening={isListeningMode} />}
-      latestEndingPhrase={<LatestEndingPhrase phrase={latestEndingPhrase} />}
+      latestEndingPhrase={wordCaptureOnly || isListeningMode ? <LatestEndingPhrase phrase={latestEndingPhrase} /> : null}
       timerSaveMessage={timerSaveMessage}
       formatTimer={formatTimer}
       compact={workspaceCompact || useCompactSessionBar}
@@ -2003,6 +2012,7 @@ export function CuriosityReadingExperience({
 
   const content = (
       <>
+        {!wordCaptureOnly ? <BookProgressSummaryBar userBookId={userBookId} listening={isListeningMode} /> : null}
         {useCompactSessionBar ? (
           <>
             <CuriosityPageHeader title={pageTitle} description={pageDescription} />
@@ -2018,9 +2028,9 @@ export function CuriosityReadingExperience({
                   bookTitle={bookTitle}
                   bookCover={bookCover}
                   contextLine={
-                    isListeningMode
-                      ? curiosityProgressLine || "Listening timer + heard words"
-                      : curiosityProgressLine
+                    wordCaptureOnly
+                      ? curiosityProgressLine
+                      : isListeningMode ? "Listening timer + heard words" : undefined
                   }
                   bookHubHref={`/books/${encodeURIComponent(userBookId)}`}
                   vocabListHref={`/books/${encodeURIComponent(userBookId)}/words`}

@@ -46,7 +46,6 @@ export default function StarRatingField({
   descriptions,
 }: StarRatingFieldProps) {
   const selected = inputValue ? Number(inputValue) : null;
-  const displayedValue = selected ?? value;
 
   return (
     <div className={editing ? "rounded border bg-white p-3 text-sm" : "rounded-xl bg-emerald-50 p-3 text-sm"}>
@@ -126,9 +125,6 @@ export default function StarRatingField({
                 </button>
               );
             })}
-          </div>
-          <div className="text-xs text-stone-500">
-            {ratingDescription(descriptions, displayedValue)}
           </div>
         </div>
       )}

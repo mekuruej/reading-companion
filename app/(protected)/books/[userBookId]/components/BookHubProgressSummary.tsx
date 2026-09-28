@@ -1,7 +1,7 @@
 import BookHubStatCard from "./BookHubStatCard";
 
 type BookHubProgressSummaryProps = {
-  // Progress math and reading-session calculations stay in page.tsx.
+  // The compact card is also used by BookProgressSummaryBar; full hub statistics remain optional.
   progressLabel: string;
   progressSummaryLabel: string;
   progressBarWidth: string;
