@@ -455,10 +455,6 @@ export default function StoryNotesExperience({ teaching = false, embedded = fals
           </div>
         </section>
 
-        <div className="hidden rounded-2xl border border-sky-100 bg-sky-50/70 px-4 py-3 text-sm font-semibold leading-6 text-sky-900 lg:block">
-          Reading as you go? Open Reading Journal from Read / Listen to use the timer and journal side by side.
-        </div>
-
         <ReadingJournalPanel
           userBookId={row.id}
           initialTab={searchParams.get("tab") === "review" ? "review" : undefined}
