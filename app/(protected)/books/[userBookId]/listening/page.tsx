@@ -269,12 +269,14 @@ export default function ListeningPage() {
               : "max-w-4xl",
         ].join(" ")}
       >
+        {!showReadingWorkspace ? (
         <Link
           href={`/books/${encodeURIComponent(userBookId)}`}
           className="inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
         >
           ← Back to Book Hub
         </Link>
+        ) : null}
 
         {canUseReadingJournal ? (
           <div className="hidden justify-end lg:flex">

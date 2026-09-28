@@ -1231,13 +1231,13 @@ export default function SimpleTimedSessionPage({
     );
 
     if (embedded) {
-        return <div className="space-y-5"><BookProgressSummaryBar userBookId={userBookId} listening={activeSessionMode === "listening"} />{content}</div>;
+        return <div className="space-y-5"><BookProgressSummaryBar userBookId={userBookId} listening={activeSessionMode === "listening"} showBackLink={workspaceCompact} />{content}</div>;
     }
 
     return (
         <main className="min-h-screen bg-stone-50 p-6">
             <div className="mx-auto max-w-4xl space-y-5">
-                <BookProgressSummaryBar userBookId={userBookId} listening={activeSessionMode === "listening"} />
+                <BookProgressSummaryBar userBookId={userBookId} listening={activeSessionMode === "listening"} showBackLink={workspaceCompact} />
                 {content}
             </div>
         </main>

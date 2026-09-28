@@ -1,11 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect } from "react";
 import { useBookProgress } from "./BookProgressProvider";
 import { summarizeBookProgress } from "@/lib/books/bookProgressSummary";
 import BookHubProgressSummary from "@/app/(protected)/books/[userBookId]/components/BookHubProgressSummary";
 
-export default function BookProgressSummaryBar({ userBookId, showVocabulary = true, listening = false }: { userBookId: string; showVocabulary?: boolean; listening?: boolean }) {
+export default function BookProgressSummaryBar({ userBookId, showVocabulary = true, listening = false, showBackLink = false }: { userBookId: string; showVocabulary?: boolean; listening?: boolean; showBackLink?: boolean }) {
   const tracking = useBookProgress();
   const { refreshSummary } = tracking;
   const matchesBook = tracking.userBookId === userBookId;
@@ -20,6 +21,9 @@ export default function BookProgressSummaryBar({ userBookId, showVocabulary = tr
   const summary = tracking.summaryData && tracking.loaded
     ? summarizeBookProgress(tracking.summaryData, tracking.method, tracking.totals, showVocabulary, listening) : null;
   return <div>
+    {showBackLink ? <Link href={`/books/${encodeURIComponent(userBookId)}`} className="mb-3 inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900">
+      ← Back to Book Hub
+    </Link> : null}
     {summary ? <BookHubProgressSummary
       {...summary} progressLabel="" progressBarWidth="0%" daysEngagedLabel=""
       savedWordsPerPageLabel="" averageMinutesPerPageLabel="" showProgressSection={false}

@@ -1941,7 +1941,7 @@ export function CuriosityReadingExperience({
 
   const sessionBar = (
     <>
-      {bookTitle ? (
+      {bookTitle && (!workspaceCompact || wordCaptureOnly) ? (
         <Link
           href={`/books/${encodeURIComponent(userBookId)}`}
           className="mb-2 inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
@@ -2012,7 +2012,7 @@ export function CuriosityReadingExperience({
 
   const content = (
       <>
-        {!wordCaptureOnly ? <BookProgressSummaryBar userBookId={userBookId} listening={isListeningMode} /> : null}
+        {!wordCaptureOnly ? <BookProgressSummaryBar userBookId={userBookId} listening={isListeningMode} showBackLink={workspaceCompact} /> : null}
         {useCompactSessionBar ? (
           <>
             <CuriosityPageHeader title={pageTitle} description={pageDescription} />
@@ -2025,6 +2025,7 @@ export function CuriosityReadingExperience({
             {userBookId ? (
               bookTitle ? (
                 <CuriosityBookContextCard
+                  showBackLink={!workspaceCompact || wordCaptureOnly}
                   bookTitle={bookTitle}
                   bookCover={bookCover}
                   contextLine={

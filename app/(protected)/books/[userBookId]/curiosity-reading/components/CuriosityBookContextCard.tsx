@@ -4,6 +4,7 @@ type CuriosityBookContextCardProps = {
   bookTitle: string;
   bookCover: string;
   contextLine?: string;
+  showBackLink?: boolean;
   bookHubHref: string;
   vocabListHref: string;
 };
@@ -12,17 +13,18 @@ export default function CuriosityBookContextCard({
   bookTitle,
   bookCover,
   contextLine,
+  showBackLink = true,
   bookHubHref,
   vocabListHref,
 }: CuriosityBookContextCardProps) {
   return (
     <>
-      <Link
+      {showBackLink ? <Link
         href={bookHubHref}
         className="mb-2 inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"
       >
         ← Back to Book Hub
-      </Link>
+      </Link> : null}
 
       <div className="mb-4 flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-2.5 shadow-sm sm:mb-5 sm:flex-row sm:items-center sm:justify-between">
         <Link
