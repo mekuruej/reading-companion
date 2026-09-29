@@ -127,3 +127,31 @@ test('migration accepts core-only editions, preserves legacy/rich records and re
     assert.equal((await db.query("select narrator from books where edition_format='audiobook'")).rows[0].narrator, 'Reader');
   } finally { await db.close(); }
 });
+
+test('legacy exception flags neither require optional metadata nor bypass core fields', () => {
+  const { missingGlobalBookFields } = load('app/(protected)/teacher/books/_shared/bookAttentionHelpers.ts', {
+    '@/lib/supabaseClient': { supabase: {} },
+  });
+  for (const flag of [false, true, null]) {
+    const book = { ...core, allow_missing_isbn: flag, allow_missing_publisher: flag, missing_info_cleared_at: '2026-01-01' };
+    assert.deepEqual(missingGlobalBookFields(book), []);
+    assert.deepEqual(missingGlobalBookFields({ ...book, author: '', edition_format: '' }), ['author', 'format']);
+  }
+});
+
+test('catalog detail editor uses the edited format and passes narrator changes to its owner', () => {
+  const Details = load('app/(protected)/books/[userBookId]/components/tabs/BookInfoDetailsSection.tsx', {
+    '@/components/books/AudioTimeInput': { default: () => null },
+    '@/lib/books/readingProgress': { formatAudioTime: () => '' },
+  }).default;
+  const nodes = t => !t || typeof t !== 'object' ? [] : Array.isArray(t) ? t.flatMap(nodes) : [t, ...nodes(t.props?.children)];
+  let saved;
+  const props = { book: { ...core, edition_format: 'paperback' }, isEditingBookInfo: true,
+    editionFormat: 'audiobook', narrator: 'Reader', setNarrator: value => { saved = value; },
+    BOOK_TYPE_OPTIONS: [], Detail: () => null };
+  const narrator = nodes(Details(props)).find(n => n.props?.label === 'Narrator (optional)');
+  assert.equal(narrator.props.inputValue, 'Reader');
+  narrator.props.setInputValue('Updated reader');
+  assert.equal(saved, 'Updated reader');
+  assert.equal(nodes(Details({ ...props, editionFormat: 'ebook' })).some(n => n.props?.label === 'Narrator (optional)'), false);
+});

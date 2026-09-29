@@ -3,6 +3,7 @@
 
 "use client";
 
+import { isValidStrokeCount, strokeCountChoices } from "@/lib/kanji/strokeCount";
 import { useStudyModeRotation } from "@/lib/study/useStudyModeRotation";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -309,11 +310,7 @@ function answerStyleForMode(mode: KanjiStudyMode, preferredStyle: KanjiAnswerSty
 }
 
 function strokeCountOptionsForCard(card: QuizCard) {
-  const correct = card.strokeCount;
-  if (correct == null) return [];
-
-  const bucketStart = Math.floor((correct - 1) / 4) * 4 + 1;
-  return Array.from({ length: 4 }, (_, index) => String(bucketStart + index));
+  return strokeCountChoices(card.strokeCount);
 }
 
 function relatedReadingExamplesForCard(card: QuizCard, cards: QuizCard[]) {
@@ -926,7 +923,7 @@ export default function KanjiReadingStudyPage() {
       if (!wordLevelAllowedForKanji(card.kanjiJlpt, card.wordJlpt)) return false;
 
       if (studyMode === "kanjiStrokeCount") {
-        return card.strokeCount != null;
+        return isValidStrokeCount(card.strokeCount);
       }
 
       return card.readingType === readingType && !!card.reading;
@@ -1251,7 +1248,9 @@ export default function KanjiReadingStudyPage() {
       return;
     }
 
-    const reportReason = `Kanji reading flagged: ${cardToFlag.kanji} in ${cardToFlag.sourceWord}`;
+    const reportReason = studyMode === "kanjiStrokeCount"
+      ? `Kanji Stroke Count flagged: ${cardToFlag.kanji} (stored: ${cardToFlag.strokeCount})`
+      : `Kanji reading flagged: ${cardToFlag.kanji} in ${cardToFlag.sourceWord}`;
 
     const { error } = await supabase.from("kanji_map_reports").insert({
       vocabulary_kanji_map_id: cardToFlag.kanjiMapId,

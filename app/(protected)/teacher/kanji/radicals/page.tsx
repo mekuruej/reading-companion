@@ -413,8 +413,9 @@ export default function TeacherKanjiRadicalsPage() {
                 </label>
 
                 <label className="block text-sm font-semibold text-stone-700">
-                  Stroke count
+                  Stroke Count (whole kanji)
                   <input
+                    type="number" min="1" step="1"
                     value={editor.stroke_count ?? ""}
                     onChange={(event) => updateEditor("stroke_count", event.target.value)}
                     inputMode="numeric"

@@ -78,8 +78,6 @@ type BookRow = {
     series_number: number | null;
     series_total: number | null;
     related_links: any | null;
-    allow_missing_isbn?: boolean | null;
-    allow_missing_publisher?: boolean | null;
     missing_info_cleared_at?: string | null;
 };
 
@@ -316,8 +314,6 @@ export default function TeacherAddBookPage() {
     const [seriesNumber, setSeriesNumber] = useState("");
     const [seriesTotal, setSeriesTotal] = useState("");
     const [linksText, setLinksText] = useState("");
-    const [allowMissingIsbn, setAllowMissingIsbn] = useState(false);
-    const [allowMissingPublisher, setAllowMissingPublisher] = useState(false);
     const [selectedAuthorId, setSelectedAuthorId] = useState<string | null>(null);
     const [selectedTranslatorId, setSelectedTranslatorId] = useState<string | null>(null);
     const [selectedIllustratorId, setSelectedIllustratorId] = useState<string | null>(null);
@@ -425,8 +421,6 @@ export default function TeacherAddBookPage() {
         series_number,
         series_total,
         related_links,
-        allow_missing_isbn,
-        allow_missing_publisher,
         missing_info_cleared_at
       `
             )
@@ -496,8 +490,6 @@ export default function TeacherAddBookPage() {
         setSeriesNumber(data.series_number == null ? "" : String(data.series_number));
         setSeriesTotal(data.series_total == null ? "" : String(data.series_total));
         setLinksText(linksToText(data.related_links));
-        setAllowMissingIsbn(Boolean(data.allow_missing_isbn));
-        setAllowMissingPublisher(Boolean(data.allow_missing_publisher));
         setSelectedAuthorId(null);
         setSelectedTranslatorId(null);
         setSelectedIllustratorId(null);
@@ -647,8 +639,6 @@ export default function TeacherAddBookPage() {
         setSeriesNumber("");
         setSeriesTotal("");
         setLinksText("");
-        setAllowMissingIsbn(false);
-        setAllowMissingPublisher(false);
         setSelectedAuthorId(null);
         setSelectedTranslatorId(null);
         setSelectedIllustratorId(null);
@@ -1029,8 +1019,6 @@ export default function TeacherAddBookPage() {
                     series_number: cleanSeriesNumber,
                     series_total: cleanSeriesTotal,
                     related_links: relatedLinks,
-                    allow_missing_isbn: allowMissingIsbn,
-                    allow_missing_publisher: allowMissingPublisher,
                 })
                 .eq("id", currentBookId);
 
@@ -1247,80 +1235,6 @@ export default function TeacherAddBookPage() {
                         PersonRow={PersonRow}
                     />
 
-                    <div className="mt-4 rounded-3xl border border-amber-200 bg-amber-50 p-4">
-                        <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-800">
-                            Manual reader exceptions
-                        </p>
-                        <h3 className="mt-2 text-lg font-black text-stone-900">
-                            Let this book pass missing metadata checks
-                        </h3>
-                        <p className="mt-2 text-sm leading-6 text-stone-700">
-                            Use these only for classroom/JSL/small-reader books where the metadata is genuinely not available.
-                        </p>
-
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                            <label className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-white p-3 text-sm font-semibold text-stone-800">
-                                <input
-                                    type="checkbox"
-                                    checked={allowMissingIsbn}
-                                    onChange={(event) => {
-                                        setAllowMissingIsbn(event.target.checked);
-                                        if (event.target.checked) {
-                                            setIsbn("");
-                                            setIsbn13("");
-                                        }
-                                    }}
-                                    className="mt-1 h-4 w-4"
-                                />
-                                <span>
-                                    ISBN: none / not available
-                                    <span className="mt-1 block text-xs font-normal leading-5 text-stone-600">
-                                        Use when the book genuinely has no ISBN. This clears ISBN fields and lets missing ISBN-13 pass review.
-                                    </span>
-                                </span>
-                            </label>
-
-                            <label className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-white p-3 text-sm font-semibold text-stone-800">
-                                <input
-                                    type="checkbox"
-                                    checked={allowMissingPublisher}
-                                    onChange={(event) => {
-                                        setAllowMissingPublisher(event.target.checked);
-                                        if (event.target.checked) {
-                                            setPublisher("");
-                                            setPublisherReading("");
-                                            setPublisherEnglishName("");
-                                            setPublisherImageUrl("");
-                                            setSelectedPublisherId(null);
-                                            setRequireSharedPublisherRecord(false);
-                                        }
-                                    }}
-                                    className="mt-1 h-4 w-4"
-                                />
-                                <span>
-                                    Publisher: none / not applicable
-                                    <span className="mt-1 block text-xs font-normal leading-5 text-stone-600">
-                                        Use for web readers or small readers with no publisher. This clears publisher fields and lets missing publisher pass review.
-                                    </span>
-                                </span>
-                            </label>
-                        </div>
-
-                        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                            <p className="text-xs font-semibold text-amber-900">
-                                Save these choices after marking any category as none.
-                            </p>
-
-                            <button
-                                type="button"
-                                onClick={() => void saveBookInfo()}
-                                disabled={saving}
-                                className="rounded-2xl bg-amber-700 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                {saving ? "Saving..." : "Save none settings"}
-                            </button>
-                        </div>
-                    </div>
                 </TeacherBookInfoSection>
             ) : null}
 

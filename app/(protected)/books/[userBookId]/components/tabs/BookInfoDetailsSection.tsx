@@ -47,8 +47,8 @@ type BookInfoDetailsSectionProps = {
   setPublishedDate: (value: string) => void;
   languageCode?: string;
   setLanguageCode?: (value: string) => void;
-  narrator?: string;
-  setNarrator?: (value: string) => void;
+  narrator: string;
+  setNarrator: (value: string) => void;
   audiobookDuration?: string;
   setAudiobookDuration?: (value: string) => void;
   kindleLocationCount?: string;
@@ -100,7 +100,7 @@ export default function BookInfoDetailsSection({
   publishedDate,
   setPublishedDate,
   languageCode = "", setLanguageCode = () => {},
-  narrator = "", setNarrator = () => {},
+  narrator, setNarrator,
   audiobookDuration = "",
   setAudiobookDuration = () => {},
   kindleLocationCount = "",

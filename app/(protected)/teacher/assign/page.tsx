@@ -3,7 +3,7 @@
 
 "use client";
 
-import { hasUsableProgressTotal } from "@/lib/books/catalogProgressTotal";
+import { missingCoreBookFields } from "@/lib/books/bookMetadata";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
@@ -42,6 +42,8 @@ type TeacherStudentLink = {
 };
 
 type BookRow = {
+  language_code?: string | null;
+  edition_format?: string | null;
   id: string;
   title: string | null;
   author: string | null;
@@ -53,8 +55,6 @@ type BookRow = {
   isbn13: string | null;
   asin: string | null;
   publisher: string | null;
-  allow_missing_isbn?: boolean | null;
-  allow_missing_publisher?: boolean | null;
 };
 
 type UserBookRow = {
@@ -94,16 +94,7 @@ function getPrepBook(bookRow: PrepItemRow["books"]) {
 }
 
 function missingBookInfo(book: BookRow | undefined) {
-  if (!book) return [];
-
-  const missing: string[] = [];
-  if (!book.author) missing.push("author");
-  if (!book.cover_url) missing.push("cover");
-  if (!hasUsableProgressTotal(book)) missing.push("progress total");
-  if (!book.book_type) missing.push("book type");
-  if (!book.allow_missing_isbn && !book.isbn13 && !book.asin) missing.push("ISBN or ASIN");
-  if (!book.allow_missing_publisher && !book.publisher) missing.push("publisher");
-  return missing;
+  return book ? missingCoreBookFields(book) : [];
 }
 
 function bookSearchText(book: BookRow) {
@@ -267,7 +258,7 @@ export default function AssignBookPage() {
         // Load books
         const { data: bookRows, error: bErr } = await supabase
           .from("books")
-          .select("id, title, author, cover_url, page_count, kindle_location_count, audiobook_duration_minutes, book_type, isbn13, asin, publisher, allow_missing_isbn, allow_missing_publisher")
+          .select("id, title, author, language_code, edition_format, cover_url, page_count, kindle_location_count, audiobook_duration_minutes, book_type, isbn13, asin, publisher")
           .order("title", { ascending: true });
 
         if (bErr) throw bErr;
@@ -300,8 +291,8 @@ export default function AssignBookPage() {
               isbn13,
               asin,
               publisher,
-              allow_missing_isbn,
-              allow_missing_publisher
+              language_code,
+              edition_format
             )
           `
           )
@@ -374,8 +365,8 @@ export default function AssignBookPage() {
               isbn13,
               asin,
               publisher,
-              allow_missing_isbn,
-              allow_missing_publisher
+              language_code,
+              edition_format
             )
           `
           )

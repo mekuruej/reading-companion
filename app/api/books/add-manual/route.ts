@@ -439,7 +439,6 @@ export async function POST(request: Request) {
         page_count: pageCountResult.value,
         audiobook_duration_minutes: editionFormat === "audiobook" ? audioTotal : null,
         kindle_location_count: locationTotal,
-        allow_missing_isbn: !isbn13 && !asin,
         needs_review: true,
       })
       .select("id")

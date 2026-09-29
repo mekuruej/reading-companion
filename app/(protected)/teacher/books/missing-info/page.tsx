@@ -46,7 +46,7 @@ export default function TeacherMissingBookInfoPage() {
       const { data, error } = await supabase
         .from("books")
         .select(
-          "id, language_code, edition_format, title, isbn13, asin, cover_url, book_type, author, publisher, published_date, page_count, kindle_location_count, audiobook_duration_minutes, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at"
+          "id, language_code, edition_format, title, isbn13, asin, cover_url, book_type, author, publisher, published_date, page_count, kindle_location_count, audiobook_duration_minutes, missing_info_cleared_at"
         )
         .order("title", { ascending: true });
 

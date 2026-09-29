@@ -252,7 +252,6 @@ export default function EnglishReaderAddBookPage() {
             edition_format: editionFormat || null,
             narrator: editionFormat === "audiobook" ? narrator.trim() || null : null,
             edition_note: trimmedEditionNote || null,
-            allow_missing_isbn: !normalizedIsbn13 && !normalizedAsin,
             related_links: relatedLinksForUrl(trimmedExternalUrl),
           })
           .select("id")

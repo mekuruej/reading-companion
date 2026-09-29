@@ -71,8 +71,6 @@ type BookSearchResult = {
     page_count: number | null;
   kindle_location_count?: number | null;
   audiobook_duration_minutes?: number | null;
-    allow_missing_isbn?: boolean | null;
-    allow_missing_publisher?: boolean | null;
     missing_info_cleared_at?: string | null;
     needs_review?: boolean | null;
     language_code?: string | null;
@@ -882,7 +880,7 @@ export default function AddBookPage() {
             const { data, error: asinSearchError } = await supabase
                 .from("books")
                 .select(
-                    "id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, kindle_location_count, audiobook_duration_minutes, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at, language_code, edition_format, edition_note"
+                    "id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, kindle_location_count, audiobook_duration_minutes, missing_info_cleared_at, language_code, edition_format, edition_note"
                 )
                 .ilike("asin", normalizedAsin)
                 .limit(1)

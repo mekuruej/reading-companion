@@ -490,3 +490,26 @@ export async function POST(req: Request) {
     );
   }
 }
+
+// A stroke-only edit must not overwrite readings, radicals, components or levels.
+export async function PATCH(req: Request) {
+  try {
+    const auth = await requireSuperTeacher(req);
+    if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+    const body = await req.json();
+    const kanji = cleanText(body.kanji);
+    const strokeCount = body.stroke_count;
+    if (Array.from(kanji).length !== 1 || !/\p{Script=Han}/u.test(kanji) ||
+        !Number.isSafeInteger(strokeCount) || strokeCount <= 0) {
+      return NextResponse.json({ error: "Choose one kanji and a positive whole Stroke Count." }, { status: 400 });
+    }
+    const { data, error } = await supabaseAdmin.from("kanji_radicals")
+      .update({ stroke_count: strokeCount }).eq("kanji", kanji)
+      .select("kanji, stroke_count").maybeSingle();
+    if (error) throw error;
+    if (!data) return NextResponse.json({ error: "Add this kanji’s canonical metadata in Radical Upkeep first." }, { status: 404 });
+    return NextResponse.json({ ok: true, ...data });
+  } catch {
+    return NextResponse.json({ error: "Could not save Stroke Count." }, { status: 500 });
+  }
+}

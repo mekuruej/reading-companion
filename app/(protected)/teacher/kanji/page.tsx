@@ -3,6 +3,7 @@
 
 "use client";
 
+import KanjiStrokeCountEditor from "./components/KanjiStrokeCountEditor";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -1696,6 +1697,7 @@ export default function TeacherKanjiPage() {
                           key={row.id}
                           className="grid gap-3 rounded-2xl border border-stone-200 bg-stone-50 p-3 md:grid-cols-[80px_140px_1fr_1fr]"
                         >
+                          <KanjiStrokeCountEditor kanji={row.kanji} />
                           <div>
                             <div className="text-xs font-semibold text-stone-500">
                               Kanji

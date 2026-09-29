@@ -16,8 +16,6 @@ export type GlobalBookRow = {
   page_count: number | null;
   kindle_location_count?: number | null;
   audiobook_duration_minutes?: number | null;
-  allow_missing_isbn?: boolean | null;
-  allow_missing_publisher?: boolean | null;
   missing_info_cleared_at?: string | null;
 };
 

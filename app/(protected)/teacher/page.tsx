@@ -3,7 +3,7 @@
 
 "use client";
 
-import { hasUsableProgressTotal } from "@/lib/books/catalogProgressTotal";
+import { missingCoreBookFields } from "@/lib/books/bookMetadata";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { countNeededTeacherRatingBooks } from "@/lib/teacher/teacherReviewCompletion";
@@ -30,6 +30,8 @@ type TeacherAlertSummary = {
 };
 
 type GlobalBookRow = {
+  language_code?: string | null;
+  edition_format?: string | null;
   title: string | null;
   isbn13: string | null;
   asin: string | null;
@@ -42,8 +44,6 @@ type GlobalBookRow = {
   kindle_location_count?: number | null;
   audiobook_duration_minutes?: number | null;
   created_at?: string | null;
-  allow_missing_isbn?: boolean | null;
-  allow_missing_publisher?: boolean | null;
   missing_info_cleared_at?: string | null;
 };
 
@@ -147,20 +147,7 @@ function sortTeacherAlerts(alerts: TeacherAlertSummary[]) {
 }
 
 function missingGlobalBookFields(book: GlobalBookRow) {
-  if (book.missing_info_cleared_at) return [];
-
-  const missing: string[] = [];
-  if (!String(book.title ?? "").trim()) missing.push("title");
-  if (!book.allow_missing_isbn && !String(book.isbn13 ?? "").trim() && !String(book.asin ?? "").trim()) {
-    missing.push("ISBN-13 or ASIN");
-  }
-  if (!String(book.cover_url ?? "").trim()) missing.push("cover");
-  if (!String(book.book_type ?? "").trim()) missing.push("book type");
-  if (!String(book.author ?? "").trim()) missing.push("author");
-  if (!book.allow_missing_publisher && !String(book.publisher ?? "").trim()) missing.push("publisher");
-  if (!String(book.published_date ?? "").trim()) missing.push("published date");
-  if (!hasUsableProgressTotal(book)) missing.push("progress total");
-  return missing;
+  return book ? missingCoreBookFields(book) : [];
 }
 
 export default function TeacherHubPage() {
