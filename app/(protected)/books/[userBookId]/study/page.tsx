@@ -2,6 +2,7 @@
 //
 "use client";
 
+import { savedSenseNumber, senseStudyKey, senseDefinitionKey } from "@/lib/studySenseIdentity";
 import { wordPositionText, type WordPositionRecord } from "@/lib/vocabulary/wordPosition";
 import { useStudyModeRotation } from "@/lib/study/useStudyModeRotation";
 import { canLoadJapaneseFlashcard, canStudyWord } from "@/lib/wordSupportEligibility";
@@ -160,6 +161,7 @@ type Flashcard = {
   repeatKey: string;
   repeatCount: number;
   totalCount: number;
+  senseEncounterCount?: number;
   kanjiMeta: KanjiMetaItem[];
   isCommon: boolean | null;
   itemType?: string | null;
@@ -504,19 +506,19 @@ export default function BookFlashcardsPage() {
 
   function getCardColorInfo(card: Flashcard | null | undefined) {
     if (!card) return null;
-    return libraryColorByWordKey[makeLibraryStudyColorKey(card.word, card.reading)] ?? null;
+    return libraryColorByWordKey[makeLibraryStudyColorKey(card.word, card.reading, card.meaningChoiceIndex + 1)] ?? null;
   }
 
   function getCardColorStatus(card: Flashcard) {
     return (
       getCardColorInfo(card)?.colorStatus ??
-      computeLibraryStudyColorStatus({ encounterCount: card.totalCount })
+      computeLibraryStudyColorStatus({ encounterCount: card.senseEncounterCount ?? 1 })
     );
   }
 
   function getCardEncounterCount(card: Flashcard | null | undefined) {
     if (!card) return 0;
-    return getCardColorInfo(card)?.encounterCount ?? card.totalCount;
+    return getCardColorInfo(card)?.encounterCount ?? card.senseEncounterCount ?? 1;
   }
 
   useEffect(() => {
@@ -788,7 +790,7 @@ export default function BookFlashcardsPage() {
                 page_number: w.page_number ?? null,
                 position_unit: w.position_unit, position_value: w.position_value, percent_location: w.percent_location,
                 meaningChoices: [],
-                meaningChoiceIndex: 0,
+                meaningChoiceIndex: savedSenseNumber(w.meaning_choice_index) - 1,
                 repeatKey,
                 repeatCount,
                 totalCount: repeatCount,
@@ -879,12 +881,7 @@ export default function BookFlashcardsPage() {
               const ch = chapterInfoFromRow(w);
               const meaningChoices = asStringArray(w.meaning_choices);
 
-              const safeIdx =
-                typeof w.meaning_choice_index === "number" &&
-                  w.meaning_choice_index >= 0 &&
-                  w.meaning_choice_index < meaningChoices.length
-                  ? w.meaning_choice_index
-                  : 0;
+              const safeIdx = savedSenseNumber(w.meaning_choice_index) - 1;
 
               const savedMeaning = (w.meaning ?? "").trim();
 
@@ -913,10 +910,13 @@ export default function BookFlashcardsPage() {
 
             const dedupedLibraryMap = new Map<string, Flashcard>();
             for (const c of normalizedLibrary) {
-              const key = normalizeRepeatKey(c.word);
+              const key = senseStudyKey(makeLibraryStudyColorKey(c.word, c.reading), senseDefinitionKey(c.meaningChoiceIndex + 1));
               if (!key) continue;
-              if (!dedupedLibraryMap.has(key)) {
-                dedupedLibraryMap.set(key, c);
+              const existingSense = dedupedLibraryMap.get(key);
+              if (existingSense) {
+                existingSense.senseEncounterCount = (existingSense.senseEncounterCount ?? 1) + 1;
+              } else {
+                dedupedLibraryMap.set(key, { ...c, senseEncounterCount: 1 });
               }
             }
 
@@ -981,12 +981,7 @@ export default function BookFlashcardsPage() {
           const ch = chapterInfoFromRow(w);
           const meaningChoices = asStringArray(w.meaning_choices);
 
-          const safeIdx =
-            typeof w.meaning_choice_index === "number" &&
-              w.meaning_choice_index >= 0 &&
-              w.meaning_choice_index < meaningChoices.length
-              ? w.meaning_choice_index
-              : 0;
+          const safeIdx = savedSenseNumber(w.meaning_choice_index) - 1;
 
           const savedMeaning = (w.meaning ?? "").trim();
 
@@ -1015,10 +1010,13 @@ export default function BookFlashcardsPage() {
 
         const dedupedMap = new Map<string, Flashcard>();
         for (const c of normalized) {
-          const key = normalizeRepeatKey(c.word);
+          const key = senseStudyKey(makeLibraryStudyColorKey(c.word, c.reading), senseDefinitionKey(c.meaningChoiceIndex + 1));
           if (!key) continue;
-          if (!dedupedMap.has(key)) {
-            dedupedMap.set(key, c);
+          const existingSense = dedupedMap.get(key);
+          if (existingSense) {
+            existingSense.senseEncounterCount = (existingSense.senseEncounterCount ?? 1) + 1;
+          } else {
+            dedupedMap.set(key, { ...c, senseEncounterCount: 1 });
           }
         }
 
@@ -1039,6 +1037,7 @@ export default function BookFlashcardsPage() {
               words: deduped.map((card) => ({
                 surface: card.word,
                 reading: card.reading,
+                senseNumber: card.meaningChoiceIndex + 1,
               })),
             }),
           });
@@ -1752,7 +1751,7 @@ export default function BookFlashcardsPage() {
     }
 
     if (studySet === "MEANING") {
-      const possible = [card.meaning, ...(card.meaningChoices ?? [])];
+      const possible = [card.meaning];
       const ok = meaningMatchesOneWord(userAns, possible);
 
       if (ok) {
@@ -1779,7 +1778,7 @@ export default function BookFlashcardsPage() {
     }
 
     if (studySet === "FROM_READING_MEANING") {
-      const possible = [card.meaning, ...(card.meaningChoices ?? [])];
+      const possible = [card.meaning];
       const ok = meaningMatchesOneWord(userAnsRaw, possible);
 
       if (ok) {
@@ -1834,7 +1833,7 @@ export default function BookFlashcardsPage() {
         return;
       }
 
-      const possible = [card.meaning, ...(card.meaningChoices ?? [])];
+      const possible = [card.meaning];
       const ok = meaningMatchesOneWord(userAnsRaw, possible);
 
       if (ok) {
@@ -1861,7 +1860,7 @@ export default function BookFlashcardsPage() {
 
     const wordOk = userAnsRaw === (card.word ?? "").trim();
 
-    const possibleMeanings = [card.meaning, ...(card.meaningChoices ?? [])];
+    const possibleMeanings = [card.meaning];
     const meaningOk = meaningMatchesOneWord(userAns, possibleMeanings);
 
     if (wordOk || meaningOk) {

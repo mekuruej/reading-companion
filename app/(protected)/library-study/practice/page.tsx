@@ -3,8 +3,9 @@
 
 "use client";
 
+import { savedSenseNumber, senseDefinitionKey, senseStudyKey, cardSenseKey, groupSavedSenseEncounters } from "@/lib/studySenseIdentity";
 import { useStudyModeRotation } from "@/lib/study/useStudyModeRotation";
-import { studyCardPromptClass, studyCardDefinitionClass, STUDY_CARD_INPUT_CLASS, STUDY_CARD_CHECK_BUTTON_CLASS, STUDY_CARD_CHECK_LABEL } from "@/lib/studyCardPresentation";
+import { studyCardPromptClass, studyCardSenseClass, resolveSenseNumber, STUDY_CARD_INPUT_CLASS, STUDY_CARD_CHECK_BUTTON_CLASS, STUDY_CARD_CHECK_LABEL } from "@/lib/studyCardPresentation";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -91,21 +92,7 @@ type LibraryWordProgressRow = {
   last_studied_at: string | null;
 };
 
-type LibraryWordSummaryRow = {
-  study_identity_key: string;
-  surface: string | null;
-  reading: string | null;
-  meaning: string | null;
-  jlpt: string | null;
-  total_encounter_count: number | null;
-  book_count: number | null;
-  check_ready_encounter_count: number | null;
-  hidden_encounter_count: number | null;
-  sample_user_book_word_id: string | null;
-  sample_user_book_id: string | null;
-  sample_book_title: string | null;
-  sample_book_cover_url: string | null;
-};
+
 
 type LibraryWordClaimRow = {
   id: string;
@@ -373,32 +360,28 @@ function getBookMeta(row: UserBookJoinRow) {
 }
 
 function definitionNumberFromIndex(index: number | null | undefined) {
-  return typeof index === "number" && index >= 0 ? index + 1 : null;
+  return savedSenseNumber(index);
 }
 
 function definitionLabel(card: StudyCard | null | undefined) {
   const progressDefinition = card?.progress?.definition_key?.trim();
   if (progressDefinition) {
     return progressDefinition === "1"
-      ? "Primary definition"
+      ? "Definition 1"
       : `Definition ${progressDefinition}`;
   }
   if (card?.definitionNumber != null) {
     return card.definitionNumber === 1
-      ? "Primary definition"
+      ? "Definition 1"
       : `Definition ${card.definitionNumber}`;
   }
   return "";
 }
 
-function isNonPrimaryDefinition(card: StudyCard | null | undefined) {
-  const progressDefinition = card?.progress?.definition_key?.trim();
-  if (progressDefinition) return progressDefinition !== "1";
-  return card?.definitionNumber != null && card.definitionNumber !== 1;
-}
+
 
 function libraryReviewDefinitionChipClass(card: StudyCard | null | undefined) {
-  return studyCardDefinitionClass(card?.colorStatus.color, isNonPrimaryDefinition(card));
+  return studyCardSenseClass(resolveSenseNumber(card?.progress?.definition_key, card?.definitionNumber));
 }
 
 async function loadAllLibraryCheckWords(userBookIds: string[]) {
@@ -411,8 +394,10 @@ async function loadAllLibraryCheckWords(userBookIds: string[]) {
       .from("user_book_words")
       .select("id, user_book_id, surface, reading, meaning, meaning_choice_index, jlpt, hidden, created_at")
       .in("user_book_id", userBookIds)
-      .or("hidden.is.null,hidden.eq.false")
+      .not("hidden", "is", true)
+      .or("target_language_code.is.null,target_language_code.eq.ja")
       .order("created_at", { ascending: false })
+      .order("id")
       .range(from, to)
       .returns<UserBookWordRow[]>();
 
@@ -428,75 +413,6 @@ async function loadAllLibraryCheckWords(userBookIds: string[]) {
   }
 
   return allRows;
-}
-
-async function loadAllLibraryWordSummaries(userId: string) {
-  const allRows: LibraryWordSummaryRow[] = [];
-  let from = 0;
-
-  while (true) {
-    const to = from + LIBRARY_CHECK_WORD_PAGE_SIZE - 1;
-    const { data, error } = await supabase
-      .from("user_library_word_summaries")
-      .select(
-        `
-          study_identity_key,
-          surface,
-          reading,
-          meaning,
-          jlpt,
-          total_encounter_count,
-          book_count,
-          check_ready_encounter_count,
-          hidden_encounter_count,
-          sample_user_book_word_id,
-          sample_user_book_id,
-          sample_book_title,
-          sample_book_cover_url
-        `
-      )
-      .eq("user_id", userId)
-      .order("total_encounter_count", { ascending: false })
-      .range(from, to)
-      .returns<LibraryWordSummaryRow[]>();
-
-    if (error) throw error;
-
-    allRows.push(...(data ?? []));
-
-    if (!data || data.length < LIBRARY_CHECK_WORD_PAGE_SIZE) {
-      break;
-    }
-
-    from += LIBRARY_CHECK_WORD_PAGE_SIZE;
-  }
-
-  return allRows;
-}
-
-async function loadDefinitionNumbersByWordId(wordIds: string[], userBookIds: string[]) {
-  const definitionNumberByWordId = new Map<string, number>();
-  const uniqueWordIds = uniqueStrings(wordIds);
-
-  for (let i = 0; i < uniqueWordIds.length; i += LIBRARY_PROGRESS_KEY_BATCH_SIZE) {
-    const batch = uniqueWordIds.slice(i, i + LIBRARY_PROGRESS_KEY_BATCH_SIZE);
-    const { data: sampleWords, error: sampleWordsErr } = await supabase
-      .from("user_book_words")
-      .select("id, meaning_choice_index")
-      .in("id", batch)
-      .in("user_book_id", userBookIds);
-
-    if (sampleWordsErr) throw sampleWordsErr;
-
-    for (const word of sampleWords ?? []) {
-      const definitionNumber = definitionNumberFromIndex((word as any).meaning_choice_index);
-      if (definitionNumber != null) {
-        definitionNumberByWordId.set((word as any).id, definitionNumber);
-      }
-    }
-  }
-
-  return definitionNumberByWordId;
 }
 
 async function loadLibraryWordClaims(userId: string) {
@@ -564,14 +480,13 @@ async function loadLibraryProgressByKey(userId: string, studyKeys: string[]) {
         `
       )
       .eq("user_id", userId)
-      .eq("definition_key", "")
       .in("study_identity_key", batch)
       .returns<LibraryWordProgressRow[]>();
 
     if (progressErr) throw progressErr;
 
     for (const row of progressRows ?? []) {
-      progressByKey.set(row.study_identity_key, row);
+      progressByKey.set(senseStudyKey(row.study_identity_key, row.definition_key), row);
     }
   }
 
@@ -646,7 +561,7 @@ function makeClaimStudyCard(
     key,
     surface,
     reading,
-    progressByKey.get(key) ?? null,
+    progressByKey.get(senseStudyKey(key)) ?? null,
     claim
   );
 
@@ -677,7 +592,7 @@ function makeClaimStudyCard(
     activeGate: pickLibraryCheckGate(colorStatus, key, surface),
     studyIdentityKey: key,
     progress,
-    definitionNumber: null,
+    definitionNumber: 1,
   };
 }
 
@@ -919,7 +834,7 @@ function LibraryPracticePanel({
 
   const showReading = !cardSkipsReading && (revealStep === "reading" || revealStep === "meaning");
   const showMeaning = revealStep === "meaning";
-  const currentCardWasFlagged = flaggedCardKeys.has(card.studyIdentityKey);
+  const currentCardWasFlagged = flaggedCardKeys.has(cardSenseKey(card));
 
   async function handleFlagCardClick() {
     if (currentCardWasFlagged || flaggingCard) return;
@@ -932,7 +847,7 @@ function LibraryPracticePanel({
       if (ok) {
         setFlaggedCardKeys((current) => {
           const next = new Set(current);
-          next.add(card.studyIdentityKey);
+          next.add(cardSenseKey(card));
           return next;
         });
       }
@@ -1497,7 +1412,6 @@ export default function LibraryStudyPage() {
   const [practiceRevealStep, setPracticeRevealStep] = useState<PracticeRevealStep>("word");
   const [practiceFinished, setPracticeFinished] = useState(false);
   const [practiceStarted, setPracticeStarted] = useState(false);
-  const [practiceStarting, setPracticeStarting] = useState(false);
   const [practiceStudyMode, setPracticeStudyMode, nextPracticeMode] = useStudyModeRotation(LIBRARY_REVIEW_MODE_ORDER, "READING");
 
   const [selectedJlptLevels, setSelectedJlptLevels] = useState<string[]>([]);
@@ -1678,152 +1592,30 @@ export default function LibraryStudyPage() {
         setReviewCountsLoading(true);
         setLoading(false);
 
-        let allSummaryRows: LibraryWordSummaryRow[] = [];
-        let summaryLoadError: unknown = null;
-
-        try {
-          allSummaryRows = await loadAllLibraryWordSummaries(user.id);
-        } catch (summaryErr) {
-          summaryLoadError = summaryErr;
-          console.warn("Library word summaries are not available yet:", summaryErr);
-        }
-
         const claimRows = await loadLibraryWordClaims(user.id);
-        const claimByKey = new Map<string, LibraryWordClaimRow>();
-        for (const claim of claimRows) {
-          if (claim.study_identity_key) claimByKey.set(claim.study_identity_key, claim);
-        }
-
-        if (allSummaryRows.length > 0) {
-          const visibleSummaryRows = allSummaryRows
-            .filter((row) => (row.total_encounter_count ?? 0) > (row.hidden_encounter_count ?? 0));
-
-          const studyKeys = uniqueStrings([
-            ...allSummaryRows.map((row) => row.study_identity_key).filter(Boolean),
-            ...claimRows.map((row) => row.study_identity_key).filter(Boolean),
-          ]);
-
-          const progressByKey = new Map<string, LibraryWordProgressRow>();
-
-          if (studyKeys.length > 0) {
-            try {
-              const loadedProgress = await loadLibraryProgressByKey(user.id, studyKeys);
-              for (const [key, row] of loadedProgress.entries()) {
-                progressByKey.set(key, row);
-              }
-            } catch (progressErr) {
-              console.warn("Ability Check progress did not load:", progressErr);
-              setNotice(
-                "Ability Check loaded, but saved gate progress did not load. You can still preview the cards."
-              );
-            }
-          }
-
-          const reviewCards: StudyCard[] = visibleSummaryRows
-            .map((summary) => {
-              const surface = (summary.surface ?? "").trim();
-              const reading = (summary.reading ?? "").trim();
-              const meaning = (summary.meaning ?? "").trim();
-              const encounterCount = summary.total_encounter_count ?? 0;
-              const progress = progressWithWordSkyClaim(
-                user.id,
-                summary.study_identity_key,
-                surface,
-                reading,
-                progressByKey.get(summary.study_identity_key) ?? null,
-                claimByKey.get(summary.study_identity_key)
-              );
-
-              if (!surface || !reading || !meaning || !summary.sample_user_book_word_id) {
-                return null;
-              }
-
-              const colorStatus = computeLibraryStudyColorStatus({
-                encounterCount,
-                settings: colorSettings,
-                readingGate: progress?.reading_gate_status ?? "not_started",
-                meaningGate: progress?.meaning_gate_status ?? "not_started",
-                heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
-                heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
-                preReadingSupportCycle: preReadingSupportCycle(progress),
-                mastered: progress?.mastered ?? false,
-              });
-
-              return {
-                id: summary.sample_user_book_word_id,
-                userBookId: summary.sample_user_book_id ?? "",
-                bookTitle: summary.sample_book_title ?? "Untitled",
-                bookCoverUrl: summary.sample_book_cover_url ?? null,
-                surface,
-                reading,
-                meaning,
-                jlpt: summary.jlpt ?? null,
-                encounterCount,
-                bookCount: summary.book_count ?? 0,
-                encounterIds: [summary.sample_user_book_word_id],
-                colorStatus,
-                activeGate: pickLibraryCheckGate(colorStatus, summary.study_identity_key, surface),
-                studyIdentityKey: summary.study_identity_key,
-                progress,
-                definitionNumber: null,
-              };
-            })
-            .filter((card): card is StudyCard => Boolean(card));
-
-          const reviewCardKeys = new Set(reviewCards.map((card) => card.studyIdentityKey));
-          const reviewClaimCards = claimRows
-            .filter((claim) => !reviewCardKeys.has(claim.study_identity_key))
-            .map((claim) => makeClaimStudyCard(user.id, claim, colorSettings, progressByKey))
-            .filter((card): card is StudyCard => Boolean(card));
-          const allReviewCards = [...reviewCards, ...reviewClaimCards];
-
-          setLibraryReviewCards(allReviewCards);
-          return;
-        }
-
-        if (summaryLoadError) {
-          console.warn("Falling back to saved-word rows for Library Practice:", summaryLoadError);
-        }
+        const claimByKey = new Map(claimRows.map((claim) => [claim.study_identity_key, claim]));
 
         const words = await loadAllLibraryCheckWords(userBookIds);
 
-        const groupedWords = new Map<string, UserBookWordRow[]>();
-
-        for (const row of words) {
-          const surface = row.surface?.trim() ?? "";
-          const reading = row.reading?.trim() ?? "";
-          const meaning = row.meaning?.trim() ?? "";
-          const key = studyIdentityKey(surface, reading);
-
-          if (!surface || !reading || !meaning || !key) continue;
-
-          const group = groupedWords.get(key) ?? [];
-          group.push(row);
-          groupedWords.set(key, group);
-        }
+        const groupedWords = groupSavedSenseEncounters(words, studyIdentityKey);
 
         const progressByKey = new Map<string, LibraryWordProgressRow>();
         const studyKeys = uniqueStrings([
-          ...Array.from(groupedWords.entries()).map(([key]) => key),
+          ...words.map((row) => studyIdentityKey(row.surface, row.reading)),
           ...claimRows.map((row) => row.study_identity_key).filter(Boolean),
         ]);
 
         if (studyKeys.length > 0) {
-          try {
-            const loadedProgress = await loadLibraryProgressByKey(user.id, studyKeys);
-            for (const [key, row] of loadedProgress.entries()) {
-              progressByKey.set(key, row);
-            }
-          } catch (progressErr) {
-            console.warn("Ability Check progress did not load:", progressErr);
-            setNotice(
-              "Ability Check loaded, but saved gate progress did not load. You can still preview the cards."
-            );
+          const loadedProgress = await loadLibraryProgressByKey(user.id, studyKeys);
+          for (const [key, row] of loadedProgress.entries()) {
+            progressByKey.set(key, row);
           }
         }
 
         const cards: StudyCard[] = Array.from(groupedWords.entries())
-          .map(([key, group]) => {
+          .map(([senseKey, group]) => {
+            const key = studyIdentityKey(group[0].surface, group[0].reading);
+            const primarySense = savedSenseNumber(group[0].meaning_choice_index) === 1;
             const representative = group[0];
             const meta = metaById.get(representative.user_book_id);
             const surface = representative.surface!.trim();
@@ -1833,8 +1625,8 @@ export default function LibraryStudyPage() {
               key,
               surface,
               reading,
-              progressByKey.get(key) ?? null,
-              claimByKey.get(key)
+              progressByKey.get(senseKey) ?? null,
+              (primarySense ? claimByKey.get(key) : undefined)
             );
 
             const colorStatus = computeLibraryStudyColorStatus({
@@ -1869,9 +1661,9 @@ export default function LibraryStudyPage() {
           })
           .filter((card): card is StudyCard => Boolean(card));
 
-        const groupedCardKeys = new Set(cards.map((card) => card.studyIdentityKey));
+        const groupedCardKeys = new Set(cards.map(cardSenseKey));
         const claimCards = claimRows
-          .filter((claim) => !groupedCardKeys.has(claim.study_identity_key))
+          .filter((claim) => !groupedCardKeys.has(senseStudyKey(claim.study_identity_key)))
           .map((claim) => makeClaimStudyCard(user.id, claim, colorSettings, progressByKey))
           .filter((card): card is StudyCard => Boolean(card));
         const allStudyCards = [...cards, ...claimCards];
@@ -1919,61 +1711,10 @@ export default function LibraryStudyPage() {
     resetPracticeDeck(practiceFilteredCards);
   }, [practiceFilteredCards, practiceStarted]);
 
-  async function hydrateDefinitionNumbersForPractice(cards: StudyCard[]) {
-    if (ownedUserBookIds.length === 0) return cards;
-
-    const wordIds = uniqueStrings(
-      cards
-        .filter((card) => !isClaimCardId(card.id))
-        .map((card) => card.id)
-    );
-
-    if (wordIds.length === 0) return cards;
-
-    try {
-      const definitionNumberByWordId = await loadDefinitionNumbersByWordId(
-        wordIds,
-        ownedUserBookIds
-      );
-
-      if (definitionNumberByWordId.size === 0) return cards;
-
-      return cards.map((card) => ({
-        ...card,
-        definitionNumber: definitionNumberByWordId.get(card.id) ?? card.definitionNumber,
-      }));
-    } catch (sampleWordsErr) {
-      console.warn("Could not load definition numbers for Library Practice:", sampleWordsErr);
-      return cards;
-    }
-  }
-
-  async function startPractice() {
+  function startPractice() {
     if (reviewCountsLoading) return;
-
-    setPracticeStarting(true);
-
-    try {
-      const hydratedCards = await hydrateDefinitionNumbersForPractice(practiceFilteredCards);
-      const definitionNumberByCardId = new Map(
-        hydratedCards.map((card) => [card.id, card.definitionNumber] as const)
-      );
-
-      setLibraryReviewCards((current) =>
-        current.map((card) =>
-          definitionNumberByCardId.has(card.id)
-            ? {
-              ...card,
-              definitionNumber: definitionNumberByCardId.get(card.id) ?? card.definitionNumber,
-            }
-            : card
-        )
-      );
-      setPracticeStarted(true);
-      resetPracticeDeck(hydratedCards);
-    } finally {
-      setPracticeStarting(false);
-    }
+    setPracticeStarted(true);
+    resetPracticeDeck(practiceFilteredCards);
   }
 
   function returnToPracticeSetup() {
@@ -2116,7 +1857,7 @@ export default function LibraryStudyPage() {
       study_identity_key: activeCard.studyIdentityKey,
       surface: activeCard.surface,
       reading: activeCard.reading,
-      definition_key: "",
+      definition_key: senseDefinitionKey(activeCard.definitionNumber),
       reading_gate_status: existing?.reading_gate_status ?? "not_started",
       meaning_gate_status: existing?.meaning_gate_status ?? "not_started",
       held_before_reading_gate: existing?.held_before_reading_gate ?? false,
@@ -2427,14 +2168,10 @@ export default function LibraryStudyPage() {
           <button
             type="button"
             onClick={startPractice}
-            disabled={reviewCountsLoading || practiceFilteredCards.length === 0 || practiceStarting}
+            disabled={reviewCountsLoading || practiceFilteredCards.length === 0}
             className="mt-5 w-full rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-black disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
           >
-            {practiceStarting
-              ? "Generating..."
-              : lockedMasteredWordsMode
-                ? "Start Mastered Words"
-                : "Start Review"}
+            {lockedMasteredWordsMode ? "Start Mastered Words" : "Start Review"}
           </button>
         </section>
       ) : (

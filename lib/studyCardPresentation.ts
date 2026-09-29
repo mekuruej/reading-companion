@@ -16,17 +16,32 @@ export function studyCardModeBadgeClass(target?: StudyCardTarget) {
   return `rounded-full border px-3 py-1.5 text-[11px] font-black uppercase tracking-wide shadow-sm sm:px-5 sm:py-2 sm:text-sm ${tone}`;
 }
 
-export function studyCardDefinitionClass(color: string | undefined, secondary: boolean) {
-  const tones: Record<string, string> = {
-    red: "border-red-300 bg-red-100 text-red-950",
-    orange: "border-orange-300 bg-orange-100 text-orange-950",
-    yellow: QUESTION_TONES.readiness,
-    green: QUESTION_TONES.reading,
-    blue: QUESTION_TONES.meaning,
-    purple: QUESTION_TONES.word,
-    grey: "border-slate-300 bg-slate-100 text-slate-700",
-  };
-  return `rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-wide shadow-sm sm:px-3 sm:py-1.5 sm:text-xs ${tones[color ?? "grey"] ?? tones.grey}${secondary ? " motion-safe:animate-pulse" : ""}`;
+// Sense accents are presentation only. Never pass review colors or stages here.
+const SENSE_ACCENTS = [
+  "border-teal-300 bg-teal-50 text-teal-950",
+  "border-fuchsia-300 bg-fuchsia-50 text-fuchsia-950",
+  "border-indigo-300 bg-indigo-50 text-indigo-950",
+  "border-stone-300 bg-stone-100 text-stone-900",
+  "border-cyan-300 bg-cyan-50 text-cyan-950",
+  "border-rose-300 bg-rose-50 text-rose-950",
+] as const;
+
+export function resolveSenseNumber(
+  definitionKey?: string | null,
+  fallbackSenseNumber?: number | null
+): number | null {
+  const value = definitionKey?.trim() ? Number(definitionKey) : fallbackSenseNumber;
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0
+    ? value
+    : null;
+}
+
+export function studyCardSenseClass(senseNumber: number | null) {
+  // Higher sense numbers repeat the palette; the visible number is the identifier.
+  const senseAccent = senseNumber !== null && Number.isSafeInteger(senseNumber) && senseNumber > 0
+    ? SENSE_ACCENTS[(senseNumber - 1) % SENSE_ACCENTS.length]
+    : "border-slate-300 bg-slate-50 text-slate-700";
+  return `rounded-full border px-2 py-1 text-[10px] font-black uppercase tracking-wide shadow-sm sm:px-3 sm:py-1.5 sm:text-xs ${senseAccent}`;
 }
 
 export const STUDY_CARD_INPUT_CLASS = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base";

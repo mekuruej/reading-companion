@@ -859,6 +859,7 @@ export default function BookWordsPage() {
           mastered
         `
               )
+              .eq("definition_key", "")
               .eq("user_id", ownerUserId)
               .returns<LibraryWordProgressRow[]>();
 

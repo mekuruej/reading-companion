@@ -17,6 +17,7 @@ type ProfileRow = {
 type WordForColorLookup = {
   surface?: string | null;
   reading?: string | null;
+  senseNumber?: number;
 };
 
 function isSuperTeacherFlag(value: unknown) {
@@ -68,6 +69,7 @@ function cleanWords(value: unknown): WordForColorLookup[] {
     .map((word) => ({
       surface: typeof word?.surface === "string" ? word.surface.trim() : "",
       reading: typeof word?.reading === "string" ? word.reading.trim() : "",
+      senseNumber: Number.isSafeInteger(word?.senseNumber) && word.senseNumber > 0 ? word.senseNumber : undefined,
     }))
     .filter((word) => word.surface && word.reading)
     .slice(0, 500);

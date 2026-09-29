@@ -173,6 +173,7 @@ export default function CommunityHubPage() {
             .select(
               "user_id, study_identity_key, reading_gate_status, meaning_gate_status, mastered, mastered_at, reading_gate_failed_at, meaning_gate_failed_at, last_studied_at"
             )
+            .eq("definition_key", "")
             .limit(10000),
         ]);
 

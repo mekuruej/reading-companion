@@ -361,6 +361,7 @@ export default function WordSkyPage() {
               .select(
                 "study_identity_key, reading_gate_status, meaning_gate_status, held_before_reading_gate, held_before_meaning_gate, reading_gate_attempts, mastered"
               )
+              .eq("definition_key", "")
               .eq("user_id", user.id)
               .limit(20000)
               .returns<LibraryProgressSkyRow[]>(),

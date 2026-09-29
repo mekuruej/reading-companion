@@ -462,6 +462,7 @@ export default function BooksPage() {
           .select(
             "id, study_identity_key, reading_gate_status, meaning_gate_status, held_before_reading_gate, held_before_meaning_gate, mastered, mastered_at, reading_gate_failed_at, meaning_gate_failed_at, last_studied_at"
           )
+          .eq("definition_key", "")
           .eq("user_id", userId)
           .in("study_identity_key", chunk)
           .returns<AbilityCheckProgressRow[]>();
