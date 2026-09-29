@@ -17,6 +17,12 @@ type UpkeepCard = {
 
 const baseUpkeepCards: UpkeepCard[] = [
   {
+    title: "Missing / Legacy Formats",
+    href: "/teacher/books/formats",
+    eyebrow: "Books",
+    description: "Repair missing edition formats in one inline queue.",
+  },
+  {
     title: "Catalog Editor",
     href: "/teacher/books/add?from=site-upkeep",
     eyebrow: "Books",
@@ -204,7 +210,7 @@ export default function TeacherGeneralUpkeepPage() {
         <section className="mt-6">
           <UpkeepCardGrid
             cards={baseUpkeepCards.filter(
-              (card) => card.href !== "/teacher/books/add?from=site-upkeep" || canUseCatalogEditor
+              (card) => !["/teacher/books/add?from=site-upkeep", "/teacher/books/formats"].includes(card.href ?? "") || canUseCatalogEditor
             )}
           />
         </section>

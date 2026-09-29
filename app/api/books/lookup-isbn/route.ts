@@ -32,7 +32,7 @@ async function lookupExistingMekuruBook(isbn13: string) {
   const { data, error } = await supabaseAdmin
     .from("books")
     .select(
-      "id, title, author, cover_url, publisher, published_date, page_count, kindle_location_count, audiobook_duration_minutes, isbn13, language_code"
+      "id, title, author, cover_url, publisher, published_date, page_count, kindle_location_count, audiobook_duration_minutes, narrator, edition_format, isbn13, language_code"
     )
     .eq("isbn13", isbn13)
     .maybeSingle();
@@ -54,6 +54,8 @@ async function lookupExistingMekuruBook(isbn13: string) {
     published_date: data.published_date,
     page_count: data.page_count,
     kindle_location_count: data.kindle_location_count,
+    narrator: data.narrator,
+    edition_format: data.edition_format,
     audiobook_duration_minutes: data.audiobook_duration_minutes,
     language_code: data.language_code,
   });

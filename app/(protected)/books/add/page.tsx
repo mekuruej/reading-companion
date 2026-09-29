@@ -2,7 +2,8 @@
 // 
 "use client";
 
-import { hasUsableProgressTotal } from "@/lib/books/catalogProgressTotal";
+import EditionCoreFields from "@/components/books/EditionCoreFields";
+import { missingCoreBookFields } from "@/lib/books/bookMetadata";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -16,11 +17,8 @@ import AddBookCatalogResult from "./components/AddBookCatalogResult";
 import ManualEditionForm, { type ManualEditionMode } from "./components/ManualEditionForm";
 import AddBookModeButton from "./components/AddBookModeButton";
 import AddBookTeacherDestinationOptions from "./components/AddBookTeacherDestinationOptions";
-import AddBookEditionLanguageConfirmation from "./components/AddBookEditionLanguageConfirmation";
 import { isValidAsin, normalizeAsin } from "@/lib/books/asin";
 import {
-    COMMON_BOOK_LANGUAGE_OPTIONS,
-    bookLanguageLabel,
     normalizeBookLanguageCode,
 } from "@/lib/books/bookLanguage";
 
@@ -56,6 +54,8 @@ type LookupBook = {
     found_existing_book?: boolean;
     existing_book_id?: string | null;
     language_code?: string | null;
+    edition_format?: string | null;
+    narrator?: string | null;
 };
 
 type BookSearchResult = {
@@ -123,20 +123,7 @@ function getPageCount(book: LookupBook) {
 }
 
 function missingGlobalBookFields(book: BookSearchResult) {
-    if (book.missing_info_cleared_at) return [];
-
-    const missing: string[] = [];
-    if (!String(book.title ?? "").trim()) missing.push("title");
-    if (!book.allow_missing_isbn && !String(book.isbn13 ?? "").trim() && !String(book.asin ?? "").trim()) {
-        missing.push("ISBN-13 or ASIN");
-    }
-    if (!String(book.cover_url ?? "").trim()) missing.push("cover");
-    if (!String(book.book_type ?? "").trim()) missing.push("book type");
-    if (!String(book.author ?? "").trim()) missing.push("author");
-    if (!book.allow_missing_publisher && !String(book.publisher ?? "").trim()) missing.push("publisher");
-    if (!String(book.published_date ?? "").trim()) missing.push("published date");
-    if (!hasUsableProgressTotal(book)) missing.push("progress total");
-    return missing;
+    return missingCoreBookFields(book);
 }
 
 
@@ -165,6 +152,11 @@ export default function AddBookPage() {
     const [confirmedEditionLanguageCode, setConfirmedEditionLanguageCode] = useState("");
     const [manualAddMode, setManualAddMode] = useState<ManualEditionMode | null>(null);
     const [manualTitle, setManualTitle] = useState("");
+    const [manualNarrator, setManualNarrator] = useState("");
+    const [previewTitle, setPreviewTitle] = useState<string | null>(null);
+    const [previewAuthor, setPreviewAuthor] = useState<string | null>(null);
+    const [previewFormat, setPreviewFormat] = useState<string | null>(null);
+    const [previewNarrator, setPreviewNarrator] = useState<string | null>(null);
     const [manualAuthor, setManualAuthor] = useState("");
     const [manualEditionFormat, setManualEditionFormat] = useState("");
     const [manualEditionNote, setManualEditionNote] = useState("");
@@ -702,6 +694,7 @@ export default function AddBookPage() {
         setManualPageCount("");
         setManualKindleLocationCount("");
         setManualAudiobookDuration("");
+        setManualNarrator("");
         setManualAddError("");
         setManualPossibleMatches([]);
     }
@@ -719,6 +712,7 @@ export default function AddBookPage() {
         setManualPageCount("");
         setManualKindleLocationCount("");
         setManualAudiobookDuration("");
+        setManualNarrator("");
         setManualAddError("");
         setManualPossibleMatches([]);
     }
@@ -776,6 +770,7 @@ export default function AddBookPage() {
         setError("");
         setBookSearchError("");
         setBook(null);
+        setPreviewTitle(null); setPreviewAuthor(null); setPreviewFormat(null); setPreviewNarrator(null);
         setConfirmedEditionLanguageCode("");
         resetManualAdd();
         setLibraryNotice(null);
@@ -855,7 +850,7 @@ export default function AddBookPage() {
 
             setError("");
             setBook(lookedUpBook);
-            setConfirmedEditionLanguageCode("");
+            setConfirmedEditionLanguageCode(normalizeBookLanguageCode(lookedUpBook.language_code) ?? "");
         } catch (lookupError) {
             console.error("Book lookup failed:", lookupError);
             setError("We couldn't complete the lookup. Please try again.");
@@ -869,6 +864,7 @@ export default function AddBookPage() {
         setError("");
         setBookSearchError("");
         setBook(null);
+        setPreviewTitle(null); setPreviewAuthor(null); setPreviewFormat(null); setPreviewNarrator(null);
         setConfirmedEditionLanguageCode("");
         resetManualAdd();
         setBookSearchResults([]);
@@ -992,6 +988,16 @@ export default function AddBookPage() {
             return;
         }
 
+        if (isNewToMekuru) {
+            const missing = missingCoreBookFields({
+                title: previewTitle ?? book.title,
+                author: previewAuthor ?? getDisplayAuthor(book),
+                language_code: selectedEditionLanguageCode,
+                edition_format: previewFormat ?? book.edition_format,
+            });
+            if (missing.length) { setError(`Please provide: ${missing.join(", ")}.`); return; }
+        }
+
         if (
             isNewToMekuru &&
             !window.confirm(
@@ -1020,10 +1026,12 @@ export default function AddBookPage() {
                 },
                 body: JSON.stringify({
                     isbn13: book.isbn13,
+                    title: previewTitle ?? book.title,
+                    author: previewAuthor ?? getDisplayAuthor(book),
+                    editionFormat: previewFormat ?? book.edition_format,
+                    narrator: previewNarrator ?? book.narrator,
                     ...addModePayload(),
-                    languageCode: needsEditionLanguageConfirmation
-                        ? selectedEditionLanguageCode
-                        : undefined,
+                    languageCode: selectedEditionLanguageCode,
                 }),
             });
 
@@ -1119,6 +1127,7 @@ export default function AddBookPage() {
                     asin: manualAddMode === "asin" ? normalizeAsin(asin) : null,
                     title: manualTitle,
                     author: manualAuthor,
+                    narrator: manualNarrator,
                     editionFormat: manualEditionFormat || null,
                     editionNote: manualEditionNote || null,
                     audiobook_duration_minutes: manualEditionFormat === "audiobook" ? manualAudiobookDuration || null : null,
@@ -1263,12 +1272,6 @@ export default function AddBookPage() {
     const needsEditionLanguageConfirmation =
         !!book && book.found_existing_book !== true && !normalizedPreviewLanguageCode;
     const selectedEditionLanguageCode = normalizeBookLanguageCode(confirmedEditionLanguageCode);
-    const selectedEditionLanguageLabel = bookLanguageLabel(selectedEditionLanguageCode);
-    const selectedCommonEditionLanguageCode = COMMON_BOOK_LANGUAGE_OPTIONS.some(
-        (option) => option.code === selectedEditionLanguageCode
-    )
-        ? selectedEditionLanguageCode ?? ""
-        : "";
     const manualIdentifierLabel =
         manualAddMode === "isbn"
             ? `ISBN ${isbn.replace(/[\s-]/g, "").trim()}`
@@ -1787,14 +1790,20 @@ export default function AddBookPage() {
                     </div>
                 ) : null}
 
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
-                            Results / Edition
+                <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4 sm:p-5">
+                    <div className="max-w-2xl">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
+                            Confirm your edition
                         </p>
                         <h2 className="mt-2 text-xl font-black text-stone-950">
-                            Confirm the edition
+                            Choose the edition you’re actually reading.
                         </h2>
+                        <p className="mt-2 text-sm leading-6 text-stone-700">
+                            MEKURU uses your edition to measure reading pace and progress, so format and edition details matter.
+                        </p>
+                        <p className="mt-2 text-xs leading-5 text-stone-600">
+                            Check the format and any ISBN or ASIN. Page counts, Kindle locations, and audiobook duration can vary by edition.
+                        </p>
                     </div>
                     {activeMode === "title" ? (
                         <button
@@ -1807,9 +1816,12 @@ export default function AddBookPage() {
                                     editionNote: fallbackRequestFormatNote,
                                 })
                             }
-                            className="rounded-2xl border border-stone-200 bg-white px-5 py-3 text-sm font-bold text-stone-700 shadow-sm transition hover:bg-stone-50"
+                            className="mt-4 rounded-xl border border-sky-200 bg-white px-4 py-2.5 text-left text-sm font-bold text-sky-900 shadow-sm transition hover:bg-sky-100"
                         >
-                            Can't find it?
+                            Can’t find your edition? Add it manually.
+                            <span className="mt-1 block text-xs font-normal text-stone-600">
+                                Use this even if the title is already listed.
+                            </span>
                         </button>
                     ) : null}
                 </div>
@@ -1892,18 +1904,14 @@ export default function AddBookPage() {
 
                 {book ? (
                     <div className="mt-4">
-                        {needsEditionLanguageConfirmation ? (
-                            <AddBookEditionLanguageConfirmation
-                                selectedCommonEditionLanguageCode={selectedCommonEditionLanguageCode}
-                                confirmedEditionLanguageCode={confirmedEditionLanguageCode}
-                                selectedEditionLanguageLabel={selectedEditionLanguageLabel}
-                                languageOptions={COMMON_BOOK_LANGUAGE_OPTIONS}
-                                onLanguageCodeChange={(value) => {
-                                    setConfirmedEditionLanguageCode(value);
-                                    setError("");
-                                }}
-                            />
-                        ) : null}
+                        {book.found_existing_book !== true ? <EditionCoreFields
+                            title={previewTitle ?? book.title ?? ""} onTitleChange={setPreviewTitle}
+                            author={previewAuthor ?? getDisplayAuthor(book)} onAuthorChange={setPreviewAuthor}
+                            languageCode={confirmedEditionLanguageCode} onLanguageChange={setConfirmedEditionLanguageCode}
+                            editionFormat={previewFormat ?? book.edition_format ?? ""} onFormatChange={setPreviewFormat}
+                            narrator={previewNarrator ?? book.narrator ?? ""} onNarratorChange={setPreviewNarrator}
+                        /> : null}
+
                         <AddBookActionRow
                             addLoading={addLoading}
                             disabled={
@@ -1950,6 +1958,8 @@ export default function AddBookPage() {
                         editionNote={manualEditionNote}
                         languageCode={manualLanguageCode}
                         pageCount={manualPageCount}
+                        narrator={manualNarrator}
+                        onNarratorChange={setManualNarrator}
                         audiobookDuration={manualAudiobookDuration}
                         onAudiobookDurationChange={setManualAudiobookDuration}
                         kindleLocationCount={manualKindleLocationCount}

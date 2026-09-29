@@ -2,7 +2,10 @@
 
 "use client";
 
-import { hasUsableProgressTotal, isValidProgressTotal } from "@/lib/books/catalogProgressTotal";
+import EditionCoreFields from "@/components/books/EditionCoreFields";
+import { missingCoreBookFields } from "@/lib/books/bookMetadata";
+import { normalizeBookLanguageCode } from "@/lib/books/bookLanguage";
+import { isValidProgressTotal } from "@/lib/books/catalogProgressTotal";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -49,6 +52,7 @@ type BookRow = {
     book_type: string | null;
     language_code: string | null;
     edition_format: string | null;
+    narrator?: string | null;
     edition_note: string | null;
     trigger_warnings: string | null;
     author: string | null;
@@ -82,6 +86,9 @@ type BookRow = {
 type EditingPanel = "bookInfoDetails" | "bookInfoPeople" | "bookInfoLinks" | null;
 
 type IsbnLookupPreview = {
+    language_code?: string | null;
+    edition_format?: string | null;
+    narrator?: string | null;
     isbn13: string;
     title: string | null;
     author_display: string | null;
@@ -103,6 +110,7 @@ type BookRequestRow = {
     isbn13: string | null;
     asin: string | null;
     edition_format: string | null;
+    narrator?: string | null;
     status: string | null;
     created_at: string | null;
 };
@@ -298,6 +306,8 @@ export default function TeacherAddBookPage() {
     const [publisherImageUrl, setPublisherImageUrl] = useState("");
 
     const [publishedDate, setPublishedDate] = useState("");
+    const [narrator, setNarrator] = useState("");
+    const [languageCode, setLanguageCode] = useState("");
     const [editionFormat, setEditionFormat] = useState("");
     const [editionNote, setEditionNote] = useState("");
     const [audiobookDuration, setAudiobookDuration] = useState("");
@@ -324,34 +334,9 @@ export default function TeacherAddBookPage() {
     const [isbnLookupError, setIsbnLookupError] = useState("");
     const [isbnLookupPreview, setIsbnLookupPreview] = useState<IsbnLookupPreview | null>(null);
 
-    const missingFields = useMemo(() => {
-        const missing: string[] = [];
-
-        if (!coverUrl.trim()) missing.push("Cover");
-        if (!bookType.trim()) missing.push("Book type");
-        if (!author.trim()) missing.push("Author");
-        const normalizedAsin = normalizeAsin(asin);
-        if (!isbn13.trim() && !normalizedAsin && !allowMissingIsbn) missing.push("ISBN-13 or ASIN");
-        if (!publisher.trim() && !allowMissingPublisher) missing.push("Publisher");
-        if (!publishedDate.trim()) missing.push("Published date");
-        if (!hasUsableProgressTotal({ page_count: pageCount, kindle_location_count: kindleLocationCount, audiobook_duration_minutes: audiobookDuration, edition_format: editionFormat })) missing.push("Progress Total");
-
-        return missing;
-    }, [
-        allowMissingIsbn,
-        allowMissingPublisher,
-        coverUrl,
-        bookType,
-        author,
-        asin,
-        isbn13,
-        publisher,
-        publishedDate,
-        pageCount,
-        kindleLocationCount,
-        audiobookDuration,
-        editionFormat,
-    ]);
+    const missingFields = useMemo(() => missingCoreBookFields({
+        title, author, language_code: languageCode, edition_format: editionFormat,
+    }), [title, author, languageCode, editionFormat]);
 
     useEffect(() => {
         async function load() {
@@ -414,6 +399,7 @@ export default function TeacherAddBookPage() {
         book_type,
         language_code,
         edition_format,
+        narrator,
         edition_note,
         trigger_warnings,
         author,
@@ -462,6 +448,8 @@ export default function TeacherAddBookPage() {
         setCoverUrl(data.cover_url ?? "");
         setBookType(data.book_type ?? "");
         setEditionFormat(data.edition_format ?? "");
+        setNarrator(data.narrator ?? "");
+        setLanguageCode(data.language_code ?? "");
         setEditionNote(data.edition_note ?? "");
 
         setAuthor(data.author ?? "");
@@ -618,6 +606,8 @@ export default function TeacherAddBookPage() {
     }
 
     function clearForm() {
+        setNarrator("");
+        setLanguageCode("");
         setCurrentBookId(null);
         setCurrentBook(null);
         setEditingPanel(null);
@@ -696,7 +686,13 @@ export default function TeacherAddBookPage() {
                 throw new Error(payload?.error ?? "ISBN lookup failed.");
             }
 
-            setIsbnLookupPreview((payload?.book ?? payload) as IsbnLookupPreview);
+            const preview = (payload?.book ?? payload) as IsbnLookupPreview;
+            setIsbnLookupPreview(preview);
+            setTitle(preview.title ?? "");
+            setAuthor(preview.author_display ?? "");
+            setLanguageCode(preview.language_code ?? "");
+            setEditionFormat(preview.edition_format ?? "");
+            setNarrator(preview.narrator ?? "");
         } catch (error: any) {
             setIsbnLookupError(error?.message ?? "ISBN lookup failed.");
         } finally {
@@ -707,12 +703,9 @@ export default function TeacherAddBookPage() {
     async function createOrLoadByIsbn() {
         setMessage("");
 
-        if (!title.trim()) {
-            setMessage(
-                bookRequest
-                    ? "Please enter the researched book title before creating the manual catalog book entry."
-                    : "Please enter a title."
-            );
+        const missing = missingCoreBookFields({ title, author, language_code: languageCode, edition_format: editionFormat });
+        if (missing.length) {
+            setMessage(`Complete the required fields before creating: ${missing.join(", ")}.`);
             return;
         }
 
@@ -739,14 +732,14 @@ export default function TeacherAddBookPage() {
             const existingIsbnLookup = cleanIsbn13
                 ? await supabase
                     .from("books")
-                    .select("id, title")
+                    .select("id, title, edition_format")
                     .eq("isbn13", cleanIsbn13)
                     .maybeSingle()
                 : { data: null, error: null };
             const existingAsinLookup = normalizedAsin
                 ? await supabase
                     .from("books")
-                    .select("id, title")
+                    .select("id, title, edition_format")
                     .ilike("asin", normalizedAsin)
                     .maybeSingle()
                 : { data: null, error: null };
@@ -767,6 +760,9 @@ export default function TeacherAddBookPage() {
                 return;
             }
 
+            if (existingBook?.edition_format && editionFormat && existingBook.edition_format !== editionFormat) {
+                throw new Error("This identifier belongs to a different format. Use this edition’s identifier, or leave it blank.");
+            }
             if (existingBook) {
                 await loadBook(existingBook.id);
                 setMessage(`Loaded existing book: ${existingBook.title}`);
@@ -784,6 +780,8 @@ export default function TeacherAddBookPage() {
                     isbn13: cleanIsbn13 || null,
                     asin: normalizedAsin,
                     edition_format: cleanText(editionFormat),
+                    narrator: editionFormat === "audiobook" ? cleanText(narrator) : null,
+                    language_code: normalizeBookLanguageCode(languageCode),
                     edition_note: cleanText(editionNote),
                     audiobook_duration_minutes: editionFormat === "audiobook" && audiobookDuration.trim() ? Number(audiobookDuration) : null,
                     kindle_location_count: kindleLocationCount.trim() ? Number(kindleLocationCount) : null,
@@ -814,9 +812,9 @@ export default function TeacherAddBookPage() {
         } catch (error: any) {
             console.error("Create/load catalog book error:", JSON.stringify(error, null, 2));
             setMessage(error?.message ?? "Failed to create or load book.");
+        } finally {
+            setSaving(false);
         }
-
-        setSaving(false);
     }
 
     async function rejectBookRequest() {
@@ -871,13 +869,6 @@ export default function TeacherAddBookPage() {
             return;
         }
 
-        if (!isbnLookupPreview.title?.trim()) {
-            setIsbnLookupError(
-                "This lookup did not return a title. Please review and create the book manually."
-            );
-            return;
-        }
-
         if (audiobookDuration.trim() && (!isValidProgressTotal(audiobookDuration) || Number(audiobookDuration) > 2147483647)) { setMessage("Audiobook length must be positive whole minutes."); return; }
         if (pageCount.trim() && !isValidProgressTotal(pageCount)) { setMessage("Page count must be a positive whole number."); return; }
         if (kindleLocationCount.trim() && !isValidProgressTotal(kindleLocationCount)) { setMessage("Total Kindle Location must be a positive whole number."); return; }
@@ -886,12 +877,15 @@ export default function TeacherAddBookPage() {
         try {
             const { data: existingBook, error: existingError } = await supabase
                 .from("books")
-                .select("id, title")
+                .select("id, title, edition_format")
                 .eq("isbn13", isbnLookupPreview.isbn13)
                 .maybeSingle();
 
             if (existingError) throw existingError;
 
+            if (existingBook?.edition_format && editionFormat && existingBook.edition_format !== editionFormat) {
+                throw new Error("This identifier belongs to a different format. Use this edition’s identifier, or leave it blank.");
+            }
             if (existingBook) {
                 await loadBook(existingBook.id);
                 setMessage("This ISBN already exists in Mekuru. Loaded the existing catalog book.");
@@ -900,7 +894,9 @@ export default function TeacherAddBookPage() {
                 return;
             }
 
-        const cleanPageCount =
+            const missing = missingCoreBookFields({title, author, language_code:languageCode, edition_format:editionFormat});
+            if (missing.length) { setIsbnLookupError(`Complete the fields above: ${missing.join(", ")}.`); return; }
+            const cleanPageCount =
                 isbnLookupPreview.page_count != null && Number.isFinite(isbnLookupPreview.page_count)
                     ? isbnLookupPreview.page_count
                     : null;
@@ -908,9 +904,9 @@ export default function TeacherAddBookPage() {
             const { data, error } = await supabase
                 .from("books")
                 .insert({
-                    title: isbnLookupPreview.title.trim(),
+                    title: title.trim(),
                     isbn13: isbnLookupPreview.isbn13,
-                    author: cleanText(isbnLookupPreview.author_display ?? ""),
+                    author: cleanText(author),
                     cover_url: cleanText(isbnLookupPreview.cover_url ?? ""),
                     publisher: cleanText(isbnLookupPreview.publisher ?? ""),
                     published_date: cleanText(isbnLookupPreview.published_date ?? ""),
@@ -918,6 +914,8 @@ export default function TeacherAddBookPage() {
                     kindle_location_count: kindleLocationCount.trim() ? Number(kindleLocationCount) : null,
                     page_count: cleanPageCount,
                     edition_format: cleanText(editionFormat),
+                    narrator: editionFormat === "audiobook" ? cleanText(narrator) : null,
+                    language_code: normalizeBookLanguageCode(languageCode),
                     edition_note: cleanText(editionNote),
                 })
                 .select("id")
@@ -949,6 +947,8 @@ export default function TeacherAddBookPage() {
             return;
         }
 
+        const missing = missingCoreBookFields({title, author, language_code:languageCode, edition_format:editionFormat});
+        if (missing.length) { setMessage(`Please provide: ${missing.join(", ")}.`); return; }
         const cleanIsbn13 = isbn13.replace(/[^0-9Xx]/g, "");
         const normalizedAsin = normalizeAsin(asin);
 
@@ -1020,6 +1020,8 @@ export default function TeacherAddBookPage() {
 
                     published_date: cleanText(publishedDate),
                     edition_format: cleanText(editionFormat),
+                    narrator: editionFormat === "audiobook" ? cleanText(narrator) : null,
+                    language_code: normalizeBookLanguageCode(languageCode),
                     edition_note: cleanText(editionNote),
                     audiobook_duration_minutes: editionFormat === "audiobook" && audiobookDuration.trim() ? Number(audiobookDuration) : null,
                     kindle_location_count: kindleLocationCount.trim() ? Number(kindleLocationCount) : null,
@@ -1088,7 +1090,12 @@ export default function TeacherAddBookPage() {
                 <TeacherBookFindCreatePanel>
                     {bookRequest ? <TeacherBookAddHelpCard /> : null}
 
+                    <EditionCoreFields title={title} onTitleChange={setTitle} author={author} onAuthorChange={setAuthor}
+                        languageCode={languageCode} onLanguageChange={setLanguageCode} editionFormat={editionFormat} onFormatChange={setEditionFormat}
+                        narrator={narrator} onNarratorChange={setNarrator} />
+
                     <TeacherBookFindCreateFields
+                        hideTitle
                         title={title}
                         titleReading={titleReading}
                         isbn13={isbn13}
@@ -1105,14 +1112,15 @@ export default function TeacherAddBookPage() {
                         onAsinChange={setAsin}
                     />
 
+
+
                     <TeacherBookTitleSearch title={title} sourceQuerySuffix={sourceQuerySuffix} />
 
                     <TeacherBookFindCreateActions
                         isbnLookupLoading={isbnLookupLoading}
                         hasIsbnValue={Boolean(isbn13.trim())}
-                        hasAsinValue={Boolean(asin.trim())}
+                        missingCoreFields={missingFields}
                         saving={saving}
-                        isBookRequest={Boolean(bookRequest)}
                         isbnLookupError={isbnLookupError}
                         onLookupIsbn={lookupIsbnPreview}
                         onCreateOrLoad={createOrLoadByIsbn}
@@ -1122,6 +1130,7 @@ export default function TeacherAddBookPage() {
                     {isbnLookupPreview ? (
                         <TeacherBookIsbnPreviewCard
                             preview={isbnLookupPreview}
+                            missingCoreFields={missingFields}
                             saving={saving}
                             metadataSourceLabel={metadataSourceLabel}
                             onCreateOrLoad={createOrLoadFromIsbnPreview}
@@ -1155,6 +1164,8 @@ export default function TeacherAddBookPage() {
                         setBookType={setBookType}
                         editionFormat={editionFormat}
                         setEditionFormat={setEditionFormat}
+                        languageCode={languageCode} setLanguageCode={setLanguageCode}
+                        narrator={narrator} setNarrator={setNarrator}
                         editionNote={editionNote}
                         setEditionNote={setEditionNote}
                         publishedDate={publishedDate}

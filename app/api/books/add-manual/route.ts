@@ -1,3 +1,4 @@
+import { missingCoreBookFields } from "@/lib/books/bookMetadata";
 import { isValidProgressTotal } from "@/lib/books/catalogProgressTotal";
 import { canTeachTargetUser } from "@/lib/teacher/targetUserAccess";
 import { NextResponse } from "next/server";
@@ -16,17 +17,6 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
-
-const EDITION_FORMATS = new Set([
-  "bunko",
-  "tankobon_hardcover",
-  "tankobon_softcover",
-  "paperback",
-  "hardcover",
-  "ebook",
-  "audiobook",
-  "other",
-]);
 
 function cleanText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -221,29 +211,37 @@ async function addBookToTeacherAndStudentLibraries({
 async function findIdentifierBook({
   isbn13,
   asin,
+  editionFormat,
 }: {
   isbn13: string | null;
   asin: string | null;
+  editionFormat: string | null;
 }) {
   if (isbn13) {
     const { data, error } = await supabaseAdmin
       .from("books")
-      .select("id")
+      .select("id, edition_format")
       .eq("isbn13", isbn13)
       .maybeSingle();
 
     if (error) throw error;
+    if (data?.edition_format && editionFormat && data.edition_format !== editionFormat) {
+      throw Object.assign(new Error("This identifier belongs to a different format. Use this edition’s identifier, or leave it blank."), { status: 409 });
+    }
     if (data?.id) return data.id as string;
   }
 
   if (asin) {
     const { data, error } = await supabaseAdmin
       .from("books")
-      .select("id")
+      .select("id, edition_format")
       .eq("asin", asin)
       .maybeSingle();
 
     if (error) throw error;
+    if (data?.edition_format && editionFormat && data.edition_format !== editionFormat) {
+      throw Object.assign(new Error("This identifier belongs to a different format. Use this edition’s identifier, or leave it blank."), { status: 409 });
+    }
     if (data?.id) return data.id as string;
   }
 
@@ -263,7 +261,7 @@ async function findPossibleMatches({
 }) {
   const { data, error } = await supabaseAdmin
     .from("books")
-    .select("id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, kindle_location_count, audiobook_duration_minutes, language_code")
+    .select("id, title, author, cover_url, book_type, isbn13, asin, publisher, published_date, page_count, kindle_location_count, audiobook_duration_minutes, language_code, edition_format")
     .ilike("title", title)
     .eq("language_code", languageCode)
     .eq("edition_format", editionFormat)
@@ -295,6 +293,7 @@ export async function POST(request: Request) {
     const asin = rawAsin || null;
     const languageCode = normalizeBookLanguageCode(body?.languageCode ?? body?.language_code);
     const editionFormat = cleanOptionalText(body?.editionFormat ?? body?.edition_format);
+    const narrator = editionFormat === "audiobook" ? cleanOptionalText(body?.narrator) : null;
     const editionNote = cleanOptionalText(body?.editionNote ?? body?.edition_note);
     const audioRaw = body?.audiobook_duration_minutes;
     const audioTotal = audioRaw == null || audioRaw === "" ? null : Number(audioRaw);
@@ -371,7 +370,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const existingIdentifierBookId = await findIdentifierBook({ isbn13, asin });
+    const existingIdentifierBookId = await findIdentifierBook({ isbn13, asin, editionFormat });
     if (existingIdentifierBookId) {
       const libraryResult = await applyAddBookDestinations({
         supabase: supabaseAdmin,
@@ -402,29 +401,9 @@ export async function POST(request: Request) {
       });
     }
 
-    if (!title) {
-      return NextResponse.json({ error: "Title is required." }, { status: 400 });
-    }
-
-    if (!languageCode) {
-      return NextResponse.json(
-        { error: "Choose the language of this edition." },
-        { status: 400 }
-      );
-    }
-
+    const missingCore = missingCoreBookFields({title, author, language_code: languageCode, edition_format: editionFormat});
+    if (missingCore.length) return NextResponse.json({error: `Please provide: ${missingCore.join(", ")}.`}, {status:400});
     const isIdentifierBacked = Boolean(isbn13 || asin);
-    if (!isIdentifierBacked && !author) {
-      return NextResponse.json({ error: "Author is required." }, { status: 400 });
-    }
-
-    if (!isIdentifierBacked && !editionFormat) {
-      return NextResponse.json({ error: "Format is required." }, { status: 400 });
-    }
-
-    if (editionFormat && !EDITION_FORMATS.has(editionFormat)) {
-      return NextResponse.json({ error: "Choose a valid edition format." }, { status: 400 });
-    }
 
     if (!isIdentifierBacked && !confirmDifferentEdition) {
       const possibleMatches = await findPossibleMatches({
@@ -455,6 +434,7 @@ export async function POST(request: Request) {
         asin,
         language_code: languageCode,
         edition_format: editionFormat,
+        narrator,
         edition_note: editionNote,
         page_count: pageCountResult.value,
         audiobook_duration_minutes: editionFormat === "audiobook" ? audioTotal : null,
@@ -475,6 +455,7 @@ export async function POST(request: Request) {
           asin,
           language_code: languageCode,
           edition_format: editionFormat,
+          narrator,
           edition_note: editionNote,
           page_count: pageCountResult.value,
           audiobook_duration_minutes: editionFormat === "audiobook" ? audioTotal : null,
@@ -490,7 +471,7 @@ export async function POST(request: Request) {
     let bookId = insertedBook?.id as string | undefined;
 
     if (insertBookError?.code === "23505") {
-      bookId = await findIdentifierBook({ isbn13, asin }) ?? undefined;
+      bookId = await findIdentifierBook({ isbn13, asin, editionFormat }) ?? undefined;
     } else if (insertBookError) {
       console.error("Error creating manual book:", insertBookError);
       return NextResponse.json(

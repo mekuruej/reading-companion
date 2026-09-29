@@ -41,6 +41,8 @@ export type NormalizedBookLookupResult = {
   page_count: number | null;
   kindle_location_count?: number | null;
   audiobook_duration_minutes?: number | null;
+  narrator?: string | null;
+  edition_format?: string | null;
   description: string | null;
   metadata_source: BookMetadataSource;
   source_id: string | null;
@@ -202,6 +204,8 @@ export function normalizedLookupFromExistingBook({
   page_count,
   kindle_location_count,
   audiobook_duration_minutes,
+  narrator,
+  edition_format,
   language_code,
 }: {
   id: string | null | undefined;
@@ -215,6 +219,8 @@ export function normalizedLookupFromExistingBook({
   page_count: number | string | null | undefined;
   kindle_location_count?: number | string | null;
   audiobook_duration_minutes?: number | string | null;
+  narrator?: string | null;
+  edition_format?: string | null;
   language_code: string | null | undefined;
 }): NormalizedBookLookupResult {
   const authors = cleanAuthors([author]);
@@ -231,6 +237,8 @@ export function normalizedLookupFromExistingBook({
     page_count: cleanNumber(page_count),
     kindle_location_count: cleanNumber(kindle_location_count),
     audiobook_duration_minutes: cleanNumber(audiobook_duration_minutes),
+    narrator: edition_format === "audiobook" ? narrator?.trim() || null : null,
+    edition_format,
     description: null,
     metadata_source: "mekuru",
     source_id: id ?? null,

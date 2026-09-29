@@ -77,6 +77,7 @@ export async function POST(
     return NextResponse.json({ error: "Choose whether to keep this teaching book." }, { status: 400 });
   }
 
+  let removalStep = "check teaching dependencies";
   try {
     const hasTeachingData = await requiresTeachingRetention(supabaseAdmin, auth.user.id, userBook.book_id, userBookId);
     if (hasTeachingData && !choice) {
@@ -91,6 +92,7 @@ export async function POST(
       if (!hasTeachingData) {
         return NextResponse.json({ error: "This book no longer has a teaching connection. Please reload." }, { status: 409 });
       }
+      removalStep = "retain teaching copy";
       const { data: retained, error } = await supabaseAdmin.from("user_books")
         .update({ personal_tracking_status: "not_tracking" })
         .eq("id", userBookId).eq("user_id", auth.user.id).eq("book_id", userBook.book_id)
@@ -100,6 +102,7 @@ export async function POST(
     }
 
     // One database transaction prevents partial deletion if any dependency fails.
+    removalStep = "remove copy transaction";
     const { error } = await supabaseAdmin.rpc("remove_owned_library_book", {
       p_actor_id: auth.user.id,
       p_user_book_id: userBookId,
@@ -108,7 +111,21 @@ export async function POST(
     if (error) throw error;
     return NextResponse.json({ success: true, outcome: "removed" });
   } catch (error) {
-    console.error("Could not safely remove library book:", error);
-    return NextResponse.json({ error: "Could not safely remove this book. Nothing was removed. Please reload and try again." }, { status: 500 });
+    // Error properties are often non-enumerable and otherwise log as {}.
+    const failure = error as { code?: string; message?: string; details?: string; hint?: string } | null;
+    const diagnostic = {
+      step: removalStep,
+      code: failure?.code ?? null,
+      message: failure?.message ?? String(error),
+      details: failure?.details ?? null,
+      hint: failure?.hint ?? null,
+    };
+    console.error("Could not safely remove library book:", diagnostic);
+    const message = "Could not safely remove this book. Nothing was removed. Please reload and try again.";
+    return NextResponse.json({
+      error: process.env.NODE_ENV === "development"
+        ? `${message} Diagnostic: ${diagnostic.step}: ${diagnostic.code ?? "error"}: ${diagnostic.message}`
+        : message,
+    }, { status: 500 });
   }
 }

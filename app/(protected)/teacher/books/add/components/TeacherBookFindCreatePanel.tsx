@@ -13,9 +13,8 @@ export function TeacherBookFindCreatePanel({
                 Edit an existing book or create a new entry
             </h2>
             <p className="mt-2 text-sm leading-6 text-stone-600">
-                Enter all or part of a title and choose Find by title to edit, then select
-                the matching edition. No ISBN is needed to find an existing book.
-                You can also look up an ISBN, or create a new catalog entry below.
+                Search with just a title, or look up an ISBN. To create a new edition,
+                complete Title, Author, Language, and Format. ISBN and ASIN are optional.
             </p>
 
             {children}

@@ -25,7 +25,8 @@ test('transaction removes only owner copy/teaching entries, preserves notebook a
  const actor=id(1),student=id(2),book=id(3),copy=id(4),studentCopy=id(5),teacherBook=id(6),entry=id(7);
  try{
  await db.exec(`create role anon;create role authenticated;create role service_role;
- create table user_books(id uuid primary key,user_id uuid,book_id uuid);
+ create table books(id uuid primary key,edition_format text);
+ create table user_books(id uuid primary key,user_id uuid,book_id uuid references books);
  create table teacher_books(id uuid primary key,teacher_id uuid,book_id uuid,user_book_id uuid references user_books on delete set null);
  create table teacher_book_items(id uuid,teacher_book_id uuid references teacher_books on delete cascade);
  create table teacher_book_prep_items(id uuid,teacher_id uuid,book_id uuid,prep_user_book_id uuid references user_books on delete set null);
@@ -36,6 +37,7 @@ test('transaction removes only owner copy/teaching entries, preserves notebook a
  create table teacher_student_lesson_books(teacher_id uuid,user_book_id uuid references user_books on delete cascade);`);
  for(const table of ['user_word_collocations','study_logs','user_study_events','user_alerts','user_book_detective_entries','user_book_characters','user_book_chapter_summaries','user_book_reading_sessions','learning_tasks','user_book_words'])await db.exec(`create table ${table}(user_book_id uuid references user_books on delete cascade)`);
  const migration=fs.readFileSync(path.join(root,'sql/20260927_explicit_library_removal.sql'),'utf8');await db.exec(migration);await db.exec(migration);
+ await db.query('insert into books values ($1,$2)',[book,'paperback']);
  await db.query('insert into user_books values ($1,$2,$3),($4,$5,$3)',[copy,actor,book,studentCopy,student]);
  await db.query('insert into teacher_books values ($1,$2,$3,$4)',[teacherBook,actor,book,copy]);
  await db.query('insert into teacher_notebook_entries values ($1,$2)',[entry,actor]);
@@ -51,6 +53,13 @@ test('transaction removes only owner copy/teaching entries, preserves notebook a
  assert.deepEqual((await db.query('select id from user_books')).rows,[{id:studentCopy}]);assert.equal((await db.query('select * from teacher_books')).rows.length,0);
  assert.equal((await db.query('select * from teacher_student_lesson_books')).rows.length,1);assert.equal((await db.query('select * from teacher_notebook_entries')).rows.length,1);
  const context=(await db.query('select * from teacher_notebook_entry_contexts')).rows[0];assert.equal(context.book_id,book);assert.equal(context.user_book_id,null);assert.equal(context.teacher_book_id,null);
+ assert.deepEqual((await db.query('select * from books')).rows,[{id:book,edition_format:'paperback'}]);
+ // Re-add with a newly selected edition: a fresh copy starts without old tracking.
+ const newEdition=id(8),newCopy=id(9);
+ await db.query('insert into books values ($1,$2)',[newEdition,'ebook']);
+ await db.query('insert into user_books values ($1,$2,$3)',[newCopy,actor,newEdition]);
+ assert.equal((await db.query('select * from user_book_words where user_book_id=$1',[newCopy])).rows.length,0);
+ assert.equal((await db.query('select * from user_book_reading_sessions where user_book_id=$1',[newCopy])).rows.length,0);
  for(const role of ['anon','authenticated'])assert.equal((await db.query(`select has_function_privilege('${role}', 'remove_owned_library_book(uuid,uuid,boolean)', 'execute') as allowed`)).rows[0].allowed,false);
  }finally{await db.close()}
 });

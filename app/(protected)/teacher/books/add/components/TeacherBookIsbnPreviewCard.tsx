@@ -14,6 +14,7 @@ type TeacherBookIsbnPreview = {
 type TeacherBookIsbnPreviewCardProps = {
     preview: TeacherBookIsbnPreview;
     saving: boolean;
+    missingCoreFields: string[];
     metadataSourceLabel: (value: TeacherBookIsbnPreview["metadata_source"]) => string;
     onCreateOrLoad: () => void;
 };
@@ -21,6 +22,7 @@ type TeacherBookIsbnPreviewCardProps = {
 export function TeacherBookIsbnPreviewCard({
     preview,
     saving,
+    missingCoreFields,
     metadataSourceLabel,
     onCreateOrLoad,
 }: TeacherBookIsbnPreviewCardProps) {
@@ -101,7 +103,7 @@ export function TeacherBookIsbnPreviewCard({
                         <button
                             type="button"
                             onClick={onCreateOrLoad}
-                            disabled={saving}
+                            disabled={saving || (!preview.found_existing_book && missingCoreFields.length > 0)}
                             className="rounded-2xl bg-sky-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-800 disabled:opacity-50"
                         >
                             {saving
@@ -111,9 +113,13 @@ export function TeacherBookIsbnPreviewCard({
                                     : "Create catalog book from this metadata"}
                         </button>
 
+                        {!preview.found_existing_book && missingCoreFields.length > 0 ? (
+                            <p className="text-sm text-amber-800">Complete the fields above before creating: {missingCoreFields.join(", ")}.</p>
+                        ) : null}
+
                         {!preview.title ? (
                             <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                                This preview has no title, so it needs manual/admin review before creating.
+                                No title was found. Complete the required fields above to create this edition.
                             </div>
                         ) : null}
                     </div>

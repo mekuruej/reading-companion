@@ -3,7 +3,7 @@
 
 "use client";
 
-import { hasUsableProgressTotal } from "@/lib/books/catalogProgressTotal";
+import { missingCoreBookFields } from "@/lib/books/bookMetadata";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -24,7 +24,9 @@ type BookFlag = {
 };
 
 type GlobalBookRow = {
+  edition_format?: string | null;
   id: string;
+  language_code?: string | null;
   title: string | null;
   isbn13: string | null;
   asin: string | null;
@@ -54,20 +56,7 @@ type PendingBookRequest = {
 };
 
 function missingGlobalBookFields(book: GlobalBookRow) {
-  if (book.missing_info_cleared_at) return [];
-
-  const missing: string[] = [];
-  if (!String(book.title ?? "").trim()) missing.push("title");
-  if (!book.allow_missing_isbn && !String(book.isbn13 ?? "").trim() && !String(book.asin ?? "").trim()) {
-    missing.push("ISBN-13 or ASIN");
-  }
-  if (!String(book.cover_url ?? "").trim()) missing.push("cover");
-  if (!String(book.book_type ?? "").trim()) missing.push("book type");
-  if (!String(book.author ?? "").trim()) missing.push("author");
-  if (!book.allow_missing_publisher && !String(book.publisher ?? "").trim()) missing.push("publisher");
-  if (!String(book.published_date ?? "").trim()) missing.push("published date");
-  if (!hasUsableProgressTotal(book)) missing.push("progress total");
-  return missing;
+    return missingCoreBookFields(book);
 }
 
 function isSuperTeacherFlag(value: unknown) {
@@ -206,7 +195,7 @@ export default function TeacherBooksQueuePage() {
       const { data: globalBooks, error: globalBooksError } = await supabase
         .from("books")
         .select(
-          "id, title, isbn13, asin, cover_url, book_type, author, publisher, published_date, page_count, kindle_location_count, audiobook_duration_minutes, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at"
+          "id, language_code, edition_format, title, isbn13, asin, cover_url, book_type, author, publisher, published_date, page_count, kindle_location_count, audiobook_duration_minutes, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at"
         )
         .order("title", { ascending: true });
 

@@ -1,9 +1,8 @@
 type TeacherBookFindCreateActionsProps = {
     isbnLookupLoading: boolean;
     hasIsbnValue: boolean;
-    hasAsinValue: boolean;
     saving: boolean;
-    isBookRequest: boolean;
+    missingCoreFields: string[];
     isbnLookupError: string;
     onLookupIsbn: () => void;
     onCreateOrLoad: () => void;
@@ -13,9 +12,8 @@ type TeacherBookFindCreateActionsProps = {
 export function TeacherBookFindCreateActions({
     isbnLookupLoading,
     hasIsbnValue,
-    hasAsinValue,
     saving,
-    isBookRequest,
+    missingCoreFields,
     isbnLookupError,
     onLookupIsbn,
     onCreateOrLoad,
@@ -35,18 +33,12 @@ export function TeacherBookFindCreateActions({
 
                 <button
                     onClick={onCreateOrLoad}
-                    disabled={saving}
+                    type="button"
+                    disabled={saving || isbnLookupLoading || missingCoreFields.length > 0}
+                    aria-describedby="manual-create-requirements"
                     className="rounded-2xl bg-stone-900 px-5 py-3 font-semibold text-white hover:bg-black disabled:opacity-50"
                 >
-                    {saving
-                        ? "Working..."
-                        : isBookRequest
-                            ? "Create Manual Book Entry"
-                            : hasIsbnValue
-                                ? "Edit or Create by ISBN"
-                                : hasAsinValue
-                                  ? "Edit or Create by ASIN"
-                                : "Create Manual Book Entry"}
+                    {saving ? "Working..." : "Create Manual Book Entry"}
                 </button>
 
                 <button
@@ -57,6 +49,12 @@ export function TeacherBookFindCreateActions({
                     Clear
                 </button>
             </div>
+
+            <p id="manual-create-requirements" className="mt-3 text-sm text-stone-600" aria-live="polite">
+                {missingCoreFields.length
+                    ? `To create a new entry, complete: ${missingCoreFields.join(", ")}. Title search needs only a title; ISBN lookup needs only an ISBN.`
+                    : "Ready to create. ISBN and ASIN are optional."}
+            </p>
 
             {isbnLookupError ? (
                 <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

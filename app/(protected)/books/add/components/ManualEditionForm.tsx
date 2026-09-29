@@ -49,6 +49,8 @@ type ManualEditionFormProps = {
   editionNote: string;
   languageCode: string;
   pageCount: string;
+  narrator: string;
+  onNarratorChange: (value: string) => void;
   audiobookDuration: string;
   onAudiobookDurationChange: (value: string) => void;
   kindleLocationCount: string;
@@ -89,6 +91,7 @@ export default function ManualEditionForm({
   editionNote,
   languageCode,
   pageCount,
+  narrator, onNarratorChange,
   audiobookDuration,
   onAudiobookDurationChange,
   kindleLocationCount,
@@ -113,8 +116,6 @@ export default function ManualEditionForm({
   onUseExistingEdition,
   onCheckDetails,
 }: ManualEditionFormProps) {
-  const formatRequired = mode === "manual";
-  const authorRequired = mode === "manual";
   const normalizedLanguageCode = normalizeBookLanguageCode(languageCode);
   const languageLabel = bookLanguageLabel(normalizedLanguageCode);
   const selectedCommonLanguageCode = COMMON_BOOK_LANGUAGE_OPTIONS.some(
@@ -143,7 +144,7 @@ export default function ManualEditionForm({
       <div className="mt-4 grid gap-3">
         <label className="block">
           <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-stone-500">
-            Title
+            Title *
           </span>
           <input
             value={title}
@@ -155,12 +156,12 @@ export default function ManualEditionForm({
 
         <label className="block">
           <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-stone-500">
-            {authorRequired ? "Author" : "Author (optional)"}
+            Author *
           </span>
           <input
             value={author}
             onChange={(event) => onAuthorChange(event.target.value)}
-            placeholder={authorRequired ? "Author" : "Author if known"}
+            placeholder="Author"
             className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3 text-base text-stone-900 shadow-sm outline-none transition focus:border-stone-400"
           />
         </label>
@@ -168,7 +169,7 @@ export default function ManualEditionForm({
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-stone-500">
-              {formatRequired ? "Format" : "Format (optional)"}
+              Format *
             </span>
             <select
               value={editionFormat}
@@ -198,10 +199,10 @@ export default function ManualEditionForm({
             </label>
           )}
 
-          {editionFormat === "audiobook" ? <AudioTimeInput value={audiobookDuration} onChange={onAudiobookDurationChange} /> : <>
-          <label className="block">Total Kindle Location (optional)
+          {editionFormat === "audiobook" ? <><label>Narrator (optional)<input value={narrator} onChange={e=>onNarratorChange(e.target.value)} className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3" /></label><AudioTimeInput value={audiobookDuration} onChange={onAudiobookDurationChange} /></> : <>
+          {editionFormat === "ebook" ? <label className="block">Total Kindle Location (optional)
             <input value={kindleLocationCount} onChange={(event) => onKindleLocationCountChange(event.target.value)} inputMode="numeric" className="mt-2 w-full rounded-2xl border border-stone-200 px-4 py-3" placeholder="e.g. 4200" />
-          </label>
+          </label> : null}
           <div>
             <span className="mb-2 block text-xs font-black uppercase tracking-[0.16em] text-stone-500">
               Page count (optional)
@@ -222,7 +223,7 @@ export default function ManualEditionForm({
 
         <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3">
           <label className="block text-sm font-black text-stone-900">
-            Language of this edition
+            Language of this edition *
           </label>
           <select
             value={selectedCommonLanguageCode}

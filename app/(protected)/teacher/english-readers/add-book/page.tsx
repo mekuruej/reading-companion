@@ -1,5 +1,6 @@
 "use client";
 
+import { missingCoreBookFields } from "@/lib/books/bookMetadata";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -58,6 +59,7 @@ export default function EnglishReaderAddBookPage() {
   const [author, setAuthor] = useState("");
   const [isbn13, setIsbn13] = useState("");
   const [asin, setAsin] = useState("");
+  const [narrator, setNarrator] = useState("");
   const [editionFormat, setEditionFormat] = useState("");
   const [editionNote, setEditionNote] = useState("");
   const [externalUrl, setExternalUrl] = useState("");
@@ -124,7 +126,7 @@ export default function EnglishReaderAddBookPage() {
     try {
       const { data, error } = await supabase
         .from("books")
-        .select("id, title, author, isbn13, asin, edition_format, edition_note, language_code")
+        .select("id, title, author, isbn13, asin, edition_format, edition_note, language_code, narrator")
         .ilike("asin", normalizedAsin)
         .limit(1)
         .maybeSingle();
@@ -148,6 +150,7 @@ export default function EnglishReaderAddBookPage() {
       setIsbn13(data.isbn13 ?? "");
       setAsin(data.asin ?? normalizedAsin);
       setEditionFormat(data.edition_format ?? "");
+      setNarrator(data.narrator ?? "");
       setEditionNote(data.edition_note ?? "");
       setMessageTone("success");
       setMessage("Found an existing English book for that ASIN. Review the fields, then add it to your Teacher Library.");
@@ -173,9 +176,9 @@ export default function EnglishReaderAddBookPage() {
     setMessage("");
     setSaveResult(null);
 
-    if (!cleanTitle) {
+    if (missingCoreBookFields({title:cleanTitle, author, language_code:"en", edition_format:editionFormat}).length) {
       setMessageTone("error");
-      setMessage("Please enter a title.");
+      setMessage("Please enter Title, Author, and Format. Language is English.");
       return;
     }
 
@@ -206,14 +209,14 @@ export default function EnglishReaderAddBookPage() {
       const existingIsbnLookup = normalizedIsbn13
         ? await supabase
             .from("books")
-            .select("id, title")
+            .select("id, title, edition_format")
             .eq("isbn13", normalizedIsbn13)
             .maybeSingle()
         : { data: null, error: null };
       const existingAsinLookup = normalizedAsin
         ? await supabase
             .from("books")
-            .select("id, title")
+            .select("id, title, edition_format")
             .ilike("asin", normalizedAsin)
             .maybeSingle()
         : { data: null, error: null };
@@ -232,6 +235,9 @@ export default function EnglishReaderAddBookPage() {
       }
 
       const existingBook = existingIsbnLookup.data ?? existingAsinLookup.data;
+      if (existingBook?.edition_format && existingBook.edition_format !== editionFormat) {
+        throw new Error("This identifier belongs to a different format. Use this edition’s identifier, or leave it blank.");
+      }
       let bookId = existingBook?.id as string | undefined;
 
       if (!bookId) {
@@ -244,6 +250,7 @@ export default function EnglishReaderAddBookPage() {
             asin: normalizedAsin,
             language_code: "en",
             edition_format: editionFormat || null,
+            narrator: editionFormat === "audiobook" ? narrator.trim() || null : null,
             edition_note: trimmedEditionNote || null,
             allow_missing_isbn: !normalizedIsbn13 && !normalizedAsin,
             related_links: relatedLinksForUrl(trimmedExternalUrl),
@@ -348,7 +355,8 @@ export default function EnglishReaderAddBookPage() {
               author={author}
               isbn13={isbn13}
               asin={asin}
-              editionFormat={editionFormat}
+              narrator={narrator} onNarratorChange={setNarrator}
+            editionFormat={editionFormat}
               editionNote={editionNote}
               externalUrl={externalUrl}
               recommendedLevel={recommendedLevel}

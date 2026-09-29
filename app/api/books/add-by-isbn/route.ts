@@ -1,3 +1,4 @@
+import { missingCoreBookFields } from "@/lib/books/bookMetadata";
 import { canTeachTargetUser } from "@/lib/teacher/targetUserAccess";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -269,7 +270,7 @@ export async function POST(request: Request) {
 
   const { data: existingBook, error: existingBookError } = await supabaseAdmin
     .from("books")
-    .select("id")
+    .select("id, edition_format")
     .eq("isbn13", isbn13)
     .maybeSingle();
 
@@ -282,45 +283,39 @@ export async function POST(request: Request) {
     );
   }
 
+  if (existingBook?.edition_format && body?.editionFormat && existingBook.edition_format !== body.editionFormat) {
+    return NextResponse.json({ error: "This ISBN belongs to a different format. Use this edition’s identifier, or add it manually without an ISBN." }, { status: 409 });
+  }
   let bookId = existingBook?.id ?? null;
 
   if (!bookId) {
     const lookupResult = await lookupNormalizedExternalBookByIsbn13(isbn13);
 
-    if (!lookupResult?.title) {
-      return NextResponse.json(
-        {
-          error:
-            "We couldn’t retrieve this edition automatically. Add the details you know.",
-        },
-        { status: 404 }
-      );
-    }
-
-    const authorDisplay = lookupResult.author_display;
+    const title = typeof body?.title === "string" ? body.title.trim() : lookupResult?.title;
+    const authorDisplay = typeof body?.author === "string" ? body.author.trim() : lookupResult?.author_display;
+    const editionFormat = typeof body?.editionFormat === "string" ? body.editionFormat.trim() : lookupResult?.edition_format;
+    const narrator = editionFormat === "audiobook" ? (typeof body?.narrator === "string" ? body.narrator.trim() || null : lookupResult?.narrator ?? null) : null;
     const editionLanguageCode =
-      normalizeBookLanguageCode(lookupResult.language_code) ??
-      userConfirmedLanguageCode;
+      userConfirmedLanguageCode ??
+      normalizeBookLanguageCode(lookupResult?.language_code);
 
-    if (!editionLanguageCode) {
-      return NextResponse.json(
-        { error: "Choose the language of this edition before adding it." },
-        { status: 400 }
-      );
-    }
+    const missingCore = missingCoreBookFields({title, author:authorDisplay, language_code:editionLanguageCode, edition_format:editionFormat});
+    if (missingCore.length) return NextResponse.json({error:`Please provide: ${missingCore.join(", ")}.`}, {status:400});
 
     let { data: insertedBook, error: insertBookError } = await supabaseAdmin
       .from("books")
       .insert({
-        isbn13: lookupResult.isbn13,
-        title: lookupResult.title,
+        isbn13,
+        title,
+        edition_format: editionFormat,
+        narrator,
         author: authorDisplay,
-        cover_url: lookupResult.cover_url,
-        publisher: lookupResult.publisher,
-        published_date: lookupResult.published_date,
-        page_count: lookupResult.page_count,
+        cover_url: lookupResult?.cover_url,
+        publisher: lookupResult?.publisher,
+        published_date: lookupResult?.published_date,
+        page_count: lookupResult?.page_count,
         language_code: editionLanguageCode,
-        metadata_source: lookupResult.metadata_source,
+        metadata_source: lookupResult?.metadata_source,
         needs_review: true,
       })
       .select("id")
@@ -330,13 +325,15 @@ export async function POST(request: Request) {
       const retry = await supabaseAdmin
         .from("books")
         .insert({
-          isbn13: lookupResult.isbn13,
-          title: lookupResult.title,
+          isbn13,
+          title,
+          edition_format: editionFormat,
+          narrator,
           author: authorDisplay,
-          cover_url: lookupResult.cover_url,
-          publisher: lookupResult.publisher,
-          published_date: lookupResult.published_date,
-          page_count: lookupResult.page_count,
+          cover_url: lookupResult?.cover_url,
+          publisher: lookupResult?.publisher,
+          published_date: lookupResult?.published_date,
+          page_count: lookupResult?.page_count,
           language_code: editionLanguageCode,
         })
         .select("id")
@@ -350,7 +347,7 @@ export async function POST(request: Request) {
       const { data: racedExistingBook, error: racedExistingBookError } =
         await supabaseAdmin
           .from("books")
-          .select("id")
+          .select("id, edition_format")
           .eq("isbn13", isbn13)
           .maybeSingle();
 
@@ -362,6 +359,9 @@ export async function POST(request: Request) {
         );
       }
 
+      if (racedExistingBook?.edition_format && racedExistingBook.edition_format !== editionFormat) {
+        return NextResponse.json({ error: "This ISBN belongs to a different format." }, { status: 409 });
+      }
       if (racedExistingBook?.id) {
         bookId = racedExistingBook.id;
       }
@@ -375,7 +375,8 @@ export async function POST(request: Request) {
     }
 
     if (!bookId) {
-      bookId = insertedBook.id;
+      bookId = insertedBook?.id;
+      if (!bookId) throw new Error("Book creation did not return an ID.");
     }
   }
 

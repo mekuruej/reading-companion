@@ -1,4 +1,6 @@
 type EnglishReaderAddBookFormProps = {
+  narrator: string;
+  onNarratorChange: (value: string) => void;
   title: string;
   author: string;
   isbn13: string;
@@ -24,11 +26,13 @@ type EnglishReaderAddBookFormProps = {
 const ENGLISH_EDITION_FORMAT_OPTIONS = [
   { value: "paperback", label: "Paperback" },
   { value: "hardcover", label: "Hardcover" },
+  { value: "audiobook", label: "Audiobook" },
   { value: "ebook", label: "Ebook" },
   { value: "other", label: "Other" },
 ];
 
 export default function EnglishReaderAddBookForm({
+  narrator, onNarratorChange,
   title,
   author,
   isbn13,
@@ -83,10 +87,12 @@ export default function EnglishReaderAddBookForm({
           />
         </div>
 
+        <p className="text-sm text-stone-600">Language: English</p>
+        {editionFormat === "audiobook" ? <label>Narrator (optional)<input value={narrator} onChange={e=>onNarratorChange(e.target.value)} className="mt-1 w-full rounded-xl border border-stone-300 p-3" /></label> : null}
         <div className="grid gap-5 md:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-semibold text-stone-800">
-              Author <span className="font-normal text-stone-500">(optional)</span>
+              Author *
             </label>
             <input
               value={author}
@@ -137,7 +143,7 @@ export default function EnglishReaderAddBookForm({
 
           <div>
             <label className="mb-1 block text-sm font-semibold text-stone-800">
-              Edition format <span className="font-normal text-stone-500">(optional)</span>
+              Edition format *
             </label>
             <select
               value={editionFormat}

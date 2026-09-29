@@ -46,7 +46,7 @@ export default function TeacherMissingBookInfoPage() {
       const { data, error } = await supabase
         .from("books")
         .select(
-          "id, title, isbn13, asin, cover_url, book_type, author, publisher, published_date, page_count, kindle_location_count, audiobook_duration_minutes, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at"
+          "id, language_code, edition_format, title, isbn13, asin, cover_url, book_type, author, publisher, published_date, page_count, kindle_location_count, audiobook_duration_minutes, allow_missing_isbn, allow_missing_publisher, missing_info_cleared_at"
         )
         .order("title", { ascending: true });
 
@@ -115,9 +115,11 @@ export default function TeacherMissingBookInfoPage() {
           {items.length} book attention item{items.length === 1 ? "" : "s"}
         </h1>
         <p className="mt-2 text-sm leading-6 text-stone-600">
-          Catalog book records missing core details such as author, cover, a progress total (pages or Kindle Locations), or publication info.
+          Catalog editions missing title, author, language, or format.
         </p>
       </section>
+
+      <Link href="/teacher/books/formats" className="mt-4 inline-block font-semibold text-sky-800">Repair missing formats in bulk →</Link>
 
       {message ? <p className="mt-4 text-sm text-amber-700">{message}</p> : null}
       {loading ? <p className="mt-6 text-sm text-stone-500">Loading missing book information...</p> : null}

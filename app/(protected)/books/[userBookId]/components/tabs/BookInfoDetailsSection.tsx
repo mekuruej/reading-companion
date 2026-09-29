@@ -12,6 +12,7 @@ type BookDetails = {
   published_date?: string | null;
   kindle_location_count?: number | null;
   audiobook_duration_minutes?: number | null;
+  narrator?: string | null;
   page_count?: number | string | null;
   series_number?: number | string | null;
   series_total?: number | string | null;
@@ -44,6 +45,10 @@ type BookInfoDetailsSectionProps = {
   setEditionNote: (value: string) => void;
   publishedDate: string;
   setPublishedDate: (value: string) => void;
+  languageCode?: string;
+  setLanguageCode?: (value: string) => void;
+  narrator?: string;
+  setNarrator?: (value: string) => void;
   audiobookDuration?: string;
   setAudiobookDuration?: (value: string) => void;
   kindleLocationCount?: string;
@@ -94,6 +99,8 @@ export default function BookInfoDetailsSection({
   setEditionNote,
   publishedDate,
   setPublishedDate,
+  languageCode = "", setLanguageCode = () => {},
+  narrator = "", setNarrator = () => {},
   audiobookDuration = "",
   setAudiobookDuration = () => {},
   kindleLocationCount = "",
@@ -252,6 +259,8 @@ export default function BookInfoDetailsSection({
           placeholder="e.g. 2005"
         />
 
+        {isEditingBookInfo ? <label>Language *<input required value={languageCode} onChange={e=>setLanguageCode(e.target.value)} className="mt-1 w-full rounded-xl border border-stone-300 p-2" placeholder="ja, en, ..." /></label> : null}
+        {(isEditingBookInfo ? editionFormat : book.edition_format) === "audiobook" ? <Detail label="Narrator (optional)" value={book.narrator} editing={isEditingBookInfo} inputValue={narrator} setInputValue={setNarrator} /> : null}
         {(isEditingBookInfo ? editionFormat : book.edition_format) === "audiobook" ? (
           isEditingBookInfo ? <AudioTimeInput value={audiobookDuration} onChange={setAudiobookDuration} disabled={saving} /> :
           <div className="text-sm"><div className="text-stone-500">Audiobook length</div>{book.audiobook_duration_minutes ? formatAudioTime(book.audiobook_duration_minutes) : "Unknown"}</div>
