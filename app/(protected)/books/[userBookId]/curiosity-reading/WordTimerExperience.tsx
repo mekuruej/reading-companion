@@ -837,7 +837,7 @@ export function CuriosityReadingExperience({
     writePersistedTimedSession({
       version: 1,
       sessionMode: timedSessionMode,
-                trackingUnit: tracking.method,
+      trackingUnit: tracking.method,
       userBookId,
       startedAt: isRunning ? startTime : null,
       accumulatedElapsedMs,
@@ -875,7 +875,7 @@ export function CuriosityReadingExperience({
       writePersistedTimedSession({
         version: 1,
         sessionMode: timedSessionMode,
-                trackingUnit: tracking.method,
+        trackingUnit: tracking.method,
         userBookId,
         startedAt: isRunning ? startTime : null,
         accumulatedElapsedMs,
@@ -1041,10 +1041,10 @@ export function CuriosityReadingExperience({
     setLastSavedWordContext(
       latest?.surface
         ? {
-            surface: latest.surface,
-            page: wordPositionInput(latest),
-            positionUnit: wordPosition(latest).unit,
-          }
+          surface: latest.surface,
+          page: wordPositionInput(latest),
+          positionUnit: wordPosition(latest).unit,
+        }
         : null
     );
   }
@@ -2011,53 +2011,221 @@ export function CuriosityReadingExperience({
   );
 
   const content = (
-      <>
-        {!wordCaptureOnly ? <BookProgressSummaryBar userBookId={userBookId} listening={isListeningMode} showBackLink={workspaceCompact} /> : null}
-        {useCompactSessionBar ? (
-          <>
-            <CuriosityPageHeader title={pageTitle} description={pageDescription} />
-            {modeSwitchSlot}
-            {sessionBar}
-          </>
-        ) : (
-          <>
-            <CuriosityPageHeader title={pageTitle} description={pageDescription} />
-            {userBookId ? (
-              bookTitle ? (
-                <CuriosityBookContextCard
-                  showBackLink={!workspaceCompact || wordCaptureOnly}
-                  bookTitle={bookTitle}
-                  bookCover={bookCover}
-                  contextLine={
-                    wordCaptureOnly
-                      ? curiosityProgressLine
-                      : isListeningMode ? "Listening timer + heard words" : undefined
-                  }
-                  bookHubHref={`/books/${encodeURIComponent(userBookId)}`}
-                  vocabListHref={`/books/${encodeURIComponent(userBookId)}/words`}
-                />
-              ) : null
-            ) : (
-              <p className="mb-6 text-sm text-gray-500">
-                Open with <code className="rounded bg-gray-100 px-1 py-0.5">?userBookId=...</code>
-              </p>
-            )}
+    <>
+      {!wordCaptureOnly ? <BookProgressSummaryBar userBookId={userBookId} listening={isListeningMode} showBackLink={workspaceCompact} /> : null}
+      {useCompactSessionBar ? (
+        <>
+          <CuriosityPageHeader title={pageTitle} description={pageDescription} />
+          {modeSwitchSlot}
+          {sessionBar}
+        </>
+      ) : (
+        <>
+          <CuriosityPageHeader title={pageTitle} description={pageDescription} />
+          {userBookId ? (
+            bookTitle ? (
+              <CuriosityBookContextCard
+                showBackLink={!workspaceCompact || wordCaptureOnly}
+                bookTitle={bookTitle}
+                bookCover={bookCover}
+                contextLine={
+                  wordCaptureOnly
+                    ? curiosityProgressLine
+                    : isListeningMode ? "Listening timer + heard words" : undefined
+                }
+                bookHubHref={`/books/${encodeURIComponent(userBookId)}`}
+                vocabListHref={`/books/${encodeURIComponent(userBookId)}/words`}
+              />
+            ) : null
+          ) : (
+            <p className="mb-6 text-sm text-gray-500">
+              Open with <code className="rounded bg-gray-100 px-1 py-0.5">?userBookId=...</code>
+            </p>
+          )}
 
-            <CuriosityStatusMessage message={message} />
+          <CuriosityStatusMessage message={message} />
 
-            {timerPanel}
-          </>
-        )}
+          {timerPanel}
+        </>
+      )}
 
-        <div className={workspaceCompact ? "hidden" : "md:hidden"}>
-          {isEnglishBook ? (
-            <CuriosityAddEditWordCard
-              title="Save English Word / Phrase"
-              description="Add English from this book with Japanese support."
+      <div className={workspaceCompact ? "hidden" : "md:hidden"}>
+        {isEnglishBook ? (
+          <CuriosityAddEditWordCard
+            title="Save English Word / Phrase"
+            description="Add English from this book with Japanese support."
+          >
+            <CuriosityAddEditWordFormShell
+              editingSurface={quickPreview.id ? quickPreview.surface : null}
             >
-              <CuriosityAddEditWordFormShell
-                editingSurface={quickPreview.id ? quickPreview.surface : null}
-              >
+              <AddEnglishWordFields
+                itemType={englishItemType}
+                source={quickPreview.surface}
+                support={quickPreview.meaning}
+                positionUnit={positionUnit}
+                onPositionUnitChange={(unit) => setQuickPreview(prev => ({ ...prev, positionUnit: unit }))}
+                pageNumber={quickPreview.page}
+                chapterNumber={quickPreview.chapterNumber}
+                chapterName={quickPreview.chapterName}
+                chapterNameOptions={sortedChapterNameOptions}
+                saving={quickLoading}
+                isEditing={quickPreview.id != null}
+                savedNotice={savedQuickNotice}
+                onItemTypeChange={setEnglishItemType}
+                onSourceChange={(value) => {
+                  setQuickPreview((prev) => ({
+                    ...prev,
+                    surface: value,
+                    cacheSurface: "",
+                    reading: "",
+                    meanings: [],
+                    selectedMeaningIndex: 0,
+                    isCustomMeaning: true,
+                    useAlternateSurface: false,
+                    alternateSurface: "",
+                    pageOrder: null,
+                  }));
+                  setSavedQuickNotice("");
+                }}
+                onSupportChange={(value) => {
+                  setQuickPreview((prev) => ({
+                    ...prev,
+                    meaning: value,
+                    meanings: [],
+                    selectedMeaningIndex: 0,
+                    isCustomMeaning: true,
+                  }));
+                  setSavedQuickNotice("");
+                }}
+                onPageNumberChange={(value) =>
+                  setQuickPreview((prev) => ({ ...prev, page: value }))
+                }
+                onChapterNumberChange={(value) =>
+                  setQuickPreview((prev) => ({ ...prev, chapterNumber: value }))
+                }
+                onChapterNameChange={(value) =>
+                  setQuickPreview((prev) => {
+                    const knownChapterNumber = chapterNumberByName[value.trim()];
+                    return {
+                      ...prev,
+                      chapterName: value,
+                      chapterNumber: knownChapterNumber || prev.chapterNumber,
+                    };
+                  })
+                }
+                onSaveWord={() => void saveQuickWord()}
+                onClearWordFields={() => clearQuickWordFields()}
+              />
+            </CuriosityAddEditWordFormShell>
+          </CuriosityAddEditWordCard>
+        ) : (
+          <MobileQuickCapture
+            title={isListeningMode ? "Save a heard word" : "Save a word"}
+            description={
+              isListeningMode
+                ? "Type a word you heard, search it, and save it without leaving your listening timer."
+                : "Type a word from your book, search it, and save it without leaving your reading timer."
+            }
+            surface={quickPreview.surface}
+            reading={quickPreview.reading}
+            meaning={quickPreview.meaning}
+            meanings={quickPreview.meanings}
+            selectedMeaningIndex={quickPreview.selectedMeaningIndex}
+            positionLabel={positionLabel(positionUnit)}
+            position={quickPreview.page}
+            quickLoading={quickLoading}
+            quickError={quickError}
+            savedNotice={savedQuickNotice}
+            canSaveWord={Boolean(
+              quickPreview.cacheSurface.trim() &&
+              quickPreview.meaning.trim() &&
+              !quickPreview.isCustomMeaning
+            )}
+            selectedCandidateId={selectedQuickLookupCandidateId}
+            candidates={quickLookupCandidates}
+            lastAddedWord={quickSessionWords[0] ?? null}
+            inputRef={quickWordInputRef}
+            onSurfaceChange={(value) => {
+              invalidateQuickLookup();
+              setQuickPreview((prev) => ({
+                ...prev,
+                surface: value,
+                cacheSurface: "",
+                reading: "",
+                meanings: [],
+                selectedMeaningIndex: 0,
+                meaning: "",
+                isCustomMeaning: true,
+                useAlternateSurface: false,
+                alternateSurface: "",
+                pageOrder: null,
+              }));
+              setSavedQuickNotice("");
+              setSelectedQuickLookupCandidateId(null);
+              if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
+            }}
+            onSearch={() => void pullQuickWord()}
+            onSearchKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void pullQuickWord();
+              }
+            }}
+            onSelectCandidate={(candidate) => {
+              invalidateQuickLookup();
+              setQuickPreview((prev) => ({
+                ...prev,
+                surface: candidate.surface,
+                cacheSurface: candidate.cacheSurface,
+                reading: candidate.reading,
+                meanings: candidate.meanings,
+                selectedMeaningIndex: candidate.selectedMeaningIndex,
+                meaning: candidate.meaning,
+                isCustomMeaning: candidate.isCustomMeaning,
+              }));
+              setSelectedQuickLookupCandidateId(candidate.id);
+              setQuickError(null);
+            }}
+            onMeaningChoiceChange={(index, meaning) =>
+              setQuickPreview((prev) => ({
+                ...prev,
+                selectedMeaningIndex: index,
+                meaning,
+                isCustomMeaning: false,
+              }))
+            }
+            onPositionChange={(value) =>
+              setQuickPreview((prev) => ({
+                ...prev,
+                page: value,
+              }))
+            }
+            onSaveWord={() => void saveQuickWord({ requireSelectedLookup: true })}
+            onDeleteLastWord={(id) => void deleteQuickWordById(id)}
+          />
+        )}
+      </div>
+
+      <div
+        className={
+          workspaceCompact && workspaceAside
+            ? "hidden md:grid md:grid-cols-[minmax(0,1fr)_minmax(24rem,30rem)] md:items-start md:gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(26rem,32rem)]"
+            : workspaceCompact ? "block" : "hidden md:block"
+        }
+      >
+        <div className="min-w-0">
+          <CuriosityAddEditWordCard
+            title={isEnglishBook ? "Save English Word / Phrase" : addWordTitle}
+            description={
+              isEnglishBook
+                ? `Add English from this book with Japanese support. ${positionLabel(positionUnit)} and chapter stay ready for the next item.`
+                : addWordDescription
+            }
+          >
+            <CuriosityAddEditWordFormShell
+              editingSurface={quickPreview.id ? quickPreview.surface : null}
+            >
+              {isEnglishBook ? (
                 <AddEnglishWordFields
                   itemType={englishItemType}
                   source={quickPreview.surface}
@@ -2116,387 +2284,220 @@ export function CuriosityReadingExperience({
                   onSaveWord={() => void saveQuickWord()}
                   onClearWordFields={() => clearQuickWordFields()}
                 />
-              </CuriosityAddEditWordFormShell>
-            </CuriosityAddEditWordCard>
-          ) : (
-            <MobileQuickCapture
-              contextFields={<div className="space-y-2">
-                <label className="block text-xs font-medium text-stone-600">Alternative spelling / kanji
-                  <input className="w-full min-w-0 rounded-lg border border-stone-300 px-2 py-1.5 text-sm" value={quickPreview.alternateSurface}
-                    onChange={e => setQuickPreview(current => ({ ...current, alternateSurface: e.target.value, useAlternateSurface: Boolean(e.target.value.trim()) }))} placeholder="Optional" />
-                </label>
-                <WordContextFields value={quickPreview} onChange={value => setQuickPreview(current => ({ ...current, ...value }))} teacher={canTeachWordForms} />
-              </div>}
-              title={isListeningMode ? "Save a heard word" : "Save a word"}
-              description={
-                isListeningMode
-                  ? "Type a word you heard, search it, and save it without leaving your listening timer."
-                  : "Type a word from your book, search it, and save it without leaving your reading timer."
-              }
-              surface={quickPreview.surface}
-              reading={quickPreview.reading}
-              meaning={quickPreview.meaning}
-              meanings={quickPreview.meanings}
-              selectedMeaningIndex={quickPreview.selectedMeaningIndex}
-              quickLoading={quickLoading}
-              quickError={quickError}
-              savedNotice={savedQuickNotice}
-              canSaveWord={Boolean(
-                quickPreview.cacheSurface.trim() &&
-                quickPreview.meaning.trim() &&
-                !quickPreview.isCustomMeaning
-              )}
-              selectedCandidateId={selectedQuickLookupCandidateId}
-              candidates={quickLookupCandidates}
-              lastAddedWord={quickSessionWords[0] ?? null}
-              inputRef={quickWordInputRef}
-              onSurfaceChange={(value) => {
-                invalidateQuickLookup();
-                setQuickPreview((prev) => ({
-                  ...prev,
-                  surface: value,
-                  cacheSurface: "",
-                  reading: "",
-                  meanings: [],
-                  selectedMeaningIndex: 0,
-                  meaning: "",
-                  isCustomMeaning: true,
-                  useAlternateSurface: false,
-                  alternateSurface: "",
-                  pageOrder: null,
-                }));
-                setSavedQuickNotice("");
-                setSelectedQuickLookupCandidateId(null);
-                if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
-              }}
-              onSearch={() => void pullQuickWord()}
-              onSearchKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  void pullQuickWord();
-                }
-              }}
-              onSelectCandidate={(candidate) => {
-                invalidateQuickLookup();
-                setQuickPreview((prev) => ({
-                  ...prev,
-                  surface: candidate.surface,
-                  cacheSurface: candidate.cacheSurface,
-                  reading: candidate.reading,
-                  meanings: candidate.meanings,
-                  selectedMeaningIndex: candidate.selectedMeaningIndex,
-                  meaning: candidate.meaning,
-                  isCustomMeaning: candidate.isCustomMeaning,
-                }));
-                setSelectedQuickLookupCandidateId(candidate.id);
-                setQuickError(null);
-              }}
-              onMeaningChoiceChange={(index, meaning) =>
-                setQuickPreview((prev) => ({
-                  ...prev,
-                  selectedMeaningIndex: index,
-                  meaning,
-                  isCustomMeaning: false,
-                }))
-              }
-              onSaveWord={() => void saveQuickWord({ requireSelectedLookup: true })}
-              onDeleteLastWord={(id) => void deleteQuickWordById(id)}
-            />
-          )}
-        </div>
-
-        <div
-          className={
-            workspaceCompact && workspaceAside
-              ? "hidden md:grid md:grid-cols-[minmax(0,1fr)_minmax(24rem,30rem)] md:items-start md:gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(26rem,32rem)]"
-              : workspaceCompact ? "block" : "hidden md:block"
-          }
-        >
-        <div className="min-w-0">
-        <CuriosityAddEditWordCard
-          title={isEnglishBook ? "Save English Word / Phrase" : addWordTitle}
-          description={
-            isEnglishBook
-              ? `Add English from this book with Japanese support. ${positionLabel(positionUnit)} and chapter stay ready for the next item.`
-              : addWordDescription
-          }
-        >
-          <CuriosityAddEditWordFormShell
-            editingSurface={quickPreview.id ? quickPreview.surface : null}
-          >
-            {isEnglishBook ? (
-              <AddEnglishWordFields
-                itemType={englishItemType}
-                source={quickPreview.surface}
-                support={quickPreview.meaning}
-                positionUnit={positionUnit}
-                  onPositionUnitChange={(unit) => setQuickPreview(prev => ({ ...prev, positionUnit: unit }))}
-                  pageNumber={quickPreview.page}
-                chapterNumber={quickPreview.chapterNumber}
-                chapterName={quickPreview.chapterName}
-                chapterNameOptions={sortedChapterNameOptions}
-                saving={quickLoading}
-                isEditing={quickPreview.id != null}
-                savedNotice={savedQuickNotice}
-                onItemTypeChange={setEnglishItemType}
-                onSourceChange={(value) => {
-                  setQuickPreview((prev) => ({
-                    ...prev,
-                    surface: value,
-                    cacheSurface: "",
-                    reading: "",
-                    meanings: [],
-                    selectedMeaningIndex: 0,
-                    isCustomMeaning: true,
-                    useAlternateSurface: false,
-                    alternateSurface: "",
-                    pageOrder: null,
-                  }));
-                  setSavedQuickNotice("");
-                }}
-                onSupportChange={(value) => {
-                  setQuickPreview((prev) => ({
-                    ...prev,
-                    meaning: value,
-                    meanings: [],
-                    selectedMeaningIndex: 0,
-                    isCustomMeaning: true,
-                  }));
-                  setSavedQuickNotice("");
-                }}
-                onPageNumberChange={(value) =>
-                  setQuickPreview((prev) => ({ ...prev, page: value }))
-                }
-                onChapterNumberChange={(value) =>
-                  setQuickPreview((prev) => ({ ...prev, chapterNumber: value }))
-                }
-                onChapterNameChange={(value) =>
-                  setQuickPreview((prev) => {
-                    const knownChapterNumber = chapterNumberByName[value.trim()];
-                    return {
-                      ...prev,
-                      chapterName: value,
-                      chapterNumber: knownChapterNumber || prev.chapterNumber,
-                    };
-                  })
-                }
-                onSaveWord={() => void saveQuickWord()}
-                onClearWordFields={() => clearQuickWordFields()}
-              />
-            ) : (
-              <>
-                <CuriosityQuickSearchRow
-              surface={quickPreview.surface}
-              reading={quickPreview.reading}
-              quickLoading={quickLoading}
-              quickPreviewLibraryColorInfo={quickPreviewLibraryColorInfo}
-              quickWordInputRef={quickWordInputRef}
-              onSurfaceChange={(value) => {
-                invalidateQuickLookup();
-                setQuickPreview((prev) => ({
-                  ...prev,
-                  surface: value,
-                  cacheSurface: value.trim() ? prev.cacheSurface : "",
-                }));
-                setSavedQuickNotice("");
-                if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
-              }}
-              onSearch={() => void pullQuickWord()}
-              onSearchKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  void pullQuickWord();
-                }
-              }}
-            />
-
-            <CuriosityWordHelpPanel
-              isOpen={isWordHelpOpen}
-              scratchWord={scratchWord}
-              kanjiLookupResetKey={kanjiLookupResetKey}
-              onToggleOpen={setIsWordHelpOpen}
-              onScratchWordChange={setScratchWord}
-              onScratchWordKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  event.stopPropagation();
-                }
-              }}
-              onUseScratchWord={searchScratchWord}
-              onPickKanji={(kanji) => {
-                setScratchWord((prev) => `${prev}${kanji}`);
-              }}
-            />
-
-            <CuriosityQuickErrorMessage message={quickError} />
-            <CuriosityDictionaryChoices
-              surface={quickPreview.surface}
-              candidates={quickLookupCandidates}
-              selectedSurface={quickPreview.surface}
-              selectedReading={quickPreview.reading}
-              selectedMeaning={quickPreview.meaning}
-              onSelectCandidate={(candidate) => {
-                invalidateQuickLookup();
-                setQuickPreview((prev) => ({
-                  ...prev,
-                  surface: candidate.surface,
-                  cacheSurface: candidate.cacheSurface,
-                  reading: candidate.reading,
-                  meanings: candidate.meanings,
-                  selectedMeaningIndex: candidate.selectedMeaningIndex,
-                  meaning: candidate.meaning,
-                  isCustomMeaning: candidate.isCustomMeaning,
-                }));
-                setQuickError(null);
-                jumpToQuickWordFields();
-              }}
-            />
-
-            <CuriosityWordDetailFields
-              quickPreview={quickPreview}
-              chapterNameOptions={sortedChapterNameOptions}
-              isEditing={quickPreview.id != null}
-              savedQuickNotice={savedQuickNotice}
-              quickWordFieldsRef={quickWordFieldsRef}
-              onReadingChange={(value) =>
-                setQuickPreview((prev) => ({ ...prev, reading: value }))
-              }
-              contextFields={<WordContextFields value={quickPreview} onChange={value => setQuickPreview(current => ({ ...current, ...value }))} teacher={canTeachWordForms} />}
-              onAlternateSurfaceChange={(value) =>
-                setQuickPreview((prev) => ({
-                  ...prev,
-                  alternateSurface: value,
-                  useAlternateSurface: value.trim().length > 0,
-                }))
-              }
-              onMeaningChoiceChange={(index, meaning) =>
-                setQuickPreview((prev) => ({
-                  ...prev,
-                  selectedMeaningIndex: index,
-                  meaning,
-                  isCustomMeaning: false,
-                }))
-              }
-              onCustomMeaningChange={(value) =>
-                setQuickPreview((prev) => ({
-                  ...prev,
-                  meaning: value,
-                  isCustomMeaning: true,
-                }))
-              }
-              onPageChange={(value) =>
-                setQuickPreview((prev) => ({ ...prev, page: value }))
-              }
-              onChapterNumberChange={(value) =>
-                setQuickPreview((prev) => ({ ...prev, chapterNumber: value }))
-              }
-              onChapterNameChange={(value) =>
-                setQuickPreview((prev) => {
-                  const knownChapterNumber = chapterNumberByName[value.trim()];
-                  return {
-                    ...prev,
-                    chapterName: value,
-                    chapterNumber: knownChapterNumber || prev.chapterNumber,
-                  };
-                })
-              }
-              onSaveWord={() => void saveQuickWord()}
-              onClearWordFields={() => clearQuickWordFields()}
-              positionUnit={positionUnit}
-              onPositionUnitChange={(unit) => setQuickPreview(prev => ({ ...prev, positionUnit: unit }))}
-              saveAreaWarning={
-                isRunning || isPaused
-                  ? "Timer is active. If you leave or refresh the page, you may lose your session."
-                  : undefined
-              }
-            />
-              </>
-            )}
-          </CuriosityAddEditWordFormShell>
-          <CuriosityRecentSessionWords wordCount={quickSessionWords.length}>
-
-            <div className="mt-3 space-y-3">
-              {quickSessionWords.slice(0, 2).map((item, index) => {
-                const colorInfo =
-                  libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
-
-                return (
-                  <CuriosityRecentSessionWordCard
-                    key={item.id}
-                    word={item}
-                    colorInfo={colorInfo}
-                    className={`rounded-lg border bg-white p-3 ${index === 1 ? "hidden sm:block" : ""
-                      }`}
-                    showLocation
-                    onEdit={() => loadQuickSessionWordIntoPreview(item)}
-                    onDelete={() => void deleteQuickWordById(item.id)}
+              ) : (
+                <>
+                  <CuriosityQuickSearchRow
+                    surface={quickPreview.surface}
+                    reading={quickPreview.reading}
+                    quickLoading={quickLoading}
+                    quickPreviewLibraryColorInfo={quickPreviewLibraryColorInfo}
+                    quickWordInputRef={quickWordInputRef}
+                    onSurfaceChange={(value) => {
+                      invalidateQuickLookup();
+                      setQuickPreview((prev) => ({
+                        ...prev,
+                        surface: value,
+                        cacheSurface: value.trim() ? prev.cacheSurface : "",
+                      }));
+                      setSavedQuickNotice("");
+                      if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
+                    }}
+                    onSearch={() => void pullQuickWord()}
+                    onSearchKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void pullQuickWord();
+                      }
+                    }}
                   />
-                );
-              })}
-            </div>
 
-            {quickSessionWords.length > 1 ? (
-              <details className="mt-3 rounded-lg border border-stone-200 bg-white sm:hidden">
-                <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-stone-700">
-                  Saved words from this session
-                </summary>
+                  <CuriosityWordHelpPanel
+                    isOpen={isWordHelpOpen}
+                    scratchWord={scratchWord}
+                    kanjiLookupResetKey={kanjiLookupResetKey}
+                    onToggleOpen={setIsWordHelpOpen}
+                    onScratchWordChange={setScratchWord}
+                    onScratchWordKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        event.stopPropagation();
+                      }
+                    }}
+                    onUseScratchWord={searchScratchWord}
+                    onPickKanji={(kanji) => {
+                      setScratchWord((prev) => `${prev}${kanji}`);
+                    }}
+                  />
 
-                <div className="space-y-3 border-t border-stone-200 p-3">
-                  {quickSessionWords.slice(1).map((item) => {
-                    const colorInfo =
-                      libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
+                  <CuriosityQuickErrorMessage message={quickError} />
+                  <CuriosityDictionaryChoices
+                    surface={quickPreview.surface}
+                    candidates={quickLookupCandidates}
+                    selectedSurface={quickPreview.surface}
+                    selectedReading={quickPreview.reading}
+                    selectedMeaning={quickPreview.meaning}
+                    onSelectCandidate={(candidate) => {
+                      invalidateQuickLookup();
+                      setQuickPreview((prev) => ({
+                        ...prev,
+                        surface: candidate.surface,
+                        cacheSurface: candidate.cacheSurface,
+                        reading: candidate.reading,
+                        meanings: candidate.meanings,
+                        selectedMeaningIndex: candidate.selectedMeaningIndex,
+                        meaning: candidate.meaning,
+                        isCustomMeaning: candidate.isCustomMeaning,
+                      }));
+                      setQuickError(null);
+                      jumpToQuickWordFields();
+                    }}
+                  />
 
-                    return (
-                      <CuriosityRecentSessionWordCard
-                        key={item.id}
-                        word={item}
-                        colorInfo={colorInfo}
-                        className="rounded-lg border bg-stone-50 p-3"
-                        showLocation={false}
-                        onEdit={() => loadQuickSessionWordIntoPreview(item)}
-                        onDelete={() => void deleteQuickWordById(item.id)}
-                      />
-                    );
-                  })}
-                </div>
+                  <CuriosityWordDetailFields
+                    quickPreview={quickPreview}
+                    chapterNameOptions={sortedChapterNameOptions}
+                    isEditing={quickPreview.id != null}
+                    savedQuickNotice={savedQuickNotice}
+                    quickWordFieldsRef={quickWordFieldsRef}
+                    onReadingChange={(value) =>
+                      setQuickPreview((prev) => ({ ...prev, reading: value }))
+                    }
+                    contextFields={<WordContextFields value={quickPreview} onChange={value => setQuickPreview(current => ({ ...current, ...value }))} teacher={canTeachWordForms} />}
+                    onAlternateSurfaceChange={(value) =>
+                      setQuickPreview((prev) => ({
+                        ...prev,
+                        alternateSurface: value,
+                        useAlternateSurface: value.trim().length > 0,
+                      }))
+                    }
+                    onMeaningChoiceChange={(index, meaning) =>
+                      setQuickPreview((prev) => ({
+                        ...prev,
+                        selectedMeaningIndex: index,
+                        meaning,
+                        isCustomMeaning: false,
+                      }))
+                    }
+                    onCustomMeaningChange={(value) =>
+                      setQuickPreview((prev) => ({
+                        ...prev,
+                        meaning: value,
+                        isCustomMeaning: true,
+                      }))
+                    }
+                    onPageChange={(value) =>
+                      setQuickPreview((prev) => ({ ...prev, page: value }))
+                    }
+                    onChapterNumberChange={(value) =>
+                      setQuickPreview((prev) => ({ ...prev, chapterNumber: value }))
+                    }
+                    onChapterNameChange={(value) =>
+                      setQuickPreview((prev) => {
+                        const knownChapterNumber = chapterNumberByName[value.trim()];
+                        return {
+                          ...prev,
+                          chapterName: value,
+                          chapterNumber: knownChapterNumber || prev.chapterNumber,
+                        };
+                      })
+                    }
+                    onSaveWord={() => void saveQuickWord()}
+                    onClearWordFields={() => clearQuickWordFields()}
+                    positionUnit={positionUnit}
+                    onPositionUnitChange={(unit) => setQuickPreview(prev => ({ ...prev, positionUnit: unit }))}
+                    saveAreaWarning={
+                      isRunning || isPaused
+                        ? "Timer is active. If you leave or refresh the page, you may lose your session."
+                        : undefined
+                    }
+                  />
+                </>
+              )}
+            </CuriosityAddEditWordFormShell>
+            <CuriosityRecentSessionWords wordCount={quickSessionWords.length}>
 
-              </details>
-            ) : null}
+              <div className="mt-3 space-y-3">
+                {quickSessionWords.slice(0, 2).map((item, index) => {
+                  const colorInfo =
+                    libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
 
-            {quickSessionWords.length > 2 ? (
-              <details className="mt-3 hidden rounded-lg border border-stone-200 bg-white sm:block">
-                <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-stone-700">
-                  Saved words from this session
-                </summary>
+                  return (
+                    <CuriosityRecentSessionWordCard
+                      key={item.id}
+                      word={item}
+                      colorInfo={colorInfo}
+                      className={`rounded-lg border bg-white p-3 ${index === 1 ? "hidden sm:block" : ""
+                        }`}
+                      showLocation
+                      onEdit={() => loadQuickSessionWordIntoPreview(item)}
+                      onDelete={() => void deleteQuickWordById(item.id)}
+                    />
+                  );
+                })}
+              </div>
 
-                <div className="space-y-3 border-t border-stone-200 p-3">
-                  {quickSessionWords.slice(2).map((item) => {
-                    const colorInfo =
-                      libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
+              {quickSessionWords.length > 1 ? (
+                <details className="mt-3 rounded-lg border border-stone-200 bg-white sm:hidden">
+                  <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-stone-700">
+                    Saved words from this session
+                  </summary>
 
-                    return (
-                      <CuriosityRecentSessionWordCard
-                        key={item.id}
-                        word={item}
-                        colorInfo={colorInfo}
-                        className="rounded-lg border bg-stone-50 p-3"
-                        showLocation={false}
-                        onEdit={() => loadQuickSessionWordIntoPreview(item)}
-                        onDelete={() => void deleteQuickWordById(item.id)}
-                      />
-                    );
-                  })}
-                </div>
-              </details>
-            ) : null}
-          </CuriosityRecentSessionWords>
-        </CuriosityAddEditWordCard>
+                  <div className="space-y-3 border-t border-stone-200 p-3">
+                    {quickSessionWords.slice(1).map((item) => {
+                      const colorInfo =
+                        libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
+
+                      return (
+                        <CuriosityRecentSessionWordCard
+                          key={item.id}
+                          word={item}
+                          colorInfo={colorInfo}
+                          className="rounded-lg border bg-stone-50 p-3"
+                          showLocation={false}
+                          onEdit={() => loadQuickSessionWordIntoPreview(item)}
+                          onDelete={() => void deleteQuickWordById(item.id)}
+                        />
+                      );
+                    })}
+                  </div>
+
+                </details>
+              ) : null}
+
+              {quickSessionWords.length > 2 ? (
+                <details className="mt-3 hidden rounded-lg border border-stone-200 bg-white sm:block">
+                  <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-stone-700">
+                    Saved words from this session
+                  </summary>
+
+                  <div className="space-y-3 border-t border-stone-200 p-3">
+                    {quickSessionWords.slice(2).map((item) => {
+                      const colorInfo =
+                        libraryColorByWordKey[makeLibraryStudyColorKey(item.surface, item.reading)] ?? null;
+
+                      return (
+                        <CuriosityRecentSessionWordCard
+                          key={item.id}
+                          word={item}
+                          colorInfo={colorInfo}
+                          className="rounded-lg border bg-stone-50 p-3"
+                          showLocation={false}
+                          onEdit={() => loadQuickSessionWordIntoPreview(item)}
+                          onDelete={() => void deleteQuickWordById(item.id)}
+                        />
+                      );
+                    })}
+                  </div>
+                </details>
+              ) : null}
+            </CuriosityRecentSessionWords>
+          </CuriosityAddEditWordCard>
         </div>
         {workspaceCompact && workspaceAside ? (
           <div className="min-w-0">{workspaceAside}</div>
         ) : null}
-        </div>
-      </>
+      </div>
+    </>
   );
 
   if (embedded) {

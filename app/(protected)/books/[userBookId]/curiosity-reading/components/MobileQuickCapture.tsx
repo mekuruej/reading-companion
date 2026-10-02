@@ -1,4 +1,4 @@
-import type { KeyboardEvent, RefObject, ReactNode } from "react";
+import type { KeyboardEvent, RefObject } from "react";
 
 type MobileQuickCaptureCandidate = {
   id: string;
@@ -19,7 +19,6 @@ type MobileQuickCaptureWord = {
 };
 
 type MobileQuickCaptureProps = {
-  contextFields?: ReactNode;
   title: string;
   description: string;
   surface: string;
@@ -27,6 +26,9 @@ type MobileQuickCaptureProps = {
   meaning: string;
   meanings: string[];
   selectedMeaningIndex: number;
+  positionLabel: string;
+  position: string;
+  onPositionChange: (value: string) => void;
   quickLoading: boolean;
   quickError: string | null;
   savedNotice: string;
@@ -45,11 +47,13 @@ type MobileQuickCaptureProps = {
 };
 
 export default function MobileQuickCapture({
-  contextFields,
-  title,  description,
+  title,
+  description,
   surface,
   meanings,
   selectedMeaningIndex,
+  positionLabel,
+  position,
   quickLoading,
   quickError,
   savedNotice,
@@ -63,6 +67,7 @@ export default function MobileQuickCapture({
   onSearchKeyDown,
   onSelectCandidate,
   onMeaningChoiceChange,
+  onPositionChange,
   onSaveWord,
   onDeleteLastWord,
 }: MobileQuickCaptureProps) {
@@ -119,11 +124,10 @@ export default function MobileQuickCapture({
                   key={candidate.id}
                   type="button"
                   onClick={() => onSelectCandidate(candidate)}
-                  className={`w-full rounded-2xl border px-3 py-2 text-left text-sm transition ${
-                    selected
-                      ? "border-emerald-400 bg-emerald-50 shadow-sm ring-2 ring-emerald-100"
-                      : "border-stone-200 bg-white/80 hover:bg-white"
-                  }`}
+                  className={`w-full rounded-2xl border px-3 py-2 text-left text-sm transition ${selected
+                    ? "border-emerald-400 bg-emerald-50 shadow-sm ring-2 ring-emerald-100"
+                    : "border-stone-200 bg-white/80 hover:bg-white"
+                    }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="font-black text-stone-900">{candidate.surface}</div>
@@ -175,11 +179,21 @@ export default function MobileQuickCapture({
           </label>
         ) : null}
 
-        {hasSelectedResult ? <div className="mt-3">{contextFields}</div> : null}
-
-        <p className="mt-2 text-xs leading-5 text-stone-500">
-          Add page and chapter details later on computer or tablet.
-        </p>
+        {hasSelectedResult ? (
+          <label className="mt-3 block rounded-2xl border border-stone-200 bg-white px-3 py-2 text-sm">
+            <span className="mb-1 block text-xs font-black uppercase tracking-[0.12em] text-stone-400">
+              {positionLabel}
+            </span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={position}
+              onChange={(event) => onPositionChange(event.target.value)}
+              placeholder={`${positionLabel} (optional)`}
+              className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900"
+            />
+          </label>
+        ) : null}
 
         {hasSelectedResult && canSaveWord ? (
           <button
