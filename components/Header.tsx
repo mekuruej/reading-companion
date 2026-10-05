@@ -225,6 +225,9 @@ export default function Header() {
   const showFullAccessNavigation = (hasFullAccess && !isTrialAccess) || showTeacherLink;
   const canUseLearningStudy = hasFullAccess || showTeacherLink;
   const canUseAdvancedStudyNavigation = showFullAccessNavigation;
+  const myLibraryHref = username
+    ? `/users/${encodeURIComponent(username)}/books`
+    : "/books";
 
   return (
     <header data-mekuru-header className="sticky top-0 z-50 border-b border-stone-200 bg-white">
@@ -232,8 +235,8 @@ export default function Header() {
         <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
           <div className="text-center md:text-left">
             <Link
-              href="/dashboard"
-              aria-label="MEKURU dashboard"
+              href={myLibraryHref}
+              aria-label="My MEKURU Library"
               className="block text-m font-semibold tracking-tight text-stone-900 sm:text-2xl md:text-4xl"
             >
               MEKURU <span className="align-middle text-xs font-semibold text-red-600 md:text-sm">(Beta)</span>

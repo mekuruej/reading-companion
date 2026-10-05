@@ -17,7 +17,7 @@ export default function LibraryHeader({
       <div>
         <div className="sm:hidden">
           <div className="text-2xl font-black text-slate-900">
-            My <Link href="/dashboard" aria-label="MEKURU dashboard" className="rounded focus-visible:outline focus-visible:outline-2">MEKURU</Link> Library
+            My <Link href="/books" aria-label="My MEKURU Library" className="rounded focus-visible:outline focus-visible:outline-2">MEKURU</Link> Library
           </div>
           <p className="mt-1 text-sm leading-6 text-slate-600">
             Read, listen, and review.
@@ -29,7 +29,7 @@ export default function LibraryHeader({
             {libraryOwnerLabel}
           </span>
 
-          <Link href="/dashboard" aria-label="MEKURU dashboard" className="rounded focus-visible:outline focus-visible:outline-2">
+          <Link href="/books" aria-label="My MEKURU Library" className="rounded focus-visible:outline focus-visible:outline-2">
           <img
             src="/mekuru-logo.png"
             alt="Mekuru"

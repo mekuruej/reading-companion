@@ -176,8 +176,9 @@ test('Library loader keeps page, Kindle and audio progress and recent engagement
   ];
   const progressByBook = { page: { method: 'page', totals: { page_count: 100 } }, kindle: { method: 'kindle_location', totals: { kindle_location_count: 1000 } }, audio: { method: 'audiobook_time', totals: { audiobook_duration_minutes: 120 } } };
   let result;
+  const queriedTables = [];
   const { progressSummary } = load('lib/books/readingProgress.ts');
-  const supabase = { from(table) { return {
+  const supabase = { from(table) { queriedTables.push(table); return {
     select(fields) {
       if (table === 'user_book_reading_sessions') assert.ok(!fields.includes('minutes_read'));
       return this;
@@ -192,7 +193,26 @@ test('Library loader keeps page, Kindle and audio progress and recent engagement
   assert.equal(result.kindle.progressPercent, 25);
   assert.equal(result.audio.progressPercent, 50); // Latest audio position, including rewind.
   assert.equal(result.audio.lastEngagedAt, '2026-02-02');
+  assert.deepEqual(queriedTables, ['user_book_reading_sessions']);
   assert.ok(Object.values(result).every(stats => !('averageMinutesPerPage' in stats)));
+  assert.ok(Object.values(result).every(stats => !('wordsLookedUp' in stats)));
+});
+
+test('Ability Check reminder waits for Library render and bounds refresh/query work', () => {
+  const pageSource = fs.readFileSync(base + 'page.tsx', 'utf8');
+  assert.match(pageSource, /if \(libraryBooksLoading\) \{\s*cancelAbilityCheckReminderLoad\(\);\s*return;\s*\}\s*void loadAbilityCheckReminder/);
+  assert.match(pageSource, /window\.addEventListener\("focus", queueForegroundRefresh\)/);
+  assert.match(pageSource, /document\.addEventListener\("visibilitychange", handleVisibilityChange\)/);
+  assert.match(pageSource, /setTimeout\(flushForegroundRefresh, 150\)/);
+  assert.match(pageSource, /activeRequest\.controller\.abort\(\)/);
+  assert.match(pageSource, /Promise\.all\(\[\s*supabase\s*\.from\("user_library_word_summaries"\)[\s\S]*?\.from\("user_library_word_claims"\)/);
+  assert.match(pageSource, /\.order\("updated_at", \{ ascending: false \}\)\s*\.limit\(500\)/);
+  assert.match(pageSource, /keys\.slice\(i, i \+ 75\)/);
+  assert.match(pageSource, /progressChunks\.slice\(i, i \+ 3\)/);
+  assert.match(pageSource, /const ABILITY_CHECK_REMINDER_MIN_DUE_CARDS = 10/);
+  assert.doesNotMatch(pageSource, /select\("id, study_identity_key, surface, reading, meaning, claimed_color, created_at, updated_at"\)/);
+  assert.doesNotMatch(pageSource, /mastered_at, reading_gate_failed_at/);
+  assert.match(pageSource, /router\.push\("\/library-study\/check\?start=1"\)/);
 });
 
 

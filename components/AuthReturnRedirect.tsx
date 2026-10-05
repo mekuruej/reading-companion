@@ -36,7 +36,7 @@ export default function AuthReturnRedirect() {
 
       if (!alive) return;
 
-      router.replace("/dashboard");
+      router.replace("/books");
     }
 
     void redirectAfterAuthReturn();

@@ -28,14 +28,15 @@ export default function TeacherBookRequestsPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [requests, setRequests] = useState<PendingBookRequest[]>([]);
+  const [addingRequestId, setAddingRequestId] = useState<string | null>(null);
 
   useEffect(() => {
     void loadRequests();
   }, []);
 
-  async function loadRequests() {
+  async function loadRequests(options: { preserveMessage?: boolean } = {}) {
     setLoading(true);
-    setMessage("");
+    if (!options.preserveMessage) setMessage("");
 
     try {
       const access = await requireSuperTeacher();
@@ -90,6 +91,30 @@ export default function TeacherBookRequestsPage() {
       setRequests([]);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function addRequestToLibrary(requestId: string) {
+    setAddingRequestId(requestId);
+    setMessage("");
+
+    try {
+      const { error } = await supabase.rpc("approve_book_request", {
+        request_id_input: requestId,
+      });
+
+      if (error) throw error;
+
+      setMessage("Book added to library!");
+      await loadRequests({ preserveMessage: true });
+    } catch (error: unknown) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not add the requested book to the library."
+      );
+    } finally {
+      setAddingRequestId(null);
     }
   }
 
@@ -169,6 +194,14 @@ export default function TeacherBookRequestsPage() {
                   >
                     Open Catalog Editor
                   </Link>
+                  <button
+                    type="button"
+                    onClick={() => void addRequestToLibrary(request.id)}
+                    disabled={addingRequestId === request.id}
+                    className="inline-flex rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {addingRequestId === request.id ? "Adding..." : "Add to Library"}
+                  </button>
                   <button
                     type="button"
                     onClick={() => void rejectBookRequest(request.id)}

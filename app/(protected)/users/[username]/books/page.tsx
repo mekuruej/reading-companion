@@ -3,7 +3,7 @@
 "use client";
 
 import { effectiveProgressMethod, progressSummary, type ProgressTrackingMethod, type ProgressTotals } from "@/lib/books/readingProgress";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import {
@@ -23,7 +23,6 @@ import FloatingAddBookButton from "./components/FloatingAddBookButton";
 import LearningTaskCard from "./components/LearningTaskCard";
 import LearningTasksPanel from "./components/LearningTasksPanel";
 import MobileVersionNotice from "./components/MobileVersionNotice";
-import PendingBookRequestsAlert from "./components/PendingBookRequestsAlert";
 import UserBar from "./components/UserBar";
 import {
   AbilityCheckReminderBanner,
@@ -35,11 +34,8 @@ import {
   abilityCheckReminderUnlocked,
   getTodayKey,
   hideAbilityCheckReminderForToday,
-  hidePendingBookRequestsAlert,
   lockAbilityCheckReminder,
   loadAbilityCheckSeenForToday,
-  pendingBookRequestsAlertHidden,
-  pendingBookRequestsSignature,
   unlockAbilityCheckReminder,
   getLibraryItemStatusLabel,
   sortLibraryItems,
@@ -104,19 +100,10 @@ type TrialBannerState = {
   formattedDate: string;
 } | null;
 
-type StudentOption = {
-  id: string;
-  display_name: string;
-  username?: string | null;
-  level?: string | null;
-  role?: ProfileRole | null;
-};
-
-type KanjiEnrichmentAlertItem = {
-  userBookId: string;
-  title: string;
-  count: number;
-  studentName: string | null;
+type AbilityCheckReminderLoadRequest = {
+  controller: AbortController;
+  queued: { userId: string; canUseAbilityCheck: boolean } | null;
+  promise: Promise<void> | null;
 };
 
 type LearningTaskRow = {
@@ -137,7 +124,6 @@ type LearningTaskRow = {
 type ReadingSessionStats = {
   progressPercent: number | null;
   furthestPage: number | null;
-  wordsLookedUp: number | null;
   lastEngagedAt: string | null; // ✅ NEW
 };
 
@@ -196,23 +182,19 @@ export default function BooksPage() {
   const [libraryBooksLoading, setLibraryBooksLoading] = useState(true);
   const [libraryBooksError, setLibraryBooksError] = useState<string | null>(null);
 
-  const [kanjiEnrichmentAlerts, setKanjiEnrichmentAlerts] = useState<KanjiEnrichmentAlertItem[]>([]);
   const [learningTasks, setLearningTasks] = useState<LearningTaskRow[]>([]);
   const [learningTasksLoading, setLearningTasksLoading] = useState(false);
   const [learningTasksError, setLearningTasksError] = useState<string | null>(null);
   const [completingLearningTaskId, setCompletingLearningTaskId] = useState<string | null>(null);
 
   const [meId, setMeId] = useState<string>("");
+  const [meDisplayName, setMeDisplayName] = useState<string | null>(null);
   const [myRole, setMyRole] = useState<ProfileRole>("member");
   const [isSuperTeacher, setIsSuperTeacher] = useState(false);
   const [hasFullLearningAccess, setHasFullLearningAccess] = useState(false);
   const [trialBanner, setTrialBanner] = useState<TrialBannerState>(null);
-  const [students, setStudents] = useState<StudentOption[]>([]);
+  const [viewingUserLabel, setViewingUserLabel] = useState("Me");
   const [viewingUserId, setViewingUserId] = useState<string>("");
-
-  const [bookRequests, setBookRequests] = useState<any[]>([]);
-  const [dismissedPendingBookRequestsSignature, setDismissedPendingBookRequestsSignature] =
-    useState("");
 
   const [searchQuery, setSearchQuery] = useState("");
   const [bookTypeFilter, setBookTypeFilter] = useState<string>("all");
@@ -246,15 +228,6 @@ export default function BooksPage() {
     });
   }, [rows, searchQuery, bookTypeFilter, statusFilter]);
 
-  const pendingBookRequestsAlertSignature = useMemo(
-    () => pendingBookRequestsSignature(bookRequests),
-    [bookRequests]
-  );
-  const showPendingBookRequestsAlert =
-    bookRequests.length > 0 &&
-    dismissedPendingBookRequestsSignature !== pendingBookRequestsAlertSignature &&
-    !pendingBookRequestsAlertHidden(pendingBookRequestsAlertSignature);
-
   const validRows = filteredRows.filter((r) => !!r.books && !r.is_teacher_prep);
   const hasLibraryBooks = rows.some((r) => !!r.books && !r.is_teacher_prep);
 
@@ -268,11 +241,13 @@ export default function BooksPage() {
   const [abilityCheckReminderHasUnlocked, setAbilityCheckReminderHasUnlocked] = useState(false);
   const [canUseAbilityCheckReminder, setCanUseAbilityCheckReminder] = useState(false);
   const [abilityCheckReminderDayKey, setAbilityCheckReminderDayKey] = useState(getTodayKey());
+  const abilityCheckReminderLoadRef = useRef<AbilityCheckReminderLoadRequest | null>(null);
+  const abilityCheckReminderLoadFunctionRef = useRef<((userId: string, canUseAbilityCheck: boolean) => Promise<void>) | null>(null);
+  const abilityCheckReminderMountedRef = useRef(false);
+  const abilityCheckReminderForegroundTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const viewingLabel =
-    viewingUserId && viewingUserId === meId
-      ? "Me"
-      : students.find((s) => s.id === viewingUserId)?.display_name || "Member";
+    viewingUserId && viewingUserId === meId ? "Me" : viewingUserLabel || "Member";
 
   const isViewingStudentLibrary =
     isTeacher && !!viewingUserId && !!meId && viewingUserId !== meId;
@@ -290,162 +265,237 @@ export default function BooksPage() {
       ? `/books/add?destination=student&targetUserId=${encodeURIComponent(viewingUserId)}`
       : "/books/add?destination=my-library";
 
-  async function loadAbilityCheckReminder(userId: string, canUseAbilityCheck: boolean) {
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") setMeDisplayName(null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const cancelAbilityCheckReminderLoad = useCallback(() => {
+    const activeRequest = abilityCheckReminderLoadRef.current;
+    if (activeRequest) {
+      activeRequest.queued = null;
+      activeRequest.controller.abort();
+    }
+    setAbilityCheckReminderLoading(false);
+  }, []);
+
+  const loadAbilityCheckReminder = useCallback((userId: string, canUseAbilityCheck: boolean): Promise<void> => {
     if (!canUseAbilityCheck) {
+      cancelAbilityCheckReminderLoad();
       setAbilityCheckReminderCount(0);
       setAbilityCheckReminderHasUnlocked(false);
-      setAbilityCheckReminderLoading(false);
       lockAbilityCheckReminder();
-      return;
+      return Promise.resolve();
     }
+
+    const activeRequest = abilityCheckReminderLoadRef.current;
+    if (activeRequest) {
+      activeRequest.queued = { userId, canUseAbilityCheck };
+      activeRequest.controller.abort();
+      setAbilityCheckReminderLoading(true);
+      return activeRequest.promise ?? Promise.resolve();
+    }
+
+    const request: AbilityCheckReminderLoadRequest = {
+      controller: new AbortController(),
+      queued: null,
+      promise: null,
+    };
+    abilityCheckReminderLoadRef.current = request;
+    const isCurrentRequest = () =>
+      abilityCheckReminderMountedRef.current &&
+      abilityCheckReminderLoadRef.current === request &&
+      !request.controller.signal.aborted;
 
     setAbilityCheckReminderLoading(true);
 
-    try {
-      let settings: AbilityCheckReminderSettings | null = null;
-      const { data: settingsWithReminder, error: settingsError } = await supabase
-        .from("user_learning_settings")
-        .select(
-          "red_stages, orange_stages, yellow_stages, skip_katakana_library_check, show_ability_check_reminder"
-        )
-        .eq("user_id", userId)
-        .maybeSingle<AbilityCheckReminderSettings>();
-
-      if (settingsError) {
-        const { data: fallbackSettings, error: fallbackError } = await supabase
+    const run = async () => {
+      try {
+        let settings: AbilityCheckReminderSettings | null = null;
+        const { data: settingsWithReminder, error: settingsError } = await supabase
           .from("user_learning_settings")
-          .select("red_stages, orange_stages, yellow_stages, skip_katakana_library_check")
+          .select(
+            "red_stages, orange_stages, yellow_stages, skip_katakana_library_check, show_ability_check_reminder"
+          )
           .eq("user_id", userId)
+          .abortSignal(request.controller.signal)
           .maybeSingle<AbilityCheckReminderSettings>();
 
-        if (fallbackError) throw fallbackError;
-        settings = fallbackSettings;
-      } else {
-        settings = settingsWithReminder;
-      }
+        if (!isCurrentRequest()) return;
 
-      const resolvedSettings = {
-        red_stages: settings?.red_stages ?? 1,
-        orange_stages: settings?.orange_stages ?? 1,
-        yellow_stages: settings?.yellow_stages ?? 1,
-        skip_katakana_library_check: settings?.skip_katakana_library_check ?? true,
-        show_ability_check_reminder: settings?.show_ability_check_reminder ?? true,
-      };
+        if (settingsError) {
+          const { data: fallbackSettings, error: fallbackError } = await supabase
+            .from("user_learning_settings")
+            .select("red_stages, orange_stages, yellow_stages, skip_katakana_library_check")
+            .eq("user_id", userId)
+            .abortSignal(request.controller.signal)
+            .maybeSingle<AbilityCheckReminderSettings>();
 
-      setAbilityCheckReminderEnabled(resolvedSettings.show_ability_check_reminder);
-
-      if (!resolvedSettings.show_ability_check_reminder) {
-        setAbilityCheckReminderCount(0);
-        return;
-      }
-
-      const encounterThreshold = getLibraryStudyEncounterStageCounts(resolvedSettings).total;
-
-      const { data: summaryRows, error: summaryError } = await supabase
-        .from("user_library_word_summaries")
-        .select(
-          "study_identity_key, surface, reading, meaning, total_encounter_count, check_ready_encounter_count, last_seen_at, sample_user_book_word_id"
-        )
-        .eq("user_id", userId)
-        .gt("check_ready_encounter_count", 0)
-        .gte("total_encounter_count", encounterThreshold)
-        .order("total_encounter_count", { ascending: false })
-        .limit(500)
-        .returns<AbilityCheckSummaryRow[]>();
-
-      if (summaryError) throw summaryError;
-
-      const summaries = summaryRows ?? [];
-      const { data: claimRows, error: claimError } = await supabase
-        .from("user_library_word_claims")
-        .select(
-          "id, study_identity_key, surface, reading, meaning, claimed_color, created_at, updated_at"
-        )
-        .eq("user_id", userId)
-        .eq("claimed_color", "green")
-        .order("updated_at", { ascending: false })
-        .limit(500)
-        .returns<AbilityCheckClaimRow[]>();
-
-      if (claimError) {
-        console.warn("Word Sky claims did not load for Ability Check reminder:", claimError);
-      }
-
-      const claims = claimError ? [] : claimRows ?? [];
-      const claimByKey = new Map<string, AbilityCheckClaimRow>();
-      for (const claim of claims) {
-        if (claim.study_identity_key) claimByKey.set(claim.study_identity_key, claim);
-      }
-
-      if (summaries.length === 0 && claims.length === 0) {
-        setAbilityCheckReminderCount(0);
-        return;
-      }
-
-      const keys = Array.from(
-        new Set([
-          ...summaries.map((row) => row.study_identity_key).filter(Boolean),
-          ...claims.map((row) => row.study_identity_key).filter(Boolean),
-        ])
-      );
-      const progressByKey = new Map<string, AbilityCheckProgressRow>();
-
-      for (let i = 0; i < keys.length; i += 75) {
-        const chunk = keys.slice(i, i + 75);
-        const { data: progressRows, error: progressError } = await supabase
-          .from("user_library_word_progress")
-          .select(
-            "id, study_identity_key, reading_gate_status, meaning_gate_status, held_before_reading_gate, held_before_meaning_gate, mastered, mastered_at, reading_gate_failed_at, meaning_gate_failed_at, last_studied_at"
-          )
-          .eq("definition_key", "")
-          .eq("user_id", userId)
-          .in("study_identity_key", chunk)
-          .returns<AbilityCheckProgressRow[]>();
-
-        if (progressError) throw progressError;
-
-        for (const row of progressRows ?? []) {
-          progressByKey.set(row.study_identity_key, row);
+          if (!isCurrentRequest()) return;
+          if (fallbackError) throw fallbackError;
+          settings = fallbackSettings;
+        } else {
+          settings = settingsWithReminder;
         }
-      }
 
-      const seenTodayIds = loadAbilityCheckSeenForToday();
-      const availableSummaryCount = summaries.filter((summary) =>
-        isAbilityCheckCardInDailyPool(
-          summary,
-          progressByKey.get(summary.study_identity_key) ?? null,
-          resolvedSettings,
-          seenTodayIds,
-          new Date(),
-          claimByKey.get(summary.study_identity_key) ?? null
-        )
-      ).length;
-      const summaryKeys = new Set(summaries.map((summary) => summary.study_identity_key));
-      const availableClaimCount = claims
-        .filter((claim) => !summaryKeys.has(claim.study_identity_key))
-        .filter((claim) =>
-          isAbilityCheckClaimInDailyPool(
-            claim,
-            progressByKey.get(claim.study_identity_key) ?? null,
+        const resolvedSettings = {
+          red_stages: settings?.red_stages ?? 1,
+          orange_stages: settings?.orange_stages ?? 1,
+          yellow_stages: settings?.yellow_stages ?? 1,
+          skip_katakana_library_check: settings?.skip_katakana_library_check ?? true,
+          show_ability_check_reminder: settings?.show_ability_check_reminder ?? true,
+        };
+
+        setAbilityCheckReminderEnabled(resolvedSettings.show_ability_check_reminder);
+
+        if (!resolvedSettings.show_ability_check_reminder) {
+          setAbilityCheckReminderCount(0);
+          return;
+        }
+
+        const encounterThreshold = getLibraryStudyEncounterStageCounts(resolvedSettings).total;
+
+        const [summaryResult, claimResult] = await Promise.all([
+          supabase
+            .from("user_library_word_summaries")
+            .select(
+              "study_identity_key, surface, reading, meaning, total_encounter_count, last_seen_at, sample_user_book_word_id"
+            )
+            .eq("user_id", userId)
+            .gt("check_ready_encounter_count", 0)
+            .gte("total_encounter_count", encounterThreshold)
+            .order("total_encounter_count", { ascending: false })
+            .limit(500)
+            .abortSignal(request.controller.signal)
+            .returns<AbilityCheckSummaryRow[]>(),
+          supabase
+            .from("user_library_word_claims")
+            .select("study_identity_key, surface, reading, meaning, claimed_color")
+            .eq("user_id", userId)
+            .eq("claimed_color", "green")
+            .order("updated_at", { ascending: false })
+            .limit(500)
+            .abortSignal(request.controller.signal)
+            .returns<AbilityCheckClaimRow[]>(),
+        ]);
+
+        if (!isCurrentRequest()) return;
+
+        const { data: summaryRows, error: summaryError } = summaryResult;
+        if (summaryError) throw summaryError;
+
+        const summaries = summaryRows ?? [];
+        const { data: claimRows, error: claimError } = claimResult;
+
+        if (claimError) {
+          console.warn("Word Sky claims did not load for Ability Check reminder:", claimError);
+        }
+
+        const claims = claimError ? [] : claimRows ?? [];
+        const claimByKey = new Map<string, AbilityCheckClaimRow>();
+        for (const claim of claims) {
+          if (claim.study_identity_key) claimByKey.set(claim.study_identity_key, claim);
+        }
+
+        if (summaries.length === 0 && claims.length === 0) {
+          setAbilityCheckReminderCount(0);
+          return;
+        }
+
+        const keys = Array.from(
+          new Set([
+            ...summaries.map((row) => row.study_identity_key).filter(Boolean),
+            ...claims.map((row) => row.study_identity_key).filter(Boolean),
+          ])
+        );
+        const progressByKey = new Map<string, AbilityCheckProgressRow>();
+        const progressChunks: string[][] = [];
+
+        for (let i = 0; i < keys.length; i += 75) {
+          progressChunks.push(keys.slice(i, i + 75));
+        }
+
+        for (let i = 0; i < progressChunks.length; i += 3) {
+          const batch = progressChunks.slice(i, i + 3);
+          const batchResults = await Promise.all(batch.map((chunk) =>
+            supabase
+              .from("user_library_word_progress")
+              .select(
+                "id, study_identity_key, reading_gate_status, meaning_gate_status, held_before_reading_gate, held_before_meaning_gate, mastered, reading_gate_failed_at, meaning_gate_failed_at, last_studied_at"
+              )
+              .eq("definition_key", "")
+              .eq("user_id", userId)
+              .in("study_identity_key", chunk)
+              .abortSignal(request.controller.signal)
+              .returns<AbilityCheckProgressRow[]>()
+          ));
+
+          if (!isCurrentRequest()) return;
+
+          for (const { data: progressRows, error: progressError } of batchResults) {
+            if (progressError) throw progressError;
+            for (const row of progressRows ?? []) {
+              progressByKey.set(row.study_identity_key, row);
+            }
+          }
+        }
+
+        const seenTodayIds = loadAbilityCheckSeenForToday();
+        const availableSummaryCount = summaries.filter((summary) =>
+          isAbilityCheckCardInDailyPool(
+            summary,
+            progressByKey.get(summary.study_identity_key) ?? null,
             resolvedSettings,
-            seenTodayIds
+            seenTodayIds,
+            new Date(),
+            claimByKey.get(summary.study_identity_key) ?? null
           )
         ).length;
-      const availableCount = availableSummaryCount + availableClaimCount;
+        const summaryKeys = new Set(summaries.map((summary) => summary.study_identity_key));
+        const availableClaimCount = claims
+          .filter((claim) => !summaryKeys.has(claim.study_identity_key))
+          .filter((claim) =>
+            isAbilityCheckClaimInDailyPool(
+              claim,
+              progressByKey.get(claim.study_identity_key) ?? null,
+              resolvedSettings,
+              seenTodayIds
+            )
+          ).length;
+        const availableCount = availableSummaryCount + availableClaimCount;
 
-      if (availableCount >= ABILITY_CHECK_REMINDER_MIN_DUE_CARDS) {
-        unlockAbilityCheckReminder();
-        setAbilityCheckReminderHasUnlocked(true);
+        if (availableCount >= ABILITY_CHECK_REMINDER_MIN_DUE_CARDS) {
+          unlockAbilityCheckReminder();
+          setAbilityCheckReminderHasUnlocked(true);
+        }
+
+        setAbilityCheckReminderCount(availableCount);
+      } catch (error) {
+        if (isCurrentRequest()) {
+          console.error("Error loading Ability Check reminder:", error);
+          setAbilityCheckReminderCount(0);
+        }
+      } finally {
+        if (isCurrentRequest()) setAbilityCheckReminderLoading(false);
       }
+    };
 
-      setAbilityCheckReminderCount(availableCount);
-    } catch (error) {
-      console.error("Error loading Ability Check reminder:", error);
-      setAbilityCheckReminderCount(0);
-    } finally {
-      setAbilityCheckReminderLoading(false);
-    }
-  }
+    request.promise = run().finally(() => {
+      if (abilityCheckReminderLoadRef.current !== request) return;
+      const queued = request.queued;
+      abilityCheckReminderLoadRef.current = null;
+      if (queued && abilityCheckReminderMountedRef.current) {
+        void abilityCheckReminderLoadFunctionRef.current?.(queued.userId, queued.canUseAbilityCheck);
+      }
+    });
+
+    return request.promise;
+  }, [cancelAbilityCheckReminderLoad]);
 
   async function loadLearningTasks(userId: string, options: { createdBy?: string | null } = {}) {
     setLearningTasksLoading(true);
@@ -529,14 +579,8 @@ export default function BooksPage() {
     console.error(prefix, err?.message, err?.details, err?.hint, err?.code, err);
   }
 
-  async function fetchBooks(userIdToView: string) {
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
+  async function fetchBooks(userIdToView: string, callerUserId: string) {
+    if (!callerUserId) {
       setLibraryBooksError("Please sign in to view your Library.");
       setRows([]);
       return;
@@ -544,7 +588,7 @@ export default function BooksPage() {
 
     setLibraryBooksError(null);
 
-    const targetUserId = isTeacher ? userIdToView : user.id;
+    const targetUserId = isTeacher ? userIdToView : callerUserId;
 
     const { data, error } = await supabase
       .from("user_books")
@@ -630,327 +674,6 @@ export default function BooksPage() {
       .filter((r: any) => resolvePersonalTrackingStatus(r) !== "not_tracking")
       .map((r: any) => r.id);
     await loadReadingStatsForBooks(userBookIds, Object.fromEntries(rowsWithTeachingBadges.map(r => [r.id, { method: effectiveProgressMethod(r.progress_tracking_method, r.books ?? {}), totals: r.books ?? {} }])));
-
-    if (isTeacher && targetUserId === meId) {
-      const studentAlertUserIds = isSuperTeacher
-        ? students.filter((s) => s.id).map((s) => s.id)
-        : students
-          .filter((s) => s.id && s.role === "member")
-          .map((s) => s.id);
-
-      const alertUserIds = Array.from(
-        new Set([meId, ...studentAlertUserIds].filter(Boolean))
-      ) as string[];
-
-      await loadKanjiEnrichmentAlerts(alertUserIds);
-    } else {
-      setKanjiEnrichmentAlerts([]);
-    }
-  }
-
-  async function loadPendingBookRequests(isCancelled: () => boolean = () => false) {
-    try {
-      const { data, error } = await supabase
-        .from("book_requests")
-        .select(`
-          id,
-          title,
-          author,
-          isbn13,
-          asin,
-          status,
-          created_at,
-          user_id,
-          profiles:user_id (
-            display_name,
-            username
-          )
-        `)
-        .or("status.eq.pending,status.is.null")
-        .order("created_at", { ascending: false });
-
-      if (isCancelled()) return;
-
-      if (error) {
-        logSbError("Error loading book requests:", error);
-        setBookRequests([]);
-        return;
-      }
-
-      setBookRequests((data as any[]) ?? []);
-    } catch (error) {
-      if (isCancelled()) return;
-      logSbError("Error loading book requests:", error);
-      setBookRequests([]);
-    }
-  }
-
-  async function handleApproveRequest(requestId: string) {
-    try {
-      const { error } = await supabase.rpc("approve_book_request", {
-        request_id_input: requestId,
-      });
-
-      if (error) {
-        console.error("Approve request error:", error);
-        alert("Could not approve request.");
-        return;
-      }
-
-      alert("Book added to library!");
-      await loadPendingBookRequests();
-      await fetchBooks(viewingUserId || meId);
-    } catch (err) {
-      console.error("Approve request error:", err);
-      alert("Something went wrong.");
-    }
-  }
-
-  async function handleRejectBookRequest(requestId: string) {
-    const confirmed = window.confirm(
-      "Reject this book request? It will leave the pending list, but the request history will stay in Mekuru."
-    );
-
-    if (!confirmed) return;
-
-    try {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-
-      if (sessionError || !token) {
-        alert("Please sign in again before rejecting this request.");
-        return;
-      }
-
-      const response = await fetch("/api/book-requests/reject", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ requestId }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        alert(data?.error ?? "Could not reject request.");
-        return;
-      }
-
-      alert("Book request rejected.");
-      await loadPendingBookRequests();
-    } catch (err) {
-      console.error("Reject request error:", err);
-      alert("Something went wrong.");
-    }
-  }
-
-  async function loadKanjiEnrichmentAlerts(userIdsToView: string[]) {
-    if (userIdsToView.length === 0) {
-      setKanjiEnrichmentAlerts([]);
-      return;
-    }
-
-    const { data: profiles, error: profilesError } = await supabase
-      .from("profiles")
-      .select("id, display_name")
-      .in("id", userIdsToView);
-
-    if (profilesError) {
-      console.error("Error loading profiles for kanji alerts:", profilesError);
-      setKanjiEnrichmentAlerts([]);
-      return;
-    }
-
-    const displayNameByUserId = new Map<string, string>();
-    for (const profile of profiles ?? []) {
-      displayNameByUserId.set((profile as any).id, (profile as any).display_name ?? "Student");
-    }
-
-    const { data: userBooks, error: userBooksError } = await supabase
-      .from("user_books")
-      .select(`
-      id,
-      user_id,
-      books (
-        title
-      )
-    `)
-      .in("user_id", userIdsToView);
-
-    if (userBooksError) {
-      console.error("Error loading user books for kanji alerts:", userBooksError);
-      setKanjiEnrichmentAlerts([]);
-      return;
-    }
-
-    const userBookIds = (userBooks ?? []).map((r: any) => r.id).filter(Boolean);
-
-    if (userBookIds.length === 0) {
-      setKanjiEnrichmentAlerts([]);
-      return;
-    }
-
-    const KANJI_ENRICHMENT_TEST_START = "2026-04-20T00:00:00";
-
-    const { data: wordRows, error: wordError } = await supabase
-      .from("user_book_words")
-      .select("user_book_id, vocabulary_cache_id, surface, reading, is_manual_override, created_at")
-      .in("user_book_id", userBookIds)
-      .eq("is_manual_override", false)
-      .gte("created_at", KANJI_ENRICHMENT_TEST_START);
-
-    if (wordError) {
-      console.error("Error loading user_book_words for kanji alerts:", wordError);
-      setKanjiEnrichmentAlerts([]);
-      return;
-    }
-
-    const cacheIds = Array.from(
-      new Set(
-        (wordRows ?? [])
-          .map((r: any) => r.vocabulary_cache_id)
-          .filter((id: number | null) => id != null)
-      )
-    );
-
-    const mapStatusByCacheId = new Map<
-      number,
-      { completePositions: Set<number>; hasIncomplete: boolean }
-    >();
-
-    if (cacheIds.length > 0) {
-      const { data: mapRows, error: mapError } = await supabase
-        .from("vocabulary_kanji_map")
-        .select("vocabulary_cache_id, kanji_position, reading_type, base_reading, realized_reading")
-        .in("vocabulary_cache_id", cacheIds);
-
-      if (mapError) {
-        console.error("Error loading kanji map rows for alerts:", mapError);
-        setKanjiEnrichmentAlerts([]);
-        return;
-      }
-
-      for (const row of mapRows ?? []) {
-        const cacheId = (row as any).vocabulary_cache_id as number;
-        const hasReadingType =
-          !!(row as any).reading_type ||
-          (!!(row as any).base_reading && !!(row as any).realized_reading);
-        const existing = mapStatusByCacheId.get(cacheId) ?? {
-          completePositions: new Set<number>(),
-          hasIncomplete: false,
-        };
-
-        if (
-          !hasReadingType ||
-          !(row as any).base_reading ||
-          !(row as any).realized_reading
-        ) {
-          existing.hasIncomplete = true;
-        } else if (typeof (row as any).kanji_position === "number") {
-          existing.completePositions.add((row as any).kanji_position);
-        }
-
-        mapStatusByCacheId.set(cacheId, existing);
-      }
-    }
-
-    const metaByUserBookId = new Map<string, { title: string; studentName: string | null }>();
-    for (const row of userBooks ?? []) {
-      const bookTitle = Array.isArray((row as any).books)
-        ? (row as any).books[0]?.title ?? "Untitled"
-        : (row as any).books?.title ?? "Untitled";
-
-      metaByUserBookId.set(row.id, {
-        title: bookTitle,
-        studentName: displayNameByUserId.get((row as any).user_id) ?? null,
-      });
-    }
-
-    function kanjiCountForSurface(surface: string) {
-      return Array.from(surface).filter((ch) => /\p{Script=Han}/u.test(ch)).length;
-    }
-
-    function kanjiQueueKey(surface: string, reading: string) {
-      return `${surface.trim()}|||${reading.trim()}`;
-    }
-
-    function isMapCompleteForSurface(
-      mapStatus: { completePositions: Set<number>; hasIncomplete: boolean } | null | undefined,
-      surface: string
-    ) {
-      const kanjiCount = kanjiCountForSurface(surface);
-
-      // A word should count as enriched if every kanji position has at least one complete row.
-      // Extra incomplete placeholder rows should not keep the Library alert alive.
-      return Boolean(mapStatus && mapStatus.completePositions.size >= kanjiCount);
-    }
-
-    const completeExactKeysByUserBookId = new Map<string, Set<string>>();
-
-    for (const row of wordRows ?? []) {
-      const surface = String((row as any).surface ?? "");
-      const reading = String((row as any).reading ?? "");
-      if (!/[\p{Script=Han}]/u.test(surface)) continue;
-
-      const cacheId = (row as any).vocabulary_cache_id as number | null;
-      if (cacheId == null) continue;
-
-      const mapStatus = mapStatusByCacheId.get(cacheId);
-      if (!isMapCompleteForSurface(mapStatus, surface)) continue;
-
-      const userBookId = (row as any).user_book_id as string;
-      const exactKeys = completeExactKeysByUserBookId.get(userBookId) ?? new Set<string>();
-      exactKeys.add(kanjiQueueKey(surface, reading));
-      completeExactKeysByUserBookId.set(userBookId, exactKeys);
-    }
-
-    const neededKeysByUserBookId = new Map<string, Set<string>>();
-
-    for (const row of wordRows ?? []) {
-      const surface = String((row as any).surface ?? "");
-      const reading = String((row as any).reading ?? "");
-      const hasKanji = /[\p{Script=Han}]/u.test(surface);
-      if (!hasKanji) continue;
-
-      const userBookId = (row as any).user_book_id as string;
-      const completeExactKeys = completeExactKeysByUserBookId.get(userBookId);
-      if (completeExactKeys?.has(kanjiQueueKey(surface, reading))) continue;
-
-      const cacheId = (row as any).vocabulary_cache_id as number | null;
-      const mapStatus = cacheId != null ? mapStatusByCacheId.get(cacheId) : null;
-
-      const needsEnrichment =
-        cacheId == null ||
-        !isMapCompleteForSurface(mapStatus, surface);
-
-      if (needsEnrichment) {
-        const neededKeys = neededKeysByUserBookId.get(userBookId) ?? new Set<string>();
-        neededKeys.add(cacheId == null ? `missing:${surface}::${reading}` : `cache:${cacheId}`);
-        neededKeysByUserBookId.set(userBookId, neededKeys);
-      }
-    }
-
-    const alerts = Array.from(neededKeysByUserBookId.entries())
-      .map(([userBookId, neededKeys]) => ({
-        userBookId,
-        title: metaByUserBookId.get(userBookId)?.title ?? "Untitled",
-        count: neededKeys.size,
-        studentName: metaByUserBookId.get(userBookId)?.studentName ?? null,
-        isMyBook: (userBooks ?? []).some(
-          (row: any) => row.id === userBookId && row.user_id === meId
-        ),
-      }))
-      .sort((a, b) => {
-        if (a.isMyBook !== b.isMyBook) {
-          return a.isMyBook ? 1 : -1;
-        }
-
-        return b.count - a.count;
-      });
-
-    setKanjiEnrichmentAlerts(alerts);
   }
 
   async function loadReadingStatsForBooks(
@@ -971,15 +694,6 @@ export default function BooksPage() {
       console.error("Error loading reading stats for library:", error);
       setReadingStatsByUserBookId({});
       return;
-    }
-
-    const { data: wordRows, error: wordErr } = await supabase
-      .from("user_book_words")
-      .select("user_book_id, surface, meaning, meaning_choice_index")
-      .in("user_book_id", userBookIds);
-
-    if (wordErr) {
-      console.error("Error loading lookup stats for library:", wordErr);
     }
 
     const grouped: Record<
@@ -1016,32 +730,6 @@ export default function BooksPage() {
 
     }
 
-    const lookupSetsByUserBookId: Record<string, Set<string>> = {};
-
-    if (wordRows) {
-      for (const row of wordRows as any[]) {
-        const userBookId = row.user_book_id as string;
-        if (!userBookId) continue;
-
-        const surface = (row.surface ?? "").trim();
-        const meaning = (row.meaning ?? "").trim();
-        if (!surface && !meaning) continue;
-
-        if (!lookupSetsByUserBookId[userBookId]) {
-          lookupSetsByUserBookId[userBookId] = new Set<string>();
-        }
-
-        lookupSetsByUserBookId[userBookId].add(`${surface}|||${meaning}`);
-      }
-    }
-
-    const lookupCountsByUserBookId: Record<string, number> = {};
-
-    for (const userBookId of Object.keys(lookupSetsByUserBookId)) {
-      lookupCountsByUserBookId[userBookId] =
-        lookupSetsByUserBookId[userBookId].size;
-    }
-
     const stats: Record<string, ReadingSessionStats> = {};
 
     for (const userBookId of userBookIds) {
@@ -1051,7 +739,6 @@ export default function BooksPage() {
         stats[userBookId] = {
           progressPercent: null,
           furthestPage: null,
-          wordsLookedUp: lookupCountsByUserBookId[userBookId] ?? 0,
           lastEngagedAt: null,
         };
         continue;
@@ -1062,7 +749,6 @@ export default function BooksPage() {
       stats[userBookId] = {
         progressPercent,
         furthestPage: g.furthestPage,
-        wordsLookedUp: lookupCountsByUserBookId[userBookId] ?? 0,
         lastEngagedAt: g.lastEngagedAt ?? null,
       };
     }
@@ -1093,10 +779,11 @@ export default function BooksPage() {
       if (cancelled) return;
 
       setMeId(user.id);
+      setViewingUserLabel("Me");
 
       const meProfileResult = await supabase
         .from("profiles")
-        .select("role, is_super_teacher, username, time_zone, app_access_type, app_access_expires_at")
+        .select("role, is_super_teacher, username, display_name, time_zone, app_access_type, app_access_expires_at")
         .eq("id", user.id)
         .single();
       let meProfile: any = meProfileResult.data;
@@ -1105,7 +792,7 @@ export default function BooksPage() {
       if (isMissingAppAccessColumnError(meProfileErr)) {
         const fallbackResult = await supabase
           .from("profiles")
-          .select("role, is_super_teacher, username, time_zone")
+          .select("role, is_super_teacher, username, display_name, time_zone")
           .eq("id", user.id)
           .single();
 
@@ -1118,6 +805,8 @@ export default function BooksPage() {
       }
 
       if (cancelled) return;
+
+      setMeDisplayName(meProfile?.display_name || "User");
 
       const role = (meProfile?.role as ProfileRole | null) ?? "member";
       const superTeacherFlag = Boolean((meProfile as any)?.is_super_teacher);
@@ -1144,121 +833,27 @@ export default function BooksPage() {
         )
       );
 
-      if (role === "super_teacher" || superTeacherFlag) {
-        // Administrative alerts must not delay resolving and loading the library.
-        void loadPendingBookRequests(() => cancelled);
-      }
-
-      if (routeUsername) {
+      if (routeUsername && routeUsername === meProfile?.username) {
+        setViewingUserId(user.id);
+        setViewingUserLabel(meProfile?.display_name || "Member");
+      } else if (routeUsername) {
         const { data: profile } = await supabase
           .from("profiles")
-          .select("id")
+          .select("id, display_name")
           .eq("username", routeUsername)
           .single();
 
         if (profile?.id) {
           setViewingUserId(profile.id);
+          setViewingUserLabel(profile.display_name || "Member");
         } else {
           setViewingUserId(user.id);
+          setViewingUserLabel("Me");
         }
       } else {
         setViewingUserId(user.id);
+        setViewingUserLabel("Me");
       }
-
-      if (role !== "teacher" && role !== "super_teacher" && !superTeacherFlag) {
-        setStudents([]);
-        return;
-      }
-
-      if (role === "super_teacher" || superTeacherFlag) {
-        const { data: profs, error: profErr } = await supabase
-          .from("profiles")
-          .select("id, display_name, username, level, role")
-          .order("display_name", { ascending: true });
-
-        if (profErr) {
-          logSbError("Error loading all profiles:", profErr);
-          if (!cancelled) setStudents([]);
-          return;
-        }
-
-        if (cancelled) return;
-
-        setStudents(
-          (profs ?? []).map((p: any) => ({
-            id: p.id,
-            display_name: p.display_name || "User",
-            username: p.username ?? null,
-            level: p.level ?? null,
-            role: p.role ?? null,
-          }))
-        );
-
-        return;
-      }
-
-      const { data: rels, error: relErr } = await supabase
-        .from("teacher_students")
-        .select("student_id")
-        .eq("teacher_id", user.id)
-        .is("archived_at", null);
-
-      if (relErr) {
-        logSbError("Error loading teacher_students:", relErr);
-        if (!cancelled) setStudents([]);
-        return;
-      }
-
-      const studentIds = (rels ?? []).map((r: any) => r.student_id).filter(Boolean);
-
-      if (studentIds.length === 0) {
-        if (!cancelled) setStudents([]);
-        return;
-      }
-
-      const { data: profs, error: profErr } = await supabase
-        .from("profiles")
-        .select("id, display_name, username, level, role")
-        .in("id", studentIds)
-        .order("display_name", { ascending: true });
-
-      if (profErr) {
-        logSbError("Error loading student profiles:", profErr);
-        if (!cancelled) setStudents([]);
-        return;
-      }
-
-      if (cancelled) return;
-
-      const meOption: StudentOption = {
-        id: user.id,
-        display_name: "Me",
-        username: (meProfile as any)?.username ?? null,
-        level: null,
-        role: "teacher",
-      };
-
-      const studentOptions: StudentOption[] = (profs ?? [])
-        .filter((p: any) => p.id !== user.id && p.role === "member")
-        .map((p: any) => ({
-          id: p.id,
-          display_name: p.display_name,
-          username: p.username ?? null,
-          level: p.level ?? null,
-          role: p.role,
-        }));
-
-      const teacherOptions: StudentOption[] = (profs ?? [])
-        .filter((p: any) => p.id !== user.id && p.role === "teacher")
-        .map((p: any) => ({
-          id: p.id,
-          display_name: p.display_name,
-          username: p.username ?? null,
-          level: p.level ?? null,
-          role: p.role,
-        }));
-
-      setStudents([meOption, ...studentOptions, ...teacherOptions]);
     })();
 
     return () => {
@@ -1278,7 +873,7 @@ export default function BooksPage() {
     setLibraryBooksError(null);
     setLibraryBooksLoading(true);
 
-    fetchBooks(viewingUserId).finally(() => {
+    fetchBooks(viewingUserId, meId).finally(() => {
       if (!cancelled) {
         setLibraryBooksLoading(false);
       }
@@ -1305,6 +900,25 @@ export default function BooksPage() {
   }, [viewingUserId, meId, isTeacher]);
 
   useEffect(() => {
+    abilityCheckReminderLoadFunctionRef.current = loadAbilityCheckReminder;
+    abilityCheckReminderMountedRef.current = true;
+
+    return () => {
+      abilityCheckReminderMountedRef.current = false;
+      if (abilityCheckReminderForegroundTimerRef.current) {
+        clearTimeout(abilityCheckReminderForegroundTimerRef.current);
+        abilityCheckReminderForegroundTimerRef.current = null;
+      }
+
+      const activeRequest = abilityCheckReminderLoadRef.current;
+      if (activeRequest) {
+        activeRequest.queued = null;
+        activeRequest.controller.abort();
+      }
+    };
+  }, [loadAbilityCheckReminder]);
+
+  useEffect(() => {
     const hiddenToday = abilityCheckReminderHiddenToday();
 
     setAbilityCheckReminderHidden(hiddenToday);
@@ -1321,15 +935,21 @@ export default function BooksPage() {
       viewingUserId !== meId ||
       hiddenToday
     ) {
+      cancelAbilityCheckReminderLoad();
       setAbilityCheckReminderCount(0);
       return;
     }
 
-    loadAbilityCheckReminder(viewingUserId, canUseAbilityCheckReminder);
-  }, [viewingUserId, meId, abilityCheckReminderDayKey, canUseAbilityCheckReminder]);
+    if (libraryBooksLoading) {
+      cancelAbilityCheckReminderLoad();
+      return;
+    }
+
+    void loadAbilityCheckReminder(viewingUserId, canUseAbilityCheckReminder);
+  }, [viewingUserId, meId, abilityCheckReminderDayKey, canUseAbilityCheckReminder, libraryBooksLoading, loadAbilityCheckReminder, cancelAbilityCheckReminderLoad]);
 
   useEffect(() => {
-    function refreshAbilityCheckReminderDay(options: { refreshCount?: boolean } = {}) {
+    function refreshAbilityCheckReminderDay(refreshCount = false) {
       const todayKey = getTodayKey();
       const hiddenToday = abilityCheckReminderHiddenToday();
 
@@ -1346,12 +966,15 @@ export default function BooksPage() {
       }
 
       if (hiddenToday) {
+        cancelAbilityCheckReminderLoad();
         setAbilityCheckReminderCount(0);
         return;
       }
 
       if (
-        options.refreshCount &&
+        refreshCount &&
+        todayKey === abilityCheckReminderDayKey &&
+        !libraryBooksLoading &&
         viewingUserId &&
         meId &&
         viewingUserId === meId
@@ -1362,24 +985,34 @@ export default function BooksPage() {
 
     refreshAbilityCheckReminderDay();
 
-    function handleFocus() {
-      refreshAbilityCheckReminderDay({ refreshCount: true });
+    function flushForegroundRefresh() {
+      abilityCheckReminderForegroundTimerRef.current = null;
+      refreshAbilityCheckReminderDay(true);
+    }
+
+    function queueForegroundRefresh() {
+      if (abilityCheckReminderForegroundTimerRef.current) {
+        clearTimeout(abilityCheckReminderForegroundTimerRef.current);
+      }
+      abilityCheckReminderForegroundTimerRef.current = setTimeout(flushForegroundRefresh, 150);
     }
 
     function handleVisibilityChange() {
-      if (document.visibilityState === "visible") {
-        refreshAbilityCheckReminderDay({ refreshCount: true });
-      }
+      if (document.visibilityState === "visible") queueForegroundRefresh();
     }
 
-    window.addEventListener("focus", handleFocus);
+    window.addEventListener("focus", queueForegroundRefresh);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("focus", queueForegroundRefresh);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (abilityCheckReminderForegroundTimerRef.current) {
+        clearTimeout(abilityCheckReminderForegroundTimerRef.current);
+        abilityCheckReminderForegroundTimerRef.current = null;
+      }
     };
-  }, [viewingUserId, meId, canUseAbilityCheckReminder]);
+  }, [viewingUserId, meId, canUseAbilityCheckReminder, abilityCheckReminderDayKey, libraryBooksLoading, loadAbilityCheckReminder, cancelAbilityCheckReminderLoad]);
 
   const currentlyReading = validRows.filter(
     (r) => resolvePersonalTrackingStatus(r) === "reading"
@@ -1526,7 +1159,7 @@ export default function BooksPage() {
           libraryOwnerLabel={libraryOwnerLabel}
           libraryContextLabel={libraryContextLabel}
         >
-          <UserBar isTeacher={isTeacher} variant="logoutOnly" />
+          <UserBar isTeacher={isTeacher} displayName={meDisplayName} variant="logoutOnly" />
         </LibraryHeader>
 
         <MobileVersionNotice />
@@ -1637,57 +1270,7 @@ export default function BooksPage() {
           }}
         />
 
-        {false && isTeacher && viewingUserId === meId && kanjiEnrichmentAlerts.length > 0 ? (
-          <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-amber-900">
-              Kanji Enrichment Needed
-            </h2>
-            <p className="mt-1 text-xs text-amber-800">
-              Books with saved kanji words that still need enrichment
-            </p>
-
-            <div className="mt-3 space-y-2">
-              {kanjiEnrichmentAlerts.map((alert) => (
-                <button
-                  key={alert.userBookId}
-                  type="button"
-                  onClick={() => router.push(`/teacher/books/${alert.userBookId}`)}
-                  className="flex w-full items-center justify-between rounded-xl border border-amber-200 bg-white px-3 py-3 text-left hover:bg-amber-100"
-                >
-                  <div>
-                    {alert.studentName ? (
-                      <div className="text-[11px] uppercase tracking-wide text-amber-800">
-                        {alert.studentName}
-                      </div>
-                    ) : null}
-                    <div className="text-sm font-medium text-stone-900">
-                      {alert.title}
-                    </div>
-                  </div>
-                  <div className="text-xs text-amber-900">
-                    {alert.count} need{alert.count === 1 ? "s" : ""}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {isSuperTeacher && showPendingBookRequestsAlert ? (
-          <PendingBookRequestsAlert
-            requests={bookRequests}
-            onDismiss={() => {
-              hidePendingBookRequestsAlert(pendingBookRequestsAlertSignature);
-              setDismissedPendingBookRequestsSignature(
-                pendingBookRequestsAlertSignature
-              );
-            }}
-            onApprove={(requestId) => handleApproveRequest(requestId)}
-            onReject={(requestId) => handleRejectBookRequest(requestId)}
-          />
-        ) : null}
-
-        <UserBar isTeacher={isTeacher} variant="labelOnly" />
+        <UserBar isTeacher={isTeacher} displayName={meDisplayName} variant="labelOnly" />
 
         {null}
 

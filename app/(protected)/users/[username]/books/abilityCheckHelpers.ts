@@ -16,7 +16,6 @@ export type AbilityCheckSummaryRow = {
   reading: string | null;
   meaning: string | null;
   total_encounter_count: number | null;
-  check_ready_encounter_count: number | null;
   last_seen_at: string | null;
   sample_user_book_word_id: string | null;
 };
@@ -29,21 +28,17 @@ export type AbilityCheckProgressRow = {
   held_before_reading_gate: boolean | null;
   held_before_meaning_gate: boolean | null;
   mastered: boolean | null;
-  mastered_at: string | null;
   reading_gate_failed_at: string | null;
   meaning_gate_failed_at: string | null;
   last_studied_at: string | null;
 };
 
 export type AbilityCheckClaimRow = {
-  id: string;
   study_identity_key: string;
   surface: string | null;
   reading: string | null;
   meaning: string | null;
   claimed_color: "green" | string | null;
-  created_at: string | null;
-  updated_at: string | null;
 };
 
 const REGULAR_GATE_RECHECK_MIN_DAYS = 3;
@@ -165,7 +160,6 @@ function progressWithAbilityCheckClaim(
     held_before_reading_gate: false,
     held_before_meaning_gate: false,
     mastered: false,
-    mastered_at: progress?.mastered_at ?? null,
     reading_gate_failed_at: progress?.reading_gate_failed_at ?? null,
     meaning_gate_failed_at: progress?.meaning_gate_failed_at ?? null,
     last_studied_at: progress?.last_studied_at ?? null,

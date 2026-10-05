@@ -35,7 +35,7 @@ export default function BetaSignupPage() {
                             showLinks={false}
                             redirectTo={
                                 typeof window !== "undefined"
-                                    ? `${window.location.origin}/dashboard`
+                                    ? `${window.location.origin}/books`
                                     : undefined
                             }
                         />

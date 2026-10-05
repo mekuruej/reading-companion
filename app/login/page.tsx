@@ -7,7 +7,7 @@ import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { useRouter } from "next/navigation";
 
-const POST_LOGIN_DASHBOARD_TARGET = "/dashboard";
+const POST_LOGIN_LIBRARY_TARGET = "/books";
 
 export default function LoginPage() {
   const [checking, setChecking] = useState(true);
@@ -24,7 +24,7 @@ export default function LoginPage() {
       if (!alive) return;
 
       if (session?.user?.id) {
-        router.replace("/dashboard");
+        router.replace(POST_LOGIN_LIBRARY_TARGET);
         return;
       }
 
@@ -39,9 +39,9 @@ export default function LoginPage() {
       if (!alive) return;
 
       if (event === "SIGNED_IN" && session?.user?.id) {
-        router.replace(POST_LOGIN_DASHBOARD_TARGET);
+        router.replace(POST_LOGIN_LIBRARY_TARGET);
       } else if (session?.user?.id) {
-        router.replace("/dashboard");
+        router.replace(POST_LOGIN_LIBRARY_TARGET);
       } else {
         setChecking(false);
       }
@@ -80,7 +80,7 @@ export default function LoginPage() {
             showLinks={false}
             redirectTo={
               typeof window !== "undefined"
-                ? `${window.location.origin}/dashboard`
+                ? `${window.location.origin}${POST_LOGIN_LIBRARY_TARGET}`
                 : undefined
             }
           />
