@@ -182,17 +182,6 @@ export function hidePendingBookRequestsAlert(signature: string) {
   window.localStorage.setItem(PENDING_BOOK_REQUESTS_ALERT_HIDE_KEY, signature);
 }
 
-
-export function isListeningFormat(value: string | null | undefined) {
-  const normalized = (value ?? "").trim().toLowerCase();
-
-  return (
-    normalized === "listening" ||
-    normalized === "audiobook" ||
-    normalized.includes("audio")
-  );
-}
-
 export function dateFromYmd(value: string) {
   return new Date(`${value}T00:00:00`);
 }
@@ -201,16 +190,10 @@ export type LibrarySortMode =
   | "status"
   | "title"
   | "last_engaged"
-  | "last_read"
   | "rating_high"
-  | "rating_low"
-  | "difficulty_high"
-  | "difficulty_low"
-  | "pace_fast"
-  | "pace_slow";
+  | "difficulty_low";
 
 export type LibraryReadingStats = {
-  averageMinutesPerPage: number | null;
   lastEngagedAt: string | null;
 };
 
@@ -222,7 +205,6 @@ type SortableLibraryItem = {
   id: string;
   personal_tracking_status?: string | null;
   started_at: string | null;
-  finished_at: string | null;
   dnf_at: string | null;
   rating_overall?: number | null;
   rating_difficulty?: number | null;
@@ -291,42 +273,14 @@ export function sortLibraryItems<T extends SortableLibraryItem>(
       return bDate - aDate;
     }
 
-    if (sortMode === "last_read") {
-      const aDate = a.finished_at ? new Date(a.finished_at).getTime() : 0;
-      const bDate = b.finished_at ? new Date(b.finished_at).getTime() : 0;
-      return bDate - aDate;
-    }
+
 
     if (sortMode === "rating_high") {
       return compareNullableNumber(a.rating_overall, b.rating_overall, "desc");
     }
 
-    if (sortMode === "rating_low") {
-      return compareNullableNumber(a.rating_overall, b.rating_overall, "asc");
-    }
-
-    if (sortMode === "difficulty_high") {
-      return compareNullableNumber(a.rating_difficulty, b.rating_difficulty, "desc");
-    }
-
     if (sortMode === "difficulty_low") {
       return compareNullableNumber(a.rating_difficulty, b.rating_difficulty, "asc");
-    }
-
-    if (sortMode === "pace_fast") {
-      return compareNullableNumber(
-        readingStatsByUserBookId[a.id]?.averageMinutesPerPage,
-        readingStatsByUserBookId[b.id]?.averageMinutesPerPage,
-        "asc"
-      );
-    }
-
-    if (sortMode === "pace_slow") {
-      return compareNullableNumber(
-        readingStatsByUserBookId[a.id]?.averageMinutesPerPage,
-        readingStatsByUserBookId[b.id]?.averageMinutesPerPage,
-        "desc"
-      );
     }
 
     return getLibraryItemStatusOrder(a) - getLibraryItemStatusOrder(b);

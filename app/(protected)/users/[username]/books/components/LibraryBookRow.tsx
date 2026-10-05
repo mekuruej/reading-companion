@@ -1,5 +1,5 @@
 import { displayBookTitle } from "@/lib/books/bookIdentity";
-import type { ReactNode } from "react";
+import type { LibraryRelationshipBadge } from "../libraryRelationship";
 
 type LibraryBookRowBook = {
   title: string;
@@ -9,7 +9,7 @@ type LibraryBookRowBook = {
 
 type LibraryBookRowData = {
   id: string;
-  isTeachingOnly?: boolean;
+  relationshipBadge?: LibraryRelationshipBadge;
   books: LibraryBookRowBook | null;
 };
 
@@ -19,7 +19,6 @@ type LibraryBookRowProps = {
   onOpen: () => void;
   secondaryActionHref?: string | null;
   secondaryActionLabel?: string;
-  teachingControls?: ReactNode;
 };
 
 export default function LibraryBookRow({
@@ -28,7 +27,6 @@ export default function LibraryBookRow({
   onOpen,
   secondaryActionHref = null,
   secondaryActionLabel = "Open",
-  teachingControls = null,
 }: LibraryBookRowProps) {
   const book = row.books;
   if (!book) return null;
@@ -55,13 +53,12 @@ export default function LibraryBookRow({
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-stone-500">
           <span>{status}</span>
-          {row.isTeachingOnly ? (
+          {row.relationshipBadge ? (
             <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-sky-700">
-              Teaching Only
+              {row.relationshipBadge}
             </span>
           ) : null}
         </div>
-        {teachingControls}
       </div>
 
       {secondaryActionHref ? (

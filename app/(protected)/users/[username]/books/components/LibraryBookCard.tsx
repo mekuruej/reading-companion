@@ -1,5 +1,5 @@
 import { displayBookTitle } from "@/lib/books/bookIdentity";
-import type { ReactNode } from "react";
+import type { LibraryRelationshipBadge } from "../libraryRelationship";
 
 type LibraryBookCardBook = {
   title: string;
@@ -9,7 +9,7 @@ type LibraryBookCardBook = {
 
 type LibraryBookCardRow = {
   id: string;
-  isTeachingOnly?: boolean;
+  relationshipBadge?: LibraryRelationshipBadge;
   started_at: string | null;
   finished_at: string | null;
   dnf_at: string | null;
@@ -29,7 +29,6 @@ type LibraryBookCardProps = {
   formatRelativeDate: (value: string) => string;
   secondaryActionHref?: string | null;
   secondaryActionLabel?: string;
-  teachingControls?: ReactNode;
 };
 
 export default function LibraryBookCard({
@@ -39,7 +38,6 @@ export default function LibraryBookCard({
   formatRelativeDate,
   secondaryActionHref = null,
   secondaryActionLabel = "Open",
-  teachingControls = null,
 }: LibraryBookCardProps) {
   const book = row.books;
   if (!book) return null;
@@ -73,9 +71,9 @@ export default function LibraryBookCard({
         {displayTitle}
       </a>
 
-      {row.isTeachingOnly ? (
+      {row.relationshipBadge ? (
         <div className="mt-1 rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-sky-700">
-          Teaching Only
+          {row.relationshipBadge}
         </div>
       ) : null}
 
@@ -131,8 +129,6 @@ export default function LibraryBookCard({
           {secondaryActionLabel}
         </a>
       ) : null}
-
-      {teachingControls}
     </li>
   );
 }

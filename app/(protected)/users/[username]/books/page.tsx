@@ -6,7 +6,6 @@ import { effectiveProgressMethod, progressSummary, type ProgressTrackingMethod, 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import { normalizeLanguageCode } from "@/lib/books/englishNativeTracker";
 import {
   getLibraryStudyEncounterStageCounts,
 } from "@/lib/libraryStudyColor";
@@ -42,21 +41,11 @@ import {
   pendingBookRequestsAlertHidden,
   pendingBookRequestsSignature,
   unlockAbilityCheckReminder,
-  isListeningFormat,
   getLibraryItemStatusLabel,
   sortLibraryItems,
 } from "./helpers";
 import { resolvePersonalTrackingStatus } from "@/lib/personalTracking";
-import {
-  TEACHING_DIFFICULTIES,
-  TEACHING_STATUSES,
-  isTeachingDifficulty,
-  isTeachingStatus,
-  teachingDifficultyLabel,
-  teachingStatusLabel,
-  type TeachingDifficulty,
-  type TeachingStatus,
-} from "@/lib/teachingStatus";
+import { getLibraryRelationshipBadge, type LibraryRelationshipBadge } from "./libraryRelationship";
 import {
   isAbilityCheckClaimInDailyPool,
   isAbilityCheckCardInDailyPool,
@@ -88,9 +77,7 @@ type UserBookRow = {
   id: string;
   book_id: string;
   personal_tracking_status?: string | null;
-  teacherBookId?: string | null;
-  teaching_status?: TeachingStatus | null;
-  teacher_jlpt_difficulty?: TeachingDifficulty | null;
+  relationshipBadge?: LibraryRelationshipBadge;
   started_at: string | null;
   finished_at: string | null;
   dnf_at: string | null;
@@ -98,7 +85,6 @@ type UserBookRow = {
   has_new_vocab: boolean;
   has_new_reading: boolean;
   books: Book | null;
-  format_type: string | null;
   progress_mode: string | null;
   progress_tracking_method: ProgressTrackingMethod | null;
   show_page_numbers: boolean | null;
@@ -109,15 +95,9 @@ type UserBookRow = {
   prepared_by?: string | null;
   source_user_book_id?: string | null;
   assigned_from_prep_at?: string | null;
-  isTeachingOnly?: boolean;
 };
 
 type ProfileRole = "teacher" | "super_teacher" | "admin" | "member";
-
-type TeachingDraft = {
-  status: TeachingStatus | "";
-  difficulty: TeachingDifficulty | "";
-};
 
 type TrialBannerState = {
   daysRemaining: number | null;
@@ -156,7 +136,6 @@ type LearningTaskRow = {
 
 type ReadingSessionStats = {
   progressPercent: number | null;
-  averageMinutesPerPage: number | null;
   furthestPage: number | null;
   wordsLookedUp: number | null;
   lastEngagedAt: string | null; // ✅ NEW
@@ -166,13 +145,8 @@ type LibrarySortMode =
   | "status"
   | "title"
   | "last_engaged"
-  | "last_read"
   | "rating_high"
-  | "rating_low"
-  | "difficulty_high"
-  | "difficulty_low"
-  | "pace_fast"
-  | "pace_slow";
+  | "difficulty_low";
 
 const ABILITY_CHECK_REMINDER_MIN_DUE_CARDS = 10;
 
@@ -190,17 +164,6 @@ function formatTrialEndDate(date: Date) {
     month: "short",
     day: "numeric",
   }).format(date);
-}
-
-function isMissingColumnError(error: any) {
-  return error?.code === "42703" || error?.code === "PGRST204";
-}
-
-function createTeachingDraft(row: UserBookRow): TeachingDraft {
-  return {
-    status: row.teaching_status ?? "",
-    difficulty: row.teacher_jlpt_difficulty ?? "",
-  };
 }
 
 function getActiveTrialBannerState(
@@ -251,17 +214,9 @@ export default function BooksPage() {
   const [dismissedPendingBookRequestsSignature, setDismissedPendingBookRequestsSignature] =
     useState("");
 
+  const [searchQuery, setSearchQuery] = useState("");
   const [bookTypeFilter, setBookTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [teachingStatusFilter, setTeachingStatusFilter] = useState<string>("all");
-  const [teachingDifficultyFilter, setTeachingDifficultyFilter] = useState<string>("all");
-  const [teachingDraftByUserBookId, setTeachingDraftByUserBookId] = useState<
-    Record<string, TeachingDraft>
-  >({});
-  const [savingTeachingUserBookId, setSavingTeachingUserBookId] = useState<string | null>(null);
-  const [teachingSaveMessageByUserBookId, setTeachingSaveMessageByUserBookId] = useState<
-    Record<string, string>
-  >({});
   const isTeacher = myRole === "teacher" || myRole === "super_teacher" || isSuperTeacher;
   const isViewingOwnLibrary =
     !!viewingUserId && !!meId && viewingUserId === meId;
@@ -274,42 +229,22 @@ export default function BooksPage() {
     isViewingOwnLibrary && hasTeachingLibraryAccess;
 
   const filteredRows = useMemo(() => {
+    const normalizedSearch = searchQuery.trim().toLocaleLowerCase();
     return rows.filter((row) => {
+      const matchesSearch =
+        !normalizedSearch ||
+        !!row.books?.title?.toLocaleLowerCase().includes(normalizedSearch) ||
+        !!row.books?.author?.toLocaleLowerCase().includes(normalizedSearch);
       const matchesBookType =
         bookTypeFilter === "all" || row.books?.book_type === bookTypeFilter;
 
       const personalTrackingStatus = resolvePersonalTrackingStatus(row);
-      const teachingStatus = row.teaching_status ?? null;
-      const teachingDifficulty = row.teacher_jlpt_difficulty ?? null;
       const matchesStatus =
-        statusFilter === "all" ||
-        (canSeeOwnTeachingLibraryContext &&
-          statusFilter === "currently_teaching" &&
-          teachingStatus === "currently_teaching") ||
-        personalTrackingStatus === statusFilter;
+        statusFilter === "all" || personalTrackingStatus === statusFilter;
 
-      const matchesTeachingStatus =
-        !canSeeOwnTeachingLibraryContext ||
-        teachingStatusFilter === "all" ||
-        (teachingStatusFilter === "not_assessed" && !teachingStatus) ||
-        teachingStatus === teachingStatusFilter;
-
-      const matchesTeachingDifficulty =
-        !canSeeOwnTeachingLibraryContext ||
-        teachingDifficultyFilter === "all" ||
-        (teachingDifficultyFilter === "not_assessed" && !teachingDifficulty) ||
-        teachingDifficulty === teachingDifficultyFilter;
-
-      return matchesBookType && matchesStatus && matchesTeachingStatus && matchesTeachingDifficulty;
+      return matchesSearch && matchesBookType && matchesStatus;
     });
-  }, [
-    rows,
-    bookTypeFilter,
-    statusFilter,
-    canSeeOwnTeachingLibraryContext,
-    teachingStatusFilter,
-    teachingDifficultyFilter,
-  ]);
+  }, [rows, searchQuery, bookTypeFilter, statusFilter]);
 
   const pendingBookRequestsAlertSignature = useMemo(
     () => pendingBookRequestsSignature(bookRequests),
@@ -320,8 +255,8 @@ export default function BooksPage() {
     dismissedPendingBookRequestsSignature !== pendingBookRequestsAlertSignature &&
     !pendingBookRequestsAlertHidden(pendingBookRequestsAlertSignature);
 
-  const allValidRows = filteredRows.filter((r) => !!r.books);
-  const validRows = allValidRows.filter((r) => !r.is_teacher_prep);
+  const validRows = filteredRows.filter((r) => !!r.books && !r.is_teacher_prep);
+  const hasLibraryBooks = rows.some((r) => !!r.books && !r.is_teacher_prep);
 
   const [viewMode, setViewMode] = useState<"cover" | "list">("cover");
   const [sortMode, setSortMode] = useState<LibrarySortMode>("status");
@@ -621,7 +556,6 @@ export default function BooksPage() {
         started_at,
         finished_at,
         dnf_at,
-        format_type,
         progress_mode,
         progress_tracking_method,
         show_page_numbers,
@@ -657,69 +591,34 @@ export default function BooksPage() {
 
     const loadedRows = (data as any) || [];
 
-    let teachingIds = new Set<string>();
-    const teachingMetaByUserBookId = new Map<
-      string,
-      {
-        teacherBookId: string;
-        teachingStatus: TeachingStatus | null;
-        teacherJlptDifficulty: TeachingDifficulty | null;
-      }
-    >();
+    // Preserve the existing own-teacher-library query scope. Missing or unknown
+    // status is not an explicit opt-out from teaching.
+    const teachingStatusByUserBookId = new Map<string, string | null>();
 
     if (hasTeachingLibraryAccess && targetUserId === meId) {
       const { data: teacherBookRows, error: teacherBookError } = await supabase
         .from("teacher_books")
-        .select("id, user_book_id, teaching_status, teacher_jlpt_difficulty")
+        .select("user_book_id, teaching_status")
         .eq("teacher_id", meId)
         .not("user_book_id", "is", null);
 
-      let resolvedTeacherBookRows = teacherBookRows;
-      let resolvedTeacherBookError = teacherBookError;
-
-      if (teacherBookError && isMissingColumnError(teacherBookError)) {
-        const fallback = await supabase
-          .from("teacher_books")
-          .select("id, user_book_id, teacher_jlpt_difficulty")
-          .eq("teacher_id", meId)
-          .not("user_book_id", "is", null);
-
-        resolvedTeacherBookRows = fallback.data as any;
-        resolvedTeacherBookError = fallback.error;
-      }
-
-      if (resolvedTeacherBookError) {
-        console.error("Error loading teaching book links:", resolvedTeacherBookError);
+      if (teacherBookError) {
+        console.error("Error loading teaching book links:", teacherBookError);
       } else {
-        teachingIds = new Set(
-          ((resolvedTeacherBookRows ?? []) as any[])
-            .map((item) => item.user_book_id as string | null)
-            .filter((id): id is string => Boolean(id))
-        );
-        for (const item of (resolvedTeacherBookRows ?? []) as any[]) {
-          if (!item.user_book_id) continue;
-          teachingMetaByUserBookId.set(item.user_book_id, {
-            teacherBookId: item.id,
-            teachingStatus: isTeachingStatus(item.teaching_status)
-              ? item.teaching_status
-              : null,
-            teacherJlptDifficulty: isTeachingDifficulty(item.teacher_jlpt_difficulty)
-              ? item.teacher_jlpt_difficulty
-              : null,
-          });
+        for (const item of teacherBookRows ?? []) {
+          if (item.user_book_id) {
+            teachingStatusByUserBookId.set(item.user_book_id, item.teaching_status);
+          }
         }
       }
     }
 
-    const rowsWithTeachingBadges = loadedRows.map((item: any) => ({
+    const rowsWithTeachingBadges = loadedRows.map((item: UserBookRow) => ({
       ...item,
-      teacherBookId: teachingMetaByUserBookId.get(item.id)?.teacherBookId ?? null,
-      teaching_status: teachingMetaByUserBookId.get(item.id)?.teachingStatus ?? null,
-      teacher_jlpt_difficulty:
-        teachingMetaByUserBookId.get(item.id)?.teacherJlptDifficulty ?? null,
-      isTeachingOnly:
-        teachingIds.has(item.id) &&
-        resolvePersonalTrackingStatus(item) === "not_tracking",
+      relationshipBadge: getLibraryRelationshipBadge(
+        resolvePersonalTrackingStatus(item) !== "not_tracking",
+        teachingStatusByUserBookId.get(item.id)
+      ),
     }));
 
     setLibraryBooksError(null);
@@ -730,13 +629,7 @@ export default function BooksPage() {
     const userBookIds = rowsWithTeachingBadges
       .filter((r: any) => resolvePersonalTrackingStatus(r) !== "not_tracking")
       .map((r: any) => r.id);
-    const formatTypeByUserBookId: Record<string, string | null> = {};
-
-    for (const r of rowsWithTeachingBadges) {
-      formatTypeByUserBookId[r.id] = r.format_type ?? null;
-    }
-
-    await loadReadingStatsForBooks(userBookIds, formatTypeByUserBookId, Object.fromEntries(rowsWithTeachingBadges.map(r => [r.id, { method: effectiveProgressMethod(r.progress_tracking_method, r.books ?? {}), totals: r.books ?? {} }])));
+    await loadReadingStatsForBooks(userBookIds, Object.fromEntries(rowsWithTeachingBadges.map(r => [r.id, { method: effectiveProgressMethod(r.progress_tracking_method, r.books ?? {}), totals: r.books ?? {} }])));
 
     if (isTeacher && targetUserId === meId) {
       const studentAlertUserIds = isSuperTeacher
@@ -752,127 +645,6 @@ export default function BooksPage() {
       await loadKanjiEnrichmentAlerts(alertUserIds);
     } else {
       setKanjiEnrichmentAlerts([]);
-    }
-  }
-
-  async function getOrCreateLibraryTeacherBook(row: UserBookRow) {
-    if (!meId || !canSeeOwnTeachingLibraryContext) {
-      throw new Error("Teaching access is required.");
-    }
-
-    if (row.teacherBookId) return row.teacherBookId;
-
-    const { data: existing, error: lookupError } = await supabase
-      .from("teacher_books")
-      .select("id, user_book_id")
-      .eq("teacher_id", meId)
-      .eq("book_id", row.book_id)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (lookupError) throw lookupError;
-
-    if (existing?.id) {
-      if (!existing.user_book_id) {
-        const { error: linkError } = await supabase
-          .from("teacher_books")
-          .update({ user_book_id: row.id })
-          .eq("id", existing.id);
-
-        if (linkError) throw linkError;
-      }
-
-      return existing.id as string;
-    }
-
-    const { data: inserted, error: insertError } = await supabase
-      .from("teacher_books")
-      .insert({
-        teacher_id: meId,
-        book_id: row.book_id,
-        user_book_id: row.id,
-      })
-      .select("id")
-      .single();
-
-    if (insertError?.code === "23505") {
-      const { data: racedExisting, error: racedLookupError } = await supabase
-        .from("teacher_books")
-        .select("id, user_book_id")
-        .eq("teacher_id", meId)
-        .eq("book_id", row.book_id)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-
-      if (racedLookupError) throw racedLookupError;
-
-      if (racedExisting?.id) {
-        if (!racedExisting.user_book_id) {
-          const { error: linkError } = await supabase
-            .from("teacher_books")
-            .update({ user_book_id: row.id })
-            .eq("id", racedExisting.id);
-
-          if (linkError) throw linkError;
-        }
-
-        return racedExisting.id as string;
-      }
-    }
-
-    if (insertError) throw insertError;
-    return inserted.id as string;
-  }
-
-  async function saveLibraryTeachingAssessment(row: UserBookRow) {
-    const draft = teachingDraftByUserBookId[row.id] ?? createTeachingDraft(row);
-
-    setSavingTeachingUserBookId(row.id);
-    setTeachingSaveMessageByUserBookId((messages) => ({
-      ...messages,
-      [row.id]: "",
-    }));
-
-    try {
-      const teacherBookId = await getOrCreateLibraryTeacherBook(row);
-      const { error } = await supabase
-        .from("teacher_books")
-        .update({
-          teaching_status: draft.status || null,
-          teacher_jlpt_difficulty: draft.difficulty || null,
-        })
-        .eq("id", teacherBookId);
-
-      if (error) throw error;
-
-      setRows((currentRows) =>
-        currentRows.map((currentRow) =>
-          currentRow.id === row.id
-            ? {
-              ...currentRow,
-              teacherBookId,
-              teaching_status: draft.status || null,
-              teacher_jlpt_difficulty: draft.difficulty || null,
-              isTeachingOnly:
-                resolvePersonalTrackingStatus(currentRow) === "not_tracking",
-            }
-            : currentRow
-        )
-      );
-      setTeachingSaveMessageByUserBookId((messages) => ({
-        ...messages,
-        [row.id]: "Saved",
-      }));
-    } catch (error: any) {
-      console.error("Error saving Library teaching filters:", error);
-      setTeachingSaveMessageByUserBookId((messages) => ({
-        ...messages,
-        [row.id]: error?.message ?? "Could not save teaching details.",
-      }));
-    } finally {
-      setSavingTeachingUserBookId(null);
     }
   }
 
@@ -1183,7 +955,6 @@ export default function BooksPage() {
 
   async function loadReadingStatsForBooks(
     userBookIds: string[],
-    formatTypeByUserBookId: Record<string, string | null>,
     progressByBook: Record<string, {method: ProgressTrackingMethod | null; totals: ProgressTotals}>
   ) {
     if (userBookIds.length === 0) {
@@ -1193,7 +964,7 @@ export default function BooksPage() {
 
     const { data, error } = await supabase
       .from("user_book_reading_sessions")
-      .select("id, created_at, user_book_id, tracking_unit, start_position, end_position, progress_total, start_page, end_page, minutes_read, read_on, session_mode")
+      .select("id, created_at, user_book_id, tracking_unit, start_position, end_position, progress_total, start_page, end_page, read_on, session_mode")
       .in("user_book_id", userBookIds);
 
     if (error) {
@@ -1215,31 +986,17 @@ export default function BooksPage() {
       string,
       {
         furthestPage: number;
-        totalTimedPages: number;
-        totalTimedMinutes: number;
         lastEngagedAt: string | null;
       }
     > = {};
 
     for (const row of data ?? []) {
       const userBookId = row.user_book_id as string;
-      const startPage = row.start_page == null ? NaN : Number((row as any).start_page);
       const endPage = row.end_page == null ? NaN : Number((row as any).end_page);
-      const rawMinutes = (row as any).minutes_read;
       const readOn = (row as any).read_on as string | null;
-      const sessionMode = (row as any).session_mode as string | null;
-      const hasPageRange =
-        Number.isFinite(startPage) && Number.isFinite(endPage) && endPage >= startPage;
-      const countsForVisualPace =
-        hasPageRange &&
-        !isListeningFormat(sessionMode) &&
-        !isListeningFormat(formatTypeByUserBookId[userBookId]);
-
       if (!grouped[userBookId]) {
         grouped[userBookId] = {
           furthestPage: 0,
-          totalTimedPages: 0,
-          totalTimedMinutes: 0,
           lastEngagedAt: null,
         };
       }
@@ -1252,21 +1009,11 @@ export default function BooksPage() {
           grouped[userBookId].lastEngagedAt = readOn;
         }
       }
-      const minutesRead = rawMinutes == null ? null : Number(rawMinutes);
 
       if (Number.isFinite(endPage)) {
         grouped[userBookId].furthestPage = Math.max(grouped[userBookId].furthestPage, endPage);
       }
 
-      if (
-        countsForVisualPace &&
-        minutesRead != null &&
-        Number.isFinite(minutesRead) &&
-        minutesRead > 0
-      ) {
-        grouped[userBookId].totalTimedPages += endPage - startPage + 1;
-        grouped[userBookId].totalTimedMinutes += minutesRead;
-      }
     }
 
     const lookupSetsByUserBookId: Record<string, Set<string>> = {};
@@ -1303,7 +1050,6 @@ export default function BooksPage() {
       if (!g) {
         stats[userBookId] = {
           progressPercent: null,
-          averageMinutesPerPage: null,
           furthestPage: null,
           wordsLookedUp: lookupCountsByUserBookId[userBookId] ?? 0,
           lastEngagedAt: null,
@@ -1313,12 +1059,8 @@ export default function BooksPage() {
 
       const progressPercent = progressSummary((data ?? []).filter(s => s.user_book_id === userBookId), progressByBook[userBookId]?.method ?? null, progressByBook[userBookId]?.totals ?? {}).percent;
 
-      const averageMinutesPerPage =
-        g.totalTimedPages > 0 ? g.totalTimedMinutes / g.totalTimedPages : null;
-
       stats[userBookId] = {
         progressPercent,
-        averageMinutesPerPage,
         furthestPage: g.furthestPage,
         wordsLookedUp: lookupCountsByUserBookId[userBookId] ?? 0,
         lastEngagedAt: g.lastEngagedAt ?? null,
@@ -1548,27 +1290,6 @@ export default function BooksPage() {
   }, [viewingUserId, meId, myRole, isSuperTeacher]);
 
   useEffect(() => {
-    if (canSeeOwnTeachingLibraryContext) return;
-
-    if (statusFilter === "currently_teaching") {
-      setStatusFilter("all");
-    }
-
-    if (teachingStatusFilter !== "all") {
-      setTeachingStatusFilter("all");
-    }
-
-    if (teachingDifficultyFilter !== "all") {
-      setTeachingDifficultyFilter("all");
-    }
-  }, [
-    canSeeOwnTeachingLibraryContext,
-    statusFilter,
-    teachingStatusFilter,
-    teachingDifficultyFilter,
-  ]);
-
-  useEffect(() => {
     const canViewLearningTasks =
       viewingUserId === meId || (isTeacher && viewingUserId !== meId);
 
@@ -1679,108 +1400,6 @@ export default function BooksPage() {
   const gridClass =
     "grid grid-cols-2 gap-x-2 gap-y-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
 
-
-  function updateTeachingDraft(
-    row: UserBookRow,
-    patch: Partial<TeachingDraft>
-  ) {
-    setTeachingDraftByUserBookId((drafts) => ({
-      ...drafts,
-      [row.id]: {
-        ...createTeachingDraft(row),
-        ...drafts[row.id],
-        ...patch,
-      },
-    }));
-  }
-
-  function renderTeachingControls(row: UserBookRow, variant: "card" | "row") {
-    if (!canSeeOwnTeachingLibraryContext || normalizeLanguageCode(row.books?.language_code) !== "ja") return null;
-
-    const draft = teachingDraftByUserBookId[row.id] ?? createTeachingDraft(row);
-    const savedStatus = row.teaching_status ?? "";
-    const savedDifficulty = row.teacher_jlpt_difficulty ?? "";
-    const hasChanges =
-      draft.status !== savedStatus || draft.difficulty !== savedDifficulty;
-    const isSaving = savingTeachingUserBookId === row.id;
-    const message = teachingSaveMessageByUserBookId[row.id];
-
-    return (
-      <details
-        onClick={(event) => event.stopPropagation()}
-        className={
-          variant === "card"
-            ? "mt-2 w-full rounded-lg border border-sky-100 bg-sky-50/50 px-2 py-1.5 text-left"
-            : "mt-2 rounded-lg border border-sky-100 bg-sky-50/50 px-2 py-1.5"
-        }
-      >
-        <summary className="cursor-pointer text-[11px] font-bold text-sky-800">
-          Teaching: {teachingStatusLabel(row.teaching_status)} ·{" "}
-          {teachingDifficultyLabel(row.teacher_jlpt_difficulty)}
-        </summary>
-
-        <div className="mt-2 space-y-2">
-          <select
-            value={draft.status}
-            onChange={(event) => {
-              const value = event.target.value;
-              updateTeachingDraft(row, {
-                status: isTeachingStatus(value) ? value : "",
-              });
-            }}
-            className="w-full rounded-md border border-sky-100 bg-white px-2 py-1 text-xs text-stone-700"
-          >
-            <option value="">Teaching Status: Not Assessed</option>
-            {TEACHING_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {teachingStatusLabel(status)}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={draft.difficulty}
-            onChange={(event) => {
-              const value = event.target.value;
-              updateTeachingDraft(row, {
-                difficulty: isTeachingDifficulty(value) ? value : "",
-              });
-            }}
-            className="w-full rounded-md border border-sky-100 bg-white px-2 py-1 text-xs text-stone-700"
-          >
-            <option value="">Difficulty: Not Assessed</option>
-            {TEACHING_DIFFICULTIES.map((difficulty) => (
-              <option key={difficulty} value={difficulty}>
-                {teachingDifficultyLabel(difficulty)}
-              </option>
-            ))}
-          </select>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                void saveLibraryTeachingAssessment(row);
-              }}
-              disabled={isSaving || !hasChanges}
-              className="rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-bold text-sky-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isSaving ? "Saving..." : "Save"}
-            </button>
-
-            {message ? (
-              <span className="text-[11px] font-semibold text-stone-500">
-                {message}
-              </span>
-            ) : null}
-          </div>
-        </div>
-      </details>
-    );
-  }
-
   function renderBookCard(row: UserBookRow) {
     const workspaceHref = isViewingStudentLibrary
       ? `/teacher/students/${encodeURIComponent(viewingUserId)}/books/${encodeURIComponent(row.id)}/workspace`
@@ -1795,7 +1414,6 @@ export default function BooksPage() {
         formatRelativeDate={formatRelativeDate}
         secondaryActionHref={workspaceHref}
         secondaryActionLabel="Open Workspace"
-        teachingControls={renderTeachingControls(row, "card")}
       />
     );
   }
@@ -1813,7 +1431,6 @@ export default function BooksPage() {
         onOpen={() => router.push(`/books/${row.id}`)}
         secondaryActionHref={workspaceHref}
         secondaryActionLabel="Open Workspace"
-        teachingControls={renderTeachingControls(row, "row")}
       />
     );
   }
@@ -1837,8 +1454,9 @@ export default function BooksPage() {
   const showLibraryBooksLoading = libraryBooksLoading;
   const showLibraryBooksError = !libraryBooksLoading && !!libraryBooksError;
   const showLibraryBookSections = !libraryBooksLoading && !libraryBooksError;
-  const showLibraryEmptyState =
-    showLibraryBookSections && allValidRows.length === 0;
+  const showLibraryEmptyState = showLibraryBookSections && !hasLibraryBooks;
+  const showLibraryNoMatches =
+    showLibraryBookSections && hasLibraryBooks && validRows.length === 0;
 
   function learningTaskTypeLabel(taskType: string) {
     if (taskType === "reread_pages") return "Reread pages";
@@ -2074,17 +1692,14 @@ export default function BooksPage() {
         {null}
 
         <LibraryViewControls
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           bookTypeFilter={bookTypeFilter}
           onBookTypeFilterChange={setBookTypeFilter}
           statusFilter={statusFilter}
           onStatusFilterChange={setStatusFilter}
-          showTeachingFilters={canSeeOwnTeachingLibraryContext}
-          teachingStatusFilter={teachingStatusFilter}
-          onTeachingStatusFilterChange={setTeachingStatusFilter}
-          teachingDifficultyFilter={teachingDifficultyFilter}
-          onTeachingDifficultyFilterChange={setTeachingDifficultyFilter}
           sortMode={sortMode}
           onSortModeChange={setSortMode}
         />
@@ -2167,6 +1782,12 @@ export default function BooksPage() {
               </ul>
             </>
           )
+        ) : null}
+
+        {showLibraryNoMatches ? (
+          <p className="mt-8 rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600">
+            No books match your search and filters.
+          </p>
         ) : null}
 
         {showLibraryEmptyState ? (

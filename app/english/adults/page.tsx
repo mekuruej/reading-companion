@@ -158,17 +158,21 @@ export default function EnglishAdultsPage() {
           <div className="space-y-3 text-stone-700">
             <p>
               <span className="font-medium">ターム払い</span>は{" "}
-              <strong>1ターム¥8,000から</strong>
+              <strong>1ターム ¥8,000から</strong>
             </p>
 
             <p>
               <span className="font-medium">月払い</span>は{" "}
-              <strong>月¥4,000から</strong>
+              <strong>月 ¥2,000から</strong>
             </p>
           </div>
 
           <p className="text-sm text-stone-600">
             スケジュールやご予算に合わせて、4つのレッスンプランをご用意しています。
+          </p>
+
+          <p className="text-xs text-stone-500">
+            月払いは、1ターム分の受講料を4回に分けてお支払いいただく方法です。
           </p>
 
           <p className="text-xs text-stone-500">

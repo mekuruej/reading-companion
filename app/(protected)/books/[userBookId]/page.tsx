@@ -48,6 +48,8 @@ import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import JapaneseLearningPromoCard from "@/components/japanese-learning/JapaneseLearningPromoCard";
 import BookHubLoadingState from "./components/BookHubLoadingState";
 import BookHubManagementActions from "./components/BookHubManagementActions";
+import BookUseSection from "./components/BookUseSection";
+import { changeBookUse, getBookUse, type BookUse } from "./bookUse";
 import { resolveBookHubMode } from "@/lib/books/bookHubMode";
 import RemoveFromLibraryDialog from "./components/RemoveFromLibraryDialog";
 import BookProgressSummaryBar from "@/components/books/BookProgressSummaryBar";
@@ -681,6 +683,9 @@ export default function BookHubPage() {
   const [teachingDifficultyDraft, setTeachingDifficultyDraft] =
     useState<TeachingDifficulty | "">("");
   const [teachingOverviewSaving, setTeachingOverviewSaving] = useState(false);
+  const [bookUseSaving, setBookUseSaving] = useState(false);
+  const [bookUseError, setBookUseError] = useState<string | null>(null);
+  const [bookUseLoaded, setBookUseLoaded] = useState(false);
   const [teachingOverviewMessage, setTeachingOverviewMessage] = useState<string | null>(null);
   const [teachingOverviewError, setTeachingOverviewError] = useState<string | null>(null);
   const [isLinkedStudentToAnyTeacher, setIsLinkedStudentToAnyTeacher] = useState(false);
@@ -3333,6 +3338,11 @@ export default function BookHubPage() {
       return false;
     }
 
+    if (nextStatus === "not_tracking" && teacherBookRelationship?.teaching_status === "not_for_teaching") {
+      setBookStatusError("Choose Teaching Only in How I use this book to enable teaching and turn off personal tracking.");
+      return false;
+    }
+
     setSavingBookStatus(true);
     setBookStatusError(null);
 
@@ -3364,6 +3374,45 @@ export default function BookHubPage() {
     }
   }
 
+  async function saveBookUse(nextUse: BookUse) {
+    if (!row?.id || !userId || !isOwnBookHub || !isTeacherContext || !bookUseLoaded || bookUseSaving || savingBookStatus || teachingOverviewSaving) return;
+    if (!confirmLeaveIfTimerActive()) return;
+    setBookUseSaving(true);
+    setBookUseError(null);
+    try {
+      const saved = await changeBookUse({
+        nextUse,
+        personalStatus: personalTrackingStatus,
+        teachingStatus: teacherBookRelationship?.teaching_status ?? null,
+        savePersonal: savePersonalTrackingOnlyStatus,
+        saveTeaching: async (status) => {
+          const relationship = await ensureTeacherBookRelationship({ supabase, teacherId: userId, bookId: row.book_id, userBookId: row.id });
+          const { data, error } = await supabase.from("teacher_books")
+            .update({ teaching_status: status }).eq("id", relationship.id)
+            .select("id, teacher_id, book_id, user_book_id, teaching_status, teacher_jlpt_difficulty, teaching_suitability, teacher_use_note").single();
+          if (error) throw error;
+          setTeacherBookRelationship(data as TeacherBookRelationship);
+          setTeachingStatusDraft(isTeachingStatus(data.teaching_status) ? data.teaching_status : "");
+          setTeachingOverviewMessage(null);
+          return true;
+        },
+      });
+      if (!saved) {
+        setBookUseError("The change did not finish. Current use reflects saved settings; please try again.");
+        return;
+      }
+      await tracking.refresh();
+      if (nextUse !== "teaching_only" && personalTrackingStatus === "not_tracking") {
+        router.replace(`/books/${encodeURIComponent(row.id)}`);
+      }
+    } catch (error) {
+      console.error("Error saving book use:", error);
+      setBookUseError("The change did not finish. Current use reflects saved settings; please try again.");
+    } finally {
+      setBookUseSaving(false);
+    }
+  }
+
   async function saveTeachingOverview() {
     if (!row?.id || !userId || teachingOverviewSaving) return;
 
@@ -3371,6 +3420,11 @@ export default function BookHubPage() {
       isOwnBookHub && isTeacherContext;
     if (!canSaveTeachingOverview) {
       setTeachingOverviewError("Teaching access is required.");
+      return;
+    }
+
+    if (personalTrackingStatus === "not_tracking" && teachingStatusDraft === "not_for_teaching") {
+      setTeachingOverviewError("Choose Personal Only in How I use this book to enable personal tracking before marking it Not for Teaching.");
       return;
     }
 
@@ -3827,6 +3881,7 @@ export default function BookHubPage() {
         currentProfileRole === "admin" ||
         currentProfileIsSuperTeacher);
 
+    setBookUseLoaded(false);
     if (canSeeOwnTeachingLibraryContext) {
       try {
         const relationship = await loadTeacherBookRelationship({
@@ -3836,6 +3891,7 @@ export default function BookHubPage() {
           userBookId: r.id,
         });
         setTeacherBookRelationship(relationship);
+        setBookUseLoaded(true);
         setTeachingStatusDraft(
           isTeachingStatus(relationship?.teaching_status) ? relationship.teaching_status : ""
         );
@@ -5558,7 +5614,7 @@ export default function BookHubPage() {
     <BookHubManagementActions
       canRemove={canRemoveFromMyLibrary}
       teachingOnly={alreadyTeachingOnly}
-      saving={savingBookStatus || isRemovingFromLibrary}
+      saving={savingBookStatus || bookUseSaving || isRemovingFromLibrary}
       error={alreadyTeachingOnly ? bookStatusError : null}
       onMoveToLibrary={() => void moveToMyLibrary()}
       onFlag={() => { setBookFlagNote(""); setShowBookFlagModal(true); }}
@@ -5622,6 +5678,16 @@ export default function BookHubPage() {
             ← Back to Library
           </Link>
         </nav>
+        {isOwnBookHub && isTeacherContext ? (
+          <BookUseSection
+            currentUse={bookUseLoaded ? getBookUse(personalTrackingStatus, teacherBookRelationship?.teaching_status ?? null) : null}
+            saving={bookUseSaving}
+            disabled={!bookUseLoaded || savingBookStatus || teachingOverviewSaving || isRemovingFromLibrary}
+            error={bookUseError || (!bookUseLoaded ? "Could not load book use. Refresh to try again." : null)}
+            onChange={(use) => void saveBookUse(use)}
+          />
+        ) : null}
+
         {canUseBookHubTeachingMode && !alreadyTeachingOnly ? (
           <BookHubModeToggle mode={bookHubMode} onModeChange={changeBookHubMode} />
         ) : null}
@@ -5646,7 +5712,7 @@ export default function BookHubPage() {
                     key={teacherBookRelationship?.id ?? "no-teaching-relationship"}
                     status={teachingStatusDraft}
                     difficulty={teachingDifficultyDraft}
-                    saving={teachingOverviewSaving}
+                    saving={teachingOverviewSaving || bookUseSaving}
                     message={teachingOverviewMessage}
                     error={teachingOverviewError}
                     onStatusChange={(value) => {
@@ -5667,7 +5733,7 @@ export default function BookHubPage() {
                     showNotTrackingOption={
                       isOwnBookHub && isTeacherContext
                     }
-                    isSavingStatus={savingBookStatus}
+                    isSavingStatus={savingBookStatus || bookUseSaving}
                     statusError={bookStatusError}
                     startedAt={startedAt}
                     finishedAt={finishedAt}

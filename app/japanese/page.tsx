@@ -139,23 +139,29 @@ export default function MekuruHomepage() {
 
                     <div className="space-y-3 text-stone-700">
                         <p>
-                            <span className="font-medium">Term payments</span> from <strong>¥19,000 per term</strong>
+                            <span className="font-medium">Term payments</span> from{" "}
+                            <strong>¥16,000 per term</strong>
                         </p>
 
                         <p>
-                            <span className="font-medium">Monthly installments</span> from <strong>¥5,000 per month</strong>
+                            <span className="font-medium">Monthly installments</span> from{" "}
+                            <strong>¥4,000 per month</strong>
                         </p>
                     </div>
 
                     <p className="text-sm text-stone-600">
-                        Four lesson plans are available to fit different schedules and budgets.
+                        Four session plans are available to fit different schedules and reading goals.
                     </p>
 
                     <p className="text-xs text-stone-500">
-                        Detailed regular lesson pricing is provided after your trial lesson.
+                        Monthly installments are a payment schedule for the full 16-week term, not a month-to-month enrollment option.
+                    </p>
+
+                    <p className="text-xs text-stone-500">
+                        Detailed regular session pricing is provided after your trial session.
                     </p>
                 </section>
-
+                
                 <div className="mx-auto mt-12 max-w-3xl px-6">
                     <div className="rounded-2xl border border-stone-200 bg-stone-50 p-6">
                         <h3 className="text-base font-semibold text-stone-900">Included with Japanese Reading Lessons</h3>
