@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 type FindBooksPageHeaderProps = {
   title?: string;
   description?: string;
@@ -11,13 +9,6 @@ export default function FindBooksPageHeader({
 }: FindBooksPageHeaderProps) {
   return (
     <header className="space-y-4">
-      <Link
-        href="/discovery"
-        className="inline-flex text-sm font-semibold text-stone-500 transition hover:text-stone-900"
-      >
-        ← Back to Discovery Hub
-      </Link>
-
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">
           Discovery

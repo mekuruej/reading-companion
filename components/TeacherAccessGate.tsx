@@ -106,10 +106,10 @@ export default function TeacherAccessGate({ children }: Props) {
           </p>
 
           <Link
-            href="/dashboard"
+            href="/books"
             className="mt-5 inline-flex rounded-2xl border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
           >
-            Back to Dashboard
+            Back to My Library
           </Link>
         </section>
       </main>

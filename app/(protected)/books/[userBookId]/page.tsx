@@ -5595,7 +5595,7 @@ export default function BookHubPage() {
       : "My Book Hub";
   const backToLibraryHref = bookHubOwnerUsername
     ? `/users/${encodeURIComponent(bookHubOwnerUsername)}/books`
-    : "/dashboard";
+    : "/books";
 
   async function moveToMyLibrary() {
     if (!canRemoveFromMyLibrary || !alreadyTeachingOnly || savingBookStatus) return;

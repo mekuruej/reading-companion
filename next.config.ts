@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/reading-companion",
-        destination: "/dashboard",
+        destination: "/books",
         permanent: false,
       },
       {
@@ -18,7 +18,7 @@ const nextConfig: NextConfig = {
             value: "app.mekurureads.com",
           },
         ],
-        destination: "/dashboard",
+        destination: "/books",
         permanent: false,
       },
     ];
