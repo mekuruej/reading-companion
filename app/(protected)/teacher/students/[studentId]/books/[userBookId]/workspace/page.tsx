@@ -8,20 +8,13 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { ensureTeacherBookSupport } from "@/lib/teacher/ensureTeacherBookSupport";
 import { getBookIdentity } from "@/lib/books/bookIdentity";
 import { bookTypeTitleLabel } from "@/lib/books/bookTypes";
+import TeacherNotebookPanel from "../../../../../components/TeacherNotebookPanel";
 import { TeacherFollowAlongPanel } from "../../../../../library/[teacherBookId]/follow/components/TeacherFollowAlongPanel";
-
-type TeacherUseStatus =
-  | "want_to_test"
-  | "testing"
-  | "currently_using"
-  | "approved_for_lesson"
-  | "use_with_caution"
-  | "do_not_use";
 
 type StudentProfile = {
   id: string;
@@ -59,27 +52,7 @@ type StudentUserBook = {
 
 type TeacherBookSupport = {
   id: string;
-  teacher_use_status: TeacherUseStatus | null;
-  teacher_use_note: string | null;
   user_book_id: string | null;
-};
-
-type ActionCard = {
-  title: string;
-  description: string;
-  href: string;
-  tone: "blue" | "green" | "purple" | "amber" | "stone";
-  anchorId?: string;
-  titleLines?: string[];
-};
-
-const teacherUseStatusLabels: Record<TeacherUseStatus, string> = {
-  want_to_test: "Potential",
-  testing: "Testing",
-  currently_using: "Currently Using",
-  approved_for_lesson: "Approved for Lesson",
-  use_with_caution: "Use with Caution",
-  do_not_use: "Not for Teaching",
 };
 
 function firstBook(book: StudentUserBook["books"]) {
@@ -100,27 +73,6 @@ function isTeacherRole(profile: any) {
   return profile?.role === "teacher" || isSuperTeacherRole(profile);
 }
 
-function teacherUseStatusLabel(status: TeacherUseStatus | null | undefined) {
-  return teacherUseStatusLabels[status ?? "want_to_test"];
-}
-
-function teacherUseStatusBadgeClass(status: TeacherUseStatus | null | undefined) {
-  switch (status ?? "want_to_test") {
-    case "approved_for_lesson":
-      return "border-emerald-200 bg-emerald-50 text-emerald-800";
-    case "currently_using":
-      return "border-sky-200 bg-sky-50 text-sky-800";
-    case "testing":
-      return "border-violet-200 bg-violet-50 text-violet-800";
-    case "use_with_caution":
-      return "border-amber-200 bg-amber-50 text-amber-800";
-    case "do_not_use":
-      return "border-rose-200 bg-rose-50 text-rose-800";
-    default:
-      return "border-stone-200 bg-stone-50 text-stone-700";
-  }
-}
-
 function bookTypeLabel(value: string | null | undefined) {
   return bookTypeTitleLabel(value);
 }
@@ -133,48 +85,6 @@ function statusLabel(userBook: StudentUserBook | null) {
   return "Not started";
 }
 
-function cardToneClass(tone: ActionCard["tone"]) {
-  if (tone === "blue") return "border-sky-200 bg-sky-50 hover:bg-sky-100";
-  if (tone === "green") return "border-emerald-200 bg-emerald-50 hover:bg-emerald-100";
-  if (tone === "purple") return "border-violet-200 bg-violet-50 hover:bg-violet-100";
-  if (tone === "amber") return "border-amber-200 bg-amber-50 hover:bg-amber-100";
-  return "border-stone-200 bg-white hover:bg-stone-50";
-}
-
-function ActionCardLink({ action }: { action: ActionCard }) {
-  return (
-    <Link
-      href={action.href}
-      onClick={(event) => {
-        if (!action.anchorId) return;
-
-        event.preventDefault();
-        const target = document.getElementById(action.anchorId);
-        if (target) {
-          target.scrollIntoView({ behavior: "smooth", block: "start" });
-          window.history.replaceState(null, "", `#${action.anchorId}`);
-        }
-      }}
-      className={`block rounded-2xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${cardToneClass(action.tone)}`}
-    >
-      <div className="flex min-h-28 flex-col justify-between gap-4">
-        <div>
-          <h3 className="text-lg font-black leading-tight text-stone-950">
-            {action.titleLines
-              ? action.titleLines.map((line) => (
-                  <span key={line} className="block">
-                    {line}
-                  </span>
-                ))
-              : action.title}
-          </h3>
-          <p className="mt-3 text-sm leading-6 text-stone-600">{action.description}</p>
-        </div>
-        <p className="text-sm font-black text-stone-900">Open</p>
-      </div>
-    </Link>
-  );
-}
 
 export default function StudentBookWorkspacePage() {
   const params = useParams<{ studentId: string; userBookId: string }>();
@@ -320,57 +230,6 @@ export default function StudentBookWorkspacePage() {
   const studentName = student?.display_name || student?.username || "Student";
   const backHref = student?.username ? `/users/${student.username}/books` : "/teacher/students";
 
-  const primaryActions = useMemo<ActionCard[]>(() => {
-    const encodedUserBookId = encodeURIComponent(userBookId);
-    return [
-      {
-        title: "Student Book Hub",
-        description: "Open the student's normal book hub and reading history.",
-        href: `/books/${encodedUserBookId}`,
-        tone: "blue",
-      },
-      {
-        title: "Book Flashcards",
-        description: "Review this book's saved vocabulary with flashcards.",
-        href: `/books/${encodedUserBookId}/study`,
-        tone: "purple",
-      },
-      {
-        title: "Follow-Along + Teacher Notebook",
-        description: "Read together with prepared support, teacher notes, and Quick Word capture.",
-        href: "#student-lesson-follow-along",
-        anchorId: "student-lesson-follow-along",
-        titleLines: ["Follow-Along +", "Teacher Notebook"],
-        tone: "green",
-      },
-    ];
-  }, [userBookId]);
-
-  const teacherSupportActions = useMemo<ActionCard[]>(() => {
-    if (!teacherBook) return [];
-    const encodedTeacherBookId = encodeURIComponent(teacherBook.id);
-    return [
-      {
-        title: "Teacher Book Workspace",
-        description: "Open your teacher-facing book launcher and use status.",
-        href: `/teacher/library/${encodedTeacherBookId}/book-workspace`,
-        tone: "stone",
-      },
-      {
-        title: "Teaching Prep",
-        description: "Edit prepared words, phrases, notes, and translations.",
-        href: `/teacher/library/${encodedTeacherBookId}`,
-        tone: "stone",
-      },
-      {
-        title: "Follow-Along Support",
-        description: "Use prepared support while working through the text together.",
-        href: `/teacher/library/${encodedTeacherBookId}/follow`,
-        tone: "stone",
-      },
-    ];
-  }, [teacherBook]);
-
   if (loading) {
     return (
       <main className="min-h-screen bg-slate-100 px-4 py-8">
@@ -463,112 +322,51 @@ export default function StudentBookWorkspacePage() {
               </div>
 
               <p className="mt-5 max-w-3xl text-sm leading-6 text-stone-600">
-                This workspace is for teaching this student through this book. Lesson words save to the student&apos;s book; teacher support comes from your Teacher Book when available.
+                This workspace is for teaching this student through this book. Words captured here stay as teacher-only drafts until you review them in Bulk Add.
               </p>
             </div>
           </div>
         </section>
 
-        <section className="mt-6">
+        <section id="student-lesson-follow-along" className="mt-6 scroll-mt-6">
           <div className="mb-3">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
-              Student Book Tools
-            </p>
-            <h2 className="mt-1 text-2xl font-black text-stone-950">Teach from this book</h2>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {primaryActions.map((action) => (
-              <ActionCardLink key={action.href} action={action} />
-            ))}
-          </div>
-        </section>
-
-        <section id="student-lesson-follow-along" className="mt-7 scroll-mt-6">
-          <div className="mb-3">
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-700">
-                Student Lesson
-              </p>
-              <p className="text-lg font-black leading-none text-sky-900">{studentName}</p>
-            </div>
-            <h2 className="mt-1 text-2xl font-black text-stone-950">
-              Follow-Along | Teacher Notebook
-            </h2>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-sky-700">Student Lesson · {studentName}</p>
+            <h2 className="mt-1 text-2xl font-black text-stone-950">Teacher Follow-Along + Quick Add</h2>
             <p className="mt-1 text-sm leading-6 text-stone-600">
-              {bookIdentity.title} · Quick Word drafts are saved to {studentName}&apos;s lesson list for this student book.
+              Use prepared support while reading together, and capture words for later review.
             </p>
           </div>
 
           {teacherBook ? (
-            <TeacherFollowAlongPanel
-              teacherBookId={teacherBook.id}
-              contextLabel={`Student Lesson · ${studentName}`}
-              contextDetail={bookIdentity.title}
-              notebookStudentId={studentId}
-              notebookStudentName={studentName}
-              notebookUserBookId={userBookId}
-              enableNotebookWordCapture
-              hideHeader
-            />
-          ) : (
-            <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-              <h3 className="text-xl font-black text-stone-950">Teacher support is not prepared yet.</h3>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-stone-600">
-                Add this title to your Teacher Library to use Follow-Along + Teacher Notebook for this student book.
-              </p>
-              <Link
-                href="/teacher/library"
-                className="mt-4 inline-flex rounded-full bg-stone-950 px-4 py-2 text-sm font-black text-white transition hover:bg-stone-800"
-              >
-                Open Teacher Library
-              </Link>
-            </div>
-          )}
-        </section>
-
-        <section className="mt-7">
-          <div className="mb-3">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
-              Teacher Support
-            </p>
-            <h2 className="mt-1 text-2xl font-black text-stone-950">Prepared support for this book</h2>
-          </div>
-
-          {teacherBook ? (
-            <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <span
-                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-black uppercase tracking-wide ${teacherUseStatusBadgeClass(
-                      teacherBook.teacher_use_status
-                    )}`}
-                  >
-                    {teacherUseStatusLabel(teacherBook.teacher_use_status)}
-                  </span>
-                  {teacherBook.teacher_use_note ? (
-                    <p className="mt-3 max-w-3xl text-sm leading-6 text-stone-600">
-                      {teacherBook.teacher_use_note}
-                    </p>
-                  ) : (
-                    <p className="mt-3 max-w-3xl text-sm leading-6 text-stone-500">
-                      Teacher support is available for this book.
-                    </p>
-                  )}
-                </div>
+            <div className="grid min-w-0 gap-4 xl:grid-cols-2">
+              <div className="min-w-0">
+                <TeacherFollowAlongPanel
+                  teacherBookId={teacherBook.id}
+                  contextLabel={`Student Lesson · ${studentName}`}
+                  contextDetail={bookIdentity.title}
+                  presentation="embedded"
+                  lessonDisplayOnly
+                  hideHeader
+                />
               </div>
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                {teacherSupportActions.map((action) => (
-                  <ActionCardLink key={action.href} action={action} />
-                ))}
+              <div className="min-w-0">
+                <TeacherNotebookPanel
+                  key={`${studentId}:${userBookId}:${teacherBook.id}`}
+                  teacherBookId={teacherBook.id}
+                  bookId={book?.id}
+                  userBookId={userBookId}
+                  studentId={studentId}
+                  studentName={studentName}
+                  enableWordCapture
+                  wordCaptureOnly
+                  mode="lesson"
+                  compact
+                />
               </div>
             </div>
           ) : (
-            <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-              <h3 className="text-xl font-black text-stone-950">No teacher support prepared yet.</h3>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-stone-600">
-                You can still add words and work from the student&apos;s book. Teacher support can be added later from Teacher Books.
-              </p>
+            <div className="rounded-2xl border border-stone-200 bg-white p-5 text-sm text-stone-600">
+              Teacher Follow-Along support could not be prepared for this book.
             </div>
           )}
         </section>

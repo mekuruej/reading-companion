@@ -77,6 +77,12 @@ type WorkspacePayload = {
   guidedTrialStatus: "none" | "pending" | "approved" | "existing_access";
   canAccessAllUsers: boolean;
   lastEngagedAt: string | null;
+  recentStudyActivity: {
+    readingSessions: number;
+    wordsSaved: number | null;
+    flashcardsReviewed: number | null;
+    followAlong: number | null;
+  };
   activeLessonBooks: LessonBook[];
   eligibleBooks: EligibleBook[];
   needsAttention: NeedsAttentionSession[];
@@ -214,6 +220,8 @@ export default function StudentWorkspacePage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [mutatingUserBookId, setMutatingUserBookId] = useState<string | null>(null);
+  const [selectedEligibleBookId, setSelectedEligibleBookId] = useState("");
+  const [connectingBook, setConnectingBook] = useState(false);
   const [lessonDayEditing, setLessonDayEditing] = useState(false);
   const [lessonDayDraft, setLessonDayDraft] = useState("");
   const [lessonDaySaving, setLessonDaySaving] = useState(false);
@@ -248,9 +256,6 @@ export default function StudentWorkspacePage() {
   const addBookHref = `/books/add?destination=student&targetUserId=${encodeURIComponent(
     studentId
   )}&context=student-lesson-book&from=student-workspace`;
-  const addLibraryBookHref = `/books/add?destination=student&targetUserId=${encodeURIComponent(
-    studentId
-  )}&from=student-workspace`;
   const notice = searchParams.get("notice");
   const workspaceNotice =
     notice === "lesson-book-existing"
@@ -387,6 +392,16 @@ export default function StudentWorkspacePage() {
     }
   }, [taskBooks, taskUserBookId]);
 
+  useEffect(() => {
+    if (!data?.eligibleBooks.length) {
+      setSelectedEligibleBookId("");
+      return;
+    }
+    if (!data.eligibleBooks.some((book) => book.id === selectedEligibleBookId)) {
+      setSelectedEligibleBookId(data.eligibleBooks[0].id);
+    }
+  }, [data?.eligibleBooks, selectedEligibleBookId]);
+
   async function loadActiveLearningTasks() {
     const { data: sessionData } = await supabase.auth.getSession();
     const currentUserId = sessionData.session?.user.id;
@@ -470,6 +485,21 @@ export default function StudentWorkspacePage() {
       setMessage(error?.message ?? "Could not remove this lesson book.");
     } finally {
       setMutatingUserBookId(null);
+    }
+  }
+
+  async function connectEligibleBook() {
+    if (!selectedEligibleBookId || connectingBook) return;
+    setConnectingBook(true);
+    setMessage("");
+    try {
+      await apiFetch("POST", { studentId, userBookId: selectedEligibleBookId });
+      await loadWorkspace();
+      setMessage("Book connected to this workspace.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not connect this book.");
+    } finally {
+      setConnectingBook(false);
     }
   }
 
@@ -828,6 +858,9 @@ export default function StudentWorkspacePage() {
                     <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-800">
                       {relationshipLabel(data.relationship)}
                     </span>
+                    <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-stone-600">
+                      Lesson day · {formatLessonDay(data.student.lesson_day)}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -839,137 +872,12 @@ export default function StudentWorkspacePage() {
                 >
                   View Library
                 </Link>
-                <Link
-                  href={addLibraryBookHref}
-                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-900 shadow-sm hover:bg-emerald-100"
-                >
-                  Add Book to Library
-                </Link>
               </div>
             </div>
 
-            <div className="mt-5 grid gap-3 md:grid-cols-4">
-              <div className="rounded-2xl border border-stone-100 bg-stone-50 px-4 py-3">
-                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-stone-400">
-                  Access
-                </p>
-                <p className="mt-1 text-lg font-black text-stone-950">
-                  {data.guidedTrialStatus === "approved" ? "Guided Trial Approved" : studentAccess?.label ?? "Learner"}
-                </p>
-                {data.guidedTrialStatus !== "approved" && studentAccess?.detail ? (
-                  <p className="mt-1 text-xs font-semibold text-stone-500">
-                    {studentAccess.detail}
-                  </p>
-                ) : null}
-                {data.canAccessAllUsers && (data.guidedTrialStatus === "none" || data.guidedTrialStatus === "pending") ? (
-                  <button type="button" onClick={() => void approveGuidedTrial()} disabled={approvingGuidedTrial}
-                    className="mt-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-900 hover:bg-violet-100 disabled:opacity-50">
-                    {approvingGuidedTrial ? "Approving..." : "Approve for Guided Trial"}
-                  </button>
-                ) : null}
-                {guidedTrialMessage ? <p role="status" className="mt-2 text-xs text-stone-600">{guidedTrialMessage}</p> : null}
-                {studentAccess?.effectiveAccessLabel ? (
-                  <p className="mt-1 text-xs font-semibold text-stone-500">
-                    {studentAccess.effectiveAccessLabel}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="rounded-2xl border border-stone-100 bg-stone-50 px-4 py-3">
-                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-stone-400">
-                  Lesson Day
-                </p>
-                {lessonDayEditing ? (
-                  <div className="mt-2 grid gap-2">
-                    <select
-                      value={lessonDayDraft}
-                      onChange={(event) => setLessonDayDraft(event.target.value)}
-                      disabled={lessonDaySaving}
-                      className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-900 outline-none focus:border-emerald-300"
-                    >
-                      <option value="">No lesson day</option>
-                      {LESSON_DAY_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void saveLessonDay()}
-                        disabled={lessonDaySaving}
-                        className="rounded-lg bg-stone-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-stone-800 disabled:opacity-50"
-                      >
-                        {lessonDaySaving ? "Saving..." : "Save"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setLessonDayDraft("");
-                          setProfileMessage("");
-                        }}
-                        disabled={lessonDaySaving}
-                        className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
-                      >
-                        Clear
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setLessonDayDraft(normalizeLessonDayForStorage(data.student.lesson_day));
-                          setLessonDayEditing(false);
-                          setProfileMessage("");
-                        }}
-                        disabled={lessonDaySaving}
-                        className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-1 flex items-center justify-between gap-3">
-                    <p className="text-lg font-black text-stone-950">
-                      {formatLessonDay(data.student.lesson_day)}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLessonDayEditing(true);
-                        setProfileMessage("");
-                      }}
-                      className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-bold text-stone-600 hover:bg-stone-50"
-                    >
-                      Edit
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-2xl border border-stone-100 bg-stone-50 px-4 py-3">
-                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-stone-400">
-                  Last Engaged
-                </p>
-                <p className="mt-1 text-lg font-black text-stone-950">
-                  {formatDate(data.lastEngagedAt)}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-stone-100 bg-stone-50 px-4 py-3">
-                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-stone-400">
-                  Student Books
-                </p>
-                <p className="mt-1 text-lg font-black text-stone-950">
-                  {data.activeLessonBooks.length} active lesson
-                  {data.activeLessonBooks.length === 1 ? "" : "s"}
-                </p>
-              </div>
-            </div>
-
-            {profileMessage ? (
-              <p className="mt-3 text-sm font-semibold text-stone-600">{profileMessage}</p>
-            ) : null}
+            <p className="mt-4 text-sm font-semibold text-stone-500">
+              Last engaged · {formatDate(data.lastEngagedAt)}
+            </p>
           </div>
         </section>
 
@@ -986,19 +894,33 @@ export default function StudentWorkspacePage() {
         ) : null}
 
         <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-xl font-black text-stone-950">Recent Study Activity</h2>
+            <p className="text-xs font-semibold text-stone-500">Last 7 days · for lesson planning</p>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              ["Reading sessions", data.recentStudyActivity?.readingSessions ?? 0],
+              ["Words saved", data.recentStudyActivity?.wordsSaved ?? null],
+              ["Flashcards reviewed", data.recentStudyActivity?.flashcardsReviewed ?? null],
+              ["Follow-Along activity", data.recentStudyActivity?.followAlong ?? null],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-xl border border-stone-100 bg-stone-50 px-4 py-3">
+                <p className="text-xs font-semibold text-stone-500">{label}</p>
+                <p className="mt-1 text-2xl font-black text-stone-900">{value ?? "—"}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-xl font-black text-stone-950">Books We're Working On</h2>
+              <h2 className="text-xl font-black text-stone-950">Books We&apos;re Working On</h2>
               <p className="mt-1 text-sm text-stone-500">
-                Active lesson books for this teacher-student workspace.
+                The books you and {studentName} are working through together.
               </p>
             </div>
-            <Link
-              href={addBookHref}
-              className="rounded-xl bg-stone-900 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-stone-800"
-            >
-              Add Lesson Book
-            </Link>
           </div>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -1048,22 +970,16 @@ export default function StudentWorkspacePage() {
                     <Link
                       href={`/teacher/students/${encodeURIComponent(
                         studentId
-                      )}/books/${encodedUserBookId}/workspace`}
+                      )}/books/${encodedUserBookId}/workspace#student-lesson-follow-along`}
                       className="rounded-xl bg-stone-900 px-3 py-2 text-center text-sm font-bold text-white hover:bg-stone-800"
                     >
-                      Open Workspace
+                      Follow-Along
                     </Link>
                     <Link
-                      href={`/books/${encodedUserBookId}/words?${context}`}
+                      href={`/books/${encodedUserBookId}/study?${context}`}
                       className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-center text-sm font-bold text-stone-700 hover:bg-stone-50"
                     >
-                      Vocabulary List
-                    </Link>
-                    <Link
-                      href={`/books/${encodedUserBookId}?${context}`}
-                      className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-center text-sm font-bold text-stone-700 hover:bg-stone-50"
-                    >
-                      Book Hub
+                      Flashcards
                     </Link>
                   </div>
 
@@ -1071,7 +987,7 @@ export default function StudentWorkspacePage() {
                     type="button"
                     onClick={() => void removeLessonBook(lessonBook)}
                     disabled={mutatingUserBookId === lessonBook.userBookId}
-                    className="mt-3 text-sm font-semibold text-stone-500 hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="mt-3 text-xs font-semibold text-stone-400 hover:text-stone-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Remove from Workspace
                   </button>
@@ -1088,10 +1004,56 @@ export default function StudentWorkspacePage() {
         </section>
 
         <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-black text-stone-950">Active Follow-Up</h2>
-          <p className="mt-1 text-sm text-stone-500">
-            Live Lesson reviews, assigned tasks, book requests, and finished-book ratings for this student.
-          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-lg font-black text-stone-950">Add or Connect Book</h2>
+              <p className="mt-1 text-sm text-stone-500">
+                Connect a book already in {studentName}&apos;s Library, or add a new one.
+              </p>
+            </div>
+            <Link
+              href={addBookHref}
+              className="shrink-0 rounded-xl border border-stone-300 bg-white px-4 py-2 text-center text-sm font-bold text-stone-700 hover:bg-stone-50"
+            >
+              Add New Book
+            </Link>
+          </div>
+          {data.eligibleBooks.length ? (
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <label className="min-w-0 flex-1">
+                <span className="sr-only">Choose a book from {studentName}&apos;s Library</span>
+                <select
+                  value={selectedEligibleBookId}
+                  onChange={(event) => setSelectedEligibleBookId(event.target.value)}
+                  disabled={connectingBook}
+                  className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm font-semibold text-stone-800"
+                >
+                  {data.eligibleBooks.map((book) => (
+                    <option key={book.id} value={book.id}>
+                      {book.title}{book.author ? ` · ${book.author}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() => void connectEligibleBook()}
+                disabled={!selectedEligibleBookId || connectingBook}
+                className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {connectingBook ? "Connecting…" : "Connect to Workspace"}
+              </button>
+            </div>
+          ) : (
+            <p className="mt-4 rounded-xl border border-dashed border-stone-300 bg-stone-50 p-4 text-sm text-stone-500">
+              There are no unconnected books in this Library right now.
+            </p>
+          )}
+        </section>
+
+        <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-black text-stone-950">Needs Attention</h2>
+          <p className="mt-1 text-sm text-stone-500">Unfinished Live Lesson word reviews.</p>
 
           <div className="mt-4 space-y-3">
             {data.needsAttention.map((session) => (
@@ -1115,7 +1077,27 @@ export default function StudentWorkspacePage() {
                 </Link>
               </article>
             ))}
+          </div>
 
+          {data.needsAttention.length === 0 ? (
+            <p className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-600">
+              No unfinished Quick Add reviews right now.
+            </p>
+          ) : null}
+        </section>
+
+        <details className="rounded-2xl border border-stone-200 bg-white p-4 text-sm">
+          <summary className="cursor-pointer font-semibold text-stone-700">Other student tools and follow-up</summary>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={openTaskModal}
+              className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs font-bold text-stone-700 hover:bg-stone-50"
+            >
+              Assign learning task
+            </button>
+          </div>
+          <div className="mt-3 space-y-3">
             {activeLearningTasks.map((task) => {
               const linkedBook = taskBooks.find((book) => book.id === task.user_book_id);
               const taskHref = task.user_book_id
@@ -1214,20 +1196,64 @@ export default function StudentWorkspacePage() {
             ))}
           </div>
 
-          {data.needsAttention.length === 0 &&
-          activeLearningTasks.length === 0 &&
-          data.bookRequests.length === 0 &&
-          data.ratingFollowUps.length === 0 ? (
-            <p className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-600">
-              No active follow-up for this student right now.
-            </p>
+          {activeLearningTasks.length === 0 && data.bookRequests.length === 0 && data.ratingFollowUps.length === 0 ? (
+            <p className="mt-3 text-xs text-stone-500">No assigned tasks, pending requests, or rating follow-up.</p>
           ) : null}
-        </section>
+        </details>
 
-        {data.managedRelationships?.length ? (
-          <details className="rounded-2xl border border-stone-200 bg-white p-4 text-sm">
+        <details className="rounded-2xl border border-stone-200 bg-white p-4 text-sm">
             <summary className="cursor-pointer font-semibold text-stone-700">Student management</summary>
-            <p className="mt-2 text-xs text-stone-500">Manage teaching relationships. The reader’s account and learning history are preserved.</p>
+            <div className="mt-3 grid gap-4 md:grid-cols-2">
+              <div className="rounded-xl bg-stone-50 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-stone-500">Access</p>
+                <p className="mt-1 font-bold text-stone-900">
+                  {data.guidedTrialStatus === "approved" ? "Guided Trial Approved" : studentAccess?.label ?? "Learner"}
+                </p>
+                {data.guidedTrialStatus !== "approved" && studentAccess?.detail ? (
+                  <p className="mt-1 text-xs text-stone-500">{studentAccess.detail}</p>
+                ) : null}
+                {studentAccess?.effectiveAccessLabel ? (
+                  <p className="mt-1 text-xs text-stone-500">{studentAccess.effectiveAccessLabel}</p>
+                ) : null}
+                {data.canAccessAllUsers && (data.guidedTrialStatus === "none" || data.guidedTrialStatus === "pending") ? (
+                  <button type="button" onClick={() => void approveGuidedTrial()} disabled={approvingGuidedTrial}
+                    className="mt-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-900 hover:bg-violet-100 disabled:opacity-50">
+                    {approvingGuidedTrial ? "Approving..." : "Approve for Guided Trial"}
+                  </button>
+                ) : null}
+                {guidedTrialMessage ? <p role="status" className="mt-2 text-xs text-stone-600">{guidedTrialMessage}</p> : null}
+              </div>
+              <div className="rounded-xl bg-stone-50 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-stone-500">Lesson day</p>
+                {lessonDayEditing ? (
+                  <div className="mt-2 grid gap-2">
+                    <select value={lessonDayDraft} onChange={(event) => setLessonDayDraft(event.target.value)} disabled={lessonDaySaving}
+                      className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-900">
+                      <option value="">No lesson day</option>
+                      {LESSON_DAY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => void saveLessonDay()} disabled={lessonDaySaving}
+                        className="rounded-lg bg-stone-900 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50">
+                        {lessonDaySaving ? "Saving..." : "Save"}
+                      </button>
+                      <button type="button" onClick={() => { setLessonDayDraft(""); setProfileMessage(""); }} disabled={lessonDaySaving}
+                        className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-bold text-stone-600 disabled:opacity-50">Clear</button>
+                      <button type="button" onClick={() => { setLessonDayDraft(normalizeLessonDayForStorage(data.student.lesson_day)); setLessonDayEditing(false); setProfileMessage(""); }} disabled={lessonDaySaving}
+                        className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-bold text-stone-600 disabled:opacity-50">Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-1 flex items-center justify-between gap-3">
+                    <span className="font-bold text-stone-900">{formatLessonDay(data.student.lesson_day)}</span>
+                    <button type="button" onClick={() => { setLessonDayEditing(true); setProfileMessage(""); }}
+                      className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-bold text-stone-600">Edit</button>
+                  </div>
+                )}
+                {profileMessage ? <p className="mt-2 text-xs text-stone-600">{profileMessage}</p> : null}
+              </div>
+            </div>
+            {data.managedRelationships?.length ? (
             <div className="mt-3 space-y-3">
               {data.managedRelationships.map(link => (
                 <div key={link.teacher_id} className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 pt-3">
@@ -1240,8 +1266,8 @@ export default function StudentWorkspacePage() {
                 </div>
               ))}
             </div>
-          </details>
-        ) : null}
+            ) : null}
+        </details>
 
         {taskModalOpen ? (
           <TeacherLearningTaskModal

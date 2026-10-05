@@ -28,6 +28,7 @@ type TeacherNotebookPanelProps = {
   lessonDate?: string | null;
   compact?: boolean;
   enableWordCapture?: boolean;
+  wordCaptureOnly?: boolean;
   mode?: "lesson" | "prep";
   initialTab?: NotebookTab | null;
   initialSearch?: string | null;
@@ -363,6 +364,7 @@ export default function TeacherNotebookPanel({
   lessonDate = null,
   compact = false,
   enableWordCapture = false,
+  wordCaptureOnly = false,
   mode = "prep",
   initialTab = null,
   initialSearch = null,
@@ -431,7 +433,7 @@ export default function TeacherNotebookPanel({
 
   useEffect(() => {
     void loadNotebook();
-  }, [teacherBookId, bookId, userBookId, studentId, lessonDate, wordCaptureEnabled, hasExternalBookJournal]);
+  }, [teacherBookId, bookId, userBookId, studentId, lessonDate, wordCaptureEnabled, wordCaptureOnly, hasExternalBookJournal]);
 
   useEffect(() => {
     if (initialTab && tabs.some((tab) => tab.id === initialTab)) {
@@ -481,10 +483,27 @@ export default function TeacherNotebookPanel({
         return;
       }
 
+      if (wordCaptureOnly && studentId && userBookId) {
+        const { data: activeLessonBook, error: lessonBookError } = await supabase
+          .from("teacher_student_lesson_books")
+          .select("id")
+          .eq("teacher_id", user.id)
+          .eq("student_id", studentId)
+          .eq("user_book_id", userBookId)
+          .eq("status", "active")
+          .maybeSingle();
+
+        if (lessonBookError) throw lessonBookError;
+        if (!activeLessonBook) {
+          setMessage("This book is not actively connected to this student workspace.");
+          return;
+        }
+      }
+
       setCanAccess(true);
       setTeacherId(user.id);
 
-      const entryRows = await loadEntries(user.id);
+      const entryRows = wordCaptureOnly ? [] : await loadEntries(user.id);
       setEntries(entryRows);
 
       if (wordCaptureEnabled) {
@@ -1059,6 +1078,59 @@ export default function TeacherNotebookPanel({
         <p className="text-sm font-semibold text-rose-700">
           {message || "Teacher access is required."}
         </p>
+      </aside>
+    );
+  }
+
+  if (wordCaptureOnly) {
+    return (
+      <aside className={`${panelClasses} space-y-3`}>
+        <div>
+          <h2 className="text-lg font-black text-stone-950">Quick Word Capture</h2>
+          <p className="mt-1 text-xs leading-5 text-stone-600">
+            Capture terms while you read. Add readings, meanings, and other details after the lesson.
+          </p>
+        </div>
+
+        <form onSubmit={addWordDraft} className="flex gap-2">
+          <label className="min-w-0 flex-1">
+            <span className="sr-only">Word or term for {studentName || "this student"}</span>
+            <input
+              ref={inputRef}
+              value={wordInput}
+              onChange={(event) => setWordInput(event.target.value)}
+              onKeyDown={handleWordInputKeyDown}
+              placeholder="Type a word or term…"
+              disabled={savingWord}
+              className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm font-semibold text-stone-950 shadow-sm focus:border-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-100"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={savingWord || !wordInput.trim()}
+            className="shrink-0 rounded-xl bg-stone-950 px-3 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {savingWord ? "Saving…" : "Add"}
+          </button>
+        </form>
+
+        {message ? (
+          <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+            {message}
+          </p>
+        ) : null}
+
+        <div className="max-h-[60vh] overflow-y-auto rounded-xl border border-stone-200 bg-stone-50 p-3">
+          <div className="mb-3">
+            <h3 className="text-xs font-black uppercase tracking-wide text-stone-700">
+              Draft list · {wordDrafts.length}
+            </h3>
+            <p className="mt-1 text-xs leading-5 text-stone-500">
+              These are teacher-only drafts for {studentName || "this student"}; they are not added to student vocabulary yet.
+            </p>
+          </div>
+          {renderWordListTools()}
+        </div>
       </aside>
     );
   }

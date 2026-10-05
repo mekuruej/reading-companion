@@ -168,7 +168,7 @@ async function loadReadingSummaries(userBookIds: string[]) {
 
   const { data, error } = await supabaseAdmin
     .from("user_book_reading_sessions")
-    .select("user_book_id, read_on, start_page, end_page")
+    .select("user_book_id, read_on, start_page, end_page, is_filler")
     .in("user_book_id", userBookIds)
     .order("read_on", { ascending: false });
 
@@ -178,21 +178,38 @@ async function loadReadingSummaries(userBookIds: string[]) {
   }
 
   const summaries = new Map<string, any>();
+  const recentActivityCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
   for (const row of data ?? []) {
-    const userBookId = (row as any).user_book_id as string | null;
+    const session = row as {
+      user_book_id: string | null;
+      read_on: string | null;
+      end_page: number | null;
+      is_filler: boolean | null;
+    };
+    const userBookId = session.user_book_id;
     if (!userBookId) continue;
 
     const current = summaries.get(userBookId) ?? {
       lastReadOn: null,
       furthestPage: null,
+      recentSessionCount: 0,
     };
 
-    if (!current.lastReadOn && (row as any).read_on) {
-      current.lastReadOn = (row as any).read_on;
+    if (!current.lastReadOn && session.read_on) {
+      current.lastReadOn = session.read_on;
     }
 
-    const endPage = row.end_page == null ? NaN : Number((row as any).end_page);
+    const readOn = session.read_on ? new Date(session.read_on).getTime() : NaN;
+    if (
+      !session.is_filler &&
+      Number.isFinite(readOn) &&
+      readOn >= recentActivityCutoff
+    ) {
+      current.recentSessionCount += 1;
+    }
+
+    const endPage = session.end_page == null ? NaN : Number(session.end_page);
     if (Number.isFinite(endPage)) {
       current.furthestPage =
         current.furthestPage == null ? endPage : Math.max(current.furthestPage, endPage);
@@ -374,6 +391,29 @@ export async function GET(request: Request) {
     const allReadingSummaries = await loadReadingSummaries(
       ((libraryRows ?? []) as any[]).map((row) => row.id as string)
     );
+    const studentUserBookIds = ((libraryRows ?? []) as any[]).map((row) => row.id as string);
+    const activitySince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const [recentWordsResult, recentFlashcardsResult] = await Promise.all([
+      studentUserBookIds.length
+        ? supabaseAdmin
+            .from("user_book_words")
+            .select("id", { count: "exact", head: true })
+            .in("user_book_id", studentUserBookIds)
+            .gte("created_at", activitySince)
+        : Promise.resolve({ count: 0, error: null }),
+      supabaseAdmin
+        .from("user_study_events")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", studentId)
+        .eq("study_mode", "study_flashcards")
+        .gte("created_at", activitySince),
+    ]);
+    if (recentWordsResult.error) {
+      console.warn("Could not load recent saved-word activity:", recentWordsResult.error);
+    }
+    if (recentFlashcardsResult.error) {
+      console.warn("Could not load recent flashcard activity:", recentFlashcardsResult.error);
+    }
     const lastEngagedAt =
       Array.from(allReadingSummaries.values())
         .map((summary) => summary.lastReadOn as string | null)
@@ -518,6 +558,17 @@ export async function GET(request: Request) {
       guidedTrialStatus,
       canAccessAllUsers: isSuperTeacher(authorization.profile),
       lastEngagedAt,
+      recentStudyActivity: {
+        readingSessions: Array.from(allReadingSummaries.values()).reduce(
+          (total, summary) => total + Number(summary.recentSessionCount ?? 0),
+          0
+        ),
+        wordsSaved: recentWordsResult.error ? null : recentWordsResult.count ?? 0,
+        flashcardsReviewed: recentFlashcardsResult.error
+          ? null
+          : recentFlashcardsResult.count ?? 0,
+        followAlong: null,
+      },
       activeLessonBooks,
       eligibleBooks,
       needsAttention,
