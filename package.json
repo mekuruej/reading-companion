@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lexicon:import-freedict": "python3 scripts/import-freedict-eng-jpn.py"
+    "lexicon:import-freedict": "python3 scripts/import-freedict-eng-jpn.py",
+    "test:billing": "node --test tests/stripe-subscription-access.test.mjs tests/stripe-billing-routes.test.mjs"
   },
   "dependencies": {
     "@supabase/auth-helpers-nextjs": "^0.15.0",
@@ -16,9 +17,12 @@
     "dotenv": "^17.2.3",
     "next": "^16.1.6",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "server-only": "^0.0.1",
+    "stripe": "^23.0.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20.19.37",
     "@types/react": "^19.2.14",

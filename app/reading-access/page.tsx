@@ -1,7 +1,6 @@
 import Link from "next/link";
 
-const kofiReadingAccessUrl =
-  process.env.NEXT_PUBLIC_KOFI_READING_ACCESS_URL;
+import SubscriptionControls from "@/components/SubscriptionControls";
 
 const readingAccessFeatures = [
   "Save vocabulary from books",
@@ -70,26 +69,15 @@ export default function ReadingAccessPage() {
             Keep reading with MEKURU.
           </h2>
           <p className="mt-5 max-w-2xl text-base leading-7 text-stone-700 sm:text-lg">
-            Japanese Learning is the ¥500/month MEKURU app tools option for
+            Japanese Learning Tools is the ¥500/month MEKURU app tools option for
             independent Japanese readers who want to keep saving vocabulary,
             reviewing words, and using Japanese reading tools after a trial.
           </p>
 
+          <SubscriptionControls />
+
           <div className="mt-7 flex flex-wrap items-center gap-3">
-            {kofiReadingAccessUrl ? (
-              <a
-                href={kofiReadingAccessUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex rounded-2xl bg-stone-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-stone-700 hover:shadow-md"
-              >
-                Join Japanese Learning 🔒 on Ko-fi
-              </a>
-            ) : (
-              <span className="inline-flex cursor-not-allowed rounded-2xl border border-stone-200 bg-stone-100 px-5 py-3 text-sm font-semibold text-stone-500">
-                Ko-fi link coming soon
-              </span>
-            )}
+
 
             <Link
               href="/books"
@@ -100,7 +88,7 @@ export default function ReadingAccessPage() {
           </div>
 
           <p className="mt-4 text-xs leading-5 text-stone-500">
-            After joining on Ko-fi, your MEKURU access will be updated manually.
+            Manage your subscription, payment method, and billing details securely through Stripe.
           </p>
         </section>
 
