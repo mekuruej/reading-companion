@@ -4,13 +4,9 @@ import SubscriptionControls from "@/components/SubscriptionControls";
 
 const readingAccessFeatures = [
   "Save vocabulary from books",
-  "Review words with flashcards",
-  "Use Follow-Along supported reading",
-  "Use Curiosity Reading / Save Words",
-  "View vocabulary lists",
-  "View Reading History",
-  "See book stats",
-  "Keep using personal reading tools after trial",
+  "Review words and readings",
+  "Use Follow-Along while reading",
+  "Use Curiosity Reading",
 ];
 
 export default function ReadingAccessPage() {
@@ -68,11 +64,17 @@ export default function ReadingAccessPage() {
           <h2 className="mt-4 text-4xl font-black leading-tight text-stone-950 sm:text-5xl">
             Keep reading with MEKURU.
           </h2>
-          <p className="mt-5 max-w-2xl text-base leading-7 text-stone-700 sm:text-lg">
-            Japanese Learning Tools is the ¥500/month MEKURU app tools option for
-            independent Japanese readers who want to keep saving vocabulary,
-            reviewing words, and using Japanese reading tools after a trial.
-          </p>
+
+          <div className="mt-5 max-w-2xl">
+            <p className="text-xl font-semibold leading-8 text-stone-900 sm:text-2xl">
+              Get full access to MEKURU’s Japanese Learning Tools.
+            </p>
+
+            <p className="mt-2 text-base leading-7 text-stone-700 sm:text-lg">
+              Track your reading, save vocabulary, and review the words and readings you
+              encounter.
+            </p>
+          </div>
 
           <SubscriptionControls />
 

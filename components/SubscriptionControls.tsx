@@ -53,9 +53,14 @@ export default function SubscriptionControls() {
     </button> : null}
     {status && !status.configured ? <p className="text-sm text-stone-600">Online subscriptions are not available yet.</p> : null}
     {status?.subscriptions.map(s => <div key={s.id} className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm">
-      <p className="font-semibold">Subscription: {s.status === 'pending' ? 'confirming payment' : s.status.replaceAll('_', ' ')}</p>
-      {s.paidThrough ? <p className="mt-1">Paid through {new Date(s.paidThrough).toLocaleDateString()}.</p> : null}
-      {s.cancelAtPeriodEnd ? <p>Cancellation is scheduled. Your paid access continues through the date above.</p> : null}
+      {s.cancelAtPeriodEnd && s.paidThrough ? <>
+        <p className="font-semibold">Subscription ends {new Date(s.paidThrough).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+        <p className="mt-1">You’ll keep access until then.</p>
+      </> : <>
+        <p className="font-semibold">Subscription: {s.status === 'pending' ? 'confirming payment' : s.status.replaceAll('_', ' ')}</p>
+        {s.paidThrough ? <p className="mt-1">Paid through {new Date(s.paidThrough).toLocaleDateString()}.</p> : null}
+        {s.cancelAtPeriodEnd ? <p>Cancellation is scheduled.</p> : null}
+      </>}
       {['past_due','unpaid','incomplete'].includes(s.status) ? <p>Please check your payment method. Access is limited to time already paid for.</p> : null}
       {s.needsReview ? <p>MEKURU needs to review this subscription. You can still manage your billing below.</p> : null}
       {status.configured ? <button type="button" disabled={busy} onClick={() => navigate('portal', { subscriptionId: s.id })}

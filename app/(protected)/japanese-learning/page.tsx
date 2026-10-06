@@ -207,6 +207,13 @@ export default function JapaneseLearningPage() {
           <h1 className="mt-3 max-w-3xl text-4xl font-black leading-tight md:text-6xl">
             Learn Japanese through the books you are actually reading.
           </h1>
+          {/* Temporary diagnostic link for authenticated in-app navigation. */}
+          <Link
+            href="/reading-access"
+            className="mt-6 inline-flex rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-black text-stone-800 transition hover:bg-stone-50"
+          >
+            View Japanese Learning Access
+          </Link>
         </section>
 
         <section className="mt-6 rounded-3xl border border-amber-200 bg-white p-5 shadow-sm">
