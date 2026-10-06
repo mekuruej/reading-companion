@@ -22,7 +22,7 @@ test('Guided Trial routes converge without starting or replacing access during a
       create table teacher_students (id uuid, teacher_id uuid, student_id uuid, archived_at timestamptz);
       create table user_alerts (user_id uuid, type text, message text);
     `);
-    for (const file of ['20260813_japanese_learning_access_requests.sql', '20260814_japanese_learning_request_context.sql', '20260927_workspace_guided_trial_approval.sql']) {
+    for (const file of ['20260813_japanese_learning_access_requests.sql', '20260814_japanese_learning_request_context.sql', '20260927_workspace_guided_trial_approval.sql', '20261006_stripe_subscription_billing.sql']) {
       await db.exec(fs.readFileSync(path.join(root, 'sql', file), 'utf8'));
     }
     const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;

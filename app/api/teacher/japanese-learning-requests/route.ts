@@ -13,11 +13,11 @@ type ProfileRow = {
   username?: string | null;
   role?: string | null;
   is_super_teacher?: boolean | string | null;
+  trial_started_at?: string | null;
   app_access_type?: string | null;
   app_access_expires_at?: string | null;
 };
 
-const GUIDED_TRIAL_DAYS = 28;
 
 function isSuperTeacherFlag(value: unknown) {
   return value === true || value === "true";
@@ -47,7 +47,7 @@ function isActiveNonTrialFullAccess(profile: ProfileRow | null) {
 }
 
 function hasExistingTrial(profile: ProfileRow | null) {
-  return (profile?.app_access_type ?? "").trim().toLowerCase() === "trial";
+  return Boolean(profile?.trial_started_at) || (profile?.app_access_type ?? "").trim().toLowerCase() === "trial";
 }
 
 function cleanText(value: unknown) {
@@ -75,7 +75,7 @@ async function getAuthenticatedUser(req: Request) {
 async function getProfile(userId: string) {
   const { data, error } = await supabaseAdmin
     .from("profiles")
-    .select("id, display_name, username, role, is_super_teacher, app_access_type, app_access_expires_at")
+    .select("id, display_name, username, role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at")
     .eq("id", userId)
     .maybeSingle<ProfileRow>();
 
@@ -259,20 +259,16 @@ export async function PATCH(request: Request) {
         );
       }
 
-      const now = new Date();
-      const trialEndsAt = new Date(now.getTime() + GUIDED_TRIAL_DAYS * 24 * 60 * 60 * 1000);
-      const trialStartedAt = now.toISOString();
-
-      const { error: profileUpdateError } = await supabaseAdmin
-        .from("profiles")
-        .update({
-          app_access_type: "trial",
-          trial_started_at: trialStartedAt,
-          app_access_expires_at: trialEndsAt.toISOString(),
-        })
-        .eq("id", existingRequest.user_id);
-
+      const { data: activated, error: profileUpdateError } = await supabaseAdmin.rpc("activate_guided_trial", {
+        p_student: existingRequest.user_id,
+        p_reviewer: auth.user.id,
+      });
+      if (profileUpdateError?.code === "P0001") {
+        return NextResponse.json({ error: "Trial already used or account has access." }, { status: 409 });
+      }
       if (profileUpdateError) throw profileUpdateError;
+      const trialStartedAt = activated.trial_started_at;
+      const trialEndsAt = new Date(activated.app_access_expires_at);
 
       let notificationError: string | null = null;
       try {

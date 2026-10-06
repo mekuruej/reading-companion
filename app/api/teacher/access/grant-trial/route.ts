@@ -11,11 +11,11 @@ type ProfileRow = {
   id: string;
   role?: string | null;
   is_super_teacher?: boolean | string | null;
+  trial_started_at?: string | null;
   app_access_type?: string | null;
   app_access_expires_at?: string | null;
 };
 
-const GUIDED_TRIAL_DAYS = 28;
 
 function isSuperTeacherFlag(value: unknown) {
   return value === true || value === "true";
@@ -59,7 +59,7 @@ async function getAuthenticatedUser(req: Request) {
 async function getProfile(userId: string) {
   const { data, error } = await supabaseAdmin
     .from("profiles")
-    .select("id, role, is_super_teacher, app_access_type, app_access_expires_at")
+    .select("id, role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at")
     .eq("id", userId)
     .maybeSingle();
 
@@ -73,7 +73,7 @@ function isActiveNonTrialFullAccess(profile: ProfileRow) {
 }
 
 function hasExistingTrial(profile: ProfileRow) {
-  return (profile.app_access_type ?? "").trim().toLowerCase() === "trial";
+  return Boolean(profile.trial_started_at) || (profile.app_access_type ?? "").trim().toLowerCase() === "trial";
 }
 
 async function findUserIdByEmail(email: string) {
@@ -178,32 +178,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const now = new Date();
-  const trialEndsAt = new Date(now.getTime() + GUIDED_TRIAL_DAYS * 24 * 60 * 60 * 1000);
-
-  const { data, error } = await supabaseAdmin
-    .from("profiles")
-    .update({
-      app_access_type: "trial",
-      trial_started_at: now.toISOString(),
-      app_access_expires_at: trialEndsAt.toISOString(),
-    })
-    .eq("id", targetUserId)
-    .select("id, display_name, username, app_access_type, app_access_expires_at")
-    .maybeSingle();
+  const { data, error } = await supabaseAdmin.rpc("activate_guided_trial", {
+    p_student: targetUserId,
+    p_reviewer: auth.user.id,
+  });
 
   if (error) {
     console.error("Error granting trial access:", error);
     return NextResponse.json(
       { error: "Could not grant the trial right now." },
-      { status: 500 }
+      { status: error?.code === "P0001" ? 409 : 500 }
     );
   }
 
   return NextResponse.json({
     profile: data,
     email,
-    trialStartedAt: now.toISOString(),
-    trialEndsAt: trialEndsAt.toISOString(),
+    trialStartedAt: data.trial_started_at,
+    trialEndsAt: data.app_access_expires_at,
   });
 }
