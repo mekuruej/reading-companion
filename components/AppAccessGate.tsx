@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { supabase } from "@/lib/supabaseClient";
+import TrialOnboarding, { TRIAL_ONBOARDING_KEY } from "@/components/TrialOnboarding";
 
 type Props = {
   children: React.ReactNode;
@@ -28,6 +29,7 @@ export default function AppAccessGate({ children }: Props) {
   const pathname = usePathname();
 
   const [checking, setChecking] = useState(true);
+  const [showTrialOnboarding, setShowTrialOnboarding] = useState(false);
   const [allowed, setAllowed] = useState(false);
   const [redirectingTo, setRedirectingTo] = useState<string | null>(null);
 
@@ -38,6 +40,7 @@ export default function AppAccessGate({ children }: Props) {
       setChecking(true);
       setAllowed(false);
       setRedirectingTo(null);
+      setShowTrialOnboarding(false);
 
       try {
         const {
@@ -133,7 +136,16 @@ export default function AppAccessGate({ children }: Props) {
           return;
         }
 
+        // Fetch the preference fresh so completion on another device is respected.
+        // This preference never participates in the access decision above.
+        let onboardingCompleted = session.user.user_metadata?.[TRIAL_ONBOARDING_KEY] === true;
+        if (status.isTrialActive && !onboardingCompleted) {
+          const { data } = await supabase.auth.getUser();
+          onboardingCompleted = data.user?.user_metadata?.[TRIAL_ONBOARDING_KEY] === true;
+        }
+
         if (!cancelled) {
+          setShowTrialOnboarding(status.isTrialActive && !onboardingCompleted);
           setAllowed(true);
           setChecking(false);
         }
@@ -165,6 +177,10 @@ export default function AppAccessGate({ children }: Props) {
         Redirecting{redirectingTo ? ` to ${redirectingTo}` : ""}...
       </div>
     );
+  }
+
+  if (showTrialOnboarding) {
+    return <TrialOnboarding onComplete={() => setShowTrialOnboarding(false)} />;
   }
 
   return <>{children}</>;
