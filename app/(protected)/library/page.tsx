@@ -117,7 +117,7 @@ function TrialCountdownBanner() {
           </summary>
           <div className="mt-2 max-w-md leading-5">
             <p>Continue Japanese Learning for ¥500/month, including vocabulary, flashcards, Follow-Along, and reading tracking.</p>
-            <p className="mt-1">After you join on Ko-fi, your MEKURU access will be updated manually.</p>
+            <p className="mt-1">Subscribe to Japanese Learning Tools and access will update after payment is confirmed.</p>
             <Link href="/reading-access" className="mt-2 inline-block font-medium text-emerald-900 underline underline-offset-4 hover:text-emerald-950">Explore Japanese Learning</Link>
           </div>
         </details>

@@ -5,6 +5,7 @@ type LibraryReminderBannerTone = "sky" | "emerald" | "violet";
 type LibraryReminderBannerProps = {
   title: string;
   tone?: LibraryReminderBannerTone;
+  spacious?: boolean;
   children: ReactNode;
   actions: ReactNode;
 };
@@ -34,6 +35,7 @@ const toneStyles: Record<
 export default function LibraryReminderBanner({
   title,
   tone = "sky",
+  spacious = false,
   children,
   actions,
 }: LibraryReminderBannerProps) {
@@ -41,11 +43,11 @@ export default function LibraryReminderBanner({
 
   return (
     <div
-      className={`mb-5 rounded-3xl border px-4 py-4 shadow-sm ${styles.shell}`}
+      className={`mb-5 rounded-3xl border shadow-sm ${spacious ? "px-5 py-6 sm:px-6 sm:py-7" : "px-4 py-4"} ${styles.shell}`}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className={`text-sm font-semibold ${styles.title}`}>
+          <div className={`${spacious ? "text-xl font-bold leading-tight sm:text-2xl" : "text-sm font-semibold"} ${styles.title}`}>
             {title}
           </div>
 

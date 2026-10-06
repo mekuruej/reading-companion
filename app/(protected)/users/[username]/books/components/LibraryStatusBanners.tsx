@@ -15,7 +15,8 @@ export function AbilityCheckReminderBanner({
 
   return (
     <LibraryReminderBanner
-      tone={isReady ? "emerald" : "sky"}
+      tone="emerald"
+      spacious
       title={isReady ? "Your Ability Check is ready!" : "Ability Check is resting today"}
       actions={
         <>
@@ -32,11 +33,7 @@ export function AbilityCheckReminderBanner({
           <button
             type="button"
             onClick={onHide}
-            className={`rounded-xl border bg-white px-4 py-2 text-sm font-semibold transition ${
-              isReady
-                ? "border-emerald-200 text-emerald-900 hover:bg-emerald-100"
-                : "border-sky-200 text-sky-900 hover:bg-sky-100"
-            }`}
+            className="rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-100"
           >
             Hide today
           </button>
@@ -53,10 +50,10 @@ export function AbilityCheckReminderBanner({
           </p>
         </div>
       ) : (
-        <p className="mt-1 text-sm leading-6 text-slate-600">
+        <p className="mt-2 text-base leading-7 text-emerald-900">
           Ability Check opens when at least {minDueCards} cards are due. You
           have{" "}
-          <span className="text-xl font-black text-slate-950">
+          <span className="text-xl font-black text-emerald-950">
             {abilityCheckReminderCount}
           </span>{" "}
           due right now.

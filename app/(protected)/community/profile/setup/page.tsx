@@ -46,8 +46,6 @@ export default function ProfileSetupPage() {
   const [customNativeLanguage, setCustomNativeLanguage] = useState("");
   const [japaneseLearningEnabled, setJapaneseLearningEnabled] = useState<boolean | null>(null);
   const [level, setLevel] = useState("");
-  const [shouldInitializeMemberRole, setShouldInitializeMemberRole] = useState(false);
-  const [shouldInitializeFreeAccess, setShouldInitializeFreeAccess] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -88,8 +86,6 @@ export default function ProfileSetupPage() {
       setUsername(profile?.username ?? "");
       setJapaneseLearningEnabled(profile ? wantsJapaneseLearning(profile) : null);
       setLevel(profile?.level ?? "");
-      setShouldInitializeMemberRole(!profile || !profile.role);
-      setShouldInitializeFreeAccess(!profile || !profile.app_access_type);
 
       const loadedNativeLanguage = profile?.native_language?.trim() ?? "";
       if (
@@ -170,19 +166,7 @@ export default function ProfileSetupPage() {
         return;
       }
 
-      const initialAccessFields = shouldInitializeFreeAccess
-        ? {
-            app_access_type: "free",
-            app_access_expires_at: null,
-            trial_started_at: null,
-          }
-        : {};
-      const initialRoleFields = shouldInitializeMemberRole
-        ? {
-            role: "member",
-          }
-        : {};
-
+      // New profiles use database defaults; updates never send access or role fields.
       const visibleJapaneseStudyFields = japaneseLearningEnabled
         ? {
             level: level.trim(),
@@ -192,14 +176,12 @@ export default function ProfileSetupPage() {
       const { error } = await supabase.from("profiles").upsert(
         {
           id: user.id,
-          ...initialRoleFields,
           display_name: displayName.trim(),
           username: cleanUsername,
           native_language: selectedNativeLanguage,
           japanese_learning_enabled: japaneseLearningEnabled,
           target_language: legacyTargetLanguageForJapaneseLearning(japaneseLearningEnabled),
           ...visibleJapaneseStudyFields,
-          ...initialAccessFields,
         },
         { onConflict: "id" }
       );

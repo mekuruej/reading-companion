@@ -48,7 +48,7 @@ export default function SupportProjectFooterGate() {
         </p>
 
         <a
-          href="https://ko-fi.com/japanesemekuru"
+          href="https://ko-fi.com/mekurureads"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-md"
