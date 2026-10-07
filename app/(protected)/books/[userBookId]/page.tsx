@@ -5627,6 +5627,47 @@ export default function BookHubPage() {
     />
   );
 
+  // Add teaching tools for eligible owner-teachers, including super teachers.
+  // Keep the existing admin and legacy mode experiences unchanged.
+  const showTeachingToolsInReaderHub =
+    canUseBookHubTeachingMode && isTeacherContext && !isAdmin;
+
+  function openTeachingTool(href: string) {
+    if (!confirmLeaveIfTimerActive()) return;
+    router.push(href);
+  }
+
+  const teachingTools = (
+    <BookHubTeachingTools
+      onReadingExperiences={(personId) => {
+        openTeachingTool(`/teacher/reading-experiences/${row.book_id}${personId ? `?person=${encodeURIComponent(personId)}` : ""}`);
+      }}
+      userBookId={row.id}
+      canUseBulkAdd={!isEnglishBook && canUseBulkAdd}
+      canUseStoryNotes
+      onMyVocabulary={() => openTeachingTool(`/books/${row.id}/words?mode=teaching`)}
+      onBulkAdd={() => {
+        openTeachingTool(
+          `/vocab/bulk?userBookId=${encodeURIComponent(row.id)}&mode=teaching&from=book-hub`
+        );
+      }}
+      onFollowAlongLesson={() => {
+        openTeachingTool(`/books/${encodeURIComponent(row.id)}/lesson`);
+      }}
+      onCuriosityRead={() => openTeachingTool(`/books/${row.id}/lesson?view=curiosity`)}
+      onStoryNotes={() => openTeachingTool(`/books/${row.id}/lesson?view=journal`)}
+      onTeacherSnapshot={() => {
+        openTeachingTool(`/books/${row.id}/teacher-snapshot`);
+      }}
+      onStudentFlashcards={(studentUserBookId) => {
+        openTeachingTool(`/books/${encodeURIComponent(studentUserBookId)}/study`);
+      }}
+      onStudentVocabularyList={(studentUserBookId) => {
+        openTeachingTool(`/books/${encodeURIComponent(studentUserBookId)}/words`);
+      }}
+    />
+  );
+
   const showBookHubStartButton = !started && realReadingSessions.length === 0;
   const showUpperProgressSummary = isJapaneseLearningBook(book.language_code ?? null);
   return (
@@ -5777,34 +5818,7 @@ export default function BookHubPage() {
 
             {bookHubMode === "teaching" ? (
               <div className="mt-6 space-y-4">
-                <BookHubTeachingTools
-                  onReadingExperiences={(personId) => {
-                    router.push(`/teacher/reading-experiences/${row.book_id}${personId ? `?person=${encodeURIComponent(personId)}` : ""}`);
-                  }}
-                  userBookId={row.id}
-                  canUseBulkAdd={!isEnglishBook && canUseBulkAdd}
-                  canUseStoryNotes
-                  onMyVocabulary={() => router.push(`/books/${row.id}/words?mode=teaching`)}
-                  onBulkAdd={() => {
-                    router.push(
-                      `/vocab/bulk?userBookId=${encodeURIComponent(row.id)}&mode=teaching&from=book-hub`
-                    );
-                  }}
-                  onFollowAlongLesson={() => {
-                    router.push(`/books/${encodeURIComponent(row.id)}/lesson`);
-                  }}
-                  onCuriosityRead={() => router.push(`/books/${row.id}/lesson?view=curiosity`)}
-                  onStoryNotes={() => router.push(`/books/${row.id}/lesson?view=journal`)}
-                  onTeacherSnapshot={() => {
-                    router.push(`/books/${row.id}/teacher-snapshot`);
-                  }}
-                  onStudentFlashcards={(studentUserBookId) => {
-                    router.push(`/books/${encodeURIComponent(studentUserBookId)}/study`);
-                  }}
-                  onStudentVocabularyList={(studentUserBookId) => {
-                    router.push(`/books/${encodeURIComponent(studentUserBookId)}/words`);
-                  }}
-                />
+                {teachingTools}
                 {managementActions}
               </div>
             ) : (
@@ -5917,6 +5931,8 @@ export default function BookHubPage() {
                   router.push(`/books/${row.id}/stats`);
                 }}
               />
+
+              {showTeachingToolsInReaderHub ? teachingTools : null}
 
               {canShowReadingReflection && (!isTrialLearningAccess || canCompleteReadingReflection) ? (
                 <section

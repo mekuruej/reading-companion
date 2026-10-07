@@ -148,7 +148,6 @@ export default function BookHubTeachingTools({
   userBookId,
   canUseBulkAdd,
   canUseStoryNotes,
-  onMyVocabulary,
   onBulkAdd,
   onFollowAlongLesson,
   onStoryNotes,
@@ -434,11 +433,13 @@ export default function BookHubTeachingTools({
       >
         <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
           <TeachingToolButton {...SAVE_WORDS_COPY}
+            title="Save Lesson Words"
+            description="Save words for yourself or a student."
             className="bg-violet-50 hover:bg-violet-100" size="primary" onClick={onCuriosityRead} />
-          <TeachingToolButton title="Follow-Along" description="Teach from your prepared words with Student Quick Add beside you."
+          <TeachingToolButton title="Teach with Follow-Along" description="Teach from your prepared words with Student Quick Add beside you."
             className="bg-blue-50 hover:bg-blue-100" size="primary" onClick={onFollowAlongLesson} />
           <TeachingToolButton
-            title="Reading Experiences"
+            title="Teaching Assessment & Experiences"
             description="Your overall book assessment and reflections from reading with people."
             className="bg-blue-50 hover:bg-blue-100"
             size="primary"
@@ -447,17 +448,16 @@ export default function BookHubTeachingTools({
         </div>
 
         <div className="flex flex-wrap gap-2 pt-1">
-          {canUseStoryNotes ? <TeachingUtilityButton title="Teacher Journal" description="Your book knowledge and private teaching prep." onClick={onStoryNotes} /> : null}
-          <TeachingUtilityButton title="My Vocabulary List" description="Review and correct your saved words for this book." onClick={onMyVocabulary} />
+          {canUseStoryNotes ? <TeachingUtilityButton title="Teaching Notes & Prep" description="Your book knowledge and private teaching prep." onClick={onStoryNotes} /> : null}
           {canUseBulkAdd ? (
             <TeachingUtilityButton
-              title="Bulk Add"
+              title="Bulk Add Lesson Words"
               description="Add several lesson words at once."
               onClick={onBulkAdd}
             />
           ) : null}
           <TeachingUtilityButton
-            title="Teacher Snapshot"
+            title="Teaching Overview"
             description="Review teaching fit and reader signals for this book."
             onClick={onTeacherSnapshot}
           />
