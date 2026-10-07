@@ -71,13 +71,18 @@ test('Library controls retain search, personal filtering, views and sorts withou
 
 const source = fs.readFileSync(base + 'page.tsx', 'utf8');
 const ast = ts.createSourceFile('page.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-let fetchSource;
-function visit(node) {
-  if (ts.isFunctionDeclaration(node) && node.name?.text === 'fetchBooks') fetchSource = node.getText(ast);
-  ts.forEachChild(node, visit);
+function getCallbackSource(name) {
+  let callbackSource;
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === name && node.initializer && ts.isCallExpression(node.initializer)) {
+      callbackSource = node.initializer.arguments[0].getText(ast);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(ast);
+  return callbackSource;
 }
-visit(ast);
-const fetchCode = ts.transpileModule(fetchSource, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
+const fetchCode = ts.transpileModule(getCallbackSource('fetchBooks'), { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText.trim().replace(/;$/, '');
 async function fetchScenario({ teacher = true, target = 'me', fail = false } = {}) {
   const queries = [], statsIds = [];
   let rows;
@@ -99,13 +104,14 @@ async function fetchScenario({ teacher = true, target = 'me', fail = false } = {
           not(...args) { record.filters.push(args); return this; }, order() { return this; }, then(resolve) { return Promise.resolve(result).then(resolve); } };
       },
     },
-    isTeacher: teacher, hasTeachingLibraryAccess: teacher, meId: 'me', isSuperTeacher: false, students: [],
+    isTeacher: teacher, hasTeachingLibraryAccess: teacher, meId: 'me', fetchBooksRequestIdRef: { current: 1 },
     setLibraryBooksError() {}, setRows(value) { rows = value; }, setLibraryBooksLoading() {}, logSbError() {},
     resolvePersonalTrackingStatus, getLibraryRelationshipBadge: badge, effectiveProgressMethod: () => null,
-    loadReadingStatsForBooks: async ids => statsIds.push(...ids), loadKanjiEnrichmentAlerts: async () => {}, setKanjiEnrichmentAlerts() {},
+    loadReadingStatsForBooks: async (ids, _progress, isCurrentRequest) => { if (isCurrentRequest()) statsIds.push(...ids); },
     console: { error() {} },
   };
-  await new Function(...Object.keys(env), fetchCode + ';return fetchBooks;')(...Object.values(env))(target);
+  const fetchBooks = new Function(...Object.keys(env), `return (${fetchCode});`)(...Object.values(env));
+  await fetchBooks(target, 'me', 1);
   return { rows, queries, statsIds };
 }
 
@@ -131,17 +137,63 @@ test('target-user scope and failure do not fabricate Personal Only relationships
   assert.equal(reader.rows[0].relationshipBadge, null);
 });
 
+test('Library fetch ignores a stale teacher-metadata response after a newer user load', async () => {
+  const deferred = () => {
+    let resolve;
+    const promise = new Promise(done => { resolve = done; });
+    return { promise, resolve };
+  };
+  const userBookRequests = [], teacherBookRequests = [];
+  let rows;
+  const requestRef = { current: 1 };
+  const env = {
+    supabase: {
+      from(table) {
+        const request = deferred();
+        (table === 'user_books' ? userBookRequests : teacherBookRequests).push(request);
+        return { select() { return this; }, eq() { return this; }, not() { return this; }, order() { return this; }, then(resolve, reject) { return request.promise.then(resolve, reject); } };
+      },
+    },
+    isTeacher: true, hasTeachingLibraryAccess: true, meId: 'me', fetchBooksRequestIdRef: requestRef,
+    setLibraryBooksError() {}, setRows(value) { rows = value; }, setLibraryBooksLoading() {}, logSbError() {},
+    resolvePersonalTrackingStatus, getLibraryRelationshipBadge: badge, effectiveProgressMethod: () => null,
+    loadReadingStatsForBooks: async (ids, _progress, isCurrentRequest) => { if (isCurrentRequest()) return; },
+    console: { error() {} },
+  };
+  const fetchBooks = new Function(...Object.keys(env), `return (${fetchCode});`)(...Object.values(env));
+  const staleRequest = fetchBooks('me', 'me', 1);
+  userBookRequests[0].resolve({ data: [{ id: 'old', personal_tracking_status: 'reading', books: {} }], error: null });
+  await new Promise(setImmediate);
+  assert.equal(teacherBookRequests.length, 1);
+
+  requestRef.current = 2;
+  const currentRequest = fetchBooks('student', 'me', 2);
+  userBookRequests[1].resolve({ data: [{ id: 'current', personal_tracking_status: 'reading', books: {} }], error: null });
+  await new Promise(setImmediate);
+  assert.equal(rows[0].id, 'current');
+
+  teacherBookRequests[0].resolve({ data: [{ user_book_id: 'old', teaching_status: 'not_for_teaching' }], error: null });
+  await Promise.all([staleRequest, currentRequest]);
+  assert.equal(rows[0].id, 'current');
+  assert.match(source, /if \(requestId === fetchBooksRequestIdRef\.current\) \{\s*setLibraryBooksLoading\(false\)/);
+  assert.match(source, /if \(requestId === fetchBooksRequestIdRef\.current\) \{\s*fetchBooksRequestIdRef\.current \+= 1/);
+  assert.match(source, /\}, \[isTeacher, hasTeachingLibraryAccess, meId, loadReadingStatsForBooks, logSbError\]\);/);
+  assert.match(source, /\}, \[viewingUserId, meId, fetchBooks\]\);/);
+});
+
 
 const { sortLibraryItems } = load(base + 'helpers.ts');
-test('six sort choices retain personal rating/difficulty ordering with missing values last', () => {
+test('Easiest First sorts Japanese books only and keeps missing difficulty last', () => {
   const items = [
-    { id: 'missing', books: { title: 'C' }, rating_overall: null, rating_difficulty: null },
-    { id: 'hard', books: { title: 'B' }, rating_overall: 5, rating_difficulty: 5 },
-    { id: 'easy', books: { title: 'A' }, rating_overall: 2, rating_difficulty: 1 },
-    { id: 'unset', books: { title: 'D' } },
+    { id: 'missing', books: { title: 'C', language_code: 'ja' }, rating_overall: null, rating_difficulty: null },
+    { id: 'hard', books: { title: 'B', language_code: 'jpn' }, rating_overall: 5, rating_difficulty: 5 },
+    { id: 'easy', books: { title: 'A', language_code: 'ja' }, rating_overall: 2, rating_difficulty: 1 },
+    { id: 'english-easy', books: { title: 'Easy English', language_code: 'en' }, rating_overall: 4, rating_difficulty: 1 },
+    { id: 'unset', books: { title: 'D', language_code: 'ja' } },
   ];
   assert.deepEqual(sortLibraryItems(items, 'difficulty_low', {}).map(row => row.id), ['easy', 'hard', 'missing', 'unset']);
-  assert.deepEqual(sortLibraryItems(items, 'rating_high', {}).map(row => row.id), ['hard', 'easy', 'missing', 'unset']);
+  assert.deepEqual(sortLibraryItems(items, 'rating_high', {}).map(row => row.id), ['hard', 'english-easy', 'easy', 'missing', 'unset']);
+  assert.deepEqual(sortLibraryItems(items, 'title', {}).map(row => row.id), ['easy', 'hard', 'missing', 'unset', 'english-easy']);
   assert.equal(items[0].id, 'missing');
   const Component = load(base + 'components/LibraryViewControls.tsx').default;
   const html = renderToStaticMarkup(createElement(Component, { searchQuery: '', onSearchQueryChange() {}, viewMode: 'cover', bookTypeFilter: 'all', statusFilter: 'all', sortMode: 'status', onViewModeChange() {}, onBookTypeFilterChange() {}, onStatusFilterChange() {}, onSortModeChange() {} }));
@@ -159,43 +211,66 @@ test('recent sorts and Book Status retain their existing ordering', () => {
   assert.equal(sortLibraryItems(items, 'last_engaged', { reading: { lastEngagedAt: '2026-04-01' }, finished: { lastEngagedAt: '2026-03-01' } })[0].id, 'reading');
 });
 
-test('Library loader keeps page, Kindle and audio progress and recent engagement without pace data', async () => {
-  let loaderSource;
-  function findLoader(node) {
-    if (ts.isFunctionDeclaration(node) && node.name?.text === 'loadReadingStatsForBooks') loaderSource = node.getText(ast);
-    ts.forEachChild(node, findLoader);
-  }
-  findLoader(ast);
-  const code = ts.transpileModule(loaderSource, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
+test('Library loader groups sessions by book and preserves page, legacy, Kindle, audio and recent-engagement results', async () => {
+  const loaderSource = getCallbackSource('loadReadingStatsForBooks');
+  const code = ts.transpileModule(loaderSource, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText.trim().replace(/;$/, '');
   const sessions = [
     { user_book_id: 'page', start_page: 1, end_page: 30, tracking_unit: 'page', end_position: 30, read_on: '2026-01-01' },
     { user_book_id: 'page', start_page: 31, end_page: 50, tracking_unit: 'page', end_position: 50, read_on: '2026-02-01' },
+    { user_book_id: 'legacy-page', start_page: 1, end_page: 10, read_on: '2026-02-03' },
     { user_book_id: 'kindle', tracking_unit: 'kindle_location', end_position: 250, read_on: '2026-02-02' },
-    { user_book_id: 'audio', tracking_unit: 'audiobook_time', end_position: 90, read_on: '2026-02-01' },
-    { user_book_id: 'audio', tracking_unit: 'audiobook_time', end_position: 60, read_on: '2026-02-02' },
+    { id: '1', created_at: '2026-02-01T10:00:00Z', user_book_id: 'audio', tracking_unit: 'audiobook_time', end_position: 90, read_on: '2026-02-01' },
+    { id: '2', created_at: '2026-02-02T10:00:00Z', user_book_id: 'audio', tracking_unit: 'audiobook_time', end_position: 60, read_on: '2026-02-02' },
   ];
-  const progressByBook = { page: { method: 'page', totals: { page_count: 100 } }, kindle: { method: 'kindle_location', totals: { kindle_location_count: 1000 } }, audio: { method: 'audiobook_time', totals: { audiobook_duration_minutes: 120 } } };
+  const progressByBook = { page: { method: 'page', totals: { page_count: 100 } }, 'legacy-page': { method: 'page', totals: { page_count: 100 } }, kindle: { method: 'kindle_location', totals: { kindle_location_count: 1000 } }, audio: { method: 'audiobook_time', totals: { audiobook_duration_minutes: 120 } } };
   let result;
   const queriedTables = [];
-  const { progressSummary } = load('lib/books/readingProgress.ts');
+  const selectedFields = [];
+  const progressInputs = [];
+  const { progressSummary: actualProgressSummary } = load('lib/books/readingProgress.ts');
+  const progressSummary = (bookSessions, ...args) => {
+    progressInputs.push(bookSessions.map(session => session.user_book_id));
+    return actualProgressSummary(bookSessions, ...args);
+  };
   const supabase = { from(table) { queriedTables.push(table); return {
     select(fields) {
-      if (table === 'user_book_reading_sessions') assert.ok(!fields.includes('minutes_read'));
+      if (table === 'user_book_reading_sessions') selectedFields.push(fields);
       return this;
     },
     in: async () => ({ data: table === 'user_book_reading_sessions' ? sessions : [] }),
   }; } };
-  const loader = new Function('supabase', 'progressSummary', 'setReadingStatsByUserBookId', code + ';return loadReadingStatsForBooks;')(supabase, progressSummary, value => { result = value; });
-  await loader(['page', 'kindle', 'audio'], progressByBook);
+  const loader = new Function('supabase', 'progressSummary', 'setReadingStatsByUserBookId', `return (${code});`)(supabase, progressSummary, value => { result = value; });
+  await loader(['page', 'legacy-page', 'kindle', 'audio'], progressByBook, () => true);
   assert.equal(result.page.progressPercent, 50);
   assert.equal(result.page.furthestPage, 50);
   assert.equal(result.page.lastEngagedAt, '2026-02-01');
+  assert.equal(result['legacy-page'].progressPercent, 10); // Legacy page columns remain a fallback.
+  assert.equal(result['legacy-page'].furthestPage, 10);
+  assert.equal(result['legacy-page'].lastEngagedAt, '2026-02-03');
   assert.equal(result.kindle.progressPercent, 25);
   assert.equal(result.audio.progressPercent, 50); // Latest audio position, including rewind.
   assert.equal(result.audio.lastEngagedAt, '2026-02-02');
   assert.deepEqual(queriedTables, ['user_book_reading_sessions']);
+  assert.equal(selectedFields.length, 1);
+  assert.ok(!selectedFields[0].includes('progress_total'));
+  assert.ok(selectedFields[0].includes('created_at') && selectedFields[0].includes('id'));
+  assert.ok(selectedFields[0].includes('session_mode'));
+  assert.deepEqual(progressInputs, [['page', 'page'], ['legacy-page'], ['kindle'], ['audio', 'audio']]);
+  assert.doesNotMatch(loaderSource, /\(data \?\? \[\]\)\.filter\(s\s*=>\s*s\.user_book_id\s*===\s*userBookId\)/);
   assert.ok(Object.values(result).every(stats => !('averageMinutesPerPage' in stats)));
   assert.ok(Object.values(result).every(stats => !('wordsLookedUp' in stats)));
+
+  let active = true;
+  let staleStats;
+  let resolveSessions;
+  const waitingForSessions = new Promise(resolve => { resolveSessions = resolve; });
+  const staleSupabase = { from() { return { select() { return this; }, in: () => waitingForSessions }; } };
+  const staleLoader = new Function('supabase', 'progressSummary', 'setReadingStatsByUserBookId', `return (${code});`)(staleSupabase, actualProgressSummary, value => { staleStats = value; });
+  const staleLoad = staleLoader(['page'], progressByBook, () => active);
+  active = false;
+  resolveSessions({ data: sessions, error: null });
+  await staleLoad;
+  assert.equal(staleStats, undefined);
 });
 
 test('Ability Check reminder waits for Library render and bounds refresh/query work', () => {

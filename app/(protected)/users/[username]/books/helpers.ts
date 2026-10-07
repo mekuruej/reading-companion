@@ -176,6 +176,7 @@ export type LibraryReadingStats = {
 
 type SortableLibraryBook = {
   title: string;
+  language_code?: string | null;
 };
 
 type SortableLibraryItem = {
@@ -227,7 +228,9 @@ export function sortLibraryItems<T extends SortableLibraryItem>(
   sortMode: LibrarySortMode,
   readingStatsByUserBookId: Record<string, LibraryReadingStats>
 ) {
-  const copy = [...items];
+  const copy = sortMode === "difficulty_low"
+    ? items.filter((item) => ["ja", "jpn"].includes(item.books?.language_code?.trim().toLowerCase() ?? ""))
+    : [...items];
 
   copy.sort((a, b) => {
     const aBook = a.books;

@@ -180,6 +180,7 @@ export default function BooksPage() {
   >({});
   const [libraryBooksLoading, setLibraryBooksLoading] = useState(true);
   const [libraryBooksError, setLibraryBooksError] = useState<string | null>(null);
+  const fetchBooksRequestIdRef = useRef(0);
 
   const [learningTasks, setLearningTasks] = useState<LearningTaskRow[]>([]);
   const [learningTasksLoading, setLearningTasksLoading] = useState(false);
@@ -227,7 +228,10 @@ export default function BooksPage() {
     });
   }, [rows, searchQuery, bookTypeFilter, statusFilter]);
 
-  const validRows = filteredRows.filter((r) => !!r.books && !r.is_teacher_prep);
+  const validRows = useMemo(
+    () => filteredRows.filter((r) => !!r.books && !r.is_teacher_prep),
+    [filteredRows]
+  );
   const usableLibraryBookCount = rows.filter((r) => !!r.books && !r.is_teacher_prep).length;
   const hasLibraryBooks = usableLibraryBookCount > 0;
 
@@ -567,11 +571,108 @@ export default function BooksPage() {
     }
   }
 
-  function logSbError(prefix: string, err: any) {
+  const logSbError = useCallback((prefix: string, err: any) => {
     console.error(prefix, err?.message, err?.details, err?.hint, err?.code, err);
-  }
+  }, []);
 
-  async function fetchBooks(userIdToView: string, callerUserId: string) {
+  const loadReadingStatsForBooks = useCallback(async (
+    userBookIds: string[],
+    progressByBook: Record<string, {method: ProgressTrackingMethod | null; totals: ProgressTotals}>,
+    isCurrentRequest: () => boolean
+  ) => {
+    if (!isCurrentRequest()) return;
+
+    if (userBookIds.length === 0) {
+      setReadingStatsByUserBookId({});
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("user_book_reading_sessions")
+      .select("id, created_at, user_book_id, tracking_unit, start_position, end_position, start_page, end_page, read_on, session_mode")
+      .in("user_book_id", userBookIds);
+
+    if (!isCurrentRequest()) return;
+
+    if (error) {
+      console.error("Error loading reading stats for library:", error);
+      setReadingStatsByUserBookId({});
+      return;
+    }
+
+    const sessionRows = data ?? [];
+    const grouped: Record<
+      string,
+      {
+        furthestPage: number;
+        lastEngagedAt: string | null;
+        sessions: typeof sessionRows;
+      }
+    > = {};
+
+    for (const row of sessionRows) {
+      const userBookId = row.user_book_id as string;
+      const endPage = row.end_page == null ? NaN : Number((row as any).end_page);
+      const readOn = (row as any).read_on as string | null;
+      if (!grouped[userBookId]) {
+        grouped[userBookId] = {
+          furthestPage: 0,
+          lastEngagedAt: null,
+          sessions: [],
+        };
+      }
+
+      grouped[userBookId].sessions.push(row);
+
+      if (readOn) {
+        if (
+          !grouped[userBookId].lastEngagedAt ||
+          readOn > grouped[userBookId].lastEngagedAt
+        ) {
+          grouped[userBookId].lastEngagedAt = readOn;
+        }
+      }
+
+      if (Number.isFinite(endPage)) {
+        grouped[userBookId].furthestPage = Math.max(grouped[userBookId].furthestPage, endPage);
+      }
+
+    }
+
+    const stats: Record<string, ReadingSessionStats> = {};
+
+    for (const userBookId of userBookIds) {
+      const g = grouped[userBookId];
+
+      if (!g) {
+        stats[userBookId] = {
+          progressPercent: null,
+          furthestPage: null,
+          lastEngagedAt: null,
+        };
+        continue;
+      }
+
+      const progressPercent = progressSummary(g.sessions, progressByBook[userBookId]?.method ?? null, progressByBook[userBookId]?.totals ?? {}).percent;
+
+      stats[userBookId] = {
+        progressPercent,
+        furthestPage: g.furthestPage,
+        lastEngagedAt: g.lastEngagedAt ?? null,
+      };
+    }
+
+    if (isCurrentRequest()) setReadingStatsByUserBookId(stats);
+  }, []);
+
+  const fetchBooks = useCallback(async (
+    userIdToView: string,
+    callerUserId: string,
+    requestId: number
+  ) => {
+    const isCurrentRequest = () => requestId === fetchBooksRequestIdRef.current;
+    if (!isCurrentRequest()) return;
+
     if (!callerUserId) {
       setLibraryBooksError("Please sign in to view your Library.");
       setRows([]);
@@ -618,6 +719,8 @@ export default function BooksPage() {
       .eq("user_id", targetUserId)
       .order("created_at", { ascending: false });
 
+    if (!isCurrentRequest()) return;
+
     if (error) {
       logSbError("Error fetching user_books:", error);
       setLibraryBooksError(error.message ?? "Could not load Library books.");
@@ -638,6 +741,8 @@ export default function BooksPage() {
         .eq("teacher_id", meId)
         .not("user_book_id", "is", null);
 
+      if (!isCurrentRequest()) return;
+
       if (teacherBookError) {
         console.error("Error loading teaching book links:", teacherBookError);
       } else {
@@ -657,6 +762,8 @@ export default function BooksPage() {
       ),
     }));
 
+    if (!isCurrentRequest()) return;
+
     setLibraryBooksError(null);
     setRows(rowsWithTeachingBadges);
     // Show the books immediately; statistics and alerts can finish afterward.
@@ -665,88 +772,12 @@ export default function BooksPage() {
     const userBookIds = rowsWithTeachingBadges
       .filter((r: any) => resolvePersonalTrackingStatus(r) !== "not_tracking")
       .map((r: any) => r.id);
-    await loadReadingStatsForBooks(userBookIds, Object.fromEntries(rowsWithTeachingBadges.map(r => [r.id, { method: effectiveProgressMethod(r.progress_tracking_method, r.books ?? {}), totals: r.books ?? {} }])));
-  }
-
-  async function loadReadingStatsForBooks(
-    userBookIds: string[],
-    progressByBook: Record<string, {method: ProgressTrackingMethod | null; totals: ProgressTotals}>
-  ) {
-    if (userBookIds.length === 0) {
-      setReadingStatsByUserBookId({});
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("user_book_reading_sessions")
-      .select("id, created_at, user_book_id, tracking_unit, start_position, end_position, progress_total, start_page, end_page, read_on, session_mode")
-      .in("user_book_id", userBookIds);
-
-    if (error) {
-      console.error("Error loading reading stats for library:", error);
-      setReadingStatsByUserBookId({});
-      return;
-    }
-
-    const grouped: Record<
-      string,
-      {
-        furthestPage: number;
-        lastEngagedAt: string | null;
-      }
-    > = {};
-
-    for (const row of data ?? []) {
-      const userBookId = row.user_book_id as string;
-      const endPage = row.end_page == null ? NaN : Number((row as any).end_page);
-      const readOn = (row as any).read_on as string | null;
-      if (!grouped[userBookId]) {
-        grouped[userBookId] = {
-          furthestPage: 0,
-          lastEngagedAt: null,
-        };
-      }
-
-      if (readOn) {
-        if (
-          !grouped[userBookId].lastEngagedAt ||
-          readOn > grouped[userBookId].lastEngagedAt
-        ) {
-          grouped[userBookId].lastEngagedAt = readOn;
-        }
-      }
-
-      if (Number.isFinite(endPage)) {
-        grouped[userBookId].furthestPage = Math.max(grouped[userBookId].furthestPage, endPage);
-      }
-
-    }
-
-    const stats: Record<string, ReadingSessionStats> = {};
-
-    for (const userBookId of userBookIds) {
-      const g = grouped[userBookId];
-
-      if (!g) {
-        stats[userBookId] = {
-          progressPercent: null,
-          furthestPage: null,
-          lastEngagedAt: null,
-        };
-        continue;
-      }
-
-      const progressPercent = progressSummary((data ?? []).filter(s => s.user_book_id === userBookId), progressByBook[userBookId]?.method ?? null, progressByBook[userBookId]?.totals ?? {}).percent;
-
-      stats[userBookId] = {
-        progressPercent,
-        furthestPage: g.furthestPage,
-        lastEngagedAt: g.lastEngagedAt ?? null,
-      };
-    }
-
-    setReadingStatsByUserBookId(stats);
-  }
+    await loadReadingStatsForBooks(
+      userBookIds,
+      Object.fromEntries(rowsWithTeachingBadges.map(r => [r.id, { method: effectiveProgressMethod(r.progress_tracking_method, r.books ?? {}), totals: r.books ?? {} }])),
+      isCurrentRequest
+    );
+  }, [isTeacher, hasTeachingLibraryAccess, meId, loadReadingStatsForBooks, logSbError]);
 
   useEffect(() => {
     let cancelled = false;
@@ -851,30 +882,33 @@ export default function BooksPage() {
     return () => {
       cancelled = true;
     };
-  }, [routeUsername]);
+  }, [routeUsername, logSbError]);
 
   useEffect(() => {
     if (!viewingUserId || !meId) {
+      fetchBooksRequestIdRef.current += 1;
       setLibraryBooksLoading(true);
       return;
     }
 
-    let cancelled = false;
+    const requestId = ++fetchBooksRequestIdRef.current;
 
     setRows([]);
     setLibraryBooksError(null);
     setLibraryBooksLoading(true);
 
-    fetchBooks(viewingUserId, meId).finally(() => {
-      if (!cancelled) {
+    void fetchBooks(viewingUserId, meId, requestId).finally(() => {
+      if (requestId === fetchBooksRequestIdRef.current) {
         setLibraryBooksLoading(false);
       }
     });
 
     return () => {
-      cancelled = true;
+      if (requestId === fetchBooksRequestIdRef.current) {
+        fetchBooksRequestIdRef.current += 1;
+      }
     };
-  }, [viewingUserId, meId, myRole, isSuperTeacher]);
+  }, [viewingUserId, meId, fetchBooks]);
 
   useEffect(() => {
     if (!viewingUserId || !meId || !isViewingOwnLibrary) {
