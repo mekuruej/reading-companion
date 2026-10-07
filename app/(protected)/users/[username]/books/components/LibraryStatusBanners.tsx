@@ -16,7 +16,6 @@ export function AbilityCheckReminderBanner({
   return (
     <LibraryReminderBanner
       tone="emerald"
-      spacious
       title={isReady ? "Your Ability Check is ready!" : "Ability Check is resting today"}
       actions={
         <>
@@ -40,25 +39,11 @@ export function AbilityCheckReminderBanner({
         </>
       }
     >
-      {isReady ? (
-        <div className="mt-1 space-y-1">
-          <p className="text-xl font-black leading-tight text-emerald-950">
-            Time to test your reading and meaning knowledge.
-          </p>
-          <p className="text-sm leading-6 text-emerald-900">
-            These words are nearing mastery and ready to check.
-          </p>
-        </div>
-      ) : (
-        <p className="mt-2 text-base leading-7 text-emerald-900">
-          Ability Check opens when at least {minDueCards} cards are due. You
-          have{" "}
-          <span className="text-xl font-black text-emerald-950">
-            {abilityCheckReminderCount}
-          </span>{" "}
-          due right now.
-        </p>
-      )}
+      <p className="mt-1 text-sm leading-5 text-emerald-900">
+        {isReady
+          ? `You have ${abilityCheckReminderCount} due cards ready to check.`
+          : `You have ${abilityCheckReminderCount} of ${minDueCards} cards due.`}
+      </p>
     </LibraryReminderBanner>
   );
 }

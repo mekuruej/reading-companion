@@ -1,30 +1,41 @@
 import type { ReactNode } from "react";
+import { useState } from "react";
 
 type LearningTasksPanelProps = {
-  title: string;
+  taskCount: number;
   children: ReactNode;
 };
 
 export default function LearningTasksPanel({
-  title,
+  taskCount,
   children,
 }: LearningTasksPanelProps) {
-  return (
-    <div className="mb-5 rounded-3xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="text-sm font-semibold text-emerald-950">
-            {title}
-          </div>
+  const [expanded, setExpanded] = useState(false);
 
-          <p className="mt-1 text-sm leading-6 text-slate-600">
-            These are small study directions for your next reading or review
-            session.
-          </p>
-        </div>
+  return (
+    <section className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-emerald-950">
+          You have {taskCount} assigned {taskCount === 1 ? "task" : "tasks"}
+        </p>
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+          className="text-xs font-semibold text-emerald-800 underline decoration-emerald-300 underline-offset-4"
+        >
+          {expanded ? "Hide tasks" : "Show tasks"}
+        </button>
       </div>
 
-      <div className="mt-3 grid gap-2">{children}</div>
-    </div>
+      {expanded ? (
+        <>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            These are small study directions for your next reading or review session.
+          </p>
+          <div className="mt-3 grid gap-2">{children}</div>
+        </>
+      ) : null}
+    </section>
   );
 }

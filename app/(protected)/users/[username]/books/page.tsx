@@ -22,7 +22,6 @@ import LibraryEmptyState from "./components/LibraryEmptyState";
 import FloatingAddBookButton from "./components/FloatingAddBookButton";
 import LearningTaskCard from "./components/LearningTaskCard";
 import LearningTasksPanel from "./components/LearningTasksPanel";
-import MobileVersionNotice from "./components/MobileVersionNotice";
 import UserBar from "./components/UserBar";
 import {
   AbilityCheckReminderBanner,
@@ -229,7 +228,8 @@ export default function BooksPage() {
   }, [rows, searchQuery, bookTypeFilter, statusFilter]);
 
   const validRows = filteredRows.filter((r) => !!r.books && !r.is_teacher_prep);
-  const hasLibraryBooks = rows.some((r) => !!r.books && !r.is_teacher_prep);
+  const usableLibraryBookCount = rows.filter((r) => !!r.books && !r.is_teacher_prep).length;
+  const hasLibraryBooks = usableLibraryBookCount > 0;
 
   const [viewMode, setViewMode] = useState<"cover" | "list">("cover");
   const [sortMode, setSortMode] = useState<LibrarySortMode>("status");
@@ -255,10 +255,6 @@ export default function BooksPage() {
   const showEmptyLibraryJapaneseLearningDiscovery =
     isViewingOwnLibrary && !hasFullLearningAccess && !trialBanner && !isTeacher;
   const libraryOwnerLabel = isViewingStudentLibrary ? `${viewingLabel}’s` : "My";
-
-  const libraryContextLabel = isViewingStudentLibrary
-    ? `Student Library · ${viewingLabel}`
-    : null;
 
   const addBookHref =
     viewingUserId && meId && viewingUserId !== meId
@@ -497,12 +493,12 @@ export default function BooksPage() {
     return request.promise;
   }, [cancelAbilityCheckReminderLoad]);
 
-  async function loadLearningTasks(userId: string, options: { createdBy?: string | null } = {}) {
+  async function loadLearningTasks(userId: string) {
     setLearningTasksLoading(true);
     setLearningTasksError(null);
 
     try {
-      let query = supabase
+      const query = supabase
         .from("learning_tasks")
         .select(
           `
@@ -526,10 +522,6 @@ export default function BooksPage() {
         .order("due_on", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: false })
         .limit(5);
-
-      if (options.createdBy) {
-        query = query.eq("created_by", options.createdBy);
-      }
 
       const { data, error } = await query.returns<LearningTaskRow[]>();
 
@@ -885,19 +877,15 @@ export default function BooksPage() {
   }, [viewingUserId, meId, myRole, isSuperTeacher]);
 
   useEffect(() => {
-    const canViewLearningTasks =
-      viewingUserId === meId || (isTeacher && viewingUserId !== meId);
-
-    if (!viewingUserId || !meId || !canViewLearningTasks) {
+    if (!viewingUserId || !meId || !isViewingOwnLibrary) {
       setLearningTasks([]);
       setLearningTasksError(null);
+      setLearningTasksLoading(false);
       return;
     }
 
-    loadLearningTasks(viewingUserId, {
-      createdBy: isViewingStudentLibrary ? meId : null,
-    });
-  }, [viewingUserId, meId, isTeacher]);
+    void loadLearningTasks(viewingUserId);
+  }, [viewingUserId, meId, isViewingOwnLibrary]);
 
   useEffect(() => {
     abilityCheckReminderLoadFunctionRef.current = loadAbilityCheckReminder;
@@ -1077,17 +1065,22 @@ export default function BooksPage() {
     !abilityCheckReminderLoading &&
     !abilityCheckReminderHidden;
   const showLearningTasks =
-    (viewingUserId === meId || isViewingStudentLibrary) &&
+    isViewingOwnLibrary &&
     !learningTasksLoading &&
     learningTasks.length > 0;
   const showLearningTasksError =
-    (viewingUserId === meId || isViewingStudentLibrary) &&
+    isViewingOwnLibrary &&
     !learningTasksLoading &&
     !!learningTasksError;
   const showLibraryBooksLoading = libraryBooksLoading;
   const showLibraryBooksError = !libraryBooksLoading && !!libraryBooksError;
   const showLibraryBookSections = !libraryBooksLoading && !libraryBooksError;
   const showLibraryEmptyState = showLibraryBookSections && !hasLibraryBooks;
+  const showLibraryGuide =
+    showLibraryBookSections &&
+    isViewingOwnLibrary &&
+    usableLibraryBookCount >= 1 &&
+    usableLibraryBookCount <= 2;
   const showLibraryNoMatches =
     showLibraryBookSections && hasLibraryBooks && validRows.length === 0;
 
@@ -1157,34 +1150,36 @@ export default function BooksPage() {
       <div className="mx-auto max-w-screen-xl">
         <LibraryHeader
           libraryOwnerLabel={libraryOwnerLabel}
-          libraryContextLabel={libraryContextLabel}
         >
-          <UserBar isTeacher={isTeacher} displayName={meDisplayName} variant="logoutOnly" />
+          <div className="flex flex-col items-end gap-2">
+            {isViewingStudentLibrary && meDisplayName ? (
+              <span className="text-xs text-slate-500">Logged in as {meDisplayName}</span>
+            ) : null}
+            <UserBar isTeacher={isTeacher} displayName={meDisplayName} variant="logoutOnly" />
+          </div>
         </LibraryHeader>
-
-        <MobileVersionNotice />
 
         {trialBanner ? (
           <section aria-label="Trial access" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-800">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-              <p>
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+              <div>
                 <span className="font-medium text-emerald-900">
-                  {trialBanner.daysRemaining == null
-                    ? "Your trial has less than 1 day left"
-                    : `Your trial has ${trialBanner.daysRemaining} ${trialBanner.daysRemaining === 1 ? "day" : "days"} left`}
+                  Japanese Learning Tools trial active
                 </span>
-                <span className="ml-2 text-xs">Ends {trialBanner.formattedDate}.</span>
-              </p>
-              <details className="text-xs">
-                <summary className="cursor-pointer rounded text-emerald-800 underline decoration-emerald-300 underline-offset-4 hover:text-emerald-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">
-                  After your trial
-                </summary>
-                <div className="mt-2 max-w-md leading-5">
-                  <p>Continue Japanese Learning for ¥500/month, including vocabulary, flashcards, Follow-Along, and reading tracking.</p>
-                  <p className="mt-1">Subscribe to Japanese Learning Tools and access will update after payment is confirmed.</p>
-                  <button type="button" onClick={() => router.push("/reading-access")} className="mt-2 font-medium text-emerald-900 underline underline-offset-4 hover:text-emerald-950">Explore Japanese Learning</button>
-                </div>
-              </details>
+                <p className="mt-1 text-xs">
+                  {trialBanner.daysRemaining == null
+                    ? "Less than 1 day remaining"
+                    : `${trialBanner.daysRemaining} ${trialBanner.daysRemaining === 1 ? "day" : "days"} remaining`}
+                  <span className="ml-2">Ends {trialBanner.formattedDate}.</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => router.push("/reading-access")}
+                className="font-medium text-emerald-900 underline underline-offset-4 hover:text-emerald-950"
+              >
+                Subscription &amp; Access
+              </button>
             </div>
           </section>
         ) : null}
@@ -1203,11 +1198,7 @@ export default function BooksPage() {
 
         {showLearningTasks ? (
           <LearningTasksPanel
-            title={
-              isViewingStudentLibrary
-                ? `${viewingLabel}’s learning tasks`
-                : "Learning tasks from your teacher"
-            }
+            taskCount={learningTasks.length}
           >
             {learningTasks.map((task) => {
               const bookTitle =
@@ -1258,38 +1249,29 @@ export default function BooksPage() {
           <LearningTasksErrorBanner message={learningTasksError} />
         ) : null}
 
-        <LibraryGuidePanel
-          hasFullAccess={hasFullLearningAccess || isTeacher}
-          onNavigate={(path) => {
-            if (path === "/books/add") {
-              router.push(addBookHref);
-              return;
-            }
-
-            router.push(path);
-          }}
-        />
-
-        <UserBar isTeacher={isTeacher} displayName={meDisplayName} variant="labelOnly" />
+        {showLibraryGuide ? (
+          <LibraryGuidePanel
+            hasFullAccess={hasFullLearningAccess || isTeacher}
+            onNavigate={(path) => router.push(path)}
+          />
+        ) : null}
 
         {null}
 
-        <LibraryViewControls
-          searchQuery={searchQuery}
-          onSearchQueryChange={setSearchQuery}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          bookTypeFilter={bookTypeFilter}
-          onBookTypeFilterChange={setBookTypeFilter}
-          statusFilter={statusFilter}
-          onStatusFilterChange={setStatusFilter}
-          sortMode={sortMode}
-          onSortModeChange={setSortMode}
-        />
-
-        <p className="mb-6 text-sm text-gray-600">
-          All reading/study tools live inside each book. Click a cover to open its Book Hub.
-        </p>
+        {showLibraryBookSections && hasLibraryBooks ? (
+          <LibraryViewControls
+            searchQuery={searchQuery}
+            onSearchQueryChange={setSearchQuery}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            bookTypeFilter={bookTypeFilter}
+            onBookTypeFilterChange={setBookTypeFilter}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            sortMode={sortMode}
+            onSortModeChange={setSortMode}
+          />
+        ) : null}
 
         {showLibraryBooksLoading ? <LibraryBooksLoadingState /> : null}
 
@@ -1380,23 +1362,19 @@ export default function BooksPage() {
             onLearnJapaneseLearning={() => router.push("/japanese-learning")}
           />
         ) : null}
-        {isTeacher ? (
-          <>
+        {!showLibraryEmptyState ? (
+          isTeacher ? (
             <FloatingAddBookButton onClick={() => router.push(addBookHref)} />
-          </>
-        ) : (
-          <>
-            {isViewingOwnLibrary ? (
-              <button
-                type="button"
-                onClick={() => router.push(addBookHref)}
-                className="fixed bottom-6 right-6 z-40 rounded-full bg-black px-5 py-3 text-sm font-medium text-white shadow-lg"
-              >
-                + Add a Book
-              </button>
-            ) : null}
-          </>
-        )}
+          ) : isViewingOwnLibrary ? (
+            <button
+              type="button"
+              onClick={() => router.push(addBookHref)}
+              className="fixed bottom-6 right-6 z-40 rounded-full bg-black px-5 py-3 text-sm font-medium text-white shadow-lg"
+            >
+              + Add a Book
+            </button>
+          ) : null
+        ) : null}
       </div>
     </main >
   );

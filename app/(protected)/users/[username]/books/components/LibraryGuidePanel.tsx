@@ -9,44 +9,14 @@ export default function LibraryGuidePanel({
   hasFullAccess,
 }: LibraryGuidePanelProps) {
   const renderReadingCompanionGuide = ({
-    includeAddBookInGrid,
     useShortDescriptions,
     showFinishedDnfNote,
   }: {
-    includeAddBookInGrid: boolean;
     useShortDescriptions: boolean;
     showFinishedDnfNote: boolean;
   }) => (
     <div className="mt-4 space-y-4">
-      {!includeAddBookInGrid ? (
-        <button
-          type="button"
-          onClick={() => onNavigate("/books/add")}
-          className="rounded-2xl border border-sky-100 bg-sky-50/70 px-3 py-2.5 text-left shadow-md shadow-slate-900/15 transition hover:-translate-y-0.5 hover:bg-sky-100 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
-        >
-          <div className="text-sm font-black text-slate-950">Add Book</div>
-          <p className="mt-1 text-xs leading-5 text-slate-600">
-            {useShortDescriptions
-              ? "Add books to your Library."
-              : "Add books you are reading or want to track."}
-          </p>
-        </button>
-      ) : null}
-
-      <div className={`grid gap-3 sm:grid-cols-2 ${includeAddBookInGrid ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
-        {includeAddBookInGrid ? (
-          <button
-            type="button"
-            onClick={() => onNavigate("/books/add")}
-            className="rounded-2xl border border-sky-100 bg-sky-50/70 px-3 py-2.5 text-left shadow-md shadow-slate-900/15 transition hover:-translate-y-0.5 hover:bg-sky-100 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
-          >
-            <div className="text-sm font-black text-slate-950">Add Book</div>
-            <p className="mt-1 text-xs leading-5 text-slate-600">
-              Add books to your Library.
-            </p>
-          </button>
-        ) : null}
-
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-2xl border border-slate-100 bg-slate-50/80 px-3 py-2.5">
           <div className="text-sm font-black text-slate-950">Open a Book Hub</div>
           <p className="mt-1 text-xs leading-5 text-slate-600">
@@ -151,7 +121,6 @@ export default function LibraryGuidePanel({
       </p>
 
       {renderReadingCompanionGuide({
-        includeAddBookInGrid: true,
         useShortDescriptions: true,
         showFinishedDnfNote: false,
       })}
@@ -160,7 +129,6 @@ export default function LibraryGuidePanel({
   );
 
   const freeAccessGuide = renderReadingCompanionGuide({
-    includeAddBookInGrid: false,
     useShortDescriptions: false,
     showFinishedDnfNote: true,
   });

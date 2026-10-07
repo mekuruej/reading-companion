@@ -5571,6 +5571,12 @@ export default function BookHubPage() {
     isJapaneseLearningBook(book.language_code ?? null) &&
     (isTeacherContext || isAdmin || isSuperTeacher) &&
     canUseWideTeachingMode;
+  const readerHubTeachingToolsEligible =
+    isOwnBookHub &&
+    isJapaneseLearningBook(book.language_code ?? null) &&
+    (isTeacherContext || isAdmin || isSuperTeacher) &&
+    isTeacherContext &&
+    !isAdmin;
   const requestedBookHubMode = searchParams.get("mode");
   const bookHubMode: BookHubMode = resolveBookHubMode({
     canUseTeachingMode: canUseBookHubTeachingMode,
@@ -5746,6 +5752,12 @@ export default function BookHubPage() {
             error={bookUseError || (!bookUseLoaded ? "Could not load book use. Refresh to try again." : null)}
             onChange={(use) => void saveBookUse(use)}
           />
+        ) : null}
+
+        {readerHubTeachingToolsEligible ? (
+          <p className="mb-4 rounded-xl border border-violet-100 bg-violet-50/60 px-4 py-3 text-sm text-violet-900 md:hidden">
+            Teaching Tools are available on larger screens.
+          </p>
         ) : null}
 
         {canUseBookHubTeachingMode && !alreadyTeachingOnly ? (
