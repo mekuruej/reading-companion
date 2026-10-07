@@ -36,7 +36,7 @@ Generated: Tue Aug 18 21:53:33 MDT 2026
   644  app/(protected)/community/profile/page.tsx
   636  app/(protected)/teacher/students/[studentId]/books/[userBookId]/workspace/page.tsx
   601  app/(protected)/community/stats/monthly/page.tsx
-  599  app/(protected)/teacher/library/[teacherBookId]/book-workspace/page.tsx
+   94  app/(protected)/teacher/library/[teacherBookId]/book-workspace/page.tsx
   587  app/(protected)/library-study/kana/page.tsx
   547  app/(protected)/teacher/assign/page.tsx
   540  app/(protected)/teacher/kanji/radicals/page.tsx

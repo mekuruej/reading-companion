@@ -140,7 +140,7 @@ export default function TeachingLessonPage() {
     return (
       <main className="min-h-screen bg-slate-100 px-4 py-8">
         <div className="mx-auto max-w-5xl rounded-2xl border border-stone-200 bg-white p-6 text-sm font-semibold text-stone-500 shadow-sm">
-          Loading Teacher Book Workspace...
+          Loading teaching lesson...
         </div>
       </main>
     );
@@ -154,7 +154,7 @@ export default function TeachingLessonPage() {
             &lt;- Back to Teaching Mode
           </Link>
           <section className="mt-4 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-            <h1 className="text-2xl font-black text-stone-950">Teacher Book Workspace</h1>
+            <h1 className="text-2xl font-black text-stone-950">Teaching Lesson</h1>
             <p className="mt-3 text-sm leading-6 text-stone-600">
               {message || "This teaching lesson could not be loaded."}
             </p>

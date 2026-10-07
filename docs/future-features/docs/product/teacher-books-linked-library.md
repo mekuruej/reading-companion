@@ -1,5 +1,9 @@
 # Teacher Books + My Mekuru Library
 
+> Historical planning note: this early plan is superseded. Owner book work now uses `/books/[userBookId]`; the former general-purpose Teacher Book Workspace is retired. Its old URL remains only as a compatibility redirect and a narrow cross-owner administrative assessment entry.
+
+## Original proposal (archived)
+
 ## Core rule
 
 - [x] Every Teacher Book has a linked `user_books` record.
