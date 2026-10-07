@@ -323,6 +323,17 @@ export default function Header() {
                   >
                     My Reading Profile
                   </Link>
+
+                  <Link
+                    href="/reading-access"
+                    className={`block rounded-xl px-3 py-2 text-sm leading-tight transition ${pathname === "/reading-access"
+                      ? "bg-stone-100 font-medium text-stone-900"
+                      : "text-stone-700 hover:bg-stone-50"
+                      }`}
+                    onClick={() => setShowLibraryMenu(false)}
+                  >
+                    Subscription &amp; Access
+                  </Link>
                 </div>
               ) : null}
             </div>
