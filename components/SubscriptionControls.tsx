@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabaseClient';
 
 type Status = {
   reason: string; canSubscribe: boolean; configured: boolean; hasAccess: boolean;
+  accessType: string; expiresAt: string | null;
   subscriptions: Array<{ id: string; status: string; cancelAtPeriodEnd: boolean; paidThrough: string | null; needsReview: boolean }>;
 };
 export default function SubscriptionControls() {
@@ -42,12 +43,23 @@ export default function SubscriptionControls() {
     finally { setBusy(false); }
   }
   const button = 'rounded-2xl bg-stone-900 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-stone-700 disabled:cursor-wait disabled:opacity-60';
+  const activeTrial = status?.reason === 'eligible' && status.hasAccess &&
+    status.accessType.trim().toLowerCase() === 'trial';
+  const trialEndDate = activeTrial && status?.expiresAt
+    ? new Date(status.expiresAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    : null;
   return <div className="mt-6 space-y-3" aria-live="polite">
     {signedOut ? <Link href="/login" className={`${button} inline-flex`}>Sign in to subscribe</Link> : null}
     {status?.reason === 'lessons' ? <p>Japanese Learning Tools are included with your lessons.</p> : null}
     {status?.reason === 'manual' ? <p>Your Japanese Learning Tools access is already arranged. No subscription is needed here.</p> : null}
     {status?.reason === 'staff' ? <p>Japanese Learning Tools are included with your staff access.</p> : null}
     {status?.reason === 'inactive' ? <p>Your account is inactive. Please contact MEKURU before subscribing.</p> : null}
+    {activeTrial ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
+      <p className="font-semibold">Japanese Learning Tools trial active</p>
+      {trialEndDate ? <p className="mt-1">Your trial ends {trialEndDate}.</p> : null}
+      <p className="mt-2">You have full access to the Japanese Learning Tools during your trial.</p>
+      {status?.canSubscribe ? <p className="mt-2 text-emerald-900">Want to keep access after your trial? Subscribe anytime.</p> : null}
+    </div> : null}
     {status?.canSubscribe ? <button type="button" disabled={busy} onClick={() => navigate('subscribe', {})} className={button}>
       Subscribe — ¥500/month
     </button> : null}
