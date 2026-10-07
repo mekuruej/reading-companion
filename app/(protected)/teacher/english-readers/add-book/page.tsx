@@ -390,12 +390,18 @@ export default function EnglishReaderAddBookPage() {
                     Back to English Readers
                   </Link>
 
+                  <Link
+                    href={`/books/${encodeURIComponent(saveResult.userBookId)}`}
+                    className="rounded-2xl bg-emerald-700 px-4 py-2 text-center text-sm font-black text-white shadow-sm transition hover:bg-emerald-800"
+                  >
+                    Open Book Hub
+                  </Link>
                   {saveResult.teacherBookId ? (
                     <Link
-                      href={`/teacher/library/${saveResult.teacherBookId}/book-workspace`}
-                      className="rounded-2xl bg-emerald-700 px-4 py-2 text-center text-sm font-black text-white shadow-sm transition hover:bg-emerald-800"
+                      href={`/teacher/library/${encodeURIComponent(saveResult.teacherBookId)}/book-workspace`}
+                      className="rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-center text-sm font-black text-emerald-900 transition hover:bg-emerald-100"
                     >
-                      Open Teacher Workspace
+                      Open English Teacher Tools
                     </Link>
                   ) : null}
                 </div>

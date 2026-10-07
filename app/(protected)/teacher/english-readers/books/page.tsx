@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { resolveTeacherBookHubUserBookId } from "@/lib/teacher/resolveTeacherBookHub";
 import EnglishReaderBookCard from "./components/EnglishReaderBookCard";
 import EnglishReaderBooksEmptyState from "./components/EnglishReaderBooksEmptyState";
 import EnglishReaderBooksHeader from "./components/EnglishReaderBooksHeader";
@@ -32,6 +33,7 @@ type TeacherBookRow = {
 
 type DisplayBook = {
   id: string;
+  userBookId: string | null;
   title: string;
   author: string | null;
   recommendedLevel: string | null;
@@ -86,6 +88,7 @@ function toDisplayBook(row: TeacherBookRow): DisplayBook | null {
 
   return {
     id: row.id,
+    userBookId: null,
     title: book.title?.trim() || "Untitled English book",
     author: book.author?.trim() || null,
     recommendedLevel: firstValue(row.user_books)?.recommended_level?.trim() || null,
@@ -159,13 +162,24 @@ export default function EnglishReaderBooksPage() {
         `
         )
         .eq("teacher_id", user.id)
-        .not("user_book_id", "is", null)
         .eq("books.language_code", "en")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
 
-      setBooks(((data ?? []) as TeacherBookRow[]).map(toDisplayBook).filter(Boolean) as DisplayBook[]);
+      const teacherBooks = ((data ?? []) as TeacherBookRow[])
+        .map(toDisplayBook)
+        .filter(Boolean) as DisplayBook[];
+      const resolvedBooks = await Promise.all(teacherBooks.map(async (book) => {
+        try {
+          const userBookId = await resolveTeacherBookHubUserBookId(supabase, book.id);
+          return { ...book, userBookId };
+        } catch (error) {
+          console.error("Could not resolve English Teacher Book Hub:", book.id, error);
+          return book;
+        }
+      }));
+      setBooks(resolvedBooks);
     } catch (error: any) {
       console.error("Error loading English Reader books:", error);
       setMessage(error?.message ?? "Could not load English Reader books.");
@@ -201,12 +215,13 @@ export default function EnglishReaderBooksPage() {
             {books.map((book) => (
               <EnglishReaderBookCard
                 key={book.id}
+                bookHubHref={book.userBookId ? `/books/${encodeURIComponent(book.userBookId)}` : null}
                 title={book.title}
                 author={book.author}
                 recommendedLevel={book.recommendedLevel}
                 isbn13={book.isbn13}
                 externalLink={book.externalLink}
-                workspaceHref={`/teacher/library/${book.id}/book-workspace`}
+                workspaceHref={`/teacher/library/${encodeURIComponent(book.id)}/book-workspace`}
               />
             ))}
           </section>

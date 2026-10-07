@@ -5729,6 +5729,17 @@ export default function BookHubPage() {
           />
         ) : null}
 
+        {isOwnBookHub && isTeacherContext && !isAdmin && isEnglishBook && teacherBookRelationship?.id ? (
+          <div className="mt-3">
+            <Link
+              href={`/teacher/library/${encodeURIComponent(teacherBookRelationship.id)}/book-workspace`}
+              className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-bold text-blue-900 hover:bg-blue-100"
+            >
+              Open English Teacher Tools
+            </Link>
+          </div>
+        ) : null}
+
         {canUseBookHubTeachingMode && !alreadyTeachingOnly ? (
           <BookHubModeToggle mode={bookHubMode} onModeChange={changeBookHubMode} />
         ) : null}

@@ -6,6 +6,7 @@ type ExternalLink = {
 };
 
 type EnglishReaderBookCardProps = {
+  bookHubHref: string | null;
   title: string;
   author: string | null;
   recommendedLevel: string | null;
@@ -15,6 +16,7 @@ type EnglishReaderBookCardProps = {
 };
 
 export default function EnglishReaderBookCard({
+  bookHubHref,
   title,
   author,
   recommendedLevel,
@@ -36,12 +38,21 @@ export default function EnglishReaderBookCard({
         </div>
 
         <Link
-          href={workspaceHref}
+          href={bookHubHref ?? workspaceHref}
           className="shrink-0 rounded-2xl bg-stone-900 px-4 py-2 text-center text-sm font-black text-white shadow-sm transition hover:bg-stone-800"
         >
-          Open Workspace
+          {bookHubHref ? "Open Book Hub" : "Open Teacher Workspace"}
         </Link>
       </div>
+
+      {bookHubHref ? (
+        <Link
+          href={workspaceHref}
+          className="mt-3 inline-flex text-sm font-semibold text-stone-600 underline decoration-stone-300 underline-offset-4 hover:text-stone-950"
+        >
+          Open English Teacher Tools
+        </Link>
+      ) : null}
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
         {recommendedLevel ? (

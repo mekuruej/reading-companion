@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { resolveTeacherBookHubUserBookId } from "@/lib/teacher/resolveTeacherBookHub";
 import {
   isTeacherProfile,
   loadSharedTeacherVocabulary,
@@ -36,10 +36,21 @@ function OriginBadges({ word }: { word: SharedTeacherVocabularyWord }) {
 
 export default function TeacherFlashcardsPage() {
   const params = useParams<{ teacherBookId: string }>();
+  const router = useRouter();
   const teacherBookId = params.teacherBookId ?? "";
 
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+
+  async function returnToBookHub() {
+    try {
+      const userBookId = await resolveTeacherBookHubUserBookId(supabase, teacherBookId);
+      router.push(`/books/${encodeURIComponent(userBookId)}`);
+    } catch (error) {
+      console.error("Could not resolve Teacher Flashcards Book Hub:", error);
+      router.push(`/teacher/library/${encodeURIComponent(teacherBookId)}/book-workspace`);
+    }
+  }
   const [context, setContext] = useState<TeacherBookContext | null>(null);
   const [book, setBook] = useState<BookMeta | null>(null);
   const [words, setWords] = useState<SharedTeacherVocabularyWord[]>([]);
@@ -116,9 +127,9 @@ export default function TeacherFlashcardsPage() {
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-8">
       <div className="mx-auto max-w-5xl">
-        <Link href={`/teacher/library/${encodeURIComponent(teacherBookId)}/book-workspace`} className="text-sm font-semibold text-stone-500 hover:text-stone-900">
-          ← Back to Teacher Book Workspace
-        </Link>
+        <button type="button" onClick={() => void returnToBookHub()} className="text-sm font-semibold text-stone-500 hover:text-stone-900">
+          ← Back to Book Hub
+        </button>
 
         <section className="mt-4 rounded-3xl border border-stone-200 bg-white p-5 text-center shadow-sm">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">
