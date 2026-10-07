@@ -28,6 +28,7 @@ type BookHubTeachingToolsProps = {
   onReadingExperiences: (personId?: string) => void;
   onCuriosityRead: () => void;
   onTeacherSnapshot: () => void;
+  onTeacherFlashcards: () => void;
   onStudentFlashcards: (studentUserBookId: string) => void;
   onStudentVocabularyList: (studentUserBookId: string) => void;
 };
@@ -154,6 +155,7 @@ export default function BookHubTeachingTools({
   onReadingExperiences,
   onCuriosityRead,
   onTeacherSnapshot,
+  onTeacherFlashcards,
   onStudentFlashcards,
   onStudentVocabularyList,
 }: BookHubTeachingToolsProps) {
@@ -449,6 +451,11 @@ export default function BookHubTeachingTools({
 
         <div className="flex flex-wrap gap-2 pt-1">
           {canUseStoryNotes ? <TeachingUtilityButton title="Teaching Notes & Prep" description="Your book knowledge and private teaching prep." onClick={onStoryNotes} /> : null}
+          <TeachingUtilityButton
+            title="Teacher Flashcards"
+            description="Review teaching-visible words as a lesson deck without changing personal study progress."
+            onClick={onTeacherFlashcards}
+          />
           {canUseBulkAdd ? (
             <TeachingUtilityButton
               title="Bulk Add Lesson Words"

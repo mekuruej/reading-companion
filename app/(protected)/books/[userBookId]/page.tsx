@@ -5637,6 +5637,24 @@ export default function BookHubPage() {
     router.push(href);
   }
 
+  async function openTeacherFlashcards() {
+    if (!row?.id || !row.book_id || !userId || !confirmLeaveIfTimerActive()) return;
+    try {
+      const relationship = await ensureTeacherBookRelationship({
+        supabase,
+        teacherId: userId,
+        bookId: row.book_id,
+        userBookId: row.id,
+      });
+      setTeacherBookRelationship(relationship);
+      router.push(`/teacher/library/${encodeURIComponent(relationship.id)}/flashcards`);
+    } catch (error: unknown) {
+      setBookUseError(
+        error instanceof Error ? error.message : "Could not open Teacher Flashcards."
+      );
+    }
+  }
+
   const teachingTools = (
     <BookHubTeachingTools
       onReadingExperiences={(personId) => {
@@ -5659,6 +5677,7 @@ export default function BookHubPage() {
       onTeacherSnapshot={() => {
         openTeachingTool(`/books/${row.id}/teacher-snapshot`);
       }}
+      onTeacherFlashcards={() => void openTeacherFlashcards()}
       onStudentFlashcards={(studentUserBookId) => {
         openTeachingTool(`/books/${encodeURIComponent(studentUserBookId)}/study`);
       }}
@@ -5719,7 +5738,7 @@ export default function BookHubPage() {
             ← Back to Library
           </Link>
         </nav>
-        {isOwnBookHub && isTeacherContext ? (
+        {isOwnBookHub && isTeacherContext && isJapaneseLearningBook(book.language_code ?? null) ? (
           <BookUseSection
             currentUse={bookUseLoaded ? getBookUse(personalTrackingStatus, teacherBookRelationship?.teaching_status ?? null) : null}
             saving={bookUseSaving}
@@ -5727,17 +5746,6 @@ export default function BookHubPage() {
             error={bookUseError || (!bookUseLoaded ? "Could not load book use. Refresh to try again." : null)}
             onChange={(use) => void saveBookUse(use)}
           />
-        ) : null}
-
-        {isOwnBookHub && isTeacherContext && !isAdmin && isEnglishBook && teacherBookRelationship?.id ? (
-          <div className="mt-3">
-            <Link
-              href={`/teacher/library/${encodeURIComponent(teacherBookRelationship.id)}/book-workspace`}
-              className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-bold text-blue-900 hover:bg-blue-100"
-            >
-              Open English Teacher Tools
-            </Link>
-          </div>
         ) : null}
 
         {canUseBookHubTeachingMode && !alreadyTeachingOnly ? (
@@ -5783,7 +5791,9 @@ export default function BookHubPage() {
                   <BookHubStatusPanel
                     personalTrackingStatus={personalTrackingStatus}
                     showNotTrackingOption={
-                      isOwnBookHub && isTeacherContext
+                      isOwnBookHub &&
+                      isTeacherContext &&
+                      isJapaneseLearningBook(book.language_code ?? null)
                     }
                     isSavingStatus={savingBookStatus || bookUseSaving}
                     statusError={bookStatusError}

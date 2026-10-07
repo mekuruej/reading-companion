@@ -11,9 +11,7 @@ import EnglishReaderAddBookHeader from "./components/EnglishReaderAddBookHeader"
 import EnglishReaderAddBookStatus from "./components/EnglishReaderAddBookStatus";
 
 type SaveResult = {
-  bookId: string;
   userBookId: string;
-  teacherBookId: string | null;
 };
 
 function isTeacherRole(profile: any) {
@@ -297,7 +295,7 @@ export default function EnglishReaderAddBookPage() {
         if (levelError) throw levelError;
       }
 
-      const { data: teacherBook, error: teacherBookError } = await supabase
+      const { error: teacherBookError } = await supabase
         .from("teacher_books")
         .upsert(
           {
@@ -306,16 +304,12 @@ export default function EnglishReaderAddBookPage() {
             user_book_id: userBookId,
           },
           { onConflict: "teacher_id,book_id" }
-        )
-        .select("id")
-        .maybeSingle();
+        );
 
       if (teacherBookError) throw teacherBookError;
 
       setSaveResult({
-        bookId,
         userBookId,
-        teacherBookId: teacherBook?.id ?? null,
       });
       setMessageTone("success");
       setMessage(existingBook ? "Existing English book added to your Teacher Library." : "English book created and added to your Teacher Library.");
@@ -396,14 +390,6 @@ export default function EnglishReaderAddBookPage() {
                   >
                     Open Book Hub
                   </Link>
-                  {saveResult.teacherBookId ? (
-                    <Link
-                      href={`/teacher/library/${encodeURIComponent(saveResult.teacherBookId)}/book-workspace`}
-                      className="rounded-2xl border border-emerald-200 bg-white px-4 py-2 text-center text-sm font-black text-emerald-900 transition hover:bg-emerald-100"
-                    >
-                      Open English Teacher Tools
-                    </Link>
-                  ) : null}
                 </div>
               </section>
             ) : null}

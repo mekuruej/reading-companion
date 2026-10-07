@@ -221,7 +221,6 @@ export default function EnglishReaderBooksPage() {
                 recommendedLevel={book.recommendedLevel}
                 isbn13={book.isbn13}
                 externalLink={book.externalLink}
-                workspaceHref={`/teacher/library/${encodeURIComponent(book.id)}/book-workspace`}
               />
             ))}
           </section>

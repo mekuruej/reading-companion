@@ -11,6 +11,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { bookTypeTitleLabel } from "@/lib/books/bookTypes";
+import { resolveTeacherBookHubUserBookId } from "@/lib/teacher/resolveTeacherBookHub";
 
 type BookMeta = {
   id: string;
@@ -276,6 +277,7 @@ export default function TeacherBookWorkspacePage() {
   const teacherBookId = params.teacherBookId ?? "";
 
   const [loading, setLoading] = useState(true);
+  const [redirecting, setRedirecting] = useState(false);
   const [message, setMessage] = useState("");
   const [canAccess, setCanAccess] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -294,6 +296,7 @@ export default function TeacherBookWorkspacePage() {
 
   async function loadWorkspace() {
     setLoading(true);
+    setRedirecting(false);
     setMessage("");
     setCanAccess(false);
     setCurrentUserId(null);
@@ -375,6 +378,19 @@ export default function TeacherBookWorkspacePage() {
       }
 
       const row = data as TeacherBookRow;
+
+      if (row.teacher_id === user.id) {
+        const userBookId = await resolveTeacherBookHubUserBookId(supabase, row.id);
+        setRedirecting(true);
+        router.replace(`/books/${encodeURIComponent(userBookId)}`);
+        return;
+      }
+
+      if (!profileIsSuperTeacher) {
+        setMessage("You do not have access to this Teacher Book.");
+        return;
+      }
+
       setCanAccess(true);
       setTeacherBook(row);
       setStatusDraft(
@@ -385,7 +401,7 @@ export default function TeacherBookWorkspacePage() {
       setNoteDraft(row.teacher_use_note ?? "");
     } catch (error: any) {
       console.error("Error loading Teacher Book Workspace:", error);
-      setMessage(error?.message ?? "Could not load Teacher Book Workspace.");
+      setMessage(error?.message ?? "Could not open the canonical Book Hub.");
     } finally {
       setLoading(false);
     }
@@ -476,6 +492,8 @@ export default function TeacherBookWorkspacePage() {
   const linkedUserBook = firstUserBook(teacherBook?.user_books ?? null);
   const retryLabel = wouldRetryLabel(linkedUserBook?.would_retry);
   const userBookId = teacherBook?.user_book_id ?? null;
+  const isCrossOwnerAdministrativeAssessment =
+    Boolean(teacherBook && currentUserId && teacherBook.teacher_id !== currentUserId && isSuperTeacher);
 
   const readerTools = useMemo<ToolCard[]>(() => {
     if (!userBookId) return [];
@@ -561,11 +579,11 @@ export default function TeacherBookWorkspacePage() {
     ];
   }, [teacherBookId]);
 
-  if (loading) {
+  if (loading || redirecting) {
     return (
       <main className="min-h-screen bg-slate-100 px-4 py-8">
         <div className="mx-auto max-w-6xl rounded-3xl border border-stone-200 bg-white p-6 text-sm text-stone-500 shadow-sm">
-          Loading Teacher Book Workspace...
+          {redirecting ? "Opening Book Hub..." : "Loading Teacher Book Workspace..."}
         </div>
       </main>
     );
@@ -821,11 +839,11 @@ export default function TeacherBookWorkspacePage() {
           ) : null}
         </section>
 
-        {!userBookId ? (
+        {!isCrossOwnerAdministrativeAssessment && !userBookId ? (
           <section className="mt-5 rounded-3xl border border-blue-200 bg-blue-50 p-5 text-sm leading-6 text-blue-900 shadow-sm">
             This is a teaching-only book right now. Personal Reader tools are hidden so teaching work does not change My Library, reading history, pace, or personal stats.
           </section>
-        ) : (
+        ) : !isCrossOwnerAdministrativeAssessment ? (
           <section className="mt-6">
             <div className="mb-3">
               <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
@@ -839,21 +857,23 @@ export default function TeacherBookWorkspacePage() {
               ))}
             </div>
           </section>
-        )}
+        ) : null}
 
-        <section className="mt-7">
-          <div className="mb-3">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
-              Teacher Support
-            </p>
-            <h2 className="mt-1 text-2xl font-black text-stone-950">Prepare and support</h2>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {teacherTools.map((tool) => (
-              <ToolCardLink key={tool.href} tool={tool} />
-            ))}
-          </div>
-        </section>
+        {!isCrossOwnerAdministrativeAssessment ? (
+          <section className="mt-7">
+            <div className="mb-3">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-400">
+                Teacher Support
+              </p>
+              <h2 className="mt-1 text-2xl font-black text-stone-950">Prepare and support</h2>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {teacherTools.map((tool) => (
+                <ToolCardLink key={tool.href} tool={tool} />
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
     </main>
   );

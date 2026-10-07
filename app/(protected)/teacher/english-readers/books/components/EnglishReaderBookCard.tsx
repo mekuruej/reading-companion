@@ -12,7 +12,6 @@ type EnglishReaderBookCardProps = {
   recommendedLevel: string | null;
   isbn13: string | null;
   externalLink: ExternalLink | null;
-  workspaceHref: string;
 };
 
 export default function EnglishReaderBookCard({
@@ -22,7 +21,6 @@ export default function EnglishReaderBookCard({
   recommendedLevel,
   isbn13,
   externalLink,
-  workspaceHref,
 }: EnglishReaderBookCardProps) {
   return (
     <article className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
@@ -37,22 +35,19 @@ export default function EnglishReaderBookCard({
           ) : null}
         </div>
 
-        <Link
-          href={bookHubHref ?? workspaceHref}
-          className="shrink-0 rounded-2xl bg-stone-900 px-4 py-2 text-center text-sm font-black text-white shadow-sm transition hover:bg-stone-800"
-        >
-          {bookHubHref ? "Open Book Hub" : "Open Teacher Workspace"}
-        </Link>
+        {bookHubHref ? (
+          <Link
+            href={bookHubHref}
+            className="shrink-0 rounded-2xl bg-stone-900 px-4 py-2 text-center text-sm font-black text-white shadow-sm transition hover:bg-stone-800"
+          >
+            Open Book Hub
+          </Link>
+        ) : (
+          <span className="shrink-0 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm font-semibold text-amber-900">
+            Book Hub unavailable
+          </span>
+        )}
       </div>
-
-      {bookHubHref ? (
-        <Link
-          href={workspaceHref}
-          className="mt-3 inline-flex text-sm font-semibold text-stone-600 underline decoration-stone-300 underline-offset-4 hover:text-stone-950"
-        >
-          Open English Teacher Tools
-        </Link>
-      ) : null}
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
         {recommendedLevel ? (

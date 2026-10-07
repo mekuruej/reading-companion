@@ -42,7 +42,7 @@ export default function TeacherVocabularyExperience({ teacherBookId, embedded = 
       router.push(`/books/${encodeURIComponent(userBookId)}`);
     } catch (error) {
       console.error("Could not resolve Teacher Vocabulary Book Hub:", error);
-      router.push(`/teacher/library/${encodeURIComponent(teacherBookId)}/book-workspace`);
+      router.push("/teacher/library");
     }
   }
 

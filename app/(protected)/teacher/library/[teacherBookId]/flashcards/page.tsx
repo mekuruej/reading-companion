@@ -48,7 +48,7 @@ export default function TeacherFlashcardsPage() {
       router.push(`/books/${encodeURIComponent(userBookId)}`);
     } catch (error) {
       console.error("Could not resolve Teacher Flashcards Book Hub:", error);
-      router.push(`/teacher/library/${encodeURIComponent(teacherBookId)}/book-workspace`);
+      router.push("/teacher/library");
     }
   }
   const [context, setContext] = useState<TeacherBookContext | null>(null);
