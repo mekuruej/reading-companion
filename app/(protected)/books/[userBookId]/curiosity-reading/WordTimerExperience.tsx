@@ -314,6 +314,7 @@ export function CuriosityReadingExperience({
   embedded = false,
   workspaceCompact = false,
   workspaceAside,
+  onCloseWorkspaceAside,
   modeSwitchSlot,
   showProgressSummaryBar = true,
   onActiveTimerChange,
@@ -325,6 +326,7 @@ export function CuriosityReadingExperience({
   embedded?: boolean;
   workspaceCompact?: boolean;
   workspaceAside?: ReactNode;
+  onCloseWorkspaceAside?: () => void;
   modeSwitchSlot?: ReactNode;
   showProgressSummaryBar?: boolean;
   onActiveTimerChange?: (active: boolean) => void;
@@ -2217,7 +2219,9 @@ export function CuriosityReadingExperience({
       <div
         className={
           workspaceCompact && workspaceAside
-            ? "hidden md:grid md:grid-cols-[minmax(0,1fr)_minmax(24rem,30rem)] md:items-start md:gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(26rem,32rem)]"
+            ? onCloseWorkspaceAside
+              ? "grid min-w-0 md:grid-cols-[minmax(0,1fr)_minmax(24rem,30rem)] md:items-start md:gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(26rem,32rem)]"
+              : "hidden md:grid md:grid-cols-[minmax(0,1fr)_minmax(24rem,30rem)] md:items-start md:gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(26rem,32rem)]"
             : workspaceCompact ? "block" : "hidden md:block"
         }
       >
@@ -2502,7 +2506,21 @@ export function CuriosityReadingExperience({
           </CuriosityAddEditWordCard>
         </div>
         {workspaceCompact && workspaceAside ? (
-          <div className="min-w-0">{workspaceAside}</div>
+          <div className={onCloseWorkspaceAside
+            ? "fixed inset-0 z-50 overflow-y-auto bg-stone-50 p-4 md:static md:z-auto md:min-w-0 md:overflow-visible md:bg-transparent md:p-0"
+            : "min-w-0"}
+          >
+            {onCloseWorkspaceAside ? (
+              <button
+                type="button"
+                onClick={onCloseWorkspaceAside}
+                className="mb-3 rounded-xl bg-stone-900 px-4 py-2 text-sm font-bold text-white md:hidden"
+              >
+                ← Back to reading
+              </button>
+            ) : null}
+            {workspaceAside}
+          </div>
         ) : null}
       </div>
     </>

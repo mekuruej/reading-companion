@@ -69,10 +69,20 @@ test('dedicated assessment page stays narrow and keeps JLPT conditional on Japan
   }
 });
 
-test('Teacher Flashcards is added alongside student tools in the eligible Japanese Book Hub', () => {
-  assert.match(teachingTools, /title="Teacher Flashcards"/);
-  assert.match(bookHubPage, /onTeacherFlashcards=\{\(\) => void openTeacherFlashcards\(\)\}/);
-  assert.match(bookHubPage, /teacher\/library\/\$\{encodeURIComponent\(relationship\.id\)\}\/flashcards/);
+test('Book Hub keeps only the four book-level teaching utilities and preserves student flashcards', () => {
+  for (const label of ['Teaching Assessment', 'Reading Experiences', 'Teacher Journal', 'Bulk Add Lesson Words']) {
+    assert.match(teachingTools, new RegExp(`title="${label}"`));
+  }
+  for (const removedLabel of ['Teacher Flashcards', 'Teaching Overview', 'Teacher Snapshot']) {
+    assert.ok(!teachingTools.includes(removedLabel), `Book Hub still shows ${removedLabel}`);
+  }
+  assert.ok(!bookHubPage.includes('openTeacherFlashcards'));
+  assert.ok(!bookHubPage.includes('onTeacherSnapshot'));
+  assert.ok(!bookHubPage.includes('/teacher-snapshot'));
+  assert.ok(!bookHubPage.includes('/teacher/library/${encodeURIComponent(relationship.id)}/flashcards'));
   assert.match(bookHubPage, /onStudentFlashcards=\{\(studentUserBookId\) =>/);
+  assert.match(teachingTools, /onStudentFlashcards\(student\.userBookId as string\)/);
   assert.match(bookHubPage, /isJapaneseLearningBook\(book\.language_code/);
+  assert.match(fs.readFileSync('app/(protected)/teacher/library/[teacherBookId]/flashcards/page.tsx', 'utf8'), /Teacher Flashcards/);
+  assert.ok(fs.existsSync('app/(protected)/books/[userBookId]/teacher-snapshot/page.tsx'));
 });

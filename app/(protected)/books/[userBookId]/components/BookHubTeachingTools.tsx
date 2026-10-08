@@ -24,8 +24,6 @@ type BookHubTeachingToolsProps = {
   onStoryNotes: () => void;
   onReadingExperiences: (personId?: string) => void;
   onTeachingAssessment: () => void;
-  onTeacherSnapshot: () => void;
-  onTeacherFlashcards: () => void;
   onStudentFollowAlong: (studentUserBookId: string) => void;
   onStudentSaveWords: (studentUserBookId: string) => void;
   onStudentFlashcards: (studentUserBookId: string) => void;
@@ -37,57 +35,6 @@ function sortStudentStudyLinks(students: StudentStudyLinkRow[]) {
     if (a.isAttached !== b.isAttached) return a.isAttached ? -1 : 1;
     return a.studentName.localeCompare(b.studentName);
   });
-}
-
-function TeachingToolButton({
-  title,
-  subtitle,
-  description,
-  size = "small",
-  className,
-  onClick,
-}: {
-  title: string;
-  subtitle?: string;
-  description: string | string[];
-  size?: "primary" | "small";
-  className: string;
-  onClick: () => void;
-}) {
-  const sizeClass =
-    size === "primary" ? "min-h-[156px] px-5 py-5" : "px-3.5 py-3";
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "relative rounded-xl border border-stone-900 text-center shadow-sm transition-all hover:-translate-y-[1px] hover:shadow-md",
-        sizeClass,
-        className,
-      ].join(" ")}
-    >
-      <div
-        className={
-          size === "primary"
-            ? "text-lg font-black text-stone-900 sm:text-xl"
-            : "text-base font-semibold text-stone-900 sm:text-lg"
-        }
-      >
-        {title}
-      </div>
-
-      {subtitle ? (
-        <div className="text-base font-semibold text-stone-900 sm:text-lg">
-          {subtitle}
-        </div>
-      ) : null}
-
-      <div className="mt-2 text-xs leading-5 text-stone-700">
-        {Array.isArray(description) ? description.map(line => <div key={line}>{line}</div>) : description}
-      </div>
-    </button>
-  );
 }
 
 function TeachingUtilityButton({
@@ -152,8 +99,6 @@ export default function BookHubTeachingTools({
   onStoryNotes,
   onReadingExperiences,
   onTeachingAssessment,
-  onTeacherSnapshot,
-  onTeacherFlashcards,
   onStudentFollowAlong,
   onStudentSaveWords,
   onStudentFlashcards,
@@ -433,30 +378,18 @@ export default function BookHubTeachingTools({
         title="Teaching Tools"
         description="ページをめくって、教えよう！"
       >
-        <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          <TeachingToolButton
+        <div className="flex flex-wrap gap-2 pt-1">
+          <TeachingUtilityButton
             title="Teaching Assessment"
             description="Your overall judgment of this book as teaching material."
-            className="bg-blue-50 hover:bg-blue-100"
-            size="primary"
             onClick={onTeachingAssessment}
           />
-          <TeachingToolButton
+          <TeachingUtilityButton
             title="Reading Experiences"
             description="Records of reading this book with specific people."
-            className="bg-blue-50 hover:bg-blue-100"
-            size="primary"
             onClick={() => onReadingExperiences()}
           />
-        </div>
-
-        <div className="flex flex-wrap gap-2 pt-1">
-          {canUseStoryNotes ? <TeachingUtilityButton title="Teaching Notes & Prep" description="Your book knowledge and private teaching prep." onClick={onStoryNotes} /> : null}
-          <TeachingUtilityButton
-            title="Teacher Flashcards"
-            description="Review teaching-visible words as a lesson deck without changing personal study progress."
-            onClick={onTeacherFlashcards}
-          />
+          {canUseStoryNotes ? <TeachingUtilityButton title="Teacher Journal" description="Your private notes and prep for this book." onClick={onStoryNotes} /> : null}
           {canUseBulkAdd ? (
             <TeachingUtilityButton
               title="Bulk Add Lesson Words"
@@ -464,11 +397,6 @@ export default function BookHubTeachingTools({
               onClick={onBulkAdd}
             />
           ) : null}
-          <TeachingUtilityButton
-            title="Teaching Overview"
-            description="Review teaching fit and reader signals for this book."
-            onClick={onTeacherSnapshot}
-          />
         </div>
       </TeachingActionSection>
 

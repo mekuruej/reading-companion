@@ -5615,24 +5615,6 @@ export default function BookHubPage() {
     router.push(href);
   }
 
-  async function openTeacherFlashcards() {
-    if (!row?.id || !row.book_id || !userId || !confirmLeaveIfTimerActive()) return;
-    try {
-      const relationship = await ensureTeacherBookRelationship({
-        supabase,
-        teacherId: userId,
-        bookId: row.book_id,
-        userBookId: row.id,
-      });
-      setTeacherBookRelationship(relationship);
-      router.push(`/teacher/library/${encodeURIComponent(relationship.id)}/flashcards`);
-    } catch (error: unknown) {
-      setBookUseError(
-        error instanceof Error ? error.message : "Could not open Teacher Flashcards."
-      );
-    }
-  }
-
   const teachingTools = (
     <BookHubTeachingTools
       onReadingExperiences={(personId) => {
@@ -5650,10 +5632,6 @@ export default function BookHubPage() {
         );
       }}
       onStoryNotes={() => openTeachingTool(`/books/${row.id}/lesson?view=journal`)}
-      onTeacherSnapshot={() => {
-        openTeachingTool(`/books/${row.id}/teacher-snapshot`);
-      }}
-      onTeacherFlashcards={() => void openTeacherFlashcards()}
       onStudentFollowAlong={(studentUserBookId) => {
         openTeachingTool(
           `/books/${encodeURIComponent(row.id)}/lesson?studentUserBookId=${encodeURIComponent(studentUserBookId)}`
