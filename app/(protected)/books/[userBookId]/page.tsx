@@ -14,6 +14,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
+import { getJapaneseLearningBookHubCta } from "@/lib/access/japaneseLearningBookHubCta";
 import { loadJapaneseLearningFreeFeatureFlags } from "@/lib/access/japaneseLearningFreeFeatures";
 import {
   canUseActiveJapaneseLearningActions,
@@ -702,6 +703,8 @@ export default function BookHubPage() {
   const [canSeeVocabularySummary, setCanSeeVocabularySummary] = useState(false);
   const [hasFullLearningAccess, setHasFullLearningAccess] = useState(false);
   const [isTrialLearningAccess, setIsTrialLearningAccess] = useState(false);
+  const [canSubscribeToJapaneseLearning, setCanSubscribeToJapaneseLearning] = useState<boolean | null>(null);
+  const [requiresGuidedJapaneseLearningAccess, setRequiresGuidedJapaneseLearningAccess] = useState(false);
   const [wantsJapaneseStudyTools, setWantsJapaneseStudyTools] = useState(false);
   const [highlightReadingReflection, setHighlightReadingReflection] = useState(false);
 
@@ -1047,6 +1050,16 @@ export default function BookHubPage() {
     isEnglishNativeTrackerBook &&
     (row?.format_type === "audiobook" || book?.edition_format === "audiobook");
   const isOwnBookHub = !!row?.user_id && !!userId && row.user_id === userId;
+  const showJapaneseLearningPromo =
+    wantsJapaneseStudyTools &&
+    isJapaneseLearningBook(book?.language_code ?? null) &&
+    !hasFullLearningAccess &&
+    !isTeacherContext;
+  const japaneseLearningCta = getJapaneseLearningBookHubCta({
+    hasAccess: canUseJapaneseLearningActions,
+    canSubscribe: canSubscribeToJapaneseLearning,
+    requiresApproval: requiresGuidedJapaneseLearningAccess,
+  });
   const canUseMyReviewNotes =
     (isOwnBookHub &&
       (isEnglishNativeTrackerBook ||
@@ -1070,6 +1083,58 @@ export default function BookHubPage() {
     Boolean(row?.reader_advice?.trim());
   const shouldShowReadingReflectionNudge =
     canCompleteReadingReflection && !hasCompletedReadingReflection;
+
+  useEffect(() => {
+    if (!showJapaneseLearningPromo) {
+      setCanSubscribeToJapaneseLearning(null);
+      setRequiresGuidedJapaneseLearningAccess(false);
+      return;
+    }
+
+    let cancelled = false;
+    setCanSubscribeToJapaneseLearning(null);
+    setRequiresGuidedJapaneseLearningAccess(false);
+
+    async function loadSubscriptionEligibility() {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!session?.access_token) return;
+
+        const headers = { Authorization: `Bearer ${session.access_token}` };
+        const [billingResponse, requestResponse] = await Promise.all([
+          fetch("/api/billing/status", { headers, cache: "no-store" }),
+          fetch("/api/japanese-learning/request", { headers, cache: "no-store" }),
+        ]);
+        const [billingStatus, requestStatus] = await Promise.all([
+          billingResponse.json().catch(() => null),
+          requestResponse.json().catch(() => null),
+        ]);
+        if (cancelled) return;
+
+        if (billingResponse.ok && billingStatus) {
+          setCanSubscribeToJapaneseLearning(
+            billingStatus.canSubscribe === true || billingStatus.reason === "eligible"
+          );
+        }
+
+        if (requestResponse.ok && requestStatus) {
+          const status = requestStatus.request?.status;
+          setRequiresGuidedJapaneseLearningAccess(
+            status === "pending" || status === "approved"
+          );
+        }
+      } catch (error) {
+        console.error("Error checking Japanese Learning access CTA:", error);
+      }
+    }
+
+    void loadSubscriptionEligibility();
+    return () => {
+      cancelled = true;
+    };
+  }, [showJapaneseLearningPromo]);
 
   useEffect(() => {
     if (!shouldShowReadingReflectionNudge) {
@@ -5837,6 +5902,10 @@ export default function BookHubPage() {
                 saveNoticeTone={saveNoticeTone}
               />
               <BookHubActionGrid
+                japaneseLearningCta={japaneseLearningCta}
+                onJapaneseLearningCtaClick={(event) => {
+                  if (!confirmLeaveIfTimerActive()) event.preventDefault();
+                }}
                 canUseJapaneseLearningActions={canUseJapaneseLearningActions}
                 canUseCuriosityReading={
                   canUseSavedWordReading &&
@@ -5860,12 +5929,7 @@ export default function BookHubPage() {
                     vocabulary: false,
                   })
                 }
-                showJapaneseLearningPromo={
-                  wantsJapaneseStudyTools &&
-                  isJapaneseLearningBook(row.books?.language_code ?? null) &&
-                  !hasFullLearningAccess &&
-                  !isTeacherContext
-                }
+                showJapaneseLearningPromo={showJapaneseLearningPromo}
                 onFluidReadingExtensive={() => {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/readalong`);
@@ -5995,7 +6059,12 @@ export default function BookHubPage() {
                 <JapaneseLearningPromoCard
                   title="Reading Reflections are locked"
                   description="Reading Reflections are available with full Japanese Learning, or when this free feature is enabled."
+                  cta={japaneseLearningCta.label}
                   source="book_hub"
+                  href={japaneseLearningCta.href}
+                  onCtaClick={(event) => {
+                    if (!confirmLeaveIfTimerActive()) event.preventDefault();
+                  }}
                   compact
                 />
               ) : null}

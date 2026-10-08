@@ -5,6 +5,8 @@ type JapaneseLearningPromoCardProps = {
   description?: string;
   cta?: string;
   source?: "study_hub" | "book_hub" | "japanese_learning_page";
+  href?: string;
+  onCtaClick?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
   compact?: boolean;
 };
 
@@ -13,9 +15,11 @@ export default function JapaneseLearningPromoCard({
   description = "Add reading support, vocabulary tools, flashcards, and more to the Japanese books you choose.",
   cta = "See what Japanese Learning adds →",
   source = "study_hub",
+  href,
+  onCtaClick,
   compact = false,
 }: JapaneseLearningPromoCardProps) {
-  const href = `/japanese-learning?source=${source}`;
+  const destination = href ?? `/japanese-learning?source=${source}`;
 
   return (
     <section
@@ -35,7 +39,8 @@ export default function JapaneseLearningPromoCard({
       </div>
 
       <Link
-        href={href}
+        href={destination}
+        onClick={onCtaClick}
         className="mt-3 inline-flex rounded-full border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-black text-violet-800 transition hover:bg-violet-100 sm:mt-0"
       >
         {cta}

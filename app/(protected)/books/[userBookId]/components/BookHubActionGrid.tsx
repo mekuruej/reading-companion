@@ -4,8 +4,11 @@
 "use client";
 
 import JapaneseLearningPromoCard from "@/components/japanese-learning/JapaneseLearningPromoCard";
+import Link from "next/link";
 
 type BookHubActionGridProps = {
+  japaneseLearningCta: { label: string; href: string };
+  onJapaneseLearningCtaClick?: (event: React.MouseEvent<HTMLAnchorElement>) => void;
   canUseJapaneseLearningActions?: boolean;
   canUseCuriosityReading?: boolean;
   canUseSavedWordReading: boolean;
@@ -28,18 +31,26 @@ type BookHubActionGridProps = {
   onAboutBook?: () => void;
 };
 
+const coolCardStyles = {
+  sky: "border-sky-200 bg-gradient-to-br from-sky-100 via-cyan-50 to-teal-50 hover:border-sky-400",
+  mint: "border-teal-200 bg-gradient-to-br from-blue-50 via-teal-50 to-emerald-100 hover:border-teal-400",
+  secondary: "border-sky-200 bg-sky-50 hover:border-sky-400 hover:bg-sky-100",
+};
+
 function ActionButton({
   title,
   subtitle,
   description,
-  className,
+  className = "",
+  appearance,
   onClick,
   size = "normal",
 }: {
   title: string;
   subtitle?: string;
   description: string | string[];
-  className: string;
+  className?: string;
+  appearance?: keyof typeof coolCardStyles;
   onClick: () => void | Promise<void>;
   size?: "normal" | "primary" | "secondary";
 }) {
@@ -55,7 +66,9 @@ function ActionButton({
       type="button"
       onClick={onClick}
       className={[
-        "relative rounded-xl border border-stone-900 text-center shadow-sm transition-all hover:-translate-y-[1px] hover:shadow-md",
+        "relative rounded-xl border text-center shadow-sm transition-all hover:-translate-y-[1px] hover:shadow-md",
+        appearance ? coolCardStyles[appearance] : "border-stone-900",
+        appearance ? "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2" : "",
         sizeClass,
         className,
       ].join(" ")}
@@ -147,6 +160,8 @@ function UtilityActionButton({
 }
 
 export default function BookHubActionGrid({
+  japaneseLearningCta,
+  onJapaneseLearningCtaClick,
   canUseJapaneseLearningActions = false,
   canUseCuriosityReading = false,
   canUseSavedWordReading,
@@ -188,11 +203,11 @@ export default function BookHubActionGrid({
         <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
           <ActionButton
             title="Read"
-            subtitle={canUseCuriosityReading ? "Also save Japanese words as you go!" : "Read and track your progress."}
+            subtitle={canUseCuriosityReading ? "Save Japanese words as you go!" : "Read and track your progress."}
             description={canUseCuriosityReading
-              ? "Just Read or Save Words as you go."
+              ? "Just read or read and save words as you go."
               : "Read at your pace and keep your progress up to date."}
-            className="bg-yellow-50 hover:bg-yellow-100"
+            appearance="sky"
             onClick={onFluidReadingJustReading}
             size="primary"
           />
@@ -201,7 +216,7 @@ export default function BookHubActionGrid({
             title="Listen"
             subtitle="Audiobook"
             description="Listen and track your audiobook progress."
-            className="bg-sky-50 hover:bg-sky-100"
+            appearance="mint"
             onClick={onListening}
             size="primary"
           />
@@ -246,51 +261,66 @@ export default function BookHubActionGrid({
           description="Study and review language from this book."
         >
           {showJapaneseLearningSection ? (
-            <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 xl:grid-cols-4">
-              {canUseStudyFlashcards ? (
-                <ActionButton
-                  title="Review Words"
-                  description="Review the words you saved from this book."
-                  className="bg-violet-50 hover:bg-violet-100"
-                  onClick={onStudyFlashcards}
-                  size="secondary"
-                />
-              ) : null}
-              {canUseSavedWordReading ? (
-                <ActionButton
-                  title="Follow-Along"
-                  description="Read this book with light support from words you saved."
-                  className="bg-violet-50 hover:bg-violet-100"
-                  onClick={onFluidReadingExtensive}
-                  size="secondary"
-                />
-              ) : null}
-              {canUseVocabularyList ? (
-                <ActionButton
-                  title="Vocabulary List"
-                  description="Open the saved words and vocabulary tools for this book."
-                  className="bg-violet-50 hover:bg-violet-100"
-                  onClick={onVocabularyList}
-                  size="secondary"
-                />
-              ) : null}
-              {canUseBulkAdd && onBulkAdd ? (
-                <ActionButton
-                  title="Bulk Add"
-                  description="Add several words to this book at once."
-                  className="bg-violet-50 hover:bg-violet-100"
-                  onClick={onBulkAdd}
-                  size="secondary"
-                />
-              ) : null}
+            <div className="space-y-2">
+              <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                {canUseStudyFlashcards ? (
+                  <ActionButton
+                    title="Flashcards"
+                    description="Review the words you saved from this book."
+                    appearance="sky"
+                    onClick={onStudyFlashcards}
+                    size="primary"
+                  />
+                ) : null}
+                {canUseSavedWordReading ? (
+                  <ActionButton
+                    title="Follow-Along"
+                    description="Read this book with light support from words you saved."
+                    appearance="mint"
+                    onClick={onFluidReadingExtensive}
+                    size="primary"
+                  />
+                ) : null}
+              </div>
+              <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                {canUseVocabularyList ? (
+                  <ActionButton
+                    title="Vocabulary List"
+                    description="Open the saved words and vocabulary tools for this book."
+                    appearance="secondary"
+                    onClick={onVocabularyList}
+                    size="secondary"
+                  />
+                ) : null}
+                {canUseBulkAdd && onBulkAdd ? (
+                  <ActionButton
+                    title="Bulk Add"
+                    description="Add several words to this book at once."
+                    appearance="secondary"
+                    onClick={onBulkAdd}
+                    size="secondary"
+                  />
+                ) : null}
+              </div>
             </div>
+          ) : null}
+          {showJapaneseLearningSection ? (
+            <Link
+              href={japaneseLearningCta.href}
+              onClick={onJapaneseLearningCtaClick}
+              className="inline-flex min-h-11 w-fit items-center justify-center rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-black text-stone-800 shadow-sm transition hover:border-stone-400 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 focus-visible:ring-offset-2"
+            >
+              {japaneseLearningCta.label}
+            </Link>
           ) : null}
           {showJapaneseLearningPromo ? (
             <JapaneseLearningPromoCard
               title="Study Japanese with this book"
               description="Add Japanese reading support, vocabulary tools, flashcards, and more."
-              cta="See Japanese Learning tools →"
+              cta={japaneseLearningCta.label}
               source="book_hub"
+              href={japaneseLearningCta.href}
+              onCtaClick={onJapaneseLearningCtaClick}
               compact
             />
           ) : null}
