@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 
 import SubscriptionControls from "@/components/SubscriptionControls";
 
@@ -10,6 +13,8 @@ const readingAccessFeatures = [
 ];
 
 export default function ReadingAccessPage() {
+  const [isComplimentaryLegacy, setIsComplimentaryLegacy] = useState<boolean | null>(null);
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-slate-100 text-slate-950">
       <div
@@ -58,43 +63,56 @@ export default function ReadingAccessPage() {
         </header>
 
         <section className="rounded-[2rem] border border-stone-200 bg-white/90 p-6 shadow-lg shadow-slate-300/30 sm:p-8">
-          <p className="text-sm font-bold uppercase tracking-[0.25em] text-violet-600">
-            Japanese Learning 🔒
-          </p>
-          <h2 className="mt-4 text-4xl font-black leading-tight text-stone-950 sm:text-5xl">
-            Keep reading with MEKURU.
-          </h2>
+          {isComplimentaryLegacy === null ? (
+            <p className="text-sm text-stone-600" role="status">Checking your access…</p>
+          ) : isComplimentaryLegacy ? (
+            <>
+              <h2 className="text-3xl font-black leading-tight text-stone-950 sm:text-4xl">
+                You’ve been granted complimentary legacy access.
+              </h2>
+              <p className="mt-4 max-w-2xl text-base leading-7 text-stone-700 sm:text-lg">
+                Your Japanese Learning Tools are included, and no subscription is needed.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-bold uppercase tracking-[0.25em] text-violet-600">
+                Japanese Learning 🔒
+              </p>
+              <h2 className="mt-4 text-4xl font-black leading-tight text-stone-950 sm:text-5xl">
+                Keep reading with MEKURU.
+              </h2>
+              <div className="mt-5 max-w-2xl">
+                <p className="text-xl font-semibold leading-8 text-stone-900 sm:text-2xl">
+                  Get full access to MEKURU’s Japanese Learning Tools.
+                </p>
+                <p className="mt-2 text-base leading-7 text-stone-700 sm:text-lg">
+                  Track your reading, save vocabulary, and review the words and readings you
+                  encounter.
+                </p>
+              </div>
+            </>
+          )}
 
-          <div className="mt-5 max-w-2xl">
-            <p className="text-xl font-semibold leading-8 text-stone-900 sm:text-2xl">
-              Get full access to MEKURU’s Japanese Learning Tools.
-            </p>
-
-            <p className="mt-2 text-base leading-7 text-stone-700 sm:text-lg">
-              Track your reading, save vocabulary, and review the words and readings you
-              encounter.
-            </p>
+          <div className={isComplimentaryLegacy === null ? "hidden" : ""}>
+            <SubscriptionControls onComplimentaryLegacyChange={setIsComplimentaryLegacy} />
           </div>
 
-          <SubscriptionControls />
+          <Link
+            href="/books"
+            className="mt-7 inline-flex rounded-2xl border border-stone-300 bg-white px-5 py-3 text-sm font-semibold text-stone-800 shadow-sm transition hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-md"
+          >
+            Back to my Library
+          </Link>
 
-          <div className="mt-7 flex flex-wrap items-center gap-3">
-
-
-            <Link
-              href="/books"
-              className="inline-flex rounded-2xl border border-stone-300 bg-white px-5 py-3 text-sm font-semibold text-stone-800 shadow-sm transition hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-md"
-            >
-              Back to my Library
-            </Link>
-          </div>
-
-          <p className="mt-4 text-xs leading-5 text-stone-500">
-            Manage your subscription, payment method, and billing details securely through Stripe.
-          </p>
+          {isComplimentaryLegacy === false ? (
+            <p className="mt-4 text-xs leading-5 text-stone-500">
+              Manage your subscription, payment method, and billing details securely through Stripe.
+            </p>
+          ) : null}
         </section>
 
-        <section className="grid gap-4 sm:grid-cols-2">
+        {isComplimentaryLegacy === false ? <section className="grid gap-4 sm:grid-cols-2">
           {readingAccessFeatures.map((feature) => (
             <div
               key={feature}
@@ -105,9 +123,9 @@ export default function ReadingAccessPage() {
               </p>
             </div>
           ))}
-        </section>
+        </section> : null}
 
-        <section className="rounded-3xl border border-stone-200 bg-white/85 p-5 shadow-sm">
+        {isComplimentaryLegacy === false ? <section className="rounded-3xl border border-stone-200 bg-white/85 p-5 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-stone-500">
             Separate lesson option
           </p>
@@ -126,7 +144,7 @@ export default function ReadingAccessPage() {
           >
             See Japanese Reading Lessons
           </Link>
-        </section>
+        </section> : null}
       </div>
     </main>
   );

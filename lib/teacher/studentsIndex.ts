@@ -1,7 +1,7 @@
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { isAllUserTeacher } from "./targetUserAccess";
 
-export type StudentsCategory = "trial" | "current" | "all" | "past";
+export type StudentsCategory = "trial" | "current" | "other" | "past";
 export type StudentsActor = { role?: string | null; is_super_teacher?: boolean | string | null };
 
 export function canUseStudentsIndex(profile: StudentsActor | null) {
@@ -9,8 +9,9 @@ export function canUseStudentsIndex(profile: StudentsActor | null) {
 }
 
 export function canUseStudentsCategory(profile: StudentsActor | null, category: StudentsCategory) {
-  return canUseStudentsIndex(profile) &&
-    (isAllUserTeacher(profile) || category === "current" || category === "past");
+  if (!canUseStudentsIndex(profile)) return false;
+  if (isAllUserTeacher(profile)) return category === "trial" || category === "current" || category === "other";
+  return category === "current" || category === "past";
 }
 
 export function isActiveStudentRelationship(link: { archived_at?: string | null }) {

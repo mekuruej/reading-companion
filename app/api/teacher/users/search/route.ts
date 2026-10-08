@@ -1,6 +1,7 @@
 import { isAllUserTeacher } from "@/lib/teacher/targetUserAccess";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { isActiveTrialParticipant } from "@/lib/teacher/studentsIndex";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,8 +12,11 @@ type ProfileRow = {
   id: string;
   display_name?: string | null;
   username?: string | null;
+  level?: string | null;
   role?: string | null;
   is_super_teacher?: boolean | string | null;
+  app_access_type?: string | null;
+  app_access_expires_at?: string | null;
 };
 
 function isSuperTeacherFlag(value: unknown) {
@@ -133,6 +137,14 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const query = (searchParams.get("q") ?? "").trim();
     const normalizedQuery = query.toLowerCase();
+    const studentsScope = searchParams.get("scope") === "students";
+
+    if (studentsScope ? !isAllUserTeacher(actorProfile) : !canSearchAllUsers(actorProfile)) {
+      return NextResponse.json(
+        { error: "Super teacher access is required to search all users." },
+        { status: 403 }
+      );
+    }
 
     if (normalizedQuery.length < 2) {
       return NextResponse.json({ users: [] });
@@ -145,13 +157,15 @@ export async function GET(request: Request) {
     const [displayNameMatches, usernameMatches] = await Promise.all([
       supabaseAdmin
         .from("profiles")
-        .select("id, display_name, username")
+        .select("id, display_name, username, level, role, is_super_teacher, app_access_type, app_access_expires_at")
+        .neq("id", auth.user.id)
         .ilike("display_name", `%${query}%`)
         .order("display_name", { ascending: true })
         .limit(limit),
       supabaseAdmin
         .from("profiles")
-        .select("id, display_name, username")
+        .select("id, display_name, username, level, role, is_super_teacher, app_access_type, app_access_expires_at")
+        .neq("id", auth.user.id)
         .ilike("username", `%${query}%`)
         .order("username", { ascending: true })
         .limit(limit),
@@ -178,7 +192,7 @@ export async function GET(request: Request) {
       if (profileIdsToLoad.length > 0) {
         const { data: emailProfiles, error: emailProfileError } = await supabaseAdmin
           .from("profiles")
-          .select("id, display_name, username")
+          .select("id, display_name, username, level, role, is_super_teacher, app_access_type, app_access_expires_at")
           .in("id", profileIdsToLoad);
 
         if (emailProfileError) throw emailProfileError;
@@ -200,16 +214,52 @@ export async function GET(request: Request) {
         ...profile,
         email: profile.email ?? resultEmails.get(profile.id) ?? null,
       }))
-      .filter((profile) => profileMatchesQuery(profile, normalizedQuery) || emailMatchIds.has(profile.id))
+      .filter((profile) => (!studentsScope || profile.id !== auth.user.id) &&
+        (profileMatchesQuery(profile, normalizedQuery) || emailMatchIds.has(profile.id)))
       .slice(0, limit)
       .map((profile) => ({
         id: profile.id,
         displayName: profile.display_name ?? null,
         username: profile.username ?? null,
         email: profile.email ?? null,
+        level: profile.level ?? null,
+        role: profile.role ?? null,
+        is_super_teacher: profile.is_super_teacher ?? null,
+        app_access_type: profile.app_access_type ?? null,
+        app_access_expires_at: profile.app_access_expires_at ?? null,
       }));
 
-    return NextResponse.json({ users });
+    if (!studentsScope) return NextResponse.json({ users: users.map(({ level, role, is_super_teacher, app_access_type, app_access_expires_at, ...user }) => user) });
+
+    const userIds = users.map(user => user.id);
+    const { data: relationships, error: relationshipError } = userIds.length
+      ? await supabaseAdmin.from("teacher_students").select("student_id, archived_at").in("student_id", userIds)
+      : { data: [], error: null };
+    if (relationshipError) throw relationshipError;
+    const activeStudentIds = new Set((relationships ?? []).filter(link => link.archived_at == null).map(link => link.student_id));
+    const pastStudentIds = new Set((relationships ?? []).filter(link => link.archived_at != null && !activeStudentIds.has(link.student_id)).map(link => link.student_id));
+    const usersWithStatus = await Promise.all(users.map(async user => {
+      const searchStatus = isActiveTrialParticipant({
+        role: user.role,
+        is_super_teacher: user.is_super_teacher,
+        app_access_type: user.app_access_type,
+        app_access_expires_at: user.app_access_expires_at,
+      }) ? "Trial" : activeStudentIds.has(user.id) ? "Current Student" : pastStudentIds.has(user.id) ? "Past Student" : "Other";
+      const { data: activity, error: activityError } = await supabaseAdmin.from("user_book_reading_sessions")
+        .select("read_on, user_books!inner(user_id)")
+        .eq("user_books.user_id", user.id).not("read_on", "is", null)
+        .order("read_on", { ascending: false }).limit(1).maybeSingle();
+      if (activityError) throw activityError;
+      return {
+        ...user,
+        display_name: user.displayName,
+        isCurrentStudent: activeStudentIds.has(user.id),
+        lastEngagedAt: activity?.read_on ?? null,
+        searchStatus,
+      };
+    }));
+
+    return NextResponse.json({ users: usersWithStatus, pageSize: limit, elevated: true });
   } catch (error) {
     console.error("Teacher all-user search failed:", error);
     return NextResponse.json(

@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     if (actorError) throw actorError;
     const params = new URL(request.url).searchParams;
     const category = (params.get("category") ?? "current") as StudentsCategory;
-    if (!["trial", "current", "all", "past"].includes(category)) {
+    if (!["trial", "current", "other", "past"].includes(category)) {
       return NextResponse.json({ error: "Unknown category." }, { status: 400 });
     }
     if (!canUseStudentsCategory(actor, category)) {
@@ -50,6 +50,12 @@ export async function GET(request: Request) {
     let query = db.from("profiles").select("id, display_name, username, level, role, is_super_teacher, lesson_day, app_access_type, app_access_expires_at", { count: "exact" })
       .neq("id", auth.user.id);
     if (scopedIds) query = query.in("id", scopedIds);
+    if (category === "other") {
+      if (activeIds.size) query = query.not("id", "in", `(${[...activeIds].join(",")})`);
+      const now = new Date().toISOString();
+      // Inverse of the canonical active-trial predicate: trial type + future expiry + non-staff.
+      query = query.or(`app_access_type.is.null,app_access_type.not.ilike.trial,app_access_expires_at.is.null,app_access_expires_at.lt.${now},role.in.(teacher,super_teacher,admin),is_super_teacher.eq.true`);
+    }
     if (category === "trial") {
       // getAppAccessStatus: active trial entitlement with a future expiry; staff access takes precedence.
       query = query.ilike("app_access_type", "trial").gte("app_access_expires_at", new Date().toISOString())

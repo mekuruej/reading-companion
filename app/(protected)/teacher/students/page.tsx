@@ -22,6 +22,7 @@ type Student = {
   isCurrentStudent: boolean;
   lastEngagedAt: string | null;
   archivedTeacherId: string | null;
+  searchStatus?: "Trial" | "Current Student" | "Past Student" | "Other";
 };
 
 function formatLastEngaged(value: string | null) {
@@ -61,8 +62,12 @@ export default function TeacherStudentsPage() {
         if (controller.signal.aborted) return;
         const token = data.session?.access_token;
         if (!token) { setDenied(true); return; }
-        const params = new URLSearchParams({ category, q: search, page: String(page) });
-        const response = await fetch(`/api/teacher/students-index?${params}`, {
+        const globalSearch = elevated && Boolean(search.trim());
+        const params = globalSearch
+          ? new URLSearchParams({ q: search.trim(), scope: "students" })
+          : new URLSearchParams({ category, q: search, page: String(page) });
+        const endpoint = globalSearch ? "/api/teacher/users/search" : "/api/teacher/students-index";
+        const response = await fetch(`${endpoint}?${params}`, {
           headers: { Authorization: `Bearer ${token}` }, signal: controller.signal,
         });
         const payload = await response.json();
@@ -70,9 +75,9 @@ export default function TeacherStudentsPage() {
         setDenied(response.status === 401 || response.status === 403);
         if (!response.ok) throw new Error(payload.error ?? "Could not load students.");
         setUsers(payload.users);
-        setTotal(payload.total);
-        setElevated(payload.elevated);
-        setPageSize(payload.pageSize);
+        setTotal(payload.total ?? payload.users.length);
+        setElevated(payload.elevated ?? elevated);
+        setPageSize(payload.pageSize ?? 24);
       } catch (err) {
         if (!controller.signal.aborted) {
           setUsers([]);
@@ -83,12 +88,14 @@ export default function TeacherStudentsPage() {
       }
     }, search ? 250 : 0);
     return () => { controller.abort(); window.clearTimeout(timer); };
-  }, [category, search, page, revision]);
+  }, [category, search, page, revision, elevated]);
 
   function chooseCategory(value: StudentsCategory) {
     setCategory(value);
     setPage(0);
   }
+
+  const globalSearch = elevated && Boolean(search.trim());
 
   async function restoreStudent(student: Student) {
     if (!student.archivedTeacherId || !window.confirm(`Restore ${student.display_name || student.username || "this learner"} to Current Students?`)) return;
@@ -115,23 +122,26 @@ export default function TeacherStudentsPage() {
         <section className="mt-5 space-y-4">
           {elevated ? (
             <nav aria-label="Students categories" className="flex flex-wrap gap-2">
-              {([["trial", "Trial"], ["current", "Current Students"], ["all", "All Users"]] as const).map(([value, label]) => (
+              {([["trial", "Trial"], ["current", "Current Students"], ["other", "Other"]] as const).map(([value, label]) => (
                 <button key={value} type="button" aria-pressed={category === value} onClick={() => chooseCategory(value)}
                   className={`rounded-xl border px-4 py-2 text-sm font-semibold ${category === value ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-white text-stone-600"}`}>{label}</button>
               ))}
             </nav>
           ) : <h2 className="text-lg font-bold">{category === "past" ? "Past student relationships" : "Students"}</h2>}
           <label className="block text-sm font-medium text-stone-600">
-            Search {category === "trial" ? "trial users" : category === "all" ? "all users" : "students"}
+            Search {elevated ? "users" : "students"}
             <input type="search" value={search} onChange={event => { setSearch(event.target.value); setPage(0); }}
-              placeholder="Name, username, level, lesson day, or book title"
+              placeholder={elevated ? "Name, username, or email" : "Name, username, level, lesson day, or book title"}
               className="mt-1 block w-full rounded-xl border border-stone-300 bg-white px-3 py-2 font-normal" />
           </label>
+          {globalSearch ? <p className="-mt-2 text-xs text-stone-500">Searching all users</p> : null}
           {error ? <p role="alert" className="text-sm text-rose-700">{error}</p> : null}
           {loading ? <p role="status" className="text-sm text-stone-500">Loading…</p> : (
             <>
-              <p className="text-xs text-stone-500" role="status">{total} {total === 1 ? "person" : "people"}{search ? " match this search" : " in this category"}</p>
-              {users.length === 0 ? <p className="text-sm text-stone-500">No people found in this category.</p> : null}
+              <p className="text-xs text-stone-500" role="status">{globalSearch
+                ? `Showing ${users.length} global search result${users.length === 1 ? "" : "s"}`
+                : `${total} ${total === 1 ? "person" : "people"}${search ? " match this search" : " in this category"}`}</p>
+              {users.length === 0 ? <p className="text-sm text-stone-500">{globalSearch ? "No people found in this search." : "No people found in this category."}</p> : null}
               <div className="grid gap-3">
                 {users.map(student => {
                   const name = student.display_name || student.username || "Unnamed user";
@@ -150,6 +160,13 @@ export default function TeacherStudentsPage() {
                     : student.archivedTeacherId ? "Archived relationship" : "No relationship";
                   const workspace = `/teacher/students/${encodeURIComponent(student.id)}/workspace`;
                   const canOpen = elevated || student.isCurrentStudent;
+                  const globalStatusClass = student.searchStatus === "Trial"
+                    ? "bg-emerald-50 text-emerald-800"
+                    : student.searchStatus === "Current Student"
+                      ? "bg-sky-50 text-sky-800"
+                      : student.searchStatus === "Past Student"
+                        ? "bg-amber-50 text-amber-800"
+                        : "bg-stone-100 text-stone-700";
                   return (
                     <article key={student.id} className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -158,10 +175,12 @@ export default function TeacherStudentsPage() {
                           <h3 className="break-words font-bold text-stone-900">{name}</h3>
                           {student.username ? <p className="break-words text-xs text-stone-500">@{student.username}</p> : null}
                           <div className="mt-1 flex flex-wrap gap-1 text-xs text-stone-600">
-                            {student.level ? <span className="rounded bg-stone-100 px-2 py-0.5">{student.level}</span> : null}
-                            <span className="rounded bg-stone-100 px-2 py-0.5">{access.label}</span>
+                            {globalSearch ? <span className={`rounded px-2 py-0.5 ${globalStatusClass}`}>{student.searchStatus ?? "Other"}</span> : <>
+                              {student.level ? <span className="rounded bg-stone-100 px-2 py-0.5">{student.level}</span> : null}
+                              <span className="rounded bg-stone-100 px-2 py-0.5">{access.label}</span>
+                            </>}
                           </div>
-                          {elevated ? (
+                          {elevated && !globalSearch ? (
                             <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-600">
                               <div className="flex gap-1"><dt className="font-medium" title="profiles.role">Role:</dt><dd>{student.role || "Not set"}{student.role !== "super_teacher" && (student.is_super_teacher === true || student.is_super_teacher === "true") ? " · super-teacher enabled" : ""}</dd></div>
                               <div className="flex gap-1"><dt className="font-medium" title="teacher_students">Teaching:</dt><dd>{relationshipInfo}</dd></div>
@@ -170,7 +189,7 @@ export default function TeacherStudentsPage() {
                           ) : null}
                           <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-stone-500">
                             <p>Last engaged: {formatLastEngaged(student.lastEngagedAt)}</p>
-                            {trialAccess?.detail ? <p className="text-emerald-800">Trial: {trialAccess.detail}</p> : null}
+                            {!globalSearch && trialAccess?.detail ? <p className="text-emerald-800">Trial: {trialAccess.detail}</p> : null}
                           </div>
                         </div>
                       </div>
@@ -183,7 +202,7 @@ export default function TeacherStudentsPage() {
                   );
                 })}
               </div>
-              {total > pageSize ? <div className="flex items-center gap-4 text-sm">
+              {!globalSearch && total > pageSize ? <div className="flex items-center gap-4 text-sm">
                 <button type="button" disabled={page === 0} onClick={() => setPage(value => value - 1)} className="disabled:opacity-40">Previous</button>
                 <span>Page {page + 1} of {Math.ceil(total / pageSize)}</span>
                 <button type="button" disabled={(page + 1) * pageSize >= total} onClick={() => setPage(value => value + 1)} className="disabled:opacity-40">Next</button>

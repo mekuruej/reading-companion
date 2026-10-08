@@ -6,10 +6,14 @@ import { supabase } from '@/lib/supabaseClient';
 
 type Status = {
   reason: string; canSubscribe: boolean; configured: boolean; hasAccess: boolean;
-  accessType: string; expiresAt: string | null;
+  accessType: string; expiresAt: string | null; isComplimentaryLegacy: boolean;
   subscriptions: Array<{ id: string; status: string; cancelAtPeriodEnd: boolean; paidThrough: string | null; needsReview: boolean }>;
 };
-export default function SubscriptionControls() {
+export default function SubscriptionControls({
+  onComplimentaryLegacyChange,
+}: {
+  onComplimentaryLegacyChange?: (isComplimentaryLegacy: boolean) => void;
+}) {
   const [status, setStatus] = useState<Status | null>(null);
   const [signedOut, setSignedOut] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -27,7 +31,14 @@ export default function SubscriptionControls() {
   }
   async function refresh() {
     setMessage('');
-    try { setStatus(await call('status')); } catch (error) { setMessage((error as Error).message); }
+    try {
+      const nextStatus = await call('status') as Status | null;
+      setStatus(nextStatus);
+      onComplimentaryLegacyChange?.(Boolean(nextStatus?.isComplimentaryLegacy));
+    } catch (error) {
+      setMessage((error as Error).message);
+      onComplimentaryLegacyChange?.(false);
+    }
   }
   useEffect(() => {
     void refresh();
@@ -48,6 +59,7 @@ export default function SubscriptionControls() {
   const trialEndDate = activeTrial && status?.expiresAt
     ? new Date(status.expiresAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
     : null;
+  if (status?.isComplimentaryLegacy) return null;
   return <div className="mt-6 space-y-3" aria-live="polite">
     {signedOut ? <Link href="/login" className={`${button} inline-flex`}>Sign in to subscribe</Link> : null}
     {status?.reason === 'lessons' ? <p>Japanese Learning Tools are included with your lessons.</p> : null}
