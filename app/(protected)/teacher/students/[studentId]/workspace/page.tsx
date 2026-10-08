@@ -5,6 +5,7 @@ import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { getLearnerAccessDisplay } from "@/lib/access/learnerDisplayLabels";
+import { DEFAULT_COMPLIMENTARY_LEGACY_REASON } from "@/lib/access/complimentaryLegacyAccess";
 import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 import TeacherLearningTaskModal from "../../components/TeacherLearningTaskModal";
 
@@ -16,6 +17,8 @@ type StudentProfile = {
   lesson_day: string | null;
   app_access_type: string | null;
   app_access_expires_at: string | null;
+  role?: string | null;
+  is_super_teacher?: boolean | null;
 };
 
 type LessonBook = {
@@ -76,6 +79,10 @@ type WorkspacePayload = {
   managedRelationships: { teacher_id: string; teacherName: string; archived_at: string | null; archive_reason: string | null }[];
   guidedTrialStatus: "none" | "pending" | "approved" | "existing_access";
   canAccessAllUsers: boolean;
+  viewerTeacherId: string;
+  canMakeMyStudent: boolean;
+  complimentaryLegacyGrant: { reason: string; granted_at: string; updated_at: string } | null;
+  canGrantComplimentaryLegacyAccess: boolean;
   lastEngagedAt: string | null;
   recentStudyActivity: {
     readingSessions: number;
@@ -307,6 +314,53 @@ export default function StudentWorkspacePage() {
 
   const [approvingGuidedTrial, setApprovingGuidedTrial] = useState(false);
   const [guidedTrialMessage, setGuidedTrialMessage] = useState("");
+  const [complimentaryReason, setComplimentaryReason] = useState(DEFAULT_COMPLIMENTARY_LEGACY_REASON);
+  const [complimentaryAccessSaving, setComplimentaryAccessSaving] = useState(false);
+  const [complimentaryAccessMessage, setComplimentaryAccessMessage] = useState("");
+
+  useEffect(() => {
+    if (data?.complimentaryLegacyGrant?.reason) {
+      setComplimentaryReason(data.complimentaryLegacyGrant.reason);
+    } else {
+      setComplimentaryReason(DEFAULT_COMPLIMENTARY_LEGACY_REASON);
+    }
+  }, [data?.complimentaryLegacyGrant?.reason]);
+
+  async function updateComplimentaryLegacyAccess(action: "grant" | "revoke") {
+    const message = action === "grant"
+      ? data?.complimentaryLegacyGrant
+        ? `Update the internal reason for ${studentName}'s complimentary legacy access?`
+        : `Grant ${studentName} permanent complimentary Japanese Learning access without a subscription?`
+      : `Remove ${studentName}'s complimentary legacy access? Their account and reading data will remain intact.`;
+    if (!window.confirm(message)) return;
+    setComplimentaryAccessSaving(true);
+    setComplimentaryAccessMessage("");
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const response = await fetch("/api/teacher/access/complimentary-legacy", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(sessionData.session?.access_token
+            ? { Authorization: `Bearer ${sessionData.session.access_token}` }
+            : {}),
+        },
+        body: JSON.stringify({
+          userId: studentId,
+          action,
+          ...(action === "grant" ? { reason: complimentaryReason } : {}),
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error ?? "Could not update complimentary access.");
+      await loadWorkspace();
+      setComplimentaryAccessMessage(action === "grant" ? "Complimentary access saved." : "Complimentary access removed.");
+    } catch (error) {
+      setComplimentaryAccessMessage(error instanceof Error ? error.message : "Could not update complimentary access.");
+    } finally {
+      setComplimentaryAccessSaving(false);
+    }
+  }
 
   async function approveGuidedTrial() {
     if (!window.confirm("Approve this student for Guided Trial scheduling? Their 28-day trial will not start yet.")) return;
@@ -461,6 +515,21 @@ export default function StudentWorkspacePage() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not update this relationship.");
     } finally { setManagingRelationship(null); }
+  }
+
+  async function makeMyStudent() {
+    if (!data?.canAccessAllUsers) return;
+    if (!window.confirm(`Make ${studentName} your student? This creates a teaching relationship only; their account and reader data stay unchanged.`)) return;
+    setManagingRelationship(data.viewerTeacherId);
+    setMessage("");
+    try {
+      await apiFetch("PATCH", { studentId, action: "make-student" });
+      await loadWorkspace();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not create the student relationship.");
+    } finally {
+      setManagingRelationship(null);
+    }
   }
 
   async function removeLessonBook(book: LessonBook) {
@@ -1207,8 +1276,20 @@ export default function StudentWorkspacePage() {
               <div className="rounded-xl bg-stone-50 p-3">
                 <p className="text-xs font-bold uppercase tracking-wide text-stone-500">Access</p>
                 <p className="mt-1 font-bold text-stone-900">
-                  {data.guidedTrialStatus === "approved" ? "Guided Trial Approved" : studentAccess?.label ?? "Learner"}
+                  {data.complimentaryLegacyGrant
+                    ? "Complimentary Legacy"
+                    : data.guidedTrialStatus === "approved" ? "Guided Trial Approved" : studentAccess?.label ?? "Learner"}
                 </p>
+                {data.complimentaryLegacyGrant ? (
+                  <>
+                    <p className="mt-1 text-xs text-stone-500">Permanent complimentary Japanese Learning access.</p>
+                    {data.canAccessAllUsers ? (
+                      <p className="mt-1 text-xs text-stone-700">
+                        <span className="font-bold">Reason:</span> {data.complimentaryLegacyGrant.reason}
+                      </p>
+                    ) : null}
+                  </>
+                ) : null}
                 {data.guidedTrialStatus !== "approved" && studentAccess?.detail ? (
                   <p className="mt-1 text-xs text-stone-500">{studentAccess.detail}</p>
                 ) : null}
@@ -1222,6 +1303,37 @@ export default function StudentWorkspacePage() {
                   </button>
                 ) : null}
                 {guidedTrialMessage ? <p role="status" className="mt-2 text-xs text-stone-600">{guidedTrialMessage}</p> : null}
+                {data.canAccessAllUsers && (data.complimentaryLegacyGrant || data.canGrantComplimentaryLegacyAccess) ? (
+                  <div className="mt-3 border-t border-stone-200 pt-3">
+                    <label className="block text-xs font-bold text-stone-600" htmlFor="complimentary-legacy-reason">
+                      {data.complimentaryLegacyGrant ? "Internal reason" : "Reason"}
+                    </label>
+                    <textarea
+                      id="complimentary-legacy-reason"
+                      value={complimentaryReason}
+                      onChange={(event) => setComplimentaryReason(event.target.value)}
+                      maxLength={500}
+                      rows={2}
+                      disabled={complimentaryAccessSaving}
+                      className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-xs text-stone-800"
+                    />
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button type="button" onClick={() => void updateComplimentaryLegacyAccess("grant")}
+                        disabled={complimentaryAccessSaving || !complimentaryReason.trim()}
+                        className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-900 disabled:opacity-50">
+                        {complimentaryAccessSaving ? "Saving…" : data.complimentaryLegacyGrant ? "Update reason" : "Grant Complimentary Legacy Access"}
+                      </button>
+                      {data.complimentaryLegacyGrant ? (
+                        <button type="button" onClick={() => void updateComplimentaryLegacyAccess("revoke")}
+                          disabled={complimentaryAccessSaving}
+                          className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-bold text-stone-700 disabled:opacity-50">
+                          Remove complimentary access
+                        </button>
+                      ) : null}
+                    </div>
+                    {complimentaryAccessMessage ? <p role="status" className="mt-2 text-xs text-stone-600">{complimentaryAccessMessage}</p> : null}
+                  </div>
+                ) : null}
               </div>
               <div className="rounded-xl bg-stone-50 p-3">
                 <p className="text-xs font-bold uppercase tracking-wide text-stone-500">Lesson day</p>
@@ -1253,17 +1365,32 @@ export default function StudentWorkspacePage() {
                 {profileMessage ? <p className="mt-2 text-xs text-stone-600">{profileMessage}</p> : null}
               </div>
             </div>
-            {data.managedRelationships?.length ? (
+            {data.managedRelationships?.length || data.canAccessAllUsers ? (
             <div className="mt-3 space-y-3">
+            {data.canMakeMyStudent && !data.managedRelationships.some(link => link.teacher_id === data.viewerTeacherId) ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 pt-3">
+                  <div><p className="font-medium">Your teaching relationship</p><p className="text-xs text-stone-500">No active relationship with this user.</p></div>
+                  <button type="button" disabled={managingRelationship !== null} onClick={() => void makeMyStudent()}
+                    className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 font-bold text-emerald-900 hover:bg-emerald-100 disabled:opacity-50">
+                    {managingRelationship === data.viewerTeacherId ? "Updating…" : "Make My Student"}
+                  </button>
+                </div>
+              ) : null}
               {data.managedRelationships.map(link => (
+                (() => {
+                  const isMyRelationship = link.teacher_id === data.viewerTeacherId;
+                  const isMakeMyStudent = data.canMakeMyStudent && isMyRelationship && Boolean(link.archived_at);
+                  return (
                 <div key={link.teacher_id} className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 pt-3">
                   <div><p className="font-medium">{link.teacherName}</p><p className="text-xs text-stone-500">{link.archived_at ? "Past student relationship" : "Active teaching relationship"}</p></div>
                   <button type="button" disabled={managingRelationship !== null}
-                    onClick={() => void manageRelationship(link.teacher_id, link.teacherName, Boolean(link.archived_at))}
+                    onClick={() => isMakeMyStudent ? void makeMyStudent() : void manageRelationship(link.teacher_id, link.teacherName, Boolean(link.archived_at))}
                     className="rounded-lg border border-stone-300 px-3 py-2 text-stone-600 hover:bg-stone-50 disabled:opacity-50">
-                    {managingRelationship === link.teacher_id ? "Updating…" : link.archived_at ? "Restore student relationship" : "Move to Past Student"}
+                    {managingRelationship === link.teacher_id ? "Updating…" : isMakeMyStudent ? "Make My Student" : link.archived_at ? "Restore student relationship" : "Move to Past Student"}
                   </button>
                 </div>
+                  );
+                })()
               ))}
             </div>
             ) : null}

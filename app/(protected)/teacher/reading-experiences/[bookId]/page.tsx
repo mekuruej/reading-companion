@@ -158,7 +158,7 @@ export default function ReadingExperiencesPage() {
   return (
     <main className="mx-auto max-w-4xl space-y-6 px-4 py-6">
       <nav className="flex flex-wrap gap-4 text-sm font-semibold text-stone-600">
-        <Link href={data.userBookId ? `/books/${data.userBookId}?mode=teaching` : "/teacher/library"}>← {data.userBookId ? "Back to Book Hub" : "Back to Find Your Next Teaching Book"}</Link>
+        <Link href={data.userBookId ? `/books/${data.userBookId}` : "/teacher/library"}>← {data.userBookId ? "Back to Book Hub" : "Back to Find Your Next Teaching Book"}</Link>
         {data.userBookId ? <Link href={`/books/${data.userBookId}/lesson?view=journal`}>Teacher Journal</Link> : null}
         <Link href="/teacher/library">Find Your Next Teaching Book</Link>
       </nav>

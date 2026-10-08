@@ -5576,9 +5576,6 @@ export default function BookHubPage() {
     teachingOnly: alreadyTeachingOnly,
     requestedMode: requestedBookHubMode,
   });
-  const teachingModeReturnQuery = "?mode=teaching";
-  const teachingModeStoryHref = `/books/${encodeURIComponent(row.id)}/story${teachingModeReturnQuery}`;
-
   function changeBookHubMode(nextMode: BookHubMode) {
     const href =
       nextMode === "teaching"
@@ -5662,10 +5659,9 @@ export default function BookHubPage() {
       userBookId={row.id}
       canUseBulkAdd={!isEnglishBook && canUseBulkAdd}
       canUseStoryNotes
-      onMyVocabulary={() => openTeachingTool(`/books/${row.id}/words?mode=teaching`)}
       onBulkAdd={() => {
         openTeachingTool(
-          `/vocab/bulk?userBookId=${encodeURIComponent(row.id)}&mode=teaching&from=book-hub`
+          `/vocab/bulk?userBookId=${encodeURIComponent(row.id)}&context=teaching&from=book-hub`
         );
       }}
       onFollowAlongLesson={() => {

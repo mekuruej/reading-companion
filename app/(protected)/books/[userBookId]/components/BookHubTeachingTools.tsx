@@ -21,7 +21,6 @@ type BookHubTeachingToolsProps = {
   userBookId: string;
   canUseBulkAdd: boolean;
   canUseStoryNotes: boolean;
-  onMyVocabulary: () => void;
   onBulkAdd: () => void;
   onFollowAlongLesson: () => void;
   onStoryNotes: () => void;

@@ -209,9 +209,9 @@ export default function BulkVocabPage() {
     ) ?? null;
   }, [selectedTeachingDestination, teachingDestinations]);
 
-  const backToBookHubHref = isTeachingModeBulkAdd
-    ? `/books/${encodeURIComponent(userBookId)}?mode=teaching`
-    : `/books/${encodeURIComponent(authorizedUserBookId)}`;
+  const backToBookHubHref = `/books/${encodeURIComponent(
+    isTeachingModeBulkAdd ? userBookId : authorizedUserBookId
+  )}`;
 
   const destinationClarification = selectedDestination?.type === "student"
     ? `These words will be added to ${selectedDestination.label}'s vocabulary for this book.`
@@ -239,7 +239,8 @@ export default function BulkVocabPage() {
     const id = params.get("userBookId") || "";
     setUserBookId(id);
     setIsTeachingModeBulkAdd(
-      params.get("mode") === "teaching" && params.get("from") === "book-hub"
+      params.get("from") === "book-hub" &&
+      (params.get("context") === "teaching" || params.get("mode") === "teaching")
     );
   }, []);
 
@@ -393,7 +394,7 @@ export default function BulkVocabPage() {
 
         if (isTeachingModeBulkAdd) {
           if (!canUseTeachingBulkAdd) {
-            setMessage("❌ Teaching Bulk Add is only available from your own Teaching-mode Book Hub.");
+            setMessage("❌ Teaching Bulk Add is only available for your own eligible book.");
             setAuthorizedUserBookId("");
             setTeachingDestinations([]);
             return;
@@ -1189,7 +1190,7 @@ export default function BulkVocabPage() {
               onClick={() => router.push(backToBookHubHref)}
               className="mb-2 inline-flex text-sm font-medium text-stone-500 underline-offset-4 transition hover:text-stone-800 hover:underline"
             >
-              {isTeachingModeBulkAdd ? "← Back to Teaching Book Hub" : "← Back to Book Hub"}
+              ← Back to Book Hub
             </button>
 
             <div className="mb-4 flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-2.5 shadow-sm sm:mb-5 sm:flex-row sm:items-center sm:justify-between">

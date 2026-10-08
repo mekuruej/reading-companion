@@ -125,7 +125,7 @@ export default function TeachingLessonPage() {
     return null;
   }, [lessonContext, selectedStudentUserBookId, view, wordTargets]);
 
-  const returnHref = `/books/${encodeURIComponent(userBookId)}?mode=teaching`;
+  const returnHref = `/books/${encodeURIComponent(userBookId)}`;
 
   function selectStudent(studentUserBookId: string) {
     const query = new URLSearchParams(searchParams.toString());
@@ -151,7 +151,7 @@ export default function TeachingLessonPage() {
       <main className="min-h-screen bg-slate-100 px-4 py-8">
         <div className="mx-auto max-w-3xl">
           <Link href={returnHref} className="text-sm font-bold text-stone-500 hover:text-stone-900">
-            &lt;- Back to Teaching Mode
+            &lt;- Back to Book Hub
           </Link>
           <section className="mt-4 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
             <h1 className="text-2xl font-black text-stone-950">Teaching Lesson</h1>
@@ -168,7 +168,7 @@ export default function TeachingLessonPage() {
     <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
       <div className="mx-auto max-w-[96rem]">
         <Link href={returnHref} className="text-sm font-bold text-stone-500 hover:text-stone-900">
-          &lt;- Back to Teaching Mode
+          &lt;- Back to Book Hub
         </Link>
 
         <section className="mt-4 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">

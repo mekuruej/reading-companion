@@ -601,7 +601,7 @@ export default function TeacherReadingSnapshotPage() {
   return (
     <TeacherSnapshotShell>
       <TeacherSnapshotHeader
-        bookHubHref={`/books/${userBookId}?mode=teaching`}
+        bookHubHref={`/books/${userBookId}`}
         title={book?.title || "Untitled book"}
         author={book?.author ?? null}
         coverUrl={book?.cover_url ?? null}

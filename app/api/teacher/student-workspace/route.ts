@@ -6,6 +6,8 @@ import {
   ensureStudentLessonBook,
   StudentLessonBookError,
 } from "@/lib/teacher/studentLessonBooks";
+import { ensureTeacherStudentRelationship } from "@/lib/teacher/studentRelationshipManagement";
+import { canGrantComplimentaryLegacyAccess } from "@/lib/access/complimentaryLegacyAccess";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -267,7 +269,7 @@ export async function GET(request: Request) {
 
     const { data: student, error: studentError } = await supabaseAdmin
       .from("profiles")
-      .select("id, display_name, username, level, lesson_day, role, is_super_teacher, app_access_type, app_access_expires_at")
+      .select("id, display_name, username, level, lesson_day, role, is_super_teacher, app_access_type, app_access_expires_at, app_access_subscription_id")
       .eq("id", studentId)
       .maybeSingle();
 
@@ -307,6 +309,30 @@ export async function GET(request: Request) {
       const teacher = teachers?.find(profile => profile.id === link.teacher_id);
       return { ...link, teacherName: teacher?.display_name || teacher?.username || "Teacher" };
     });
+
+    const elevated = isSuperTeacher(authorization.profile);
+    const canMakeMyStudent = elevated && student.id !== auth.user.id &&
+      !["teacher", "super_teacher", "admin"].includes(student.role ?? "") &&
+      !isSuperTeacherFlag(student.is_super_teacher);
+    let complimentaryLegacyGrant = null;
+    let hasActiveStripeSubscription = false;
+    if (elevated) {
+      const [grantResult, subscriptionsResult] = await Promise.all([
+        supabaseAdmin.from("complimentary_legacy_access_grants")
+          .select("reason, granted_at, updated_at")
+          .eq("user_id", studentId).is("revoked_at", null).maybeSingle(),
+        supabaseAdmin.from("stripe_subscriptions")
+          .select("status, paid_through")
+          .eq("user_id", studentId),
+      ]);
+      if (grantResult.error) throw grantResult.error;
+      if (subscriptionsResult.error) throw subscriptionsResult.error;
+      complimentaryLegacyGrant = grantResult.data;
+      hasActiveStripeSubscription = (subscriptionsResult.data ?? []).some(subscription =>
+        (! ["canceled", "incomplete_expired"].includes(subscription.status) ||
+          (subscription.paid_through != null && Date.parse(subscription.paid_through) > Date.now()))
+      );
+    }
 
     const { data: lessonRows, error: lessonError } = await supabaseAdmin
       .from("teacher_student_lesson_books")
@@ -555,8 +581,13 @@ export async function GET(request: Request) {
       student,
       relationship: relationship ?? null,
       managedRelationships,
+      viewerTeacherId: auth.user.id,
+      canMakeMyStudent,
       guidedTrialStatus,
       canAccessAllUsers: isSuperTeacher(authorization.profile),
+      complimentaryLegacyGrant,
+      canGrantComplimentaryLegacyAccess: elevated && !complimentaryLegacyGrant &&
+        canGrantComplimentaryLegacyAccess(student, hasActiveStripeSubscription),
       lastEngagedAt,
       recentStudyActivity: {
         readingSessions: Array.from(allReadingSummaries.values()).reduce(
@@ -695,6 +726,56 @@ export async function PATCH(request: Request) {
       });
       if (error) throw error;
       return NextResponse.json({ ok: true, ...data });
+    }
+
+    if (action === "make-student") {
+      if (!isSuperTeacher(authorization.profile)) {
+        return NextResponse.json({ error: "Super teacher access is required to create a new student relationship." }, { status: 403 });
+      }
+      if (studentId === auth.user.id) {
+        return NextResponse.json({ error: "You cannot make yourself your student." }, { status: 400 });
+      }
+      const { data: target, error: targetError } = await supabaseAdmin
+        .from("profiles")
+        .select("id, role, is_super_teacher")
+        .eq("id", studentId)
+        .maybeSingle();
+      if (targetError) throw targetError;
+      if (!target) return NextResponse.json({ error: "User profile not found." }, { status: 404 });
+      if (["teacher", "super_teacher", "admin"].includes(target.role ?? "") || isSuperTeacherFlag(target.is_super_teacher)) {
+        return NextResponse.json({ error: "Only learner accounts can be made students." }, { status: 400 });
+      }
+
+      const relationship = await ensureTeacherStudentRelationship({
+        teacherId: auth.user.id,
+        studentId,
+        store: {
+          async find(teacherId, targetStudentId) {
+            const { data, error } = await supabaseAdmin.from("teacher_students")
+              .select("teacher_id, student_id, archived_at")
+              .eq("teacher_id", teacherId).eq("student_id", targetStudentId).maybeSingle();
+            if (error) throw error;
+            return data;
+          },
+          async insert(teacherId, targetStudentId) {
+            const { error } = await supabaseAdmin.from("teacher_students").insert({
+              teacher_id: teacherId,
+              student_id: targetStudentId,
+              relationship_status: "current",
+            });
+            if (error) throw error;
+          },
+          async reactivate(teacherId, targetStudentId) {
+            const { data, error } = await supabaseAdmin.from("teacher_students")
+              .update({ relationship_status: "current", archived_at: null, archived_by: null, archive_reason: null })
+              .eq("teacher_id", teacherId).eq("student_id", targetStudentId)
+              .not("archived_at", "is", null).select("teacher_id");
+            if (error) throw error;
+            if (!data?.length) throw new Error("This relationship has already changed. Refresh the workspace.");
+          },
+        },
+      });
+      return NextResponse.json({ ok: true, ...relationship });
     }
 
     if (action === "archive-relationship" || action === "restore-relationship") {
