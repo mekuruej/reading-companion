@@ -3,8 +3,6 @@
 
 "use client";
 
-import JapaneseLearningPromoCard from "@/components/japanese-learning/JapaneseLearningPromoCard";
-
 type BookHubActionGridProps = {
   canUseJapaneseLearningActions?: boolean;
   canUseCuriosityReading?: boolean;
@@ -12,7 +10,6 @@ type BookHubActionGridProps = {
   canUseStudyFlashcards: boolean;
   canUseVocabularyList: boolean;
   canUseBulkAdd?: boolean;
-  canUseStoryNotes?: boolean;
   hasSavedWords: boolean;
   hasLearningJournalArchive?: boolean;
   showJapaneseLearningPromo?: boolean;
@@ -20,6 +17,7 @@ type BookHubActionGridProps = {
   onFluidReadingExtensive: () => void;
   onFluidReadingJustReading: () => void;
   onListening: () => void;
+  onJapaneseLearning?: () => void;
   onStudyFlashcards: () => void;
   onVocabularyList: () => void;
   onBulkAdd?: () => void;
@@ -126,36 +124,6 @@ function ActionSection({
   );
 }
 
-function CompactActionButton({
-  title,
-  description,
-  className = "",
-  onClick,
-}: {
-  title: string;
-  description: string;
-  className?: string;
-  onClick: () => void | Promise<void>;
-}) {
-  const colorClass =
-    className ||
-    "border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50";
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "rounded-xl border px-3.5 py-3 text-left shadow-sm transition-all hover:-translate-y-[1px] hover:shadow-md",
-        colorClass,
-      ].join(" ")}
-    >
-      <div className="text-base font-black text-stone-900">{title}</div>
-      <div className="mt-1 text-xs leading-5 text-stone-600">{description}</div>
-    </button>
-  );
-}
-
 function UtilityActionButton({
   title,
   description,
@@ -184,13 +152,13 @@ export default function BookHubActionGrid({
   canUseStudyFlashcards,
   canUseVocabularyList,
   canUseBulkAdd = false,
-  canUseStoryNotes = false,
   hasSavedWords,
   hasLearningJournalArchive = false,
   showJapaneseLearningPromo = false,
   onFluidReadingExtensive,
   onFluidReadingJustReading,
   onListening,
+  onJapaneseLearning,
   onStudyFlashcards,
   onVocabularyList,
   onBulkAdd,
@@ -206,84 +174,24 @@ export default function BookHubActionGrid({
     canUseBulkAdd;
   const showJapaneseLearningSection =
     canUseJapaneseLearningActions && hasCurrentLearningAction;
+  const showJapaneseLearningCard =
+    showJapaneseLearningSection || showJapaneseLearningPromo;
   const showJapaneseLearningArchive =
     !showJapaneseLearningSection && (hasSavedWords || hasLearningJournalArchive);
 
   return (
     <div className="space-y-6 pb-2">
-      {showJapaneseLearningPromo ? (
-        <JapaneseLearningPromoCard
-          title="Study Japanese with this book"
-          description="Add Japanese reading support, vocabulary tools, flashcards, and more."
-          cta="See Japanese Learning tools →"
-          source="book_hub"
-          compact
-        />
-      ) : null}
-
-      {showJapaneseLearningSection ? (
-        <ActionSection
-          title="Japanese Learning"
-          description="ページをめくって、日本語を深めよう。"
-        >
-          <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
-            {canUseStudyFlashcards ? (
-              <ActionButton
-                title="Review Words"
-                subtitle="Flashcards"
-                description="Review the words you saved from this book."
-                className="bg-blue-50 hover:bg-blue-100"
-                onClick={onStudyFlashcards}
-                size="primary"
-              />
-            ) : null}
-
-            {canUseSavedWordReading ? (
-              <ActionButton
-                title="Follow-Along"
-                subtitle="Supported Reading"
-                description={[
-                  "Fluid Reading: review with light support",
-                  "from words you already saved.",
-                ]}
-                className="bg-violet-50 hover:bg-violet-100"
-                onClick={onFluidReadingExtensive}
-                size="primary"
-              />
-            ) : null}
-          </div>
-
-          <div className="flex flex-wrap gap-2 pt-1">
-            {canUseVocabularyList ? (
-              <UtilityActionButton
-                title="Vocabulary List"
-                description="Open the saved words and vocabulary tools for this book."
-                onClick={onVocabularyList}
-              />
-            ) : null}
-
-            {canUseBulkAdd && onBulkAdd ? (
-              <UtilityActionButton
-                title="Bulk Add"
-                description="Add several words to this book at once."
-                onClick={onBulkAdd}
-              />
-            ) : null}
-          </div>
-        </ActionSection>
-      ) : null}
-
       <ActionSection
         title="Reading Companion"
         description="Every word carries the memory of where you met it."
       >
-        <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+        <div className={`grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 ${showJapaneseLearningCard ? "lg:grid-cols-3" : ""}`}>
           <ActionButton
             title="Read"
-            subtitle={canUseCuriosityReading ? "Fluid or Curiosity Reading" : "Fluid Reading"}
+            subtitle={canUseCuriosityReading ? "Also save Japanese words as you go!" : "Read and track your progress."}
             description={canUseCuriosityReading
-              ? "Choose a mode to read without stopping or save words as you read."
-              : "Standard reading mode: time and log sessions without word capture."}
+              ? "Read at your pace and save useful words from this book."
+              : "Read at your pace and keep your progress up to date."}
             className="bg-yellow-50 hover:bg-yellow-100"
             onClick={onFluidReadingJustReading}
             size="primary"
@@ -297,20 +205,65 @@ export default function BookHubActionGrid({
             onClick={onListening}
             size="primary"
           />
-        </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {onStoryNotes ? (
-            <CompactActionButton
-              title="Reading Journal"
-              description="Track characters, plot, quotes, notes, and reviews."
-              className="border-green-200 bg-green-50 text-green-950 hover:border-green-300 hover:bg-green-100"
-              onClick={onStoryNotes}
+          {showJapaneseLearningCard && onJapaneseLearning ? (
+            <ActionButton
+              title="Japanese Learning"
+              subtitle={showJapaneseLearningSection ? "Explore Japanese study tools" : "Add Japanese support to your reading."}
+              description={showJapaneseLearningSection
+                ? "Continue learning with vocabulary, flashcards, and study activities."
+                : "See the reading support and vocabulary tools available for Japanese books."}
+              className="bg-violet-50 hover:bg-violet-100"
+              onClick={onJapaneseLearning}
+              size="primary"
             />
           ) : null}
         </div>
 
+        {showJapaneseLearningSection ? (
+          <div className="space-y-2">
+            <p className="text-xs font-bold uppercase tracking-wide text-stone-500">More Japanese Learning tools</p>
+            <div className="flex flex-wrap gap-2">
+              {canUseStudyFlashcards ? (
+                <UtilityActionButton
+                  title="Review Words"
+                  description="Review the words you saved from this book."
+                  onClick={onStudyFlashcards}
+                />
+              ) : null}
+              {canUseSavedWordReading ? (
+                <UtilityActionButton
+                  title="Follow-Along"
+                  description="Read this book with light support from words you saved."
+                  onClick={onFluidReadingExtensive}
+                />
+              ) : null}
+              {canUseVocabularyList ? (
+                <UtilityActionButton
+                  title="Vocabulary List"
+                  description="Open the saved words and vocabulary tools for this book."
+                  onClick={onVocabularyList}
+                />
+              ) : null}
+              {canUseBulkAdd && onBulkAdd ? (
+                <UtilityActionButton
+                  title="Bulk Add"
+                  description="Add several words to this book at once."
+                  onClick={onBulkAdd}
+                />
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap gap-2">
+          {onStoryNotes ? (
+            <UtilityActionButton
+              title="Reading Journal"
+              description="Open your private Reading Journal for this book."
+              onClick={onStoryNotes}
+            />
+          ) : null}
           {onBookStats ? (
             <UtilityActionButton
               title="Book Stats"

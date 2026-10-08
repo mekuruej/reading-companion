@@ -5847,7 +5847,6 @@ export default function BookHubPage() {
                 canUseStudyFlashcards={canUseStudyFlashcards}
                 canUseVocabularyList={canUseVocabularyList}
                 canUseBulkAdd={!isEnglishBook && canUseBulkAdd}
-                canUseStoryNotes
                 hasSavedWords={
                   wantsJapaneseStudyTools &&
                   isJapaneseLearningBook(row.books?.language_code ?? null) &&
@@ -5878,6 +5877,14 @@ export default function BookHubPage() {
                 onListening={() => {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/listening`);
+                }}
+                onJapaneseLearning={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  router.push(
+                    canUseJapaneseLearningActions
+                      ? "/library-study"
+                      : "/japanese-learning?source=book_hub",
+                  );
                 }}
                 onStudyFlashcards={() => {
                   if (!confirmLeaveIfTimerActive()) return;
