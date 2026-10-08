@@ -500,7 +500,7 @@ export default function BookHubTeachingTools({
               return (
                 <article
                   key={draftKey}
-                  className="rounded-xl border border-stone-200 bg-stone-50 p-3"
+                  className="rounded-xl border border-stone-200 bg-stone-50 p-2.5"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
@@ -510,7 +510,7 @@ export default function BookHubTeachingTools({
                       <p className="mt-1 text-xs font-semibold text-stone-500">
                         {student.isAttached
                           ? student.resumeAtText
-                            ? "Resume at"
+                            ? <>Resume at <span className="font-bold text-stone-700">{student.resumeAtText}</span></>
                             : "Resume point not set."
                           : "Not attached to this book."}
                       </p>
@@ -523,43 +523,48 @@ export default function BookHubTeachingTools({
                   </div>
 
                   {student.isAttached ? (
-                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                      <input
-                        value={draft}
-                        onChange={(event) => {
-                          const nextValue = event.target.value.slice(
-                            0,
-                            MAX_RESUME_AT_LENGTH
-                          );
-                          setDrafts((prev) => ({
-                            ...prev,
-                            [draftKey]: nextValue,
-                          }));
-                          setMessageById((prev) => ({
-                            ...prev,
-                            [draftKey]: "",
-                          }));
-                          setErrorById((prev) => ({
-                            ...prev,
-                            [draftKey]: "",
-                          }));
-                        }}
-                        maxLength={MAX_RESUME_AT_LENGTH}
-                        placeholder="Example: Page 45 - 打算"
-                        className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-900 shadow-sm focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => void saveResumePoint(student)}
-                        disabled={isSaving}
-                        className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-black text-stone-800 shadow-sm transition hover:-translate-y-[1px] hover:border-stone-400 hover:bg-stone-50 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {isSaving ? "Saving..." : "Save"}
-                      </button>
-                    </div>
+                    <details className="mt-2">
+                      <summary className="w-fit cursor-pointer text-xs font-semibold text-stone-500 hover:text-stone-800">
+                        Edit resume point
+                      </summary>
+                      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                        <input
+                          value={draft}
+                          onChange={(event) => {
+                            const nextValue = event.target.value.slice(
+                              0,
+                              MAX_RESUME_AT_LENGTH
+                            );
+                            setDrafts((prev) => ({
+                              ...prev,
+                              [draftKey]: nextValue,
+                            }));
+                            setMessageById((prev) => ({
+                              ...prev,
+                              [draftKey]: "",
+                            }));
+                            setErrorById((prev) => ({
+                              ...prev,
+                              [draftKey]: "",
+                            }));
+                          }}
+                          maxLength={MAX_RESUME_AT_LENGTH}
+                          placeholder="Example: Page 45 - 打算"
+                          className="min-w-0 flex-1 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm font-semibold text-stone-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void saveResumePoint(student)}
+                          disabled={isSaving}
+                          className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isSaving ? "Saving..." : "Save resume point"}
+                        </button>
+                      </div>
+                    </details>
                   ) : null}
 
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold">
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold">
                     {updatedAt ? (
                       <span className="text-stone-500">Updated {updatedAt}</span>
                     ) : null}
@@ -569,37 +574,41 @@ export default function BookHubTeachingTools({
                     {rowError ? <span className="text-red-700">{rowError}</span> : null}
                   </div>
 
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    <button type="button" onClick={() => onReadingExperiences(student.studentId)} className="inline-flex min-h-11 items-center justify-center rounded-full border border-violet-200 bg-white px-4 py-2 text-sm font-semibold text-violet-800 hover:bg-violet-50">
-                      Add Reading Experience
-                    </button>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
                     {student.isAttached && student.userBookId ? (
                       <>
                         <button
                           type="button"
                           onClick={() => onStudentFlashcards(student.userBookId as string)}
-                          className="inline-flex min-h-11 items-center justify-center rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-black text-stone-800 shadow-sm transition hover:-translate-y-[1px] hover:border-stone-400 hover:bg-stone-50 hover:shadow-md"
+                          className="inline-flex min-h-9 items-center justify-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-bold text-stone-800 hover:bg-stone-100"
                         >
                           Flashcards
                         </button>
                         <button
                           type="button"
                           onClick={() => onStudentVocabularyList(student.userBookId as string)}
-                          className="inline-flex min-h-11 items-center justify-center rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-black text-stone-800 shadow-sm transition hover:-translate-y-[1px] hover:border-stone-400 hover:bg-stone-50 hover:shadow-md"
+                          className="inline-flex min-h-9 items-center justify-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-bold text-stone-800 hover:bg-stone-100"
                         >
                           Vocabulary List
                         </button>
                       </>
                     ) : null}
+                    <button
+                      type="button"
+                      onClick={() => onReadingExperiences(student.studentId)}
+                      className="inline-flex min-h-9 items-center justify-center rounded-lg px-2 py-1.5 text-sm font-medium text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+                    >
+                      Add Reading Experience
+                    </button>
                   </div>
 
-                  <div className="mt-3">
+                  <div className="mt-2 border-t border-stone-200 pt-2">
                     {student.isAttached ? (
                       <button
                         type="button"
                         onClick={() => void removeStudentBook(student)}
                         disabled={isMutating}
-                        className="text-sm font-semibold text-stone-500 hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="text-xs font-medium text-stone-500 hover:text-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {isMutating ? "Removing..." : "Remove from student tools"}
                       </button>
@@ -608,7 +617,7 @@ export default function BookHubTeachingTools({
                         type="button"
                         onClick={() => void addStudentBook(student)}
                         disabled={isMutating}
-                        className="inline-flex min-h-11 items-center justify-center rounded-full border border-stone-900 bg-stone-900 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:-translate-y-[1px] hover:bg-stone-800 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex min-h-9 items-center justify-center rounded-lg border border-stone-400 bg-white px-3 py-1.5 text-sm font-semibold text-stone-700 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {isMutating ? "Adding..." : "Add to Student"}
                       </button>

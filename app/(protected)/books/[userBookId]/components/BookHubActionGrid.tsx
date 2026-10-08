@@ -7,6 +7,7 @@ import JapaneseLearningPromoCard from "@/components/japanese-learning/JapaneseLe
 
 type BookHubActionGridProps = {
   canUseJapaneseLearningActions?: boolean;
+  canUseCuriosityReading?: boolean;
   canUseSavedWordReading: boolean;
   canUseStudyFlashcards: boolean;
   canUseVocabularyList: boolean;
@@ -178,6 +179,7 @@ function UtilityActionButton({
 
 export default function BookHubActionGrid({
   canUseJapaneseLearningActions = false,
+  canUseCuriosityReading = false,
   canUseSavedWordReading,
   canUseStudyFlashcards,
   canUseVocabularyList,
@@ -188,6 +190,7 @@ export default function BookHubActionGrid({
   showJapaneseLearningPromo = false,
   onFluidReadingExtensive,
   onFluidReadingJustReading,
+  onListening,
   onStudyFlashcards,
   onVocabularyList,
   onBulkAdd,
@@ -274,14 +277,29 @@ export default function BookHubActionGrid({
         title="Reading Companion"
         description="Every word carries the memory of where you met it."
       >
-        <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <CompactActionButton
+        <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+          <ActionButton
             title="Read"
-            description="Time reading or listening and update progress."
-            className="border-yellow-300 bg-yellow-100 text-yellow-950 hover:border-yellow-400 hover:bg-yellow-200"
+            subtitle={canUseCuriosityReading ? "Fluid or Curiosity Reading" : "Fluid Reading"}
+            description={canUseCuriosityReading
+              ? "Choose a mode to read without stopping or save words as you read."
+              : "Standard reading mode: time and log sessions without word capture."}
+            className="bg-yellow-50 hover:bg-yellow-100"
             onClick={onFluidReadingJustReading}
+            size="primary"
           />
 
+          <ActionButton
+            title="Listen"
+            subtitle="Audiobook"
+            description="Listen and track your audiobook progress."
+            className="bg-sky-50 hover:bg-sky-100"
+            onClick={onListening}
+            size="primary"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {onStoryNotes ? (
             <CompactActionButton
               title="Reading Journal"

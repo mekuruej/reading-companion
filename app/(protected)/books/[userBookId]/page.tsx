@@ -5875,6 +5875,11 @@ export default function BookHubPage() {
               />
               <BookHubActionGrid
                 canUseJapaneseLearningActions={canUseJapaneseLearningActions}
+                canUseCuriosityReading={
+                  canUseSavedWordReading &&
+                  wantsJapaneseStudyTools &&
+                  isJapaneseLearningBook(row.books?.language_code ?? null)
+                }
                 canUseSavedWordReading={canUseSavedWordReading}
                 canUseStudyFlashcards={canUseStudyFlashcards}
                 canUseVocabularyList={canUseVocabularyList}
