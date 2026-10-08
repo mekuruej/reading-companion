@@ -5878,14 +5878,6 @@ export default function BookHubPage() {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/listening`);
                 }}
-                onJapaneseLearning={() => {
-                  if (!confirmLeaveIfTimerActive()) return;
-                  router.push(
-                    canUseJapaneseLearningActions
-                      ? "/library-study"
-                      : "/japanese-learning?source=book_hub",
-                  );
-                }}
                 onStudyFlashcards={() => {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/study`);
