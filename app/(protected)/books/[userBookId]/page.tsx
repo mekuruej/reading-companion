@@ -60,7 +60,6 @@ import BookHubStatusPanel from "./components/BookHubStatusPanel";
 import BookHubModeToggle from "./components/BookHubModeToggle";
 import BookHubTeachingOverview from "./components/BookHubTeachingOverview";
 import BookHubTeachingTools from "./components/BookHubTeachingTools";
-import BookHubActionPrompt from "./components/BookHubActionPrompt";
 import WordExplorerModal from "./components/WordExplorerModal";
 import StarRatingField from "./components/StarRatingField";
 import DifficultyField from "./components/DifficultyField";
@@ -5888,8 +5887,6 @@ export default function BookHubPage() {
                 canEditLength={canEditBookInfo}
                 onRequestLength={() => { if (canEditBookInfo) { router.push(`/teacher/books/add?bookId=${encodeURIComponent(row.book_id)}`); return; } setBookFlagNote("Please add/correct the total audiobook length for this edition: "); setShowBookFlagModal(true); }}
               />
-              <BookHubActionPrompt />
-
               <BookHubNotices
                 error={error}
                 hideError={isEditingBookInfoPeople}
