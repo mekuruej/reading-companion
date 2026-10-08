@@ -112,7 +112,7 @@ export default function TeacherDiscoveryPage() {
         <div className="grid gap-4 md:grid-cols-2">{filtered.slice(0, visibleCount).map(entry => <article key={entry.book.id} className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
           <BookIdentity book={entry.book} /><AssessmentBadges entry={entry} />
           <p className="mt-3 text-xs text-stone-500">{entry.assessments.length} teacher assessment{entry.assessments.length === 1 ? "" : "s"}</p>
-          <Link href={`/teacher/reading-experiences/${entry.book.id}#overall-teaching-assessment`} className="mt-4 inline-flex rounded-2xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-black text-violet-800 hover:bg-violet-100">My Overall Teaching Assessment</Link>
+          <Link href={`/teacher/teaching-assessment/${entry.book.id}`} className="mt-4 inline-flex rounded-2xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-black text-violet-800 hover:bg-violet-100">My Overall Teaching Assessment</Link>
         </article>)}</div>
         {!filtered.length ? <p className="rounded-2xl bg-stone-50 p-4 text-sm text-stone-600">{results.length ? "No books match these filters." : "No teaching assessments have been contributed yet."}</p> : null}
         {filtered.length > visibleCount ? <button type="button" className="rounded-xl border px-4 py-2 text-sm" onClick={() => setVisibleCount(value => value + 24)}>Show more results</button> : null}
@@ -122,7 +122,7 @@ export default function TeacherDiscoveryPage() {
         <p className="text-sm text-stone-600">Japanese books in your own library awaiting your Overall Teaching Assessment. Saving an assessment removes the book from this queue, including “Not for Teaching.”</p>
         <div className="grid gap-4 md:grid-cols-2">{queue.slice(0, queueCount).map(book => <article key={book.id} className="rounded-2xl border border-stone-200 bg-white p-4">
           <BookIdentity book={book} />
-          <Link href={`/teacher/reading-experiences/${book.id}#overall-teaching-assessment`} className="mt-4 inline-flex rounded-2xl bg-blue-700 px-4 py-2 text-sm font-black text-white hover:bg-blue-800">Assess</Link>
+          <Link href={`/teacher/teaching-assessment/${book.id}`} className="mt-4 inline-flex rounded-2xl bg-blue-700 px-4 py-2 text-sm font-black text-white hover:bg-blue-800">Assess</Link>
         </article>)}</div>
         {!queue.length ? <p className="text-sm text-stone-600">No books need your assessment.</p> : null}
         {queue.length > queueCount ? <button type="button" className="rounded-xl border bg-white px-4 py-2 text-sm" onClick={() => setQueueCount(value => value + 12)}>Show more books to assess</button> : null}

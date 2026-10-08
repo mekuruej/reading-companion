@@ -79,10 +79,10 @@ test('original controls reject changes that would produce Neither before any wri
   });
   assert.equal(await personalSave('not_tracking'), false);
   assert.match(error, /How I use this book/);
-  const teachingSave = pageFunction('saveTeachingOverview', {
-    row: { id: 'book' }, userId: 'teacher', teachingOverviewSaving: false,
+  const teachingSave = pageFunction('saveTeachingStatus', {
+    row: { id: 'book' }, userId: 'teacher', teachingStatusSaving: false,
     isOwnBookHub: true, isTeacherContext: true, personalTrackingStatus: 'not_tracking',
-    teachingStatusDraft: 'not_for_teaching', setTeachingOverviewError: value => { error = value; },
+    teachingStatusDraft: 'not_for_teaching', setTeachingStatusError: value => { error = value; },
   });
   await teachingSave();
   assert.match(error, /Personal Only/);
@@ -91,7 +91,7 @@ test('direct book-use updates remain owner/teacher-only and require loaded relat
   for (const override of [{ isOwnBookHub: false }, { isTeacherContext: false }, { bookUseLoaded: false }]) {
     const handler = pageFunction('saveBookUse', {
       row: { id: 'book' }, userId: 'teacher', isOwnBookHub: true, isTeacherContext: true,
-      bookUseLoaded: true, bookUseSaving: false, savingBookStatus: false, teachingOverviewSaving: false,
+      bookUseLoaded: true, bookUseSaving: false, savingBookStatus: false, teachingStatusSaving: false,
       ...override,
     });
     await handler('personal_only');

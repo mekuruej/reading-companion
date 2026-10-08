@@ -72,9 +72,7 @@ import {
   type TeacherBookRelationship,
 } from "@/lib/teacher/teacherBookRelationship";
 import {
-  isTeachingDifficulty,
   isTeachingStatus,
-  type TeachingDifficulty,
   type TeachingStatus,
 } from "@/lib/teachingStatus";
 
@@ -678,14 +676,12 @@ export default function BookHubPage() {
   const [teacherBookRelationship, setTeacherBookRelationship] =
     useState<TeacherBookRelationship | null>(null);
   const [teachingStatusDraft, setTeachingStatusDraft] = useState<TeachingStatus | "">("");
-  const [teachingDifficultyDraft, setTeachingDifficultyDraft] =
-    useState<TeachingDifficulty | "">("");
-  const [teachingOverviewSaving, setTeachingOverviewSaving] = useState(false);
+  const [teachingStatusSaving, setTeachingStatusSaving] = useState(false);
   const [bookUseSaving, setBookUseSaving] = useState(false);
   const [bookUseError, setBookUseError] = useState<string | null>(null);
   const [bookUseLoaded, setBookUseLoaded] = useState(false);
-  const [teachingOverviewMessage, setTeachingOverviewMessage] = useState<string | null>(null);
-  const [teachingOverviewError, setTeachingOverviewError] = useState<string | null>(null);
+  const [teachingStatusMessage, setTeachingStatusMessage] = useState<string | null>(null);
+  const [teachingStatusError, setTeachingStatusError] = useState<string | null>(null);
   const [isLinkedStudentToAnyTeacher, setIsLinkedStudentToAnyTeacher] = useState(false);
   const [profileLevel, setProfileLevel] = useState<string>("");
   const [bookHubOwnerName, setBookHubOwnerName] = useState<string>("");
@@ -3372,7 +3368,7 @@ export default function BookHubPage() {
   }
 
   async function saveBookUse(nextUse: BookUse) {
-    if (!row?.id || !userId || !isOwnBookHub || !isTeacherContext || !bookUseLoaded || bookUseSaving || savingBookStatus || teachingOverviewSaving) return;
+    if (!row?.id || !userId || !isOwnBookHub || !isTeacherContext || !bookUseLoaded || bookUseSaving || savingBookStatus || teachingStatusSaving) return;
     if (!confirmLeaveIfTimerActive()) return;
     setBookUseSaving(true);
     setBookUseError(null);
@@ -3390,7 +3386,7 @@ export default function BookHubPage() {
           if (error) throw error;
           setTeacherBookRelationship(data as TeacherBookRelationship);
           setTeachingStatusDraft(isTeachingStatus(data.teaching_status) ? data.teaching_status : "");
-          setTeachingOverviewMessage(null);
+          setTeachingStatusMessage(null);
           return true;
         },
       });
@@ -3410,24 +3406,24 @@ export default function BookHubPage() {
     }
   }
 
-  async function saveTeachingOverview() {
-    if (!row?.id || !userId || teachingOverviewSaving) return;
+  async function saveTeachingStatus() {
+    if (!row?.id || !userId || teachingStatusSaving) return;
 
-    const canSaveTeachingOverview =
+    const canSaveTeachingStatus =
       isOwnBookHub && isTeacherContext;
-    if (!canSaveTeachingOverview) {
-      setTeachingOverviewError("Teaching access is required.");
+    if (!canSaveTeachingStatus) {
+      setTeachingStatusError("Teaching access is required.");
       return;
     }
 
     if (personalTrackingStatus === "not_tracking" && teachingStatusDraft === "not_for_teaching") {
-      setTeachingOverviewError("Choose Personal Only in How I use this book to enable personal tracking before marking it Not for Teaching.");
+      setTeachingStatusError("Choose Personal Only in How I use this book to enable personal tracking before marking it Not for Teaching.");
       return;
     }
 
-    setTeachingOverviewSaving(true);
-    setTeachingOverviewMessage(null);
-    setTeachingOverviewError(null);
+    setTeachingStatusSaving(true);
+    setTeachingStatusMessage(null);
+    setTeachingStatusError(null);
 
     try {
       const relationship = await ensureTeacherBookRelationship({
@@ -3439,10 +3435,7 @@ export default function BookHubPage() {
 
       const { data, error } = await supabase
         .from("teacher_books")
-        .update({
-          teaching_status: teachingStatusDraft || null,
-          teacher_jlpt_difficulty: teachingDifficultyDraft || null,
-        })
+        .update({ teaching_status: teachingStatusDraft || null })
         .eq("id", relationship.id)
         .select(
           "id, teacher_id, book_id, user_book_id, teaching_status, teacher_jlpt_difficulty, teaching_suitability, teacher_use_note"
@@ -3458,17 +3451,12 @@ export default function BookHubPage() {
           ? nextRelationship.teaching_status
           : ""
       );
-      setTeachingDifficultyDraft(
-        isTeachingDifficulty(nextRelationship.teacher_jlpt_difficulty)
-          ? nextRelationship.teacher_jlpt_difficulty
-          : ""
-      );
-      setTeachingOverviewMessage("Teaching overview saved.");
+      setTeachingStatusMessage("Teaching status saved.");
     } catch (error: any) {
-      console.error("Error saving Book Hub teaching overview:", error);
-      setTeachingOverviewError(error?.message ?? "Could not save teaching overview.");
+      console.error("Error saving Book Hub teaching status:", error);
+      setTeachingStatusError(error?.message ?? "Could not save teaching status.");
     } finally {
-      setTeachingOverviewSaving(false);
+      setTeachingStatusSaving(false);
     }
   }
 
@@ -3672,9 +3660,8 @@ export default function BookHubPage() {
     setHasFullLearningAccess(false);
     setTeacherBookRelationship(null);
     setTeachingStatusDraft("");
-    setTeachingDifficultyDraft("");
-    setTeachingOverviewMessage(null);
-    setTeachingOverviewError(null);
+    setTeachingStatusMessage(null);
+    setTeachingStatusError(null);
     setStudentWorkspaceBackContext(null);
     setBookHubOwnerNativeLanguage(null);
 
@@ -3888,14 +3875,9 @@ export default function BookHubPage() {
         setTeachingStatusDraft(
           isTeachingStatus(relationship?.teaching_status) ? relationship.teaching_status : ""
         );
-        setTeachingDifficultyDraft(
-          isTeachingDifficulty(relationship?.teacher_jlpt_difficulty)
-            ? relationship.teacher_jlpt_difficulty
-            : ""
-        );
       } catch (error: any) {
         console.error("Error loading Book Hub teaching relationship:", error);
-        setTeachingOverviewError(error?.message ?? "Could not load teaching overview.");
+        setTeachingStatusError(error?.message ?? "Could not load teaching status.");
       }
     }
 
@@ -5656,6 +5638,9 @@ export default function BookHubPage() {
       onReadingExperiences={(personId) => {
         openTeachingTool(`/teacher/reading-experiences/${row.book_id}${personId ? `?person=${encodeURIComponent(personId)}` : ""}`);
       }}
+      onTeachingAssessment={() => {
+        openTeachingTool(`/teacher/teaching-assessment/${row.book_id}`);
+      }}
       userBookId={row.id}
       canUseBulkAdd={!isEnglishBook && canUseBulkAdd}
       canUseStoryNotes
@@ -5664,15 +5649,21 @@ export default function BookHubPage() {
           `/vocab/bulk?userBookId=${encodeURIComponent(row.id)}&context=teaching&from=book-hub`
         );
       }}
-      onFollowAlongLesson={() => {
-        openTeachingTool(`/books/${encodeURIComponent(row.id)}/lesson`);
-      }}
-      onCuriosityRead={() => openTeachingTool(`/books/${row.id}/lesson?view=curiosity`)}
       onStoryNotes={() => openTeachingTool(`/books/${row.id}/lesson?view=journal`)}
       onTeacherSnapshot={() => {
         openTeachingTool(`/books/${row.id}/teacher-snapshot`);
       }}
       onTeacherFlashcards={() => void openTeacherFlashcards()}
+      onStudentFollowAlong={(studentUserBookId) => {
+        openTeachingTool(
+          `/books/${encodeURIComponent(row.id)}/lesson?studentUserBookId=${encodeURIComponent(studentUserBookId)}`
+        );
+      }}
+      onStudentSaveWords={(studentUserBookId) => {
+        openTeachingTool(
+          `/books/${encodeURIComponent(row.id)}/lesson?view=curiosity&studentUserBookId=${encodeURIComponent(studentUserBookId)}`
+        );
+      }}
       onStudentFlashcards={(studentUserBookId) => {
         openTeachingTool(`/books/${encodeURIComponent(studentUserBookId)}/study`);
       }}
@@ -5736,7 +5727,7 @@ export default function BookHubPage() {
           <BookUseSection
             currentUse={bookUseLoaded ? getBookUse(personalTrackingStatus, teacherBookRelationship?.teaching_status ?? null) : null}
             saving={bookUseSaving}
-            disabled={!bookUseLoaded || savingBookStatus || teachingOverviewSaving || isRemovingFromLibrary}
+            disabled={!bookUseLoaded || savingBookStatus || teachingStatusSaving || isRemovingFromLibrary}
             error={bookUseError || (!bookUseLoaded ? "Could not load book use. Refresh to try again." : null)}
             onChange={(use) => void saveBookUse(use)}
           />
@@ -5767,21 +5758,15 @@ export default function BookHubPage() {
                   <BookHubTeachingOverview
                     key={teacherBookRelationship?.id ?? "no-teaching-relationship"}
                     status={teachingStatusDraft}
-                    difficulty={teachingDifficultyDraft}
-                    saving={teachingOverviewSaving || bookUseSaving}
-                    message={teachingOverviewMessage}
-                    error={teachingOverviewError}
+                    saving={teachingStatusSaving || bookUseSaving}
+                    message={teachingStatusMessage}
+                    error={teachingStatusError}
                     onStatusChange={(value) => {
                       setTeachingStatusDraft(isTeachingStatus(value) ? value : "");
-                      setTeachingOverviewMessage(null);
-                      setTeachingOverviewError(null);
+                      setTeachingStatusMessage(null);
+                      setTeachingStatusError(null);
                     }}
-                    onDifficultyChange={(value) => {
-                      setTeachingDifficultyDraft(isTeachingDifficulty(value) ? value : "");
-                      setTeachingOverviewMessage(null);
-                      setTeachingOverviewError(null);
-                    }}
-                    onSave={() => void saveTeachingOverview()}
+                    onSave={() => void saveTeachingStatus()}
                   />
                 ) : (
                   <BookHubStatusPanel

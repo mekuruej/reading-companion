@@ -119,13 +119,13 @@ test('discovery page routes Assess to canonical assessment and refreshes the que
     const render = () => { cursor = 0; return nodes(component.default()); };
     render(); effect(); await new Promise(resolve => setImmediate(resolve));
     const assess = render().find(n => n.props?.children === 'Assess');
-    assert.equal(assess.props.href, '/teacher/reading-experiences/pending#overall-teaching-assessment');
-    assert.ok(render().some(n => n.props?.href === '/teacher/reading-experiences/unowned#overall-teaching-assessment'));
+    assert.equal(assess.props.href, '/teacher/teaching-assessment/pending');
+    assert.ok(render().some(n => n.props?.href === '/teacher/teaching-assessment/unowned'));
     assert.equal(render().filter(n => n.type === 'textarea').length, 0);
     queue = [];
     listeners.storage({ key: 'teaching-assessment-saved', newValue: JSON.stringify({ bookId: 'pending' }) });
     assert.ok(!render().some(n => n.props?.children === 'Assess'));
     await new Promise(resolve => setImmediate(resolve));
-    assert.ok(render().some(n => n.props?.href === '/teacher/reading-experiences/unowned#overall-teaching-assessment'));
+    assert.ok(render().some(n => n.props?.href === '/teacher/teaching-assessment/unowned'));
   } finally { globalThis.fetch = originalFetch; globalThis.window = originalWindow; }
 });

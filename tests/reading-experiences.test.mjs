@@ -213,37 +213,18 @@ test('experience form preselects the shortcut person, retains failed drafts, and
     assert.equal(requestedPerson, true);
     const badges = () => render().filter(node => node.type?.name === 'SaveBadge');
     assert.equal(badges()[0].props.state, 'new');
-    const assessmentNote = () => render().find(node => node.type === 'textarea' && !node.props.maxLength);
-    assessmentNote().props.onChange({ target: { value: 'Good teaching choice' } });
-    assert.equal(badges()[0].props.state, 'unsaved');
-    render().filter(node => node.type === 'form')[0].props.onSubmit({ preventDefault() {} });
-    assert.equal(badges()[0].props.state, 'saving');
-    assert.ok(button('Saving assessment…'));
-    await settle();
-    assert.equal(badges()[0].props.state, 'saved');
-    assert.equal(button('✓ Assessment saved').props.disabled, true);
-    assessmentNote().props.onChange({ target: { value: 'Revised assessment' } });
-    assert.equal(badges()[0].props.state, 'unsaved');
-    fail = true;
-    render().filter(node => node.type === 'form')[0].props.onSubmit({ preventDefault() {} });
-    await settle();
-    assert.equal(badges()[0].props.state, 'failed');
-    assert.ok(button('Retry save assessment'));
-    assert.equal(assessmentNote().props.value, 'Revised assessment');
-    fail = false;
-    render().filter(node => node.type === 'form')[0].props.onSubmit({ preventDefault() {} });
-    await settle();
-    assert.equal(badges()[0].props.state, 'saved');
+    assert.equal(render().filter(node => node.type === 'textarea').length, 1);
+    assert.ok(!render().some(node => node.type === 'select' && ['JLPT Difficulty', 'Teaching Suitability'].includes(node.props?.children)));
     assert.ok(!render().some(node => node.type === 'details'));
     control('experience-reader-level').props.onChange({ target: { value: 'Level 5' } });
     control('experience-level-fit').props.onChange({ target: { value: 'good_fit' } });
     assert.equal(button('Save experience').props.disabled, false);
     note().props.onChange({ target: { value: 'Early observation' } });
-    const submit = () => render().filter(node => node.type === 'form')[1].props.onSubmit({ preventDefault() {} });
+    const submit = () => render().filter(node => node.type === 'form')[0].props.onSubmit({ preventDefault() {} });
     fail = true; submit();
-    assert.equal(badges()[1].props.state, 'saving');
+    assert.equal(badges()[0].props.state, 'saving');
     await settle();
-    assert.equal(badges()[1].props.state, 'failed');
+    assert.equal(badges()[0].props.state, 'failed');
     assert.ok(button('Retry save experience'));
     assert.equal(note().props.value, 'Early observation');
     assert.equal(control('experience-reader-level').props.value, 'Level 5');
@@ -278,4 +259,54 @@ test('experience form preselects the shortcut person, retains failed drafts, and
     assert.equal(saved.length, 2); assert.equal(saved[1].person_id, person);
     assert.equal(saved[1].reader_level, null); assert.equal(saved[1].level_fit, null);
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test('dedicated Teaching Assessment edits only the existing teacher-book assessment fields', async () => {
+  const states = []; let cursor = 0, effect, savedPayload = null, savedSignal = null;
+  const originalFetch = globalThis.fetch, originalWindow = globalThis.window;
+  const existing = {
+    teacher_jlpt_difficulty: 'n3', teaching_suitability: 'usable',
+    teacher_use_status: 'testing', teacher_use_note: 'Existing private note',
+    assessed_at: '2026-09-20T12:00:00Z',
+  };
+  globalThis.window = { localStorage: { setItem: (key, value) => { savedSignal = [key, value]; } } };
+  globalThis.fetch = async (_url, options) => {
+    if (options?.method === 'POST') {
+      savedPayload = JSON.parse(options.body);
+      return Response.json({ assessment: { ...savedPayload.assessment, assessed_at: '2026-09-28T12:00:00Z' } });
+    }
+    return Response.json({ book: { id: book, title: 'Book' }, userBookId: 'copy', assessment: existing });
+  };
+  try {
+    const component = load('app/(protected)/teacher/teaching-assessment/[bookId]/page.tsx', {
+      react: {
+        useState(initial) { const index = cursor++; if (!(index in states)) states[index] = initial; return [states[index], next => { states[index] = typeof next === 'function' ? next(states[index]) : next; }]; },
+        useEffect(fn) { effect ??= fn; },
+      },
+      'next/navigation': { useParams: () => ({ bookId: book }) },
+      'next/link': { default: 'a' },
+      '@/lib/supabaseClient': { supabase: { auth: { getSession: async () => ({ data: { session: { access_token: 'test' } } }) } } },
+      '@/lib/teacher/readingExperiences': model,
+      '@/lib/teacher/teachingDiscovery': load('lib/teacher/teachingDiscovery.ts'),
+    });
+    const nodes = tree => !tree || typeof tree !== 'object' ? [] : Array.isArray(tree) ? tree.flatMap(nodes) : [tree, ...nodes(tree.props?.children)];
+    const render = () => { cursor = 0; return nodes(component.default()); };
+    const settle = () => new Promise(resolve => setImmediate(resolve));
+    render(); effect(); await settle();
+    assert.ok(render().some(node => node.type === 'h1' && node.props.children === 'Teaching Assessment'));
+    const selectors = render().filter(node => node.type === 'select');
+    assert.equal(selectors.length, 3);
+    selectors[0].props.onChange({ target: { value: 'n2' } });
+    const note = render().find(node => node.type === 'textarea');
+    note.props.onChange({ target: { value: 'Updated private assessment' } });
+    render().find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
+    await settle();
+    assert.equal(savedPayload.kind, 'assessment');
+    assert.deepEqual(savedPayload.assessment, {
+      ...existing,
+      teacher_jlpt_difficulty: 'n2',
+      teacher_use_note: 'Updated private assessment',
+    });
+    assert.deepEqual(savedSignal && savedSignal[0], 'teaching-assessment-saved');
+  } finally { globalThis.fetch = originalFetch; globalThis.window = originalWindow; }
 });

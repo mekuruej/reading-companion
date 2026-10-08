@@ -4,18 +4,16 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
-import { hasOverallTeachingAssessment } from "@/lib/teacher/teachingDiscovery";
 import { todayYmdAppTimeZone } from "@/lib/timeZone";
 import { MEKURU_READING_LEVEL_GROUPS } from "@/components/profile/MekuruReadingLevelGuide";
 import {
-  ASSESSMENT_DIFFICULTIES, ASSESSMENT_STATUSES, ASSESSMENT_SUITABILITIES, EMPTY_ASSESSMENT,
   EXPERIENCE_CONTEXTS, EXPERIENCE_NOTE_LIMIT, EXPERIENCE_LEVEL_FITS, validateExperience,
-  type BookAssessment, type ExperiencePerson, type ReadingExperience,
+  type ExperiencePerson, type ReadingExperience,
 } from "@/lib/teacher/readingExperiences";
 
 type PageData = {
   book: { id: string; title: string }; teacherId: string; userBookId: string | null;
-  assessment: BookAssessment | null; experiences: ReadingExperience[]; experienceError: string | null; hasMore: boolean;
+  experiences: ReadingExperience[]; experienceError: string | null; hasMore: boolean;
 };
 type Draft = { id?: string; person: ExperiencePerson | null; experienced_on: string; context: string; notes: string; reader_level: string; level_fit: string };
 const inputClass = "mt-1 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm";
@@ -29,9 +27,6 @@ function SaveBadge({ state }: { state: SaveState }) {
     : state === "saving" ? "border-violet-200 bg-violet-100 text-violet-900"
     : "border-amber-200 bg-amber-50 text-amber-900";
   return <span role="status" aria-live="polite" className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${tone}`}>{labels[state]}</span>;
-}
-function assessmentKey(value: BookAssessment | null) {
-  return JSON.stringify([value?.teacher_jlpt_difficulty ?? "", value?.teaching_suitability ?? "", value?.teacher_use_status ?? "", value?.teacher_use_note ?? ""]);
 }
 function experienceKey(value: { person?: ExperiencePerson | null; experienced_on: string; context: string | null; notes: string; reader_level: string | null; level_fit: string | null }) {
   return JSON.stringify([value.person?.id ?? "", value.experienced_on, value.context ?? "", value.notes, value.reader_level ?? "", value.level_fit ?? ""]);
@@ -54,18 +49,14 @@ export default function ReadingExperiencesPage() {
   const searchParams = useSearchParams();
   const initialPersonId = searchParams.get("person");
   const [data, setData] = useState<PageData | null>(null);
-  const [assessment, setAssessment] = useState<BookAssessment>({ ...EMPTY_ASSESSMENT });
   const [draft, setDraft] = useState<Draft | null>(null);
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [assessmentMessage, setAssessmentMessage] = useState("");
   const [experienceMessage, setExperienceMessage] = useState("");
-  const [assessmentSaveFailed, setAssessmentSaveFailed] = useState(false);
   const [experienceSaveFailed, setExperienceSaveFailed] = useState(false);
   const [experienceNoticeError, setExperienceNoticeError] = useState(false);
   const [lastSavedExperienceId, setLastSavedExperienceId] = useState<string | null>(null);
-  const [savingAssessment, setSavingAssessment] = useState(false);
   const [savingExperience, setSavingExperience] = useState(false);
   const [lookingUp, setLookingUp] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -77,12 +68,12 @@ export default function ReadingExperiencesPage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true); setError(""); setData(null); setDraft(null);
-    setAssessmentMessage(""); setExperienceMessage(""); setAssessmentSaveFailed(false); setExperienceSaveFailed(false); setExperienceNoticeError(false); setLastSavedExperienceId(null);
+    setExperienceMessage(""); setExperienceSaveFailed(false); setExperienceNoticeError(false); setLastSavedExperienceId(null);
     async function load() {
       try {
         const result = await requestApi(bookId) as PageData;
         if (cancelled) return;
-        setData(result); setAssessment(result.assessment ?? { ...EMPTY_ASSESSMENT });
+        setData(result);
         if (initialPersonId) {
           setDraft(newDraft());
           try {
@@ -107,17 +98,6 @@ export default function ReadingExperiencesPage() {
       setDraft(current => current ? { ...current, person } : current);
     } catch (err) { setExperienceNoticeError(true); setExperienceMessage(err instanceof Error ? err.message : "Could not find this person."); }
     finally { setLookingUp(false); }
-  }
-  async function saveAssessment() {
-    if (savingAssessment) return;
-    setAssessmentSaveFailed(false);
-    setSavingAssessment(true); setAssessmentMessage("");
-    try {
-      const result = await requestApi(bookId, { method: "POST", body: JSON.stringify({ kind: "assessment", bookId, assessment }) });
-      setAssessment(result.assessment); setData(current => current ? { ...current, assessment: result.assessment } : current); setAssessmentMessage("Overall Teaching Assessment saved.");
-      try { window.localStorage.setItem("teaching-assessment-saved", JSON.stringify({ bookId, savedAt: Date.now() })); } catch { /* Refresh on focus is also available. */ }
-    } catch (err) { setAssessmentSaveFailed(true); setAssessmentMessage(`Assessment not saved. ${err instanceof Error ? err.message : "Please try again."} Your changes are still here.`); }
-    finally { setSavingAssessment(false); }
   }
   async function saveExperience() {
     if (!draft || savingExperience) return;
@@ -146,9 +126,6 @@ export default function ReadingExperiencesPage() {
     finally { setLoadingMore(false); }
   }
 
-  const assessmentDirty = assessmentKey(assessment) !== assessmentKey(data?.assessment ?? null);
-  const assessmentSaved = hasOverallTeachingAssessment(data?.assessment);
-  const assessmentState: SaveState = savingAssessment ? "saving" : assessmentSaveFailed ? "failed" : assessmentDirty ? "unsaved" : assessmentSaved ? "saved" : "new";
   const originalExperience = data?.experiences.find(item => item.id === draft?.id);
   const experienceDirty = !!draft && (!originalExperience || experienceKey(draft) !== experienceKey(originalExperience));
   const experienceState: SaveState = savingExperience ? "saving" : experienceSaveFailed ? "failed" : experienceDirty ? (draft?.id ? "unsaved" : "new") : "saved";
@@ -159,30 +136,11 @@ export default function ReadingExperiencesPage() {
     <main className="mx-auto max-w-4xl space-y-6 px-4 py-6">
       <nav className="flex flex-wrap gap-4 text-sm font-semibold text-stone-600">
         <Link href={data.userBookId ? `/books/${data.userBookId}` : "/teacher/library"}>← {data.userBookId ? "Back to Book Hub" : "Back to Find Your Next Teaching Book"}</Link>
+        <Link href={`/teacher/teaching-assessment/${bookId}`}>Teaching Assessment</Link>
         {data.userBookId ? <Link href={`/books/${data.userBookId}/lesson?view=journal`}>Teacher Journal</Link> : null}
         <Link href="/teacher/library">Find Your Next Teaching Book</Link>
       </nav>
-      <header><p className="text-sm font-semibold text-violet-700">{data.book.title}</p><h1 className="mt-1 text-3xl font-black">Reading Experiences</h1><p className="mt-2 text-sm text-stone-600">Your overall assessment and the people you have read this book with.</p></header>
-
-      <section id="overall-teaching-assessment" className="scroll-mt-6 rounded-3xl border border-stone-200 bg-white p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold">Overall Teaching Assessment</h2><SaveBadge state={assessmentState} /></div>
-        <p className="mt-1 text-sm text-stone-600">Your current opinion of the book as a teaching choice. JLPT, suitability, and status contribute to teaching discovery; your Teacher Note stays private.</p>
-        <form aria-busy={savingAssessment} className="mt-4 space-y-4" onSubmit={event => { event.preventDefault(); void saveAssessment(); }}>
-          <fieldset disabled={savingAssessment} className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <label className="text-sm font-semibold">JLPT Difficulty<select className={inputClass} value={assessment.teacher_jlpt_difficulty ?? ""} onChange={event => setAssessment({ ...assessment, teacher_jlpt_difficulty: event.target.value || null })}><option value="">Not assessed</option>{ASSESSMENT_DIFFICULTIES.map(value => <option key={value} value={value}>{value === "above_n1" ? "Above N1" : value.toUpperCase()}</option>)}</select></label>
-              <label className="text-sm font-semibold">Teaching Suitability<select className={inputClass} value={assessment.teaching_suitability ?? ""} onChange={event => setAssessment({ ...assessment, teaching_suitability: event.target.value || null })}><option value="">Not assessed</option>{ASSESSMENT_SUITABILITIES.map(value => <option key={value} value={value}>{value === "poor_fit" ? "Poor Fit" : value === "excellent" ? "Excellent" : "Usable"}</option>)}</select></label>
-              <label className="text-sm font-semibold">Status<select className={inputClass} value={assessment.teacher_use_status ?? ""} onChange={event => setAssessment({ ...assessment, teacher_use_status: event.target.value || null })}><option value="">Not set</option>{ASSESSMENT_STATUSES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-            </div>
-            <label className="block text-sm font-semibold">Teacher Note<textarea className={inputClass} rows={3} value={assessment.teacher_use_note ?? ""} onChange={event => setAssessment({ ...assessment, teacher_use_note: event.target.value })} placeholder="Level fit, content warning, why it works, or why to avoid it…" /></label>
-            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
-              <button className={primaryClass} type="submit" disabled={savingAssessment || (assessmentSaved && !assessmentDirty && !assessmentSaveFailed)}>{savingAssessment ? "Saving assessment…" : assessmentState === "saved" ? "✓ Assessment saved" : assessmentSaveFailed ? "Retry save assessment" : "Save assessment"}</button>
-              <p className="text-sm text-stone-600">{assessmentState === "saved" ? "Your assessment is saved." : "Save this assessment separately from your reading experiences."}</p>
-            </div>
-          </fieldset>
-          {assessmentMessage && (assessmentSaveFailed || !assessmentDirty) ? <p role={assessmentSaveFailed ? "alert" : "status"} className={`rounded-xl border p-3 text-sm font-semibold ${assessmentSaveFailed ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-900"}`}>{assessmentMessage}</p> : null}
-        </form>
-      </section>
+      <header><p className="text-sm font-semibold text-violet-700">{data.book.title}</p><h1 className="mt-1 text-3xl font-black">Reading Experiences</h1><p className="mt-2 text-sm text-stone-600">Records of reading this book with specific people.</p></header>
 
       <section className="space-y-4 rounded-3xl border border-violet-200 bg-violet-50/40 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold">Reading Experiences</h2><button className={primaryClass} disabled={!!draft || !!data.experienceError} onClick={() => { setDraft(newDraft()); setExperienceMessage(""); setUsername(""); setExperienceSaveFailed(false); setExperienceNoticeError(false); }}>+ Add Reading Experience</button></div>

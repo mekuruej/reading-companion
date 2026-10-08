@@ -1,6 +1,5 @@
 "use client";
 
-import { SAVE_WORDS_COPY } from "@/lib/books/saveWordsCopy";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -22,12 +21,13 @@ type BookHubTeachingToolsProps = {
   canUseBulkAdd: boolean;
   canUseStoryNotes: boolean;
   onBulkAdd: () => void;
-  onFollowAlongLesson: () => void;
   onStoryNotes: () => void;
   onReadingExperiences: (personId?: string) => void;
-  onCuriosityRead: () => void;
+  onTeachingAssessment: () => void;
   onTeacherSnapshot: () => void;
   onTeacherFlashcards: () => void;
+  onStudentFollowAlong: (studentUserBookId: string) => void;
+  onStudentSaveWords: (studentUserBookId: string) => void;
   onStudentFlashcards: (studentUserBookId: string) => void;
   onStudentVocabularyList: (studentUserBookId: string) => void;
 };
@@ -149,12 +149,13 @@ export default function BookHubTeachingTools({
   canUseBulkAdd,
   canUseStoryNotes,
   onBulkAdd,
-  onFollowAlongLesson,
   onStoryNotes,
   onReadingExperiences,
-  onCuriosityRead,
+  onTeachingAssessment,
   onTeacherSnapshot,
   onTeacherFlashcards,
+  onStudentFollowAlong,
+  onStudentSaveWords,
   onStudentFlashcards,
   onStudentVocabularyList,
 }: BookHubTeachingToolsProps) {
@@ -433,15 +434,16 @@ export default function BookHubTeachingTools({
         description="ページをめくって、教えよう！"
       >
         <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          <TeachingToolButton {...SAVE_WORDS_COPY}
-            title="Save Lesson Words"
-            description="Save words for yourself or a student."
-            className="bg-violet-50 hover:bg-violet-100" size="primary" onClick={onCuriosityRead} />
-          <TeachingToolButton title="Teach with Follow-Along" description="Teach from your prepared words with Student Quick Add beside you."
-            className="bg-blue-50 hover:bg-blue-100" size="primary" onClick={onFollowAlongLesson} />
           <TeachingToolButton
-            title="Teaching Assessment & Experiences"
-            description="Your overall book assessment and reflections from reading with people."
+            title="Teaching Assessment"
+            description="Your overall judgment of this book as teaching material."
+            className="bg-blue-50 hover:bg-blue-100"
+            size="primary"
+            onClick={onTeachingAssessment}
+          />
+          <TeachingToolButton
+            title="Reading Experiences"
+            description="Records of reading this book with specific people."
             className="bg-blue-50 hover:bg-blue-100"
             size="primary"
             onClick={() => onReadingExperiences()}
@@ -577,6 +579,20 @@ export default function BookHubTeachingTools({
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     {student.isAttached && student.userBookId ? (
                       <>
+                        <button
+                          type="button"
+                          onClick={() => onStudentFollowAlong(student.userBookId as string)}
+                          className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-700 bg-blue-700 px-3 py-1.5 text-sm font-bold text-white hover:bg-blue-800"
+                        >
+                          Follow-Along
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onStudentSaveWords(student.userBookId as string)}
+                          className="inline-flex min-h-9 items-center justify-center rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm font-semibold text-violet-800 hover:bg-violet-100"
+                        >
+                          Save Words
+                        </button>
                         <button
                           type="button"
                           onClick={() => onStudentFlashcards(student.userBookId as string)}
