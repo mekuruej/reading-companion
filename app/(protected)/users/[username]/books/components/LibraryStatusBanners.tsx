@@ -39,11 +39,11 @@ export function AbilityCheckReminderBanner({
         </>
       }
     >
-      <p className="mt-1 text-sm leading-5 text-emerald-900">
-        {isReady
-          ? `You have ${abilityCheckReminderCount} due cards ready to check.`
-          : `You have ${abilityCheckReminderCount} of ${minDueCards} cards due.`}
-      </p>
+      {!isReady ? (
+        <p className="mt-1 text-sm leading-5 text-emerald-900">
+          Your Ability Check will be available again when enough cards are due.
+        </p>
+      ) : null}
     </LibraryReminderBanner>
   );
 }

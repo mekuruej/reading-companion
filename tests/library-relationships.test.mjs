@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
 import { createRequire } from 'node:module';
 import ts from 'typescript';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -15,6 +16,12 @@ function load(file) {
   }).outputText;
   new Function('require', 'module', 'exports', code)(name => {
     if (name.startsWith('@/')) return load(name.slice(2) + '.ts');
+    if (name.startsWith('./')) {
+      const siblingPath = path.join(path.dirname(file), name);
+      for (const extension of ['.tsx', '.ts']) {
+        if (fs.existsSync(siblingPath + extension)) return load(siblingPath + extension);
+      }
+    }
     return require(name);
   }, mod, mod.exports);
   return mod.exports;
@@ -67,6 +74,24 @@ test('Library controls retain search, personal filtering, views and sorts withou
   assert.ok(html.includes('Cover') && html.includes('List') && html.includes('difficulty_low'));
   assert.ok(html.includes('type=\"search\"') && html.includes('Search title or author'));
   assert.ok(!/currently_teaching|Teaching Status|Teaching Difficulty|Clear teaching/.test(html));
+});
+
+test('Ability Check Library reminder hides due-card counts but preserves actions and resting meaning', () => {
+  const { AbilityCheckReminderBanner } = load(base + 'components/LibraryStatusBanners.tsx');
+  const readyHtml = renderToStaticMarkup(createElement(AbilityCheckReminderBanner, {
+    abilityCheckReminderCount: 391, minDueCards: 10, onStart() {}, onHide() {},
+  }));
+  assert.ok(readyHtml.includes('Your Ability Check is ready!'));
+  assert.ok(readyHtml.includes('Start now') && readyHtml.includes('Hide today'));
+  assert.ok(!/391|due cards|cards ready|backlog/i.test(readyHtml));
+
+  const restingHtml = renderToStaticMarkup(createElement(AbilityCheckReminderBanner, {
+    abilityCheckReminderCount: 4, minDueCards: 10, onStart() {}, onHide() {},
+  }));
+  assert.ok(restingHtml.includes('Ability Check is resting today'));
+  assert.ok(restingHtml.includes('available again when enough cards are due'));
+  assert.ok(restingHtml.includes('Hide today') && !restingHtml.includes('Start now'));
+  assert.ok(!/4 of 10|cards due/.test(restingHtml));
 });
 
 const source = fs.readFileSync(base + 'page.tsx', 'utf8');
