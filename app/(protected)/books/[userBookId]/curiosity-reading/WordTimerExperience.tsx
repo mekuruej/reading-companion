@@ -315,6 +315,8 @@ export function CuriosityReadingExperience({
   workspaceCompact = false,
   workspaceAside,
   modeSwitchSlot,
+  showProgressSummaryBar = true,
+  onActiveTimerChange,
   onReadingJournalContextChange,
 }: {
   targetUserBookId?: string;
@@ -324,6 +326,8 @@ export function CuriosityReadingExperience({
   workspaceCompact?: boolean;
   workspaceAside?: ReactNode;
   modeSwitchSlot?: ReactNode;
+  showProgressSummaryBar?: boolean;
+  onActiveTimerChange?: (active: boolean) => void;
   onReadingJournalContextChange?: (context: CuriosityReadingJournalContext) => void;
 }) {
   const router = useRouter();
@@ -761,6 +765,10 @@ export function CuriosityReadingExperience({
   useEffect(() => {
     quickWordInputRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    onActiveTimerChange?.(isRunning || isPaused || showTimedSessionForm);
+  }, [isRunning, isPaused, showTimedSessionForm, onActiveTimerChange]);
 
   useEffect(() => {
     if (wordCaptureOnly || !userBookId || !tracking.loaded) return;
@@ -2012,7 +2020,7 @@ export function CuriosityReadingExperience({
 
   const content = (
     <>
-      {!wordCaptureOnly ? <BookProgressSummaryBar userBookId={userBookId} listening={isListeningMode} showBackLink={workspaceCompact} /> : null}
+      {!wordCaptureOnly && showProgressSummaryBar ? <BookProgressSummaryBar userBookId={userBookId} listening={isListeningMode} showBackLink={workspaceCompact} /> : null}
       {useCompactSessionBar ? (
         <>
           <CuriosityPageHeader title={pageTitle} description={pageDescription} />

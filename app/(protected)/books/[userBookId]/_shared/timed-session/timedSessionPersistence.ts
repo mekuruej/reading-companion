@@ -54,6 +54,15 @@ export function readPersistedTimedSession(
   }
 }
 
+export function hasUnfinishedTimedSession(state: PersistedTimedSessionState | null) {
+  return Boolean(state && (
+    state.isPaused ||
+    state.startedAt != null ||
+    state.showTimedSessionForm ||
+    state.accumulatedElapsedMs > 0
+  ));
+}
+
 export function writePersistedTimedSession(state: PersistedTimedSessionState) {
   if (typeof window === "undefined") return;
 

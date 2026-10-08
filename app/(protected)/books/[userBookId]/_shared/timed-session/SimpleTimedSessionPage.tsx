@@ -41,6 +41,8 @@ type SimpleTimedSessionPageProps = {
     embedded?: boolean;
     workspaceCompact?: boolean;
     showFluidReadingExplanation?: boolean;
+    showProgressSummaryBar?: boolean;
+    onActiveTimerChange?: (active: boolean) => void;
 };
 
 function formatTimer(totalSeconds: number) {
@@ -70,6 +72,8 @@ export default function SimpleTimedSessionPage({
     embedded = false,
     workspaceCompact = false,
     showFluidReadingExplanation = false,
+    showProgressSummaryBar = true,
+    onActiveTimerChange,
 }: SimpleTimedSessionPageProps) {
     const tracking = useBookProgress();
     const labels = progressLabels(tracking.method);
@@ -149,6 +153,10 @@ export default function SimpleTimedSessionPage({
             onActiveSessionModeChange?.(activeSessionMode);
         }
     }, [activeSessionMode, allowNativeReadListenToggle, onActiveSessionModeChange]);
+
+    useEffect(() => {
+        onActiveTimerChange?.(isRunning || isPaused || showTimedSessionForm);
+    }, [isRunning, isPaused, showTimedSessionForm, onActiveTimerChange]);
 
     useEffect(() => {
         let cancelled = false;
@@ -1231,13 +1239,13 @@ export default function SimpleTimedSessionPage({
     );
 
     if (embedded) {
-        return <div className="space-y-5"><BookProgressSummaryBar userBookId={userBookId} listening={activeSessionMode === "listening"} showBackLink={workspaceCompact} />{content}</div>;
+        return <div className="space-y-5">{showProgressSummaryBar ? <BookProgressSummaryBar userBookId={userBookId} listening={activeSessionMode === "listening"} showBackLink={workspaceCompact} /> : null}{content}</div>;
     }
 
     return (
         <main className="min-h-screen bg-stone-50 p-6">
             <div className="mx-auto max-w-4xl space-y-5">
-                <BookProgressSummaryBar userBookId={userBookId} listening={activeSessionMode === "listening"} showBackLink={workspaceCompact} />
+                {showProgressSummaryBar ? <BookProgressSummaryBar userBookId={userBookId} listening={activeSessionMode === "listening"} showBackLink={workspaceCompact} /> : null}
                 {content}
             </div>
         </main>

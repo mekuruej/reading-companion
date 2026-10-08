@@ -695,7 +695,6 @@ export default function BookHubPage() {
     useState<StudentWorkspaceBackContext | null>(null);
 
   const [canUseStoryNotes, setCanUseStoryNotes] = useState(false);
-  const [canUseCuriosityReading, setCanUseCuriosityReading] = useState(false);
   const [canUseSavedWordReading, setCanUseSavedWordReading] = useState(false);
   const [canUseStudyFlashcards, setCanUseStudyFlashcards] = useState(false);
   const [canUseVocabularyList, setCanUseVocabularyList] = useState(false);
@@ -3662,7 +3661,6 @@ export default function BookHubPage() {
     setLoading(true);
     setError(null);
     setCanUseStoryNotes(false);
-    setCanUseCuriosityReading(false);
     setCanUseSavedWordReading(false);
     setCanUseStudyFlashcards(false);
     setCanUseVocabularyList(false);
@@ -3747,9 +3745,6 @@ export default function BookHubPage() {
     });
 
     setCanUseStoryNotes(canUseFullAccessFeature(featureAccess, "story_notes"));
-    setCanUseCuriosityReading(
-      canUseFullAccessFeature(featureAccess, "curiosity_reading")
-    );
     setCanUseSavedWordReading(
       canUseFullAccessFeature(featureAccess, "saved_word_reading")
     );
@@ -5884,7 +5879,6 @@ export default function BookHubPage() {
               />
               <BookHubActionGrid
                 canUseJapaneseLearningActions={canUseJapaneseLearningActions}
-                canUseCuriosityReading={canUseCuriosityReading}
                 canUseSavedWordReading={canUseSavedWordReading}
                 canUseStudyFlashcards={canUseStudyFlashcards}
                 canUseVocabularyList={canUseVocabularyList}
@@ -5909,17 +5903,13 @@ export default function BookHubPage() {
                   !hasFullLearningAccess &&
                   !isTeacherContext
                 }
-                onCuriosityReading={() => {
-                  if (!confirmLeaveIfTimerActive()) return;
-                  router.push(`/books/${row.id}/curiosity-reading`);
-                }}
                 onFluidReadingExtensive={() => {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/readalong`);
                 }}
                 onFluidReadingJustReading={() => {
                   if (!confirmLeaveIfTimerActive()) return;
-                  router.push(`/books/${row.id}/just-reading`);
+                  router.push(`/books/${row.id}/read?mode=fluid`);
                 }}
                 onListening={() => {
                   if (!confirmLeaveIfTimerActive()) return;

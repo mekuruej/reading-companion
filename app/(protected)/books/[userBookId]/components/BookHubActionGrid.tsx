@@ -3,13 +3,10 @@
 
 "use client";
 
-import { SAVE_WORDS_COPY } from "@/lib/books/saveWordsCopy";
-
 import JapaneseLearningPromoCard from "@/components/japanese-learning/JapaneseLearningPromoCard";
 
 type BookHubActionGridProps = {
   canUseJapaneseLearningActions?: boolean;
-  canUseCuriosityReading: boolean;
   canUseSavedWordReading: boolean;
   canUseStudyFlashcards: boolean;
   canUseVocabularyList: boolean;
@@ -19,7 +16,6 @@ type BookHubActionGridProps = {
   hasLearningJournalArchive?: boolean;
   showJapaneseLearningPromo?: boolean;
 
-  onCuriosityReading: () => void;
   onFluidReadingExtensive: () => void;
   onFluidReadingJustReading: () => void;
   onListening: () => void;
@@ -182,7 +178,6 @@ function UtilityActionButton({
 
 export default function BookHubActionGrid({
   canUseJapaneseLearningActions = false,
-  canUseCuriosityReading,
   canUseSavedWordReading,
   canUseStudyFlashcards,
   canUseVocabularyList,
@@ -191,7 +186,6 @@ export default function BookHubActionGrid({
   hasSavedWords,
   hasLearningJournalArchive = false,
   showJapaneseLearningPromo = false,
-  onCuriosityReading,
   onFluidReadingExtensive,
   onFluidReadingJustReading,
   onStudyFlashcards,
@@ -205,7 +199,6 @@ export default function BookHubActionGrid({
   const hasCurrentLearningAction =
     canUseSavedWordReading ||
     canUseStudyFlashcards ||
-    canUseCuriosityReading ||
     canUseVocabularyList ||
     canUseBulkAdd;
   const showJapaneseLearningSection =
@@ -231,15 +224,6 @@ export default function BookHubActionGrid({
           description="ページをめくって、日本語を深めよう。"
         >
           <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
-            {canUseCuriosityReading ? (
-              <ActionButton
-                {...SAVE_WORDS_COPY}
-                className="bg-violet-50 hover:bg-violet-100"
-                onClick={onCuriosityReading}
-                size="primary"
-              />
-            ) : null}
-
             {canUseStudyFlashcards ? (
               <ActionButton
                 title="Review Words"
@@ -292,7 +276,7 @@ export default function BookHubActionGrid({
       >
         <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <CompactActionButton
-            title="Read / Listen"
+            title="Read"
             description="Time reading or listening and update progress."
             className="border-yellow-300 bg-yellow-100 text-yellow-950 hover:border-yellow-400 hover:bg-yellow-200"
             onClick={onFluidReadingJustReading}
