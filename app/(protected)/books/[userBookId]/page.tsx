@@ -52,7 +52,6 @@ import BookUseSection from "./components/BookUseSection";
 import { changeBookUse, getBookUse, type BookUse } from "./bookUse";
 import { resolveBookHubMode } from "@/lib/books/bookHubMode";
 import RemoveFromLibraryDialog from "./components/RemoveFromLibraryDialog";
-import BookProgressSummaryBar from "@/components/books/BookProgressSummaryBar";
 import BookHubProgressSummary from "./components/BookHubProgressSummary";
 import BookHubNotices from "./components/BookHubNotices";
 import BookHubHero from "./components/BookHubHero";
@@ -5693,7 +5692,6 @@ export default function BookHubPage() {
   );
 
   const showBookHubStartButton = !started && realReadingSessions.length === 0;
-  const showUpperProgressSummary = isJapaneseLearningBook(book.language_code ?? null);
   return (
     <main className="min-h-screen bg-stone-50 p-6">
       {showBookFlagModal ? (
@@ -5777,7 +5775,7 @@ export default function BookHubPage() {
                 }}
               />
 
-              <div className={showUpperProgressSummary && bookHubMode !== "teaching" ? "md:row-span-2" : ""}>
+              <div>
                 {bookHubMode === "teaching" ? (
                   <BookHubTeachingOverview
                     key={teacherBookRelationship?.id ?? "no-teaching-relationship"}
@@ -5841,11 +5839,6 @@ export default function BookHubPage() {
                 )}
               </div>
 
-              {showUpperProgressSummary && bookHubMode !== "teaching" ? (
-                <div className="md:col-span-2">
-                  <BookProgressSummaryBar userBookId={row.id} showVocabulary={canSeeVocabularySummary} />
-                </div>
-              ) : null}
             </div>
 
             {bookHubMode === "teaching" ? (
