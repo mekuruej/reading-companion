@@ -5769,10 +5769,6 @@ export default function BookHubPage() {
                 displayedCoverUrl={book.cover_url}
                 bookHubContextLabel={bookHubContextLabel}
                 isViewingStudentBookHub={isViewingStudentBookHub}
-                onAboutBook={() => {
-                  if (!confirmLeaveIfTimerActive()) return;
-                  router.push(`/books/${row.id}/about${bookHubMode === "teaching" ? "?mode=teaching" : ""}`);
-                }}
               />
 
               <div>
@@ -5952,6 +5948,10 @@ export default function BookHubPage() {
                 onBookStats={() => {
                   if (!confirmLeaveIfTimerActive()) return;
                   router.push(`/books/${row.id}/stats`);
+                }}
+                onAboutBook={() => {
+                  if (!confirmLeaveIfTimerActive()) return;
+                  router.push(`/books/${row.id}/about`);
                 }}
               />
 

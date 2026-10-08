@@ -15,7 +15,6 @@ type BookHubHeroProps = {
   displayedCoverUrl: string | null;
   bookHubContextLabel: string;
   isViewingStudentBookHub: boolean;
-  onAboutBook?: () => void;
 };
 
 export default function BookHubHero({
@@ -23,7 +22,6 @@ export default function BookHubHero({
   displayedCoverUrl,
   bookHubContextLabel,
   isViewingStudentBookHub,
-  onAboutBook,
 }: BookHubHeroProps) {
   const bookIdentity = getBookIdentity(book);
 
@@ -82,17 +80,6 @@ export default function BookHubHero({
           ) : null}
         </div>
 
-        {onAboutBook ? (
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={onAboutBook}
-              className="inline-flex rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm font-bold text-stone-700 shadow-sm transition hover:border-stone-300 hover:bg-white hover:text-stone-950"
-            >
-              About this book -&gt;
-            </button>
-          </div>
-        ) : null}
       </div>
     </>
   );

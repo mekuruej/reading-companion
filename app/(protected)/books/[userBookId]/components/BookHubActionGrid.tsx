@@ -29,6 +29,7 @@ type BookHubActionGridProps = {
   onStoryNotes?: () => void;
   onReadingSessions?: () => void;
   onBookStats?: () => void;
+  onAboutBook?: () => void;
 };
 
 function ActionButton({
@@ -199,6 +200,7 @@ export default function BookHubActionGrid({
   onStoryNotes,
   onReadingSessions,
   onBookStats,
+  onAboutBook,
 }: BookHubActionGridProps) {
   const hasCurrentLearningAction =
     canUseSavedWordReading ||
@@ -304,22 +306,28 @@ export default function BookHubActionGrid({
               onClick={onStoryNotes}
             />
           ) : null}
+        </div>
 
+        <div className="flex flex-wrap gap-2">
           {onBookStats ? (
-            <CompactActionButton
+            <UtilityActionButton
               title="Book Stats"
               description="Open time, pages, sessions, and progress for this book."
-              className="border-blue-200 bg-blue-50 text-blue-950 hover:border-blue-300 hover:bg-blue-100"
               onClick={onBookStats}
             />
           ) : null}
-
           {onReadingSessions ? (
-            <CompactActionButton
+            <UtilityActionButton
               title="Reading History"
               description="Edit session records, dates, and reading history for this book."
-              className="border-purple-200 bg-purple-50 text-purple-950 hover:border-purple-300 hover:bg-purple-100"
               onClick={onReadingSessions}
+            />
+          ) : null}
+          {onAboutBook ? (
+            <UtilityActionButton
+              title="About this Book"
+              description="View book details and metadata."
+              onClick={onAboutBook}
             />
           ) : null}
         </div>
