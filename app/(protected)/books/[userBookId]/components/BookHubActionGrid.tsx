@@ -190,7 +190,7 @@ export default function BookHubActionGrid({
             title="Read"
             subtitle={canUseCuriosityReading ? "Also save Japanese words as you go!" : "Read and track your progress."}
             description={canUseCuriosityReading
-              ? "Read at your pace and save useful words from this book."
+              ? "Just Read or Save Words as you go."
               : "Read at your pace and keep your progress up to date."}
             className="bg-yellow-50 hover:bg-yellow-100"
             onClick={onFluidReadingJustReading}

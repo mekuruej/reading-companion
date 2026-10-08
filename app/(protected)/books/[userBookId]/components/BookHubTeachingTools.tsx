@@ -58,6 +58,43 @@ function TeachingUtilityButton({
   );
 }
 
+function StudentCardButton({
+  children,
+  onClick,
+  variant = "secondary",
+  disabled = false,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  variant?: "primary" | "secondary" | "tertiary" | "attach";
+  disabled?: boolean;
+}) {
+  const variantClass = {
+    primary:
+      "border-violet-700 bg-violet-700 text-white hover:border-violet-800 hover:bg-violet-800 focus-visible:ring-violet-300",
+    secondary:
+      "border-violet-200 bg-white text-stone-800 hover:border-violet-300 hover:bg-violet-50 focus-visible:ring-violet-200",
+    tertiary:
+      "border-transparent bg-transparent text-stone-500 shadow-none hover:bg-white/70 hover:text-stone-800 focus-visible:ring-stone-300",
+    attach:
+      "border-stone-300 bg-white text-stone-700 hover:border-stone-400 hover:bg-stone-100 focus-visible:ring-stone-300",
+  }[variant];
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={[
+        "inline-flex min-h-9 items-center justify-center rounded-lg border px-3 py-1.5 text-sm font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
+        variantClass,
+      ].join(" ")}
+    >
+      {children}
+    </button>
+  );
+}
+
 function TeachingActionSection({
   title,
   description,
@@ -430,14 +467,19 @@ export default function BookHubTeachingTools({
               return (
                 <article
                   key={draftKey}
-                  className="rounded-xl border border-stone-200 bg-stone-50 p-2.5"
+                  className={[
+                    "rounded-xl border p-3 shadow-sm",
+                    student.isAttached
+                      ? "border-violet-200 bg-gradient-to-br from-violet-50 via-white to-amber-50"
+                      : "border-stone-200 bg-stone-50/80",
+                  ].join(" ")}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <h3 className="text-sm font-black text-stone-950">
                         {student.studentName}
                       </h3>
-                      <p className="mt-1 text-xs font-semibold text-stone-500">
+                      <p className="mt-1 text-xs font-semibold text-stone-600">
                         {student.isAttached
                           ? student.resumeAtText
                             ? <>Resume at <span className="font-bold text-stone-700">{student.resumeAtText}</span></>
@@ -453,8 +495,8 @@ export default function BookHubTeachingTools({
                   </div>
 
                   {student.isAttached ? (
-                    <details className="mt-2">
-                      <summary className="w-fit cursor-pointer text-xs font-semibold text-stone-500 hover:text-stone-800">
+                    <details className="mt-2.5">
+                      <summary className="inline-flex min-h-8 w-fit cursor-pointer items-center rounded-md px-2 text-xs font-semibold text-stone-600 hover:bg-white/70 hover:text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 focus-visible:ring-offset-1">
                         Edit resume point
                       </summary>
                       <div className="mt-2 flex flex-col gap-2 sm:flex-row">
@@ -480,21 +522,19 @@ export default function BookHubTeachingTools({
                           }}
                           maxLength={MAX_RESUME_AT_LENGTH}
                           placeholder="Example: Page 45 - 打算"
-                          className="min-w-0 flex-1 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm font-semibold text-stone-900 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                          className="min-w-0 flex-1 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm font-semibold text-stone-900 focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-100"
                         />
-                        <button
-                          type="button"
+                        <StudentCardButton
                           onClick={() => void saveResumePoint(student)}
                           disabled={isSaving}
-                          className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {isSaving ? "Saving..." : "Save resume point"}
-                        </button>
+                        </StudentCardButton>
                       </div>
                     </details>
                   ) : null}
 
-                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold">
                     {updatedAt ? (
                       <span className="text-stone-500">Updated {updatedAt}</span>
                     ) : null}
@@ -504,67 +544,56 @@ export default function BookHubTeachingTools({
                     {rowError ? <span className="text-red-700">{rowError}</span> : null}
                   </div>
 
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2">
                     {student.isAttached && student.userBookId ? (
                       <>
-                        <button
-                          type="button"
+                        <StudentCardButton
                           onClick={() => onStudentFollowAlong(student.userBookId as string)}
-                          className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-700 bg-blue-700 px-3 py-1.5 text-sm font-bold text-white hover:bg-blue-800"
+                          variant="primary"
                         >
                           Follow-Along
-                        </button>
-                        <button
-                          type="button"
+                        </StudentCardButton>
+                        <StudentCardButton
                           onClick={() => onStudentSaveWords(student.userBookId as string)}
-                          className="inline-flex min-h-9 items-center justify-center rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-sm font-semibold text-violet-800 hover:bg-violet-100"
                         >
                           Save Words
-                        </button>
-                        <button
-                          type="button"
+                        </StudentCardButton>
+                        <StudentCardButton
                           onClick={() => onStudentFlashcards(student.userBookId as string)}
-                          className="inline-flex min-h-9 items-center justify-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-bold text-stone-800 hover:bg-stone-100"
                         >
                           Flashcards
-                        </button>
-                        <button
-                          type="button"
+                        </StudentCardButton>
+                        <StudentCardButton
                           onClick={() => onStudentVocabularyList(student.userBookId as string)}
-                          className="inline-flex min-h-9 items-center justify-center rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-bold text-stone-800 hover:bg-stone-100"
                         >
                           Vocabulary List
-                        </button>
+                        </StudentCardButton>
                       </>
                     ) : null}
-                    <button
-                      type="button"
+                    <StudentCardButton
                       onClick={() => onReadingExperiences(student.studentId)}
-                      className="inline-flex min-h-9 items-center justify-center rounded-lg px-2 py-1.5 text-sm font-medium text-stone-500 hover:bg-stone-100 hover:text-stone-800"
                     >
-                      Add Reading Experience
-                    </button>
+                      Reading Experience
+                    </StudentCardButton>
                   </div>
 
-                  <div className="mt-2 border-t border-stone-200 pt-2">
+                  <div className="mt-2.5 border-t border-stone-200/80 pt-2">
                     {student.isAttached ? (
-                      <button
-                        type="button"
+                      <StudentCardButton
                         onClick={() => void removeStudentBook(student)}
                         disabled={isMutating}
-                        className="text-xs font-medium text-stone-500 hover:text-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
+                        variant="tertiary"
                       >
                         {isMutating ? "Removing..." : "Remove from student tools"}
-                      </button>
+                      </StudentCardButton>
                     ) : (
-                      <button
-                        type="button"
+                      <StudentCardButton
                         onClick={() => void addStudentBook(student)}
                         disabled={isMutating}
-                        className="inline-flex min-h-9 items-center justify-center rounded-lg border border-stone-400 bg-white px-3 py-1.5 text-sm font-semibold text-stone-700 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        variant="attach"
                       >
                         {isMutating ? "Adding..." : "Add to Student"}
-                      </button>
+                      </StudentCardButton>
                     )}
                   </div>
                 </article>
