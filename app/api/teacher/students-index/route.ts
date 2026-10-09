@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import { isAllUserTeacher } from "@/lib/teacher/targetUserAccess";
 import { canUseStudentsCategory, isActiveStudentRelationship, type StudentsCategory } from "@/lib/teacher/studentsIndex";
 
+import { loadActiveComplimentaryLegacyUserIds } from "@/lib/teacher/complimentaryLegacyIndex";
+
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 const PAGE_SIZE = 24;
 
@@ -27,7 +29,7 @@ export async function GET(request: Request) {
     if (actorError) throw actorError;
     const params = new URL(request.url).searchParams;
     const category = (params.get("category") ?? "current") as StudentsCategory;
-    if (!["trial", "current", "other", "past"].includes(category)) {
+    if (!["trial", "current", "legacy", "other", "past"].includes(category)) {
       return NextResponse.json({ error: "Unknown category." }, { status: 400 });
     }
     if (!canUseStudentsCategory(actor, category)) {
@@ -44,13 +46,15 @@ export async function GET(request: Request) {
     });
     const activeIds = new Set(links.filter(isActiveStudentRelationship).map(link => link.student_id));
     const pastIds = new Set(links.filter(link => !isActiveStudentRelationship(link) && !activeIds.has(link.student_id)).map(link => link.student_id));
-    const scopedIds = category === "current" ? [...activeIds] : category === "past" ? [...pastIds] : null;
+    const legacyIds = elevated ? await loadActiveComplimentaryLegacyUserIds(db) : new Set<string>();
+    const scopedIds = category === "current" ? [...activeIds] : category === "past" ? [...pastIds] : category === "legacy" ? [...legacyIds] : null;
     if (scopedIds?.length === 0) return NextResponse.json({ users: [], total: 0, elevated, pageSize: PAGE_SIZE });
 
     let query = db.from("profiles").select("id, display_name, username, level, role, is_super_teacher, lesson_day, app_access_type, app_access_expires_at", { count: "exact" })
       .neq("id", auth.user.id);
     if (scopedIds) query = query.in("id", scopedIds);
     if (category === "other") {
+      if (legacyIds.size) query = query.not("id", "in", `(${[...legacyIds].join(",")})`);
       if (activeIds.size) query = query.not("id", "in", `(${[...activeIds].join(",")})`);
       const now = new Date().toISOString();
       // Inverse of the canonical active-trial predicate: trial type + future expiry + non-staff.
@@ -88,7 +92,7 @@ export async function GET(request: Request) {
           .eq("user_books.user_id", profile.id).not("read_on", "is", null)
           .order("read_on", { ascending: false }).limit(1).maybeSingle();
       if (activityError) throw activityError;
-      return { ...profile, isCurrentStudent: activeIds.has(profile.id),
+      return { ...profile, hasComplimentaryLegacyAccess: legacyIds.has(profile.id), isCurrentStudent: activeIds.has(profile.id),
         lastEngagedAt: activity?.read_on ?? null,
         archivedTeacherId: links.find(link => link.student_id === profile.id && link.archived_at)?.teacher_id ?? null };
     }));

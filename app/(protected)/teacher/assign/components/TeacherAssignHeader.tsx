@@ -29,7 +29,7 @@ export function TeacherAssignHeader({ isSuperTeacher }: TeacherAssignHeaderProps
             fontWeight: 750,
           }}
         >
-          Back to My Students
+          {isSuperTeacher ? "Back to Users" : "Back to My Students"}
         </Link>
       </div>
 

@@ -4,7 +4,6 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { wantsJapaneseLearning } from "@/lib/access/japaneseLearningIntent";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function BooksRedirectPage() {
@@ -44,8 +43,7 @@ export default function BooksRedirectPage() {
         !!profile?.username &&
         !!profile?.display_name &&
         !!profile?.native_language &&
-        typeof profile?.japanese_learning_enabled === "boolean" &&
-        (!wantsJapaneseLearning(profile) || !!profile?.level);
+        typeof profile?.japanese_learning_enabled === "boolean";
 
       if (!isComplete) {
         router.replace("/community/profile/setup");

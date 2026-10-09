@@ -4,6 +4,7 @@
 "use client";
 
 import Link from "next/link";
+import { isAllUserTeacher } from "@/lib/teacher/targetUserAccess";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -139,6 +140,7 @@ function PrepCardGrid({ cards }: { cards: PrepCard[] }) {
 
 export default function TeacherLessonPrepPage() {
   const [accessChecked, setAccessChecked] = useState(false);
+  const [indexElevated, setIndexElevated] = useState(false);
   const [canAccess, setCanAccess] = useState(false);
   const [currentTeacherId, setCurrentTeacherId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -186,6 +188,7 @@ export default function TeacherLessonPrepPage() {
         profile?.role === "super_teacher" ||
         isSuperTeacherFlag(profile?.is_super_teacher);
 
+      setIndexElevated(isAllUserTeacher(profile));
       setCanAccess(isTeacher);
       setCurrentTeacherId(isTeacher ? user.id : null);
       setMessage(isTeacher ? "" : "Teacher access is required.");
@@ -308,7 +311,7 @@ export default function TeacherLessonPrepPage() {
         </section>
 
         <section className="mt-6">
-          <PrepCardGrid cards={prepCards} />
+          <PrepCardGrid cards={prepCards.map(card => card.href?.startsWith("/teacher/students") && indexElevated ? { ...card, title: "Users" } : card)} />
         </section>
 
         <section className="mt-6 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
@@ -328,7 +331,7 @@ export default function TeacherLessonPrepPage() {
               href="/teacher/students"
               className="inline-flex rounded-2xl border border-stone-200 bg-white px-4 py-2 text-sm font-black text-stone-800 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
             >
-              Open Students →
+              Open {indexElevated ? "Users" : "Students"} →
             </Link>
           </div>
 

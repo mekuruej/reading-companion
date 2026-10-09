@@ -83,3 +83,9 @@ export const PROFILE_LEVEL_OPTIONS = [
     feel: "Can read widely with nuance, ambiguity, tone, and less hand-holding.",
   },
 ] as const;
+
+// Omission preserves an existing profile level; an unknown level is never guessed.
+export function profileReadingLevelFields(japaneseLearningEnabled: boolean | null, selectedLevel: string) {
+  const level = selectedLevel.trim();
+  return japaneseLearningEnabled && level ? { level } : {};
+}

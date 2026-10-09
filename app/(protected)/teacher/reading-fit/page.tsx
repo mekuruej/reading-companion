@@ -249,7 +249,7 @@ export default function TeacherReadingFitPage() {
             profile?.username ||
             "Unknown student";
 
-          const effectiveReaderLevel = row.reader_level || profile?.level || null;
+          const effectiveReaderLevel = row.reader_level ?? null;
           const missingReaderLevel = !String(effectiveReaderLevel ?? "").trim();
           const missingDifficulty = row.rating_difficulty == null;
           const missingEntertainment = row.rating_overall == null;

@@ -1,4 +1,5 @@
 import 'server-only';
+import { hasActiveComplimentaryLegacyAccess } from '@/lib/access/complimentaryLegacyAccess';
 import { getAppAccessStatus } from '@/lib/access/appAccess';
 import { BillingError, config, db } from './server';
 
@@ -24,10 +25,7 @@ export async function billingStatus(userId: string) {
   const subscriptions = rows ?? [];
   const existing = subscriptions.some(s => !['canceled','incomplete_expired'].includes(s.status) ||
     (s.paid_through && Date.parse(s.paid_through) > Date.now()));
-  const isComplimentaryLegacy = Boolean(legacyGrant &&
-    profile.app_access_type?.trim().toLowerCase() === 'reading_access' &&
-    !profile.app_access_expires_at && !profile.app_access_subscription_id &&
-    !profile.trial_started_at && !existing && access.reason === 'active');
+  const isComplimentaryLegacy = hasActiveComplimentaryLegacyAccess(profile, Boolean(legacyGrant), existing);
   let configured = true;
   try { config(); } catch { configured = false; }
   const reason = profile.app_access_type === 'inactive' ? 'inactive'

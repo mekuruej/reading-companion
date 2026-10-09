@@ -2,6 +2,7 @@
 //
 
 import type { Metadata } from "next";
+import MobileOptimizationNotice from "@/components/MobileOptimizationNotice";
 import AppHeaderGate from "@/components/AppHeaderGate";
 import SupportProjectFooterGate from "@/components/SupportProjectFooterGate";
 import "./globals.css";
@@ -38,6 +39,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="flex min-h-screen flex-col bg-white text-black">
         <AppHeaderGate />
+        <MobileOptimizationNotice />
         <main className="flex-1">{children}</main>
         <SupportProjectFooterGate />
       </body>

@@ -77,11 +77,6 @@ type FlaggedKanjiMapCountRow = {
   flagged_at: string | null;
 };
 
-type ReadingFitCountProfileRow = {
-  id: string;
-  level: string | null;
-};
-
 const teachingCards: TeacherHubCard[] = [
   {
     title: "Students",
@@ -223,14 +218,9 @@ export default function TeacherHubPage() {
         );
 
         const [
-          { data: readingFitProfiles },
           { data: readingFitRows },
           { data: teacherRatingRows },
         ] = await Promise.all([
-          supabase
-            .from("profiles")
-            .select("id, level")
-            .in("id", studentIds),
           supabase
             .from("user_books")
             .select("user_id, finished_at, dnf_at, reader_level, rating_difficulty, rating_overall, teacher_review_cleared_at")
@@ -244,17 +234,10 @@ export default function TeacherHubPage() {
             .in("user_id", studentIds),
         ]);
 
-        const readerLevelByUserId = new Map(
-          ((readingFitProfiles ?? []) as ReadingFitCountProfileRow[]).map((profile) => [
-            profile.id,
-            profile.level,
-          ])
-        );
-
         const readingFitItems = ((readingFitRows ?? []) as ReadingFitCountUserBookRow[]).filter(
           (item) => {
             const effectiveReaderLevel =
-              item.reader_level || readerLevelByUserId.get(item.user_id) || null;
+              item.reader_level ?? null;
             return (
               !String(effectiveReaderLevel ?? "").trim() ||
               item.rating_difficulty == null ||
@@ -340,10 +323,10 @@ export default function TeacherHubPage() {
             Teaching
           </p>
           <h2 className="mt-1 text-2xl font-black text-stone-950">
-            Students, lessons, and teaching books
+            {isSuperTeacher ? "Users" : "Students"}, lessons, and teaching books
           </h2>
         </div>
-        <TeacherHubCardGrid cards={teachingCards.filter(card => card.href !== "/teacher/students" || canAccessStudents)} />
+        <TeacherHubCardGrid cards={teachingCards.filter(card => card.href !== "/teacher/students" || canAccessStudents).map(card => card.href === "/teacher/students" && isSuperTeacher ? { ...card, title: "Users" } : card)} />
       </section>
 
       <TeacherHubTodaySection

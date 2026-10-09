@@ -12,7 +12,6 @@ import { supabase } from "@/lib/supabaseClient";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
 import { canUseFullAccessFeature } from "@/lib/access/requireFullAccess";
-import { wantsJapaneseLearning } from "@/lib/access/japaneseLearningIntent";
 import DashboardBackground from "./components/DashboardBackground";
 import DashboardLoadingCard from "./components/DashboardLoadingCard";
 import ReaderRolesSection from "./components/ReaderRolesSection";
@@ -118,14 +117,12 @@ type ProfileBasics = {
 
 function isProfileReady(profile: ProfileBasics | null) {
   const hasJapaneseStudyPreference = typeof profile?.japanese_learning_enabled === "boolean";
-  const needsJapaneseReadingLevel = hasJapaneseStudyPreference && wantsJapaneseLearning(profile);
 
   return Boolean(
     profile?.username &&
     profile?.display_name &&
     profile?.native_language &&
-    hasJapaneseStudyPreference &&
-    (!needsJapaneseReadingLevel || profile?.level)
+    hasJapaneseStudyPreference
   );
 }
 

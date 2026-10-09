@@ -9,11 +9,7 @@ type Status = {
   accessType: string; expiresAt: string | null; isComplimentaryLegacy: boolean;
   subscriptions: Array<{ id: string; status: string; cancelAtPeriodEnd: boolean; paidThrough: string | null; needsReview: boolean }>;
 };
-export default function SubscriptionControls({
-  onComplimentaryLegacyChange,
-}: {
-  onComplimentaryLegacyChange?: (isComplimentaryLegacy: boolean) => void;
-}) {
+export default function SubscriptionControls() {
   const [status, setStatus] = useState<Status | null>(null);
   const [signedOut, setSignedOut] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -34,10 +30,8 @@ export default function SubscriptionControls({
     try {
       const nextStatus = await call('status') as Status | null;
       setStatus(nextStatus);
-      onComplimentaryLegacyChange?.(Boolean(nextStatus?.isComplimentaryLegacy));
     } catch (error) {
       setMessage((error as Error).message);
-      onComplimentaryLegacyChange?.(false);
     }
   }
   useEffect(() => {
@@ -59,15 +53,31 @@ export default function SubscriptionControls({
   const trialEndDate = activeTrial && status?.expiresAt
     ? new Date(status.expiresAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
     : null;
-  if (status?.isComplimentaryLegacy) return null;
-  return <div className="mt-6 space-y-3" aria-live="polite">
-    {signedOut ? <Link href="/login" className={`${button} inline-flex`}>Sign in to subscribe</Link> : null}
-    {status?.reason === 'lessons' ? <p>Japanese Learning Tools are included with your lessons.</p> : null}
-    {status?.reason === 'manual' ? <p>Your Japanese Learning Tools access is already arranged. No subscription is needed here.</p> : null}
-    {status?.reason === 'staff' ? <p>Japanese Learning Tools are included with your staff access.</p> : null}
-    {status?.reason === 'inactive' ? <p>Your account is inactive. Please contact MEKURU before subscribing.</p> : null}
+  if (status?.isComplimentaryLegacy) return <div className="space-y-3">
+    <h2 className="text-2xl font-black text-stone-950">You’ve been granted complimentary legacy access.</h2>
+    <p className="text-stone-700">Your Japanese Learning Tools are included, and no subscription is needed.</p>
+  </div>;
+  const statusHeading = status?.reason === 'inactive' ? 'Your account is inactive'
+    : status?.hasAccess ? 'Japanese Learning Tools are included'
+    : 'Free reading tools remain available';
+  const statusCopy = status?.reason === 'inactive' ? 'Please contact MEKURU before subscribing.'
+    : status?.hasAccess && status.reason === 'lessons' ? 'Japanese Learning Tools are included with your lessons.'
+    : status?.hasAccess && status.reason === 'staff' ? 'Japanese Learning Tools are included with your staff access.'
+    : status?.hasAccess && status.reason === 'manual' ? 'Your Japanese Learning Tools access is already arranged. No subscription is needed here.'
+    : status?.hasAccess ? 'Your Japanese Learning Tools access is active.'
+    : status?.reason === 'manual' || status?.reason === 'lessons' || status?.reason === 'staff'
+      ? 'Japanese Learning Tools access is not currently active. Please contact MEKURU about your arranged access.'
+      : 'Use your Library, reading timers, and Reading Journal without a Japanese Learning Tools subscription.';
+  return <div className="space-y-4" aria-live="polite">
+    {signedOut ? <>
+      <h2 className="text-2xl font-black text-stone-950">Check your access</h2>
+      <Link href="/login" className={`${button} inline-flex`}>Sign in to view your access</Link>
+    </> : status && !activeTrial ? <>
+      <h2 className="text-2xl font-black text-stone-950">{statusHeading}</h2>
+      <p className="text-stone-700">{statusCopy}</p>
+    </> : null}
     {activeTrial ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
-      <p className="font-semibold">Japanese Learning Tools trial active</p>
+      <h2 className="text-2xl font-black">Japanese Learning Tools trial active</h2>
       {trialEndDate ? <p className="mt-1">Your trial ends {trialEndDate}.</p> : null}
       <p className="mt-2">You have full access to the Japanese Learning Tools during your trial.</p>
       {status?.canSubscribe ? <p className="mt-2 text-emerald-900">Want to keep access after your trial? Subscribe anytime.</p> : null}
@@ -93,6 +103,9 @@ export default function SubscriptionControls({
     {!signedOut ? <button type="button" onClick={refresh} disabled={busy} className="block text-sm text-stone-600 underline underline-offset-4">Refresh subscription status</button> : null}
     {!status && !signedOut && !message ? <p className="text-sm text-stone-500">Checking subscription…</p> : null}
     {message ? <p role="alert" className="text-sm text-red-700">{message}</p> : null}
-    <p className="text-xs leading-5 text-stone-500">Access updates after payment is confirmed. If you have just subscribed, refresh your status in a moment.</p>
+    {status && (status.canSubscribe || status.subscriptions.length > 0) ? <>
+      <p className="text-xs leading-5 text-stone-500">Access updates after payment is confirmed. If you have just subscribed, refresh your status in a moment.</p>
+      <p className="text-xs leading-5 text-stone-500">Manage subscription payments securely through Stripe. Subscribing to Japanese Learning Tools is separate from guided-trial scheduling and reading lessons.</p>
+    </> : null}
   </div>;
 }

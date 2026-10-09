@@ -20,6 +20,7 @@ type Student = {
   app_access_type: string | null;
   app_access_expires_at: string | null;
   isCurrentStudent: boolean;
+  hasComplimentaryLegacyAccess?: boolean;
   lastEngagedAt: string | null;
   archivedTeacherId: string | null;
   searchStatus?: "Trial" | "Current Student" | "Past Student" | "Other";
@@ -117,12 +118,12 @@ export default function TeacherStudentsPage() {
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
       <Link href={backLink.href} className="mb-3 inline-block text-sm font-semibold text-stone-500 hover:text-stone-900">{backLink.label}</Link>
-      <TeacherStudentsHeader />
+      <TeacherStudentsHeader elevated={elevated} />
       {denied ? <p className="mt-6 text-stone-600">Students is available to teachers and accounts with super-teacher access.</p> : (
         <section className="mt-5 space-y-4">
           {elevated ? (
-            <nav aria-label="Students categories" className="flex flex-wrap gap-2">
-              {([["trial", "Trial"], ["current", "Current Students"], ["other", "Other"]] as const).map(([value, label]) => (
+            <nav aria-label="Users categories" className="flex flex-wrap gap-2">
+              {([["trial", "Trial"], ["current", "Current Students"], ["legacy", "Legacy"], ["other", "Other"]] as const).map(([value, label]) => (
                 <button key={value} type="button" aria-pressed={category === value} onClick={() => chooseCategory(value)}
                   className={`rounded-xl border px-4 py-2 text-sm font-semibold ${category === value ? "border-stone-900 bg-stone-900 text-white" : "border-stone-200 bg-white text-stone-600"}`}>{label}</button>
               ))}
@@ -179,6 +180,7 @@ export default function TeacherStudentsPage() {
                               {student.level ? <span className="rounded bg-stone-100 px-2 py-0.5">{student.level}</span> : null}
                               <span className="rounded bg-stone-100 px-2 py-0.5">{access.label}</span>
                             </>}
+                            {student.hasComplimentaryLegacyAccess ? <span className="rounded bg-violet-50 px-2 py-0.5 text-violet-800">Legacy</span> : null}
                           </div>
                           {elevated && !globalSearch ? (
                             <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-600">

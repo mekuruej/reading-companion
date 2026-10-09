@@ -1,89 +1,30 @@
-import Link from "next/link";
+import type { Metadata } from "next";
+import GuidedTrialSchedulingAction from "@/components/GuidedTrialSchedulingAction";
+
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default function TryMekuruPage() {
   return (
     <main className="mx-auto max-w-3xl px-6 py-16">
-      <section className="space-y-8">
-        <div className="space-y-4">
-          <p className="text-sm font-medium uppercase tracking-wide text-stone-500">
-            MEKURU Japanese Reading
-          </p>
-
-          <h1 className="text-4xl font-semibold tracking-tight text-stone-900">
-            Interested in trying MEKURU Japanese Reading?
-          </h1>
-
-          <p className="text-lg leading-8 text-stone-700">
-            MEKURU is currently being tested with a small number of Japanese
-            readers.
+      <section className="space-y-7">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">For invited testers</p>
+          <h1 className="mt-3 text-3xl font-bold tracking-tight text-stone-900">Your guided Japanese reading trial</h1>
+          <p className="mt-4 leading-7 text-stone-700">
+            Try MEKURU’s Japanese Learning Tools with an initial guided reading session and time to explore the app yourself.
           </p>
         </div>
-
-        <div className="space-y-4 text-stone-700">
-          <p>
-            Anyone can create a free MEKURU account and use the regular reading
-            tools.
-          </p>
-
-          <p>
-            Japanese Learning access is separate and requires approval. To try
-            the learning features with guided reading support, start from the
-            Japanese Learning page and request an invitation in the app.
-          </p>
-
-          <p>
-            If approved, you can book an initial 30-minute private reading session.
-          </p>
-
-          <p>
-            We’ll read Japanese together and talk about your reading goals,
-            needs, and comfort level.
-          </p>
-
-          <p>
-            Your 28-day Japanese Learning trial will begin after the reading
-            session.
-          </p>
-        </div>
-
         <div className="rounded-2xl border border-stone-200 bg-stone-50 p-6">
-          <h2 className="text-xl font-semibold text-stone-900">
-            How it works
-          </h2>
-
-          <ol className="mt-4 space-y-3 text-stone-700">
-            <li>
-              <strong>1.</strong> Create a free MEKURU account or log in.
-            </li>
-            <li>
-              <strong>2.</strong> Go to the Japanese Learning page.
-            </li>
-            <li>
-              <strong>3.</strong> Choose “Request an invitation.”
-            </li>
-            <li>
-              <strong>4.</strong> If approved, book your initial 30-minute private reading session.
-            </li>
-            <li>
-              <strong>5.</strong> Your 28-day Japanese Learning trial begins after the session.
-            </li>
-          </ol>
+          <h2 className="text-lg font-semibold text-stone-900">Your initial 30-minute reading session</h2>
+          <p className="mt-3 leading-7 text-stone-700">
+            We’ll read Japanese together, talk about your reading goals and comfort level, and introduce the tools you can use while reading.
+          </p>
         </div>
-
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <Link
-            href="/login/beta-signup"
-            className="inline-flex items-center justify-center rounded-xl border border-stone-300 px-5 py-3 font-medium text-stone-700 transition hover:bg-stone-50"
-          >
-            Create an Account or Log In
-          </Link>
+        <div className="space-y-3 leading-7 text-stone-700">
+          <p>Your 28-day Japanese Learning Tools trial begins after that session. Scheduling a session does not activate the trial.</p>
+          <p>If you use the app and have feedback to share, an optional follow-up session is available.</p>
         </div>
-
-        <p className="text-sm text-stone-500">
-          Creating an account or requesting an invitation does not start your
-          trial. Japanese Learning trial access requires approval and begins
-          only after your initial reading session.
-        </p>
+        <GuidedTrialSchedulingAction />
       </section>
     </main>
   );

@@ -3,6 +3,7 @@
 "use client";
 
 import type { ComponentType } from "react";
+import { PROFILE_LEVEL_OPTIONS } from "@/lib/profileLevels";
 
 type Option = {
   value: string;
@@ -38,7 +39,8 @@ type RatingTabProps = {
   ratingOverall: string;
   setRatingOverall: (value: string) => void;
 
-  profileLevel: string;
+  readerLevel: string;
+  setReaderLevel: (value: string) => void;
   isEnglishBook?: boolean;
   bookType: string | null;
   ratingDifficulty: string;
@@ -158,6 +160,8 @@ export default function RatingTab({
   bookType,
   ratingDifficulty,
   setRatingDifficulty,
+  readerLevel,
+  setReaderLevel,
   favoriteQuotes,
   setFavoriteQuotes,
   memorableWords,
@@ -198,6 +202,19 @@ export default function RatingTab({
           <div className={isEditingReflection ? "rounded-2xl border border-stone-200 bg-stone-50 p-4" : "rounded-2xl bg-stone-50 p-4"}>
             <div className="mb-3 text-sm font-semibold text-stone-900">
               Reader Difficulty
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-stone-700" htmlFor="reflection-reader-level">
+                Your reading level for this experience (optional)
+              </label>
+              {isEditingReflection ? (
+                <select id="reflection-reader-level" value={readerLevel} onChange={(event) => setReaderLevel(event.target.value)}
+                  className="mt-2 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400">
+                  <option value="">Not sure</option>
+                  {PROFILE_LEVEL_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.title} — {option.plain}</option>)}
+                </select>
+              ) : <p className="mt-1 text-sm text-stone-600">{row.reader_level || "Not sure"}</p>}
             </div>
 
             <DifficultyField

@@ -1,4 +1,5 @@
 import { isAllUserTeacher } from "@/lib/teacher/targetUserAccess";
+import { loadActiveComplimentaryLegacyUserIds } from "@/lib/teacher/complimentaryLegacyIndex";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isActiveTrialParticipant } from "@/lib/teacher/studentsIndex";
@@ -232,6 +233,7 @@ export async function GET(request: Request) {
     if (!studentsScope) return NextResponse.json({ users: users.map(({ level, role, is_super_teacher, app_access_type, app_access_expires_at, ...user }) => user) });
 
     const userIds = users.map(user => user.id);
+    const legacyIds = await loadActiveComplimentaryLegacyUserIds(supabaseAdmin, userIds);
     const { data: relationships, error: relationshipError } = userIds.length
       ? await supabaseAdmin.from("teacher_students").select("student_id, archived_at").in("student_id", userIds)
       : { data: [], error: null };
@@ -254,6 +256,7 @@ export async function GET(request: Request) {
         ...user,
         display_name: user.displayName,
         isCurrentStudent: activeStudentIds.has(user.id),
+        hasComplimentaryLegacyAccess: legacyIds.has(user.id),
         lastEngagedAt: activity?.read_on ?? null,
         searchStatus,
       };

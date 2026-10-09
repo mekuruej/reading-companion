@@ -2,6 +2,7 @@
 //
 "use client";
 
+import { initialReflectionReaderLevel, reflectionReaderLevelForSave } from "@/lib/books/readingReflectionLevel";
 import { loadReviewedBookWordCount, readingTimeLabel } from "@/lib/books/bookHubLearningSnapshot";
 import type { DnfDetails } from "@/lib/books/dnf";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
@@ -4060,7 +4061,7 @@ export default function BookHubPage() {
     setFavoriteQuotes((r as any).favorite_quotes ?? "");
     setMemorableWords((r as any).memorable_words ?? "");
 
-    setReaderLevel(r.reader_level ?? meProfile?.level ?? "");
+    setReaderLevel(initialReflectionReaderLevel(r, meProfile?.level));
     setRecommendedLevel(r.recommended_level ?? "");
     setFormatType(r.format_type ?? "");
     setProgressMode(r.progress_mode ?? "");
@@ -4244,7 +4245,7 @@ export default function BookHubPage() {
     setFavoriteQuotes((row as any).favorite_quotes ?? "");
     setMemorableWords((row as any).memorable_words ?? "");
 
-    setReaderLevel(row.reader_level ?? profileLevel ?? "");
+    setReaderLevel(initialReflectionReaderLevel(row, profileLevel));
     setRecommendedLevel(row.recommended_level ?? "");
 
     setFormatType(row.format_type ?? "");
@@ -4650,7 +4651,7 @@ export default function BookHubPage() {
       const rd = ratingDifficulty.trim()
         ? clampRating5(Number(ratingDifficulty.trim()))
         : null;
-      const reflectionReaderLevel = profileLevel || readerLevel || null;
+      const reflectionReaderLevel = reflectionReaderLevelForSave(readerLevel);
 
       const { error: userBookError } = await supabase
         .from("user_books")
@@ -4859,7 +4860,7 @@ export default function BookHubPage() {
         favorite_quotes: favoriteQuotes.trim() || null,
         memorable_words: memorableWords.trim() || null,
         reader_level: canSaveReadingReflection
-          ? readerLevel || profileLevel || null
+          ? reflectionReaderLevelForSave(readerLevel)
           : row.reader_level ?? null,
         recommended_level: recommendedLevel || null,
         format_type: formatType || null,
@@ -4945,7 +4946,7 @@ export default function BookHubPage() {
         userBookId: row.id,
         bookId: row.books.id,
         ownerUserId: row.user_id,
-        readerLevel: readerLevel || profileLevel || null,
+        readerLevel: reflectionReaderLevelForSave(readerLevel),
         bookType: bookType || row.books.book_type || null,
         entertainmentRating: ro,
         difficultyRating: rd,
@@ -6034,7 +6035,8 @@ export default function BookHubPage() {
                       setReaderAdvice={setReaderAdvice}
                       ratingOverall={ratingOverall}
                       setRatingOverall={setRatingOverall}
-                      profileLevel={profileLevel}
+                      readerLevel={readerLevel}
+                      setReaderLevel={setReaderLevel}
                       isEnglishBook={isEnglishBook}
                       bookType={book?.book_type ?? null}
                       ratingDifficulty={ratingDifficulty}

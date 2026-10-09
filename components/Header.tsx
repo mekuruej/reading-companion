@@ -537,7 +537,7 @@ export default function Header() {
                         }`}
                       onClick={() => setShowTeacherMenu(false)}
                     >
-                      Students
+                      {profileRole === "super_teacher" || profileIsSuperTeacher ? "Users" : "Students"}
                     </Link>
                     ) : null}
 

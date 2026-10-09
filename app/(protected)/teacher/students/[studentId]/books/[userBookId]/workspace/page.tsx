@@ -7,6 +7,7 @@
 "use client";
 
 import Link from "next/link";
+import { isAllUserTeacher } from "@/lib/teacher/targetUserAccess";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -91,6 +92,7 @@ export default function StudentBookWorkspacePage() {
   const studentId = params.studentId ?? "";
   const userBookId = params.userBookId ?? "";
 
+  const [indexElevated, setIndexElevated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [student, setStudent] = useState<StudentProfile | null>(null);
@@ -135,6 +137,7 @@ export default function StudentBookWorkspacePage() {
         .maybeSingle();
 
       if (profileError) throw profileError;
+      setIndexElevated(isAllUserTeacher(profile));
 
       const isSuperTeacher = isSuperTeacherRole(profile);
       if (!isTeacherRole(profile)) {
@@ -245,7 +248,7 @@ export default function StudentBookWorkspacePage() {
       <main className="min-h-screen bg-slate-100 px-4 py-8">
         <div className="mx-auto max-w-3xl rounded-3xl border border-stone-200 bg-white p-6 shadow-sm">
           <Link href="/teacher/students" className="text-sm font-semibold text-stone-500 hover:text-stone-900">
-            &lt;- Students
+            &lt;- {indexElevated ? "Users" : "Students"}
           </Link>
           <h1 className="mt-4 text-3xl font-black text-stone-950">Student Book Workspace</h1>
           <p className="mt-3 text-sm leading-6 text-stone-600">

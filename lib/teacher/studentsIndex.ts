@@ -1,7 +1,7 @@
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { isAllUserTeacher } from "./targetUserAccess";
 
-export type StudentsCategory = "trial" | "current" | "other" | "past";
+export type StudentsCategory = "trial" | "current" | "legacy" | "other" | "past";
 export type StudentsActor = { role?: string | null; is_super_teacher?: boolean | string | null };
 
 export function canUseStudentsIndex(profile: StudentsActor | null) {
@@ -10,7 +10,7 @@ export function canUseStudentsIndex(profile: StudentsActor | null) {
 
 export function canUseStudentsCategory(profile: StudentsActor | null, category: StudentsCategory) {
   if (!canUseStudentsIndex(profile)) return false;
-  if (isAllUserTeacher(profile)) return category === "trial" || category === "current" || category === "other";
+  if (isAllUserTeacher(profile)) return category === "trial" || category === "current" || category === "legacy" || category === "other";
   return category === "current" || category === "past";
 }
 
@@ -21,4 +21,8 @@ export function isActiveStudentRelationship(link: { archived_at?: string | null 
 
 export function isActiveTrialParticipant(profile: Parameters<typeof getAppAccessStatus>[0]) {
   return getAppAccessStatus(profile).reason === "trial";
+}
+
+export function studentsIndexLabel(elevated: boolean) {
+  return elevated ? "Users" : "Students";
 }

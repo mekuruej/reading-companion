@@ -45,11 +45,6 @@ type ReadingFitCountUserBookRow = {
   teacher_review_cleared_at: string | null;
 };
 
-type ReadingFitCountProfileRow = {
-  id: string;
-  level: string | null;
-};
-
 type TeacherRatingCountUserBookRow = {
   id: string;
   book_id: string | null;
@@ -232,12 +227,10 @@ export default function TeacherNeedsAttentionPage() {
         );
 
         const [
-          { data: readingFitProfiles },
           { data: readingFitRows },
           { data: teacherRatingRows },
           { count: grammarReviewCount },
         ] = await Promise.all([
-          supabase.from("profiles").select("id, level").in("id", studentIds),
           supabase
             .from("user_books")
             .select(
@@ -258,17 +251,10 @@ export default function TeacherNeedsAttentionPage() {
             .in("status", ["needs_review", "in_progress"]),
         ]);
 
-        const readerLevelByUserId = new Map(
-          ((readingFitProfiles ?? []) as ReadingFitCountProfileRow[]).map((profile) => [
-            profile.id,
-            profile.level,
-          ])
-        );
-
         const readingFitCount = ((readingFitRows ?? []) as ReadingFitCountUserBookRow[]).filter(
           (item) => {
             const effectiveReaderLevel =
-              item.reader_level || readerLevelByUserId.get(item.user_id) || null;
+              item.reader_level ?? null;
             return (
               !String(effectiveReaderLevel ?? "").trim() ||
               item.rating_difficulty == null ||

@@ -174,18 +174,22 @@ function MekuruLevelCard({
 
 export default function MekuruReadingLevelGuide({
   selectedLevel = "",
+  optional = false,
   onSelect,
 }: {
   selectedLevel?: string;
+  optional?: boolean;
   onSelect?: (level: MekuruReadingLevel) => void;
 }) {
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-stone-900">Mekuru reading levels</h2>
+      <h2 className="text-lg font-semibold text-stone-900">Mekuru reading levels{optional ? " (optional)" : ""}</h2>
       <p className="mt-1 text-sm leading-6 text-stone-600">
         These levels describe how reading feels, not just test labels. Pick the level that feels
         closest right now; you can always adjust it later.
       </p>
+
+      {optional ? <p className="mt-2 text-sm text-stone-500">You can leave this unknown and choose a level later.</p> : null}
 
       <div className="mt-5 space-y-6">
         {MEKURU_READING_LEVEL_GROUPS.map((group) => (

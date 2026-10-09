@@ -358,6 +358,9 @@ export default function JapaneseLearningPage() {
           {!loading && approvedRequest ? (
             <div className="mt-5 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-4 text-sm text-violet-950">
               <h3 className="text-lg font-black">Book your Guided Japanese Trial session</h3>
+              <Link href="/try-mekuru" className="mt-2 inline-block text-sm font-semibold underline underline-offset-4">
+                What to expect from your guided trial
+              </Link>
               <p className="mt-2 leading-6">
                 Please book your initial 30-minute reading session now. 
               </p>
@@ -373,7 +376,7 @@ export default function JapaneseLearningPage() {
                   rel="noreferrer"
                   className="inline-flex rounded-full bg-violet-700 px-4 py-2 text-sm font-black text-white transition hover:bg-violet-800"
                 >
-                  Book Initial Reading Session
+                  Schedule your initial reading session
                 </a>
               </div>
             </div>

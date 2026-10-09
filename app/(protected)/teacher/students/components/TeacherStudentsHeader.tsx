@@ -1,4 +1,6 @@
-export default function TeacherStudentsHeader() {
+import { studentsIndexLabel } from "@/lib/teacher/studentsIndex";
+
+export default function TeacherStudentsHeader({ elevated = false }: { elevated?: boolean }) {
   return (
     <section className="rounded-3xl border border-stone-200 bg-white px-5 py-4 shadow-sm">
       <div className="grid gap-3 md:grid-cols-[minmax(12rem,auto)_minmax(0,1fr)] md:items-end">
@@ -8,7 +10,7 @@ export default function TeacherStudentsHeader() {
           </p>
 
           <h1 className="mt-1 text-2xl font-black tracking-tight text-stone-900">
-            Students
+            {studentsIndexLabel(elevated)}
           </h1>
         </div>
 

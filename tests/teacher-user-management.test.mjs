@@ -16,8 +16,8 @@ function load(file, deps = {}) {
 }
 
 const { ensureTeacherStudentRelationship } = load('lib/teacher/studentRelationshipManagement.ts');
-const access = load('lib/access/complimentaryLegacyAccess.ts');
 const appAccess = load('lib/access/appAccess.ts');
+const access = load('lib/access/complimentaryLegacyAccess.ts', { './appAccess': appAccess });
 const targetUserAccess = load('lib/teacher/targetUserAccess.ts');
 const studentIndex = load('lib/teacher/studentsIndex.ts', {
   '@/lib/access/appAccess': appAccess,

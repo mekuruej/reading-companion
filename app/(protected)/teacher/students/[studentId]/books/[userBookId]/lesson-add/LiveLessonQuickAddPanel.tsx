@@ -8,6 +8,7 @@ import WordContextFields from "@/components/vocabulary/WordContextFields";
 import { wordContextPayload, type WordContext } from "@/lib/vocabulary/wordContext";
 
 import Link from "next/link";
+import { isAllUserTeacher } from "@/lib/teacher/targetUserAccess";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
@@ -416,6 +417,7 @@ export default function LiveLessonQuickAddPanel({
   const wordInputRef = useRef<HTMLInputElement | null>(null);
   const skipNextPersistRef = useRef(false);
 
+  const [indexElevated, setIndexElevated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [notice, setNotice] = useState("");
@@ -736,6 +738,7 @@ export default function LiveLessonQuickAddPanel({
         .maybeSingle();
 
       if (profileError) throw profileError;
+      setIndexElevated(isAllUserTeacher(profile));
 
       if (!isTeacherRole(profile)) {
         setMessage("Teacher access is required.");
@@ -1185,7 +1188,7 @@ export default function LiveLessonQuickAddPanel({
       <main className="min-h-screen bg-slate-100 px-4 py-8">
         <div className="mx-auto max-w-3xl rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <Link href="/teacher/students" className="text-sm font-semibold text-stone-500 hover:text-stone-900">
-            &lt;- Students
+            &lt;- {indexElevated ? "Users" : "Students"}
           </Link>
           <h1 className="mt-4 text-2xl font-black text-stone-950">Live Lesson Add Word</h1>
           <p className="mt-3 text-sm leading-6 text-stone-600">{message}</p>

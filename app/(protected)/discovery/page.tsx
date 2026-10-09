@@ -16,7 +16,6 @@ import DiscoveryPreviewState from "./components/DiscoveryPreviewState";
 import DiscoveryPreviewBookCard from "./components/DiscoveryPreviewBookCard";
 import DiscoveryPreviewSection from "./components/DiscoveryPreviewSection";
 
-
 type BookMeta = {
   id: string;
   title: string | null;
@@ -104,13 +103,6 @@ function formatAverage(value: number | null) {
 function firstBook(row: UserBookRatingRow) {
   if (Array.isArray(row.books)) return row.books[0] ?? null;
   return row.books ?? null;
-}
-
-function effectiveReaderLevel(
-  row: UserBookRatingRow,
-  profileLevelsByUserId: Record<string, string | null>
-) {
-  return row.reader_level ?? (row.user_id ? profileLevelsByUserId[row.user_id] ?? null : null);
 }
 
 function bookTypeLabel(value: string | null | undefined) {
@@ -233,7 +225,6 @@ export default function DiscoveryHubPage() {
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [bookTypeFilter, setBookTypeFilter] = useState("all");
   const [readerLevelFilter, setReaderLevelFilter] = useState("all");
-  const [profileLevelsByUserId, setProfileLevelsByUserId] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     let alive = true;
@@ -286,7 +277,6 @@ export default function DiscoveryHubPage() {
 
         if (!featureAccess.canUseFindNextBook) {
           setRatingRows([]);
-          setProfileLevelsByUserId({});
           return;
         }
 
@@ -333,7 +323,6 @@ export default function DiscoveryHubPage() {
         );
 
         setRatingRows(rows);
-        setProfileLevelsByUserId({});
       } catch (error: any) {
         console.error("Error loading discovery ratings:", error);
         if (!alive) return;
@@ -370,14 +359,14 @@ export default function DiscoveryHubPage() {
     const levels = new Set<string>();
 
     for (const row of ratingRows) {
-      const level = effectiveReaderLevel(row, profileLevelsByUserId);
+      const level = row.reader_level;
       if (level) levels.add(level);
     }
 
     return Array.from(levels).sort((a, b) =>
       formatReaderLevel(a).localeCompare(formatReaderLevel(b))
     );
-  }, [ratingRows, profileLevelsByUserId]);
+  }, [ratingRows]);
 
   const ratedBookGroups = useMemo(() => {
     const map = new Map<string, RatedBookGroup>();
@@ -386,7 +375,7 @@ export default function DiscoveryHubPage() {
       const book = firstBook(row);
       if (!book?.id) continue;
       if (bookTypeFilter !== "all" && book.book_type !== bookTypeFilter) continue;
-      const readerLevel = effectiveReaderLevel(row, profileLevelsByUserId);
+      const readerLevel = row.reader_level;
       if (readerLevelFilter !== "all" && readerLevel !== readerLevelFilter) {
         continue;
       }
@@ -454,7 +443,7 @@ export default function DiscoveryHubPage() {
       }
       return (b.latestFinishedAt ?? "").localeCompare(a.latestFinishedAt ?? "");
     });
-  }, [ratingRows, sortMode, bookTypeFilter, readerLevelFilter, profileLevelsByUserId]);
+  }, [ratingRows, sortMode, bookTypeFilter, readerLevelFilter]);
 
   return (
     <main className="min-h-screen bg-slate-100 px-5 py-8">

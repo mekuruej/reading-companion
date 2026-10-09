@@ -223,6 +223,7 @@ export default function StudentWorkspacePage() {
   const [managingRelationship, setManagingRelationship] = useState<string | null>(null);
   const studentId = params?.studentId ?? "";
 
+  const [indexElevated, setIndexElevated] = useState(false);
   const [data, setData] = useState<WorkspacePayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -417,6 +418,7 @@ export default function StudentWorkspacePage() {
 
     try {
       const payload = (await apiFetch("GET")) as WorkspacePayload;
+      setIndexElevated(payload.canAccessAllUsers);
       setData(payload);
     } catch (error: any) {
       console.error("Error loading Student Workspace:", error);
@@ -890,7 +892,7 @@ export default function StudentWorkspacePage() {
       <main className="min-h-screen bg-slate-100 px-4 py-8">
         <div className="mx-auto max-w-3xl rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
           <Link href="/teacher/students" className="text-sm font-semibold text-stone-500 hover:text-stone-900">
-            &lt;- Back to Students
+            &lt;- Back to {indexElevated ? "Users" : "Students"}
           </Link>
           <h1 className="mt-4 text-2xl font-black text-stone-950">Student Workspace</h1>
           <p className="mt-3 text-sm leading-6 text-stone-600">
@@ -905,7 +907,7 @@ export default function StudentWorkspacePage() {
     <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
       <div className="mx-auto max-w-6xl space-y-5">
         <Link href="/teacher/students" className="text-sm font-semibold text-stone-500 hover:text-stone-900">
-          &lt;- Back to Students
+          &lt;- Back to {indexElevated ? "Users" : "Students"}
         </Link>
 
         <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
