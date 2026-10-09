@@ -2,6 +2,7 @@
 //
 "use client";
 
+import { loadReviewedBookWordCount, readingTimeLabel } from "@/lib/books/bookHubLearningSnapshot";
 import type { DnfDetails } from "@/lib/books/dnf";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
 import AudiobookProgressControl from "@/components/books/AudiobookProgressControl";
@@ -718,6 +719,7 @@ export default function BookHubPage() {
   const [saving, setSaving] = useState(false);
 
   const isEnglishBook = row?.books?.language_code === "en";
+  const [reviewedWordCount, setReviewedWordCount] = useState<number | null>(null);
   const [uniqueLookupCount, setUniqueLookupCount] = useState<number | null>(null);
   const [lastSavedWord, setLastSavedWord] = useState<string>("");
   const [lastSavedWordPage, setLastSavedWordPage] = useState<number | null>(null);
@@ -1252,24 +1254,27 @@ export default function BookHubPage() {
     savedWordsPerPage != null ? savedWordsPerPage.toFixed(1) : "—";
   const bookHubAverageMinutesPerPageLabel =
     averageMinutesPerPage != null ? averageMinutesPerPage.toFixed(1) : "—";
-  const bookHubSummaryStats = isEnglishNativeTrackerBook || tracking.method === "audiobook_time" ? [] : tracking.method === "kindle_location" ? [
+  const bookHubSummaryStats = [
     { label: "Days Engaged", value: bookHubDaysEngagedLabel, caption: "Reading or listening" },
-    ...(canSeeVocabularySummary ? [{
-      label: "Saved Words/Location",
-      value: uniqueLookupCount != null && trackedProgress.totalDistance > 0
-        ? (uniqueLookupCount / trackedProgress.totalDistance).toFixed(2) : "—",
-      caption: "Saved-word load",
-    }] : []),
-    {
-      label: "Avg Min/Location",
-      value: trackedProgress.averageMinutesPerUnit != null
-        ? trackedProgress.averageMinutesPerUnit.toFixed(2) : "—",
-      caption: "Timed location-tracked reading",
-    },
-  ] : tracking.method === "percent" ? [
-    { label: "Days Engaged", value: bookHubDaysEngagedLabel, caption: "Reading or listening" },
-    { label: "Percentage Points/Hour", value: trackedProgress.rate != null ? trackedProgress.rate.toFixed(1) : "—", caption: "Timed reading in the selected unit" },
-  ] : undefined;
+    { label: "Avg Min / Page", value: bookHubAverageMinutesPerPageLabel, caption: "Timed page-tracked reading" },
+    { label: "Total Reading Time", value: readingTimeLabel(totalTimedMinutes), caption: "Completed reading sessions" },
+  ];
+  const bookHubLearningStats = [
+    { label: "Saved Words", value: uniqueLookupCount != null ? String(uniqueLookupCount) : "—", caption: "Distinct saved vocabulary" },
+    { label: "Saved Words / Page", value: bookHubSavedWordsPerPageLabel, caption: "Saved-word load" },
+    { label: "Words Reviewed", value: reviewedWordCount != null ? String(reviewedWordCount) : "—", caption: "Distinct saved words studied" },
+  ];
+
+  useEffect(() => {
+    let cancelled = false;
+    setReviewedWordCount(null);
+    if (!row?.id || !row.user_id || !canSeeVocabularySummary || !isJapaneseLearningBook(row.books?.language_code ?? null)) return;
+    void loadReviewedBookWordCount(supabase, row.id, row.user_id)
+      .then(count => { if (!cancelled) setReviewedWordCount(count); })
+      .catch(error => { console.warn("Could not load book review snapshot:", error); });
+    return () => { cancelled = true; };
+  }, [row?.id, row?.user_id, row?.books?.language_code, canSeeVocabularySummary]);
+
   const shouldNudgeStartBook = !started && realReadingSessions.length === 0;
   const lastReadDate = useMemo(() => {
     if (visualReadingSessions.length === 0) return null;
@@ -5718,7 +5723,7 @@ export default function BookHubPage() {
 
   const showBookHubStartButton = !started && realReadingSessions.length === 0;
   return (
-    <main className="min-h-screen bg-stone-50 p-6">
+    <main className="min-h-screen bg-gradient-to-br from-[#cdc0df] via-[#e5dfdf] to-[#e7d7b7] p-6">
       {showBookFlagModal ? (
         <BookFlagModal
           bookTitle={book.title ?? "Untitled book"}
@@ -5766,6 +5771,8 @@ export default function BookHubPage() {
             ← Back to Library
           </Link>
         </nav>
+        {(isOwnBookHub && isTeacherContext && isJapaneseLearningBook(book.language_code ?? null)) || (canUseBookHubTeachingMode && !alreadyTeachingOnly) ? (
+          <section aria-label="Book setup and mode" className="mb-5 space-y-3 rounded-2xl border border-stone-200/60 bg-white/70 p-3 [&>section]:mb-0 [&>section]:border-0 [&>section]:bg-transparent [&>section]:p-1 [&>div]:mb-0">
         {isOwnBookHub && isTeacherContext && isJapaneseLearningBook(book.language_code ?? null) ? (
           <BookUseSection
             currentUse={bookUseLoaded ? getBookUse(personalTrackingStatus, teacherBookRelationship?.teaching_status ?? null) : null}
@@ -5776,18 +5783,21 @@ export default function BookHubPage() {
           />
         ) : null}
 
+        {canUseBookHubTeachingMode && !alreadyTeachingOnly ? (
+          <BookHubModeToggle mode={bookHubMode} onModeChange={changeBookHubMode} />
+        ) : null}
+
+          </section>
+        ) : null}
         {readerHubTeachingToolsEligible ? (
           <p className="mb-4 rounded-xl border border-violet-100 bg-violet-50/60 px-4 py-3 text-sm text-violet-900 md:hidden">
             Teaching Tools are available on larger screens.
           </p>
         ) : null}
 
-        {canUseBookHubTeachingMode && !alreadyTeachingOnly ? (
-          <BookHubModeToggle mode={bookHubMode} onModeChange={changeBookHubMode} />
-        ) : null}
-
-        <section className="overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm">
+        <section className="overflow-hidden rounded-3xl border border-stone-200/60 bg-[#f7f7f7] shadow-sm [&_[data-hub-surface-text=heading]]:text-stone-950 [&_[data-hub-surface-text=body]]:text-stone-700">
           <div className="p-5 md:p-8">
+            <section aria-label="Book Overview" className="rounded-3xl border border-stone-200/70 bg-white p-4 shadow-sm md:p-6">
             <div className="grid gap-6 md:grid-cols-[150px_minmax(0,1fr)_380px] md:items-start md:gap-8">
               <BookHubHero
                 book={book}
@@ -5856,20 +5866,8 @@ export default function BookHubPage() {
 
             </div>
 
-            {bookHubMode === "teaching" ? (
-              <div className="mt-6 space-y-4">
-                {teachingTools}
-                {managementActions}
-              </div>
-            ) : (
-              <>
-                {row.is_teacher_prep && row.teacher_prep_kind === "trial" ? (
-                  <div className="mt-6">
-                    <TeacherPrepAssignBox userBookId={row.id} />
-                  </div>
-                ) : null}
-
-                <div className="mt-6 space-y-4">
+              {bookHubMode !== "teaching" ? (
+                <div className="mt-7 space-y-4 border-t border-stone-100 pt-6">
               <BookHubProgressSummary
                 progressLabel={bookHubProgressLabel}
                 progressSummaryLabel={bookHubProgressSummaryLabel}
@@ -5886,6 +5884,7 @@ export default function BookHubPage() {
                 showVocabularyStats={canSeeVocabularySummary}
                 showSummaryCard={false}
                 summaryStats={bookHubSummaryStats}
+                learningStats={canSeeVocabularySummary && isJapaneseLearningBook(book.language_code ?? null) ? bookHubLearningStats : undefined}
               />
 
               <AudiobookProgressControl
@@ -5895,6 +5894,24 @@ export default function BookHubPage() {
                 canEditLength={canEditBookInfo}
                 onRequestLength={() => { if (canEditBookInfo) { router.push(`/teacher/books/add?bookId=${encodeURIComponent(row.book_id)}`); return; } setBookFlagNote("Please add/correct the total audiobook length for this edition: "); setShowBookFlagModal(true); }}
               />
+                </div>
+              ) : null}
+            </section>
+
+            {bookHubMode === "teaching" ? (
+              <div className="mt-6 space-y-4">
+                {teachingTools}
+                {managementActions}
+              </div>
+            ) : (
+              <>
+                {row.is_teacher_prep && row.teacher_prep_kind === "trial" ? (
+                  <div className="mt-6">
+                    <TeacherPrepAssignBox userBookId={row.id} />
+                  </div>
+                ) : null}
+
+                <div className="mt-8 space-y-4">
               <BookHubNotices
                 error={error}
                 hideError={isEditingBookInfoPeople}

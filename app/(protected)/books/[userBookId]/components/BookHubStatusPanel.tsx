@@ -132,7 +132,7 @@ export default function BookHubStatusPanel({
     progressPercent >= 100;
 
   return (
-    <div className="rounded-2xl border border-violet-100 bg-violet-50/60 p-4">
+    <div className="rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-100 via-purple-50 to-amber-50 p-4 shadow-[0_3px_14px_rgba(41,37,36,0.12)]">
       <div className="mb-3 text-sm font-semibold text-stone-900">
         Book Status
       </div>

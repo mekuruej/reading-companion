@@ -253,6 +253,7 @@ export default function StudentWorkspacePage() {
   const [taskKanjiCardCount, setTaskKanjiCardCount] = useState("10");
   const [taskSaving, setTaskSaving] = useState(false);
   const [taskMessage, setTaskMessage] = useState<string | null>(null);
+  const [managedTaskId, setManagedTaskId] = useState<string | null>(null);
   const [activeLearningTasks, setActiveLearningTasks] = useState<ActiveLearningTask[]>([]);
   const [cancellingTaskId, setCancellingTaskId] = useState<string | null>(null);
 
@@ -618,8 +619,17 @@ export default function StudentWorkspacePage() {
   }
 
   function openTaskModal() {
+    setManagedTaskId(null);
     setTaskLearnerId(studentId);
     setTaskUserBookId(taskBooks[0]?.id ?? "");
+    setTaskMessage(null);
+    setTaskModalOpen(true);
+    void loadActiveLearningTasks();
+  }
+
+  function manageLearningTask(taskId: string) {
+    if (!activeLearningTasks.some((task) => task.id === taskId)) return;
+    setManagedTaskId(taskId);
     setTaskMessage(null);
     setTaskModalOpen(true);
     void loadActiveLearningTasks();
@@ -1156,7 +1166,7 @@ export default function StudentWorkspacePage() {
         </section>
 
         <details className="rounded-2xl border border-stone-200 bg-white p-4 text-sm">
-          <summary className="cursor-pointer font-semibold text-stone-700">Other student tools and follow-up</summary>
+          <summary className="cursor-pointer font-semibold text-stone-700">Assigned Tasks</summary>
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
@@ -1191,26 +1201,36 @@ export default function StudentWorkspacePage() {
                       </p>
                     ) : null}
                   </div>
-                  {taskHref ? (
-                    <Link
-                      href={taskHref}
-                      className="rounded-xl bg-emerald-700 px-4 py-2 text-center text-sm font-bold text-white hover:bg-emerald-800"
-                    >
-                      Open Book
-                    </Link>
-                  ) : (
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    {taskHref ? (
+                      <Link
+                        href={taskHref}
+                        className="rounded-xl border border-emerald-200 bg-white px-3 py-2 text-center text-sm font-semibold text-emerald-800 hover:bg-emerald-50"
+                      >
+                        Open Book
+                      </Link>
+                    ) : null}
                     <button
                       type="button"
-                      onClick={openTaskModal}
-                      className="rounded-xl bg-emerald-700 px-4 py-2 text-center text-sm font-bold text-white hover:bg-emerald-800"
+                      onClick={() => manageLearningTask(task.id)}
+                      className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
                     >
                       Manage Task
                     </button>
-                  )}
+                  </div>
                 </article>
               );
             })}
 
+          </div>
+          {activeLearningTasks.length === 0 ? (
+            <p className="mt-3 text-xs text-stone-500">No active assigned tasks.</p>
+          ) : null}
+        </details>
+
+        <details className="rounded-2xl border border-stone-200 bg-white p-4 text-sm">
+          <summary className="cursor-pointer font-semibold text-stone-700">Other student follow-up</summary>
+          <div className="mt-3 space-y-3">
             {data.bookRequests.map((request) => {
               const displayTitle =
                 String(request.title ?? "").trim() ||
@@ -1265,8 +1285,8 @@ export default function StudentWorkspacePage() {
             ))}
           </div>
 
-          {activeLearningTasks.length === 0 && data.bookRequests.length === 0 && data.ratingFollowUps.length === 0 ? (
-            <p className="mt-3 text-xs text-stone-500">No assigned tasks, pending requests, or rating follow-up.</p>
+          {data.bookRequests.length === 0 && data.ratingFollowUps.length === 0 ? (
+            <p className="mt-3 text-xs text-stone-500">No pending requests or rating follow-up.</p>
           ) : null}
         </details>
 
@@ -1432,6 +1452,7 @@ export default function StudentWorkspacePage() {
             onTaskPageEndChange={setTaskPageEnd}
             taskSaving={taskSaving}
             taskMessage={taskMessage}
+            managedTaskId={managedTaskId}
             activeTasks={activeLearningTasks}
             taskBooksByStudentId={taskBooksByStudentId}
             cancellingTaskId={cancellingTaskId}

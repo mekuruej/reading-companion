@@ -54,12 +54,12 @@ export default function BookHubHero({
       <div className="min-w-0">
         <div className="space-y-3">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-stone-900 md:text-4xl">
+            <h1 data-hub-surface-text="heading" className="text-3xl font-bold tracking-tight text-stone-900 md:text-4xl">
               {bookIdentity.title}
             </h1>
 
             {bookIdentity.titleReading ? (
-              <div className="mt-1 text-sm font-medium text-stone-500">
+              <div data-hub-surface-text="body" className="mt-1 text-sm font-medium text-stone-500">
                 {bookIdentity.titleReading}
               </div>
             ) : null}
@@ -67,12 +67,12 @@ export default function BookHubHero({
 
           {bookIdentity.author ? (
             <div>
-              <div className="text-xl font-semibold text-stone-900 md:text-2xl">
+              <div data-hub-surface-text="heading" className="text-xl font-semibold text-stone-900 md:text-2xl">
                 {bookIdentity.author}
               </div>
 
               {bookIdentity.authorReading ? (
-                <div className="mt-1 text-sm font-medium text-stone-500">
+                <div data-hub-surface-text="body" className="mt-1 text-sm font-medium text-stone-500">
                   {bookIdentity.authorReading}
                 </div>
               ) : null}

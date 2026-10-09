@@ -80,6 +80,7 @@ export default function TeacherLearningTaskModal({
   onTaskPageEndChange,
   taskSaving,
   taskMessage,
+  managedTaskId = null,
   activeTasks,
   taskBooksByStudentId,
   cancellingTaskId,
@@ -117,6 +118,7 @@ export default function TeacherLearningTaskModal({
   onTaskPageEndChange: (value: string) => void;
   taskSaving: boolean;
   taskMessage: string | null;
+  managedTaskId?: string | null;
   activeTasks: ActiveLearningTask[];
   taskBooksByStudentId: Record<string, TaskBookOption[]>;
   cancellingTaskId: string | null;
@@ -125,6 +127,9 @@ export default function TeacherLearningTaskModal({
   onCreateTask: () => void;
   onCancelTask: (taskId: string) => void;
 }) {
+  const displayedTasks = managedTaskId
+    ? activeTasks.filter((task) => task.id === managedTaskId)
+    : activeTasks;
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-stone-950/40 px-4 py-8">
       <section className="w-full max-w-3xl rounded-3xl border border-emerald-200 bg-emerald-50 p-5 shadow-2xl">
@@ -134,11 +139,13 @@ export default function TeacherLearningTaskModal({
               Learning Tasks
             </p>
             <h2 className="mt-1 text-lg font-black text-stone-900">
-              Create a task for {student.display_name || student.username || "this learner"}
+              {managedTaskId ? "Manage task for" : "Create a task for"} {student.display_name || student.username || "this learner"}
             </h2>
-            <p className="mt-1 text-sm leading-6 text-stone-600">
-              A small manual task for a learner. Tasks appear on the learner’s Library page.
-            </p>
+            {!managedTaskId ? (
+              <p className="mt-1 text-sm leading-6 text-stone-600">
+                A small manual task for a learner. Tasks appear on the learner’s Library page.
+              </p>
+            ) : null}
           </div>
           <button
             type="button"
@@ -150,6 +157,8 @@ export default function TeacherLearningTaskModal({
           </button>
         </div>
 
+        {!managedTaskId ? (
+          <>
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           <label className="grid gap-1 text-sm font-semibold text-stone-700">
             Task type
@@ -336,11 +345,16 @@ export default function TeacherLearningTaskModal({
           ) : null}
         </div>
 
+          </>
+        ) : taskMessage ? (
+          <p role="status" className="mt-4 text-sm font-medium text-emerald-900">{taskMessage}</p>
+        ) : null}
+
         <div className="mt-5 rounded-2xl border border-emerald-200 bg-white p-4">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h3 className="text-sm font-black text-stone-900">
-                Active tasks for this learner
+                {managedTaskId ? "Assigned task" : "Active tasks for this learner"}
               </h3>
               <p className="text-xs leading-5 text-stone-500">
                 Cancel a task here if it should disappear from their Library page.
@@ -348,9 +362,9 @@ export default function TeacherLearningTaskModal({
             </div>
           </div>
 
-          {activeTasks.length > 0 ? (
+          {displayedTasks.length > 0 ? (
             <div className="mt-3 space-y-2">
-              {activeTasks.map((task) => {
+              {displayedTasks.map((task) => {
                 const linkedBook = (taskBooksByStudentId[task.learner_id] ?? []).find(
                   (book) => book.id === task.user_book_id
                 );
@@ -368,8 +382,12 @@ export default function TeacherLearningTaskModal({
                       <div className="mt-1 text-sm font-black text-stone-900">
                         {task.title}
                       </div>
+                      <p className="mt-1 text-xs text-stone-500">
+                        Assigned {new Date(task.created_at).toLocaleDateString()}
+                        {task.due_on ? ` · Due ${task.due_on}` : ""}
+                      </p>
                       {task.instructions ? (
-                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-stone-500">
+                        <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-stone-500">
                           {task.instructions}
                         </p>
                       ) : null}
@@ -389,7 +407,7 @@ export default function TeacherLearningTaskModal({
             </div>
           ) : (
             <p className="mt-3 rounded-2xl border border-dashed border-stone-200 bg-stone-50 px-3 py-3 text-sm text-stone-500">
-              No active tasks from you right now.
+              {managedTaskId ? "This task is no longer active." : "No active tasks from you right now."}
             </p>
           )}
         </div>

@@ -27,20 +27,22 @@ test('Reading Journal is a compact utility beside the other secondary destinatio
   assert.doesNotMatch(grid, /CompactActionButton|bg-green-50/);
 });
 
-test('book-specific Japanese Learning actions are consistent responsive feature cards', () => {
+test('Japanese Learning keeps two primary cards and a compact wrapping utility row', () => {
   const section = grid.match(/title="Japanese Learning"[\s\S]*?\{showJapaneseLearningSection \? \([\s\S]*?<\/ActionSection>/)?.[0];
   assert.ok(section, 'Japanese Learning has a dedicated section');
   for (const title of ['Vocabulary List', 'Bulk Add']) {
-    assert.match(section, new RegExp(`title="${title}"[\\s\\S]*?size="secondary"`), `${title} is a feature card`);
+    assert.match(section, new RegExp(`<UtilityActionButton\\s+title="${title}"`), `${title} is a compact utility`);
   }
   for (const title of ['Flashcards', 'Follow-Along']) {
     assert.match(section, new RegExp(`title="${title}"[\\s\\S]*?size="primary"`));
   }
   assert.doesNotMatch(section, /Review Words/);
-  assert.equal((section.match(/grid-cols-1 gap-2 text-sm sm:grid-cols-2/g) || []).length, 2);
+  assert.equal((section.match(/grid-cols-1 gap-2 text-sm sm:grid-cols-2/g) || []).length, 1);
   assert.match(grid, /title="Read"[\s\S]*?appearance="sky"/);
   assert.match(grid, /title="Listen"[\s\S]*?appearance="mint"/);
-  assert.doesNotMatch(section, /UtilityActionButton/);
+  assert.match(section, /flex flex-wrap gap-2/);
+  assert.match(section, /href=\{japaneseLearningCta.href\}[\s\S]*?onClick=\{onJapaneseLearningCtaClick\}[\s\S]*?Study Hub/);
+  assert.doesNotMatch(section, /appearance="secondary"/);
   assert.match(bookHub, /onStudyFlashcards=\{\(\) => \{[\s\S]*?confirmLeaveIfTimerActive\(\)[\s\S]*?router\.push\(`\/books\/\$\{row\.id\}\/study`\)/);
   assert.match(bookHub, /onFluidReadingExtensive=\{\(\) => \{[\s\S]*?confirmLeaveIfTimerActive\(\)[\s\S]*?router\.push\(`\/books\/\$\{row\.id\}\/readalong`\)/);
   assert.match(bookHub, /onVocabularyList=\{\(\) => \{[\s\S]*?confirmLeaveIfTimerActive\(\)[\s\S]*?router\.push\(`\/books\/\$\{row\.id\}\/words`\)/);

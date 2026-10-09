@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import BookHubStatCard from "./BookHubStatCard";
 
 type BookHubProgressSummaryProps = {
@@ -17,6 +18,7 @@ type BookHubProgressSummaryProps = {
   showVocabularyStats?: boolean;
   showSummaryCard?: boolean;
   showProgressSection?: boolean;
+  learningStats?: { label: string; value: string; caption: string }[];
   summaryStats?: {
     label: string;
     value: string;
@@ -41,7 +43,30 @@ export default function BookHubProgressSummary({
   showSummaryCard = true,
   showProgressSection = true,
   summaryStats,
+  learningStats,
 }: BookHubProgressSummaryProps) {
+  const [snapshotView, setSnapshotView] = useState<"reading" | "learning">("reading");
+  const [snapshotHovered, setSnapshotHovered] = useState(false);
+  const [snapshotFocused, setSnapshotFocused] = useState(false);
+  const [snapshotVisible, setSnapshotVisible] = useState(true);
+  const hasLearningStats = Boolean(learningStats && summaryStats);
+  useEffect(() => {
+    if (!hasLearningStats || !showProgressSection || snapshotHovered || snapshotFocused) return;
+    let contentChange: number | undefined;
+    let fadeIn: number | undefined;
+    const rotation = window.setInterval(() => {
+      setSnapshotVisible(false);
+      contentChange = window.setTimeout(() => {
+        setSnapshotView(view => view === "reading" ? "learning" : "reading");
+        fadeIn = window.setTimeout(() => setSnapshotVisible(true), 150);
+      }, 450);
+    }, 15000);
+    return () => {
+      window.clearInterval(rotation);
+      window.clearTimeout(contentChange);
+      window.clearTimeout(fadeIn);
+    };
+  }, [hasLearningStats, showProgressSection, snapshotHovered, snapshotFocused]);
   const showLastDetailLine = lastSavedWordLabel || lastChapterLabel || lastPageLabel;
   const statGridClass = summaryStats
     ? summaryStats.length >= 3
@@ -104,14 +129,14 @@ export default function BookHubProgressSummary({
       {showProgressSection ? (
         <>
           <div>
-            <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-stone-500">
+            <div data-hub-surface-text="body" className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold text-stone-500">
               <span>Current Progress</span>
               <span>
                 {progressPercentLabel ? `${progressPercentLabel} · ` : ""}{progressLabel}
               </span>
             </div>
 
-            <div className="h-3 w-full overflow-hidden rounded-full bg-stone-200">
+            <div className="h-3 w-full overflow-hidden rounded-full bg-white ring-1 ring-stone-300">
               <div
                 className="h-full rounded-full bg-stone-700 transition-all"
                 style={{ width: progressBarWidth }}
@@ -119,8 +144,38 @@ export default function BookHubProgressSummary({
             </div>
           </div>
 
-          {summaryStats && summaryStats.length === 0 ? null : (
-            <div className={`grid grid-cols-1 gap-3 ${statGridClass}`}>
+          {hasLearningStats ? (
+            <div
+              role="region"
+              aria-label="Reading and learning progress snapshot"
+              tabIndex={0}
+              onMouseEnter={() => { setSnapshotHovered(true); setSnapshotVisible(true); }}
+              onMouseLeave={() => setSnapshotHovered(false)}
+              onFocusCapture={() => { setSnapshotFocused(true); setSnapshotVisible(true); }}
+              onBlurCapture={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) setSnapshotFocused(false);
+              }}
+              className="grid rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 focus-visible:ring-offset-2"
+            >
+              {(["reading", "learning"] as const).map(view => (
+                <div
+                  key={view}
+                  aria-hidden={snapshotView !== view}
+                  className={`col-start-1 row-start-1 space-y-2 transition-opacity duration-[450ms] motion-reduce:transition-none ${snapshotView === view && snapshotVisible ? "opacity-100" : "pointer-events-none opacity-0"}`}
+                >
+                  <h3 className="text-xs font-semibold tracking-wide text-stone-500">
+                    {view === "reading" ? "Reading Snapshot" : "Learning Snapshot"}
+                  </h3>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    {(view === "reading" ? summaryStats : learningStats)?.map(stat => (
+                      <BookHubStatCard key={stat.label} label={stat.label} value={stat.value} caption={stat.caption} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : summaryStats && summaryStats.length === 0 ? null : (
+            <div className={`grid grid-cols-1 gap-3 ${learningStats ? "sm:grid-cols-3" : statGridClass}`}>
               {summaryStats ? (
                 summaryStats.map((stat) => (
                   <BookHubStatCard

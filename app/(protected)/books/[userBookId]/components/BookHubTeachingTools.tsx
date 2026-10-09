@@ -107,9 +107,9 @@ function TeachingActionSection({
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="text-xl font-black text-stone-950">{title}</h2>
+        <h2 data-hub-surface-text="heading" className="text-xl font-black text-stone-950">{title}</h2>
         {description ? (
-          <p className="mt-1 text-sm leading-6 text-stone-600">{description}</p>
+          <p data-hub-surface-text="body" className="mt-1 text-sm leading-6 text-stone-600">{description}</p>
         ) : null}
       </div>
       {children}
@@ -442,7 +442,7 @@ export default function BookHubTeachingTools({
         description="Open each attached student's flashcards or vocabulary list for this book."
       >
         {loadingStudents ? (
-          <p className="text-sm font-semibold text-stone-500">
+          <p data-hub-surface-text="body" className="text-sm font-semibold text-stone-500">
             Loading connected students...
           </p>
         ) : studentsError ? (

@@ -34,7 +34,6 @@ type BookHubActionGridProps = {
 const coolCardStyles = {
   sky: "border-sky-200 bg-gradient-to-br from-sky-100 via-cyan-50 to-teal-50 hover:border-sky-400",
   mint: "border-teal-200 bg-gradient-to-br from-blue-50 via-teal-50 to-emerald-100 hover:border-teal-400",
-  secondary: "border-sky-200 bg-sky-50 hover:border-sky-400 hover:bg-sky-100",
 };
 
 function ActionButton({
@@ -66,9 +65,12 @@ function ActionButton({
       type="button"
       onClick={onClick}
       className={[
-        "relative rounded-xl border text-center shadow-sm transition-all hover:-translate-y-[1px] hover:shadow-md",
+        "relative rounded-xl border text-center transition-all hover:-translate-y-[1px] hover:shadow-md",
         appearance ? coolCardStyles[appearance] : "border-stone-900",
         appearance ? "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2" : "",
+        size === "primary"
+          ? "shadow-[0_3px_14px_rgba(41,37,36,0.12)]"
+          : "shadow-sm",
         sizeClass,
         className,
       ].join(" ")}
@@ -122,15 +124,15 @@ function ActionSection({
     <section className="space-y-3">
       <div>
         {eyebrow ? (
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-stone-500">
+          <p data-hub-surface-text="body" className="text-xs font-black uppercase tracking-[0.18em] text-stone-500">
             {eyebrow}
           </p>
         ) : null}
-        <h2 className={eyebrow ? "mt-1 text-xl font-black text-stone-950" : "text-xl font-black text-stone-950"}>
+        <h2 data-hub-surface-text="heading" className={eyebrow ? "mt-1 text-xl font-black text-stone-950" : "text-xl font-black text-stone-950"}>
           {title}
         </h2>
         {description ? (
-          <p className="mt-1 text-sm leading-6 text-stone-600">{description}</p>
+          <p data-hub-surface-text="body" className="mt-1 text-sm leading-6 text-stone-600">{description}</p>
         ) : null}
       </div>
       {children}
@@ -151,7 +153,7 @@ function UtilityActionButton({
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex min-h-11 items-center justify-center rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-black text-stone-800 shadow-sm transition hover:-translate-y-[1px] hover:border-stone-400 hover:bg-stone-50 hover:shadow-md"
+      className="inline-flex min-h-11 items-center justify-center rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-black text-stone-800 shadow-[0_2px_8px_rgba(41,37,36,0.10)] transition hover:-translate-y-[1px] hover:border-stone-400 hover:bg-stone-50 hover:shadow-md"
       title={description}
     >
       {title}
@@ -282,36 +284,30 @@ export default function BookHubActionGrid({
                   />
                 ) : null}
               </div>
-              <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+              <div className="flex flex-wrap gap-2">
                 {canUseVocabularyList ? (
-                  <ActionButton
+                  <UtilityActionButton
                     title="Vocabulary List"
                     description="Open the saved words and vocabulary tools for this book."
-                    appearance="secondary"
                     onClick={onVocabularyList}
-                    size="secondary"
                   />
                 ) : null}
                 {canUseBulkAdd && onBulkAdd ? (
-                  <ActionButton
+                  <UtilityActionButton
                     title="Bulk Add"
                     description="Add several words to this book at once."
-                    appearance="secondary"
                     onClick={onBulkAdd}
-                    size="secondary"
                   />
                 ) : null}
+                <Link
+                  href={japaneseLearningCta.href}
+                  onClick={onJapaneseLearningCtaClick}
+                  className="inline-flex min-h-11 items-center justify-center rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-black text-stone-800 shadow-[0_2px_8px_rgba(41,37,36,0.10)] transition hover:-translate-y-[1px] hover:border-stone-400 hover:bg-stone-50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 focus-visible:ring-offset-2"
+                >
+                  Study Hub
+                </Link>
               </div>
             </div>
-          ) : null}
-          {showJapaneseLearningSection ? (
-            <Link
-              href={japaneseLearningCta.href}
-              onClick={onJapaneseLearningCtaClick}
-              className="inline-flex min-h-11 w-fit items-center justify-center rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-black text-stone-800 shadow-sm transition hover:border-stone-400 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 focus-visible:ring-offset-2"
-            >
-              {japaneseLearningCta.label}
-            </Link>
           ) : null}
           {showJapaneseLearningPromo ? (
             <JapaneseLearningPromoCard
