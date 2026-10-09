@@ -61,7 +61,7 @@ export default function ProfileSettingsCoreCard({
             placeholder="devon"
           />
           <p className="mt-1 text-xs text-stone-500">
-            Lowercase letters, numbers, and underscores only. Your Library link uses this name.
+            Lowercase letters, numbers, and underscores only. Changing your username changes your Library link.
           </p>
         </div>
 

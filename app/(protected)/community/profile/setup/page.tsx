@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 import ProfileShell from "@/components/profile/ProfileShell";
 import MekuruReadingLevelGuide from "@/components/profile/MekuruReadingLevelGuide";
 import {
-  legacyTargetLanguageForJapaneseLearning,
   wantsJapaneseLearning,
 } from "@/lib/access/japaneseLearningIntent";
 import { supabase } from "@/lib/supabaseClient";
@@ -41,7 +40,7 @@ export default function ProfileSetupPage() {
   const [message, setMessage] = useState("");
 
   const [displayName, setDisplayName] = useState("");
-  const [username, setUsername] = useState("");
+  const [existingDisplayName, setExistingDisplayName] = useState("");
   const [nativeLanguageChoice, setNativeLanguageChoice] = useState("");
   const [customNativeLanguage, setCustomNativeLanguage] = useState("");
   const [japaneseLearningEnabled, setJapaneseLearningEnabled] = useState<boolean | null>(null);
@@ -69,7 +68,7 @@ export default function ProfileSetupPage() {
       const { data: profile, error } = await supabase
         .from("profiles")
         .select(
-          "display_name, username, native_language, target_language, japanese_learning_enabled, level, role, app_access_type"
+          "display_name, native_language, target_language, japanese_learning_enabled, level, role, app_access_type"
         )
         .eq("id", user.id)
         .maybeSingle();
@@ -83,7 +82,7 @@ export default function ProfileSetupPage() {
       }
 
       setDisplayName(profile?.display_name ?? "");
-      setUsername(profile?.username ?? "");
+      setExistingDisplayName(profile?.display_name ?? "");
       setJapaneseLearningEnabled(profile ? wantsJapaneseLearning(profile) : null);
       setLevel(profile?.level ?? "");
 
@@ -117,7 +116,6 @@ export default function ProfileSetupPage() {
   async function saveSetup() {
     setMessage("");
 
-    const cleanUsername = username.trim().toLowerCase();
     const selectedNativeLanguage =
       nativeLanguageChoice === NATIVE_LANGUAGE_OTHER
         ? customNativeLanguage.trim()
@@ -125,16 +123,6 @@ export default function ProfileSetupPage() {
 
     if (!displayName.trim()) {
       setMessage("Please enter a display name.");
-      return;
-    }
-
-    if (!cleanUsername) {
-      setMessage("Please enter a username.");
-      return;
-    }
-
-    if (!/^[a-z0-9_]+$/.test(cleanUsername)) {
-      setMessage("Username can only use lowercase letters, numbers, and underscores.");
       return;
     }
 
@@ -148,51 +136,30 @@ export default function ProfileSetupPage() {
       return;
     }
 
-    if (japaneseLearningEnabled && !level.trim()) {
-      setMessage("Please choose the reading level that feels closest right now.");
-      return;
-    }
-
     setSaving(true);
 
     try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError || !user) {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
         router.replace("/login");
         return;
       }
-
-      // New profiles use database defaults; updates never send access or role fields.
-      const visibleJapaneseStudyFields = japaneseLearningEnabled
-        ? {
-            level: level.trim(),
-          }
-        : {};
-
-      const { error } = await supabase.from("profiles").upsert(
-        {
-          id: user.id,
-          display_name: displayName.trim(),
-          username: cleanUsername,
-          native_language: selectedNativeLanguage,
-          japanese_learning_enabled: japaneseLearningEnabled,
-          target_language: legacyTargetLanguageForJapaneseLearning(japaneseLearningEnabled),
-          ...visibleJapaneseStudyFields,
-        },
-        { onConflict: "id" }
-      );
-
-      if (error) {
-        setMessage(error.message ?? "Could not save profile setup.");
+      const response = await fetch("/api/profile/setup", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ displayName: displayName.trim(), nativeLanguage: selectedNativeLanguage,
+          japaneseLearningEnabled, level }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setMessage(result.error ?? "Could not save profile setup.");
         return;
       }
 
       router.replace("/books");
       router.refresh();
+    } catch {
+      setMessage("Could not save profile setup. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -214,7 +181,7 @@ export default function ProfileSetupPage() {
   return (
     <ProfileShell
       title="Quick Profile Setup"
-      description="Just the basics Mekuru needs to create your profile and Library link."
+      description="Just the basics for your Library. Your username is assigned automatically."
     >
       <div className="mx-auto max-w-3xl space-y-4">
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
@@ -227,24 +194,12 @@ export default function ProfileSetupPage() {
             <div>
               <label className="block text-sm font-medium text-stone-800">Display name</label>
               <input
+                readOnly={Boolean(existingDisplayName.trim())}
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 className="mt-1 w-full rounded-xl border px-3 py-2"
                 placeholder="Devon"
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-stone-800">Username</label>
-              <input
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="mt-1 w-full rounded-xl border px-3 py-2"
-                placeholder="devon"
-              />
-              <p className="mt-1 text-xs text-stone-500">
-                Lowercase letters, numbers, and underscores only. This becomes your Library link.
-              </p>
             </div>
 
             <div>
@@ -315,7 +270,7 @@ export default function ProfileSetupPage() {
         </div>
 
         {japaneseLearningEnabled ? (
-          <MekuruReadingLevelGuide selectedLevel={level} onSelect={setLevel} />
+          <MekuruReadingLevelGuide optional selectedLevel={level} onSelect={setLevel} />
         ) : null}
 
         {message ? <p className="text-sm text-red-600">{message}</p> : null}

@@ -12,6 +12,7 @@ import {
   wantsJapaneseLearning,
 } from "@/lib/access/japaneseLearningIntent";
 import { supabase } from "@/lib/supabaseClient";
+import { profileReadingLevelFields } from "@/lib/profileLevels";
 import MekuruReadingLevelGuide from "@/components/profile/MekuruReadingLevelGuide";
 import ProfileSettingsLoadingState from "./components/ProfileSettingsLoadingState";
 import ProfileSettingsMessage from "./components/ProfileSettingsMessage";
@@ -61,6 +62,7 @@ export default function ProfileSettingsPage() {
 
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
+  const [originalUsername, setOriginalUsername] = useState("");
   const [nativeLanguageChoice, setNativeLanguageChoice] = useState("");
   const [customNativeLanguage, setCustomNativeLanguage] = useState("");
   const [japaneseLearningEnabled, setJapaneseLearningEnabled] = useState(false);
@@ -126,6 +128,7 @@ export default function ProfileSettingsPage() {
 
       setDisplayName(profile?.display_name ?? "");
       setUsername(profile?.username ?? "");
+      setOriginalUsername(profile?.username ?? "");
 
       const savedNativeLanguage = profile?.native_language ?? "";
       if (
@@ -204,7 +207,7 @@ export default function ProfileSettingsPage() {
       return;
     }
 
-    const cleanUsername = username.trim().toLowerCase();
+    const cleanUsername = username === originalUsername ? originalUsername : username.trim().toLowerCase();
 
     if (!displayName.trim()) {
       setSaving(false);
@@ -218,7 +221,7 @@ export default function ProfileSettingsPage() {
       return;
     }
 
-    if (!/^[a-z0-9_]+$/.test(cleanUsername)) {
+    if (username !== originalUsername && !/^[a-z0-9_]+$/.test(cleanUsername)) {
       setSaving(false);
       setErrorMsg("Usernames can only use lowercase letters, numbers, and underscores.");
       return;
@@ -235,12 +238,6 @@ export default function ProfileSettingsPage() {
       return;
     }
 
-    if (japaneseLearningEnabled && !level.trim()) {
-      setSaving(false);
-      setErrorMsg("Please choose the reading level that feels closest right now.");
-      return;
-    }
-
     const cleanedGenres: string[] = [];
     favoriteGenres.forEach((genre) => {
       const cleanGenre = genre.trim();
@@ -254,11 +251,7 @@ export default function ProfileSettingsPage() {
       }
     });
 
-    const visibleJapaneseStudyFields = japaneseLearningEnabled
-      ? {
-          level: level.trim(),
-        }
-      : {};
+    const visibleJapaneseStudyFields = profileReadingLevelFields(japaneseLearningEnabled, level);
     const visiblePublicJapaneseLevelFields = japaneseLearningEnabled
       ? {
           jlpt_level_public: publicLevel === "None" ? null : publicLevel,
@@ -302,6 +295,8 @@ export default function ProfileSettingsPage() {
       return;
     }
 
+    setOriginalUsername(cleanUsername);
+    setUsername(cleanUsername);
     setSuccessMsg("Profile saved.");
     window.dispatchEvent(new Event("mekuru-profile-preferences-updated"));
     router.replace("/community/profile");
@@ -345,7 +340,7 @@ export default function ProfileSettingsPage() {
         />
 
         {japaneseLearningEnabled ? (
-          <MekuruReadingLevelGuide selectedLevel={level} onSelect={setLevel} />
+          <MekuruReadingLevelGuide optional selectedLevel={level} onSelect={setLevel} />
         ) : null}
 
         <ProfileSettingsPublicCard
