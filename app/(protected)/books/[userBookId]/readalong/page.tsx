@@ -2,6 +2,8 @@
 // 
 
 "use client";
+import VocabularyProgressPrompt from "@/components/books/VocabularyProgressPrompt";
+import type { CapturePosition } from "@/lib/books/vocabularyProgress";
 import WordPositionField from "@/components/vocabulary/WordPositionField";
 import { wordPosition, wordPositionText, wordPositionPayload, wordPositionInput, parseWordPosition, type WordPositionRecord } from "@/lib/vocabulary/wordPosition";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
@@ -327,6 +329,10 @@ async function generateVocabularyKanjiMap(vocabularyCacheId: number) {
 }
 
 export default function ReadAlongPage() {
+    const params = useParams<{ userBookId: string }>();
+    return <ReadAlongContent key={params.userBookId} />;
+}
+function ReadAlongContent() {
     const tracking = useBookProgress();
     const router = useRouter();
     const params = useParams<{ userBookId: string }>();
@@ -334,6 +340,7 @@ export default function ReadAlongPage() {
     const searchParams = useSearchParams();
     const savedPageStorageKey = `readalong-current-page:${userBookId}`;
 
+    const [capturePositions, setCapturePositions] = useState<CapturePosition[]>([]);
     const [words, setWords] = useState<ReadAlongWord[]>([]);
     const [libraryColorByWordKey, setLibraryColorByWordKey] = useState<
         Record<string, LibraryStudyWordColorInfo>
@@ -1749,6 +1756,7 @@ export default function ReadAlongPage() {
                 hide_kanji_in_reading_support: !!insertedRow.hide_kanji_in_reading_support,
             };
 
+            setCapturePositions(current => [...current, { value: wordPosition(insertedRow).value, unit: wordPosition(insertedRow).unit }]);
             setWords((currentWords) => {
                 const withInserted = [
                     ...currentWords.filter((word) => word.id !== insertedWord.id),
@@ -1960,6 +1968,7 @@ export default function ReadAlongPage() {
                 hide_kanji_in_reading_support: !!insertedRow.hide_kanji_in_reading_support,
             };
 
+            setCapturePositions(current => [...current, { value: wordPosition(insertedRow).value, unit: wordPosition(insertedRow).unit }]);
             setWords((currentWords) =>
                 [...currentWords.filter((word) => word.id !== insertedWord.id), insertedWord].sort(
                     (a, b) => {
@@ -2249,6 +2258,8 @@ export default function ReadAlongPage() {
                     showReadingWorkspace ? "max-w-[96rem]" : "max-w-4xl"
                 }`}
             >
+                {capturePositions.length > 0 && !isRunning && !isPaused && !showTimedSessionForm && !hasFinishedTimer && elapsed === 0 ?
+                    <VocabularyProgressPrompt userBookId={userBookId} studentId={studentWorkspaceBackContext?.studentId} positions={capturePositions} /> : null}
                 {studentWorkspaceBackContext ? (
                     <button
                         type="button"

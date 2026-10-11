@@ -1,6 +1,7 @@
 //Single Add 
 // 
 "use client";
+import VocabularyProgressPrompt from "@/components/books/VocabularyProgressPrompt";
 import WordContextFields from "@/components/vocabulary/WordContextFields";
 import { wordContextPayload, type WordContext } from "@/lib/vocabulary/wordContext";
 
@@ -216,6 +217,10 @@ async function generateVocabularyKanjiMap(vocabularyCacheId: number) {
 }
 
 export default function AddWordPage() {
+  const params = useParams<{ userBookId: string }>();
+  return <AddWordContent key={params.userBookId} />;
+}
+function AddWordContent() {
   const tracking = useBookProgress();
   const [editPositionUnit, setEditPositionUnit] = useState<ProgressTrackingMethod>("page");
   const router = useRouter();
@@ -1511,6 +1516,8 @@ export default function AddWordPage() {
     <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">
       <div className="mx-auto max-w-5xl">
         <AddWordPageHeader />
+        {sessionWords.length > 0 ? <VocabularyProgressPrompt userBookId={userBookId}
+          actionLabel="Update progress" positions={sessionWords.map(word => ({ value: word.pageNumber, unit: word.positionUnit }))} /> : null}
 
         {bookTitle ? (
           <AddWordBookContextCard

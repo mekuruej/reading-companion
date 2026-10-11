@@ -61,6 +61,9 @@ type LiveLessonWordUpdate = {
   positionUnit?: ProgressTrackingMethod;
   id?: string;
   surface?: unknown;
+  encountered_surface?: unknown;
+  base_form?: unknown;
+  lookup_surface?: unknown;
   reading?: unknown;
   meaning?: unknown;
   meaning_choices?: unknown;
@@ -332,7 +335,7 @@ function wordSelect() {
   return `
     id,
     vocabulary_cache_id,
-    surface,
+    surface, encountered_surface, base_form, lookup_surface,
     book_form, book_form_description, follow_along_support_note,
     reading,
     meaning,
@@ -617,21 +620,23 @@ async function saveReviewWords({
     const id = cleanString(word.id);
     if (!id || !allowedIds.has(id)) continue;
 
-    const { data: savedWord, error: savedError } = await supabaseAdmin.from("user_book_words").select("position_unit,position_value,page_number,percent_location,surface,base_form,lookup_surface").eq("id", id).eq("user_book_id", userBookId).single();
+    const { data: savedWord, error: savedError } = await supabaseAdmin.from("user_book_words").select("position_unit,position_value,page_number,percent_location,surface,encountered_surface,base_form,lookup_surface").eq("id", id).eq("user_book_id", userBookId).single();
     if (savedError) throw savedError;
     const unit = word.positionUnit ?? wordPosition(savedWord).unit;
     if (!["page", "kindle_location", "percent"].includes(unit)) throw new Error("Invalid position unit");
     const parsedPosition = parseWordPosition(word.page_number ?? word.pageNumber, unit);
     if (parsedPosition.error) throw new Error(parsedPosition.error);
     const surface = cleanString(word.surface);
+    if (!surface) throw new Error("Enter a word before saving review.");
     const targetLanguageCode = cleanString(
       word.target_language_code ?? word.targetLanguageCode
     );
     const payload: Record<string, unknown> = {
       surface,
-      encountered_surface: surface,
-      base_form: surface === savedWord.surface ? savedWord.base_form || surface : surface,
-      lookup_surface: surface === savedWord.surface ? savedWord.lookup_surface || surface : surface,
+      encountered_surface: word.encountered_surface === undefined ? savedWord.encountered_surface || savedWord.surface : nullableText(word.encountered_surface),
+      base_form: word.base_form === undefined ? (surface === savedWord.surface ? savedWord.base_form || surface : surface) : nullableText(word.base_form),
+      lookup_surface: word.lookup_surface === undefined ? (surface === savedWord.surface ? savedWord.lookup_surface || surface : surface) : nullableText(word.lookup_surface),
+      ...(surface !== savedWord.surface || (word.lookup_surface !== undefined && nullableText(word.lookup_surface) !== savedWord.lookup_surface) ? { vocabulary_cache_id: null, jlpt: null, is_common: null } : {}),
       reading: nullableText(word.reading),
       ...(Object.prototype.hasOwnProperty.call(word, "book_form") ? wordContextPayload(word) : {}),
       meaning: nullableText(word.meaning),
@@ -861,8 +866,7 @@ export async function POST(req: Request) {
     const payload = {
       user_book_id: userBookId,
       vocabulary_cache_id: null,
-      surface: cleanString(body?.alternativeSurface) || surface,
-      ...wordContextPayload(body),
+      surface,
       encountered_surface: surface,
       base_form: surface,
       lookup_surface: surface,

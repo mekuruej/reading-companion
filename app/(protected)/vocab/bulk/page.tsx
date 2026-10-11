@@ -2,6 +2,7 @@
 // 
 "use client";
 
+import VocabularyProgressPrompt from "@/components/books/VocabularyProgressPrompt";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
@@ -1425,7 +1426,13 @@ function BulkVocabContent() {
             </div>
           </>
         )}
-        {step === "done" && <BulkDonePanel />}
+        {step === "done" && <><BulkDonePanel />
+          <VocabularyProgressPrompt autoOpen
+            userBookId={selectedDestination?.type === "student" ? selectedDestination.userBookId : authorizedUserBookId}
+            studentId={selectedDestination?.type === "student" ? selectedDestination.studentId : teacherStudentContext?.studentId}
+            sourceUserBookId={selectedDestination?.type === "student" ? (lockedStudent ? sourceUserBookId : userBookId) : undefined}
+            positions={items.map(item => ({ value: item.page, unit: positionUnit }))} />
+        </>}
       </div>
     </main>
   );

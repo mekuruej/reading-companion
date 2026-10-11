@@ -1,6 +1,7 @@
 // Curiosity Reading / Listening word timer experience
 //
 "use client";
+import VocabularyProgressPrompt from "@/components/books/VocabularyProgressPrompt";
 import BookProgressSummaryBar from "@/components/books/BookProgressSummaryBar";
 import { useSessionEndingPhrase, SessionEndingPhraseField, LatestEndingPhrase } from "@/components/books/SessionEndingPhrase";
 import WordContextFields from "@/components/vocabulary/WordContextFields";
@@ -309,7 +310,12 @@ async function generateVocabularyKanjiMap(vocabularyCacheId: number) {
 
 import { saveStudentWord, type StudentWordContext } from "@/lib/teacher/saveStudentWord";
 
-export function CuriosityReadingExperience({
+export function CuriosityReadingExperience(props: Parameters<typeof CuriosityReadingContent>[0]) {
+  const params = useParams<{ userBookId: string }>();
+  return <CuriosityReadingContent key={`${props.targetUserBookId ?? params.userBookId}:${props.studentContext?.studentId ?? ""}`} {...props} />;
+}
+
+function CuriosityReadingContent({
   studentContext,
   targetUserBookId,
   wordCaptureOnly = false,
@@ -2026,6 +2032,9 @@ export function CuriosityReadingExperience({
 
   const content = (
     <>
+      {quickSessionWords.length > 0 && !isRunning && !isPaused && !showTimedSessionForm && !hasFinishedTimer && elapsed === 0 ?
+        <VocabularyProgressPrompt userBookId={userBookId} studentId={studentContext?.studentId} sourceUserBookId={studentContext?.sourceUserBookId}
+          positions={quickSessionWords.map(word => ({ value: word.page, unit: word.positionUnit }))} /> : null}
       {!wordCaptureOnly && showProgressSummaryBar ? <BookProgressSummaryBar userBookId={userBookId} listening={isListeningMode} showBackLink={workspaceCompact} /> : null}
       {useCompactSessionBar ? (
         <>

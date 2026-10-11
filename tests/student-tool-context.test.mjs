@@ -30,7 +30,7 @@ function database(role = 'teacher') {
   const mutations = [];
   return { tables, mutations, auth: { getUser: async token => ({data:{user: token === 'valid' ? {id:teacher} : null},error:null}) }, from(table) {
     const filters=[]; let operation; let values;
-    const q = { select(){return q;}, order(){return q;}, limit(){return q;}, in(k,v){filters.push(r=>v.includes(r[k]));return q;}, upsert(v){operation="insert";values=v;return q;}, eq(k,v){filters.push(r=>r[k]===v);return q;}, is(k,v){filters.push(r=>r[k]===v);return q;},
+    const q = { not(k,op,v){filters.push(r=>r[k] != v);return q;}, neq(k,v){filters.push(r=>r[k]!==v);return q;}, select(){return q;}, order(){return q;}, limit(){return q;}, in(k,v){filters.push(r=>v.includes(r[k]));return q;}, upsert(v){operation="insert";values=v;return q;}, eq(k,v){filters.push(r=>r[k]===v);return q;}, is(k,v){filters.push(r=>r[k]===v);return q;},
       insert(v){operation='insert';values=v;return q;}, update(v){operation='update';values=v;return q;}, delete(){operation='delete';return q;},
       maybeSingle: async()=>run(false), single:async()=>run(true), then(resolve,reject){return Promise.resolve(run(false,true)).then(resolve,reject);} };
     function run(required,many=false) {
@@ -179,4 +179,63 @@ test('Bulk Add locks the visible target despite stale destination state and remo
   const outer=component();assert.notEqual(outer.key,lastKey);lastKey=outer.key;
   const tree=outer.type(outer.props);assert.ok(labels(tree).includes(`Adding words to ${name}`));assert.ok(!nodes(tree).some(n=>n.type==='select'));
  }
+});
+
+test('live capture → checkpoint → defer → fresh reload → enrich → finish preserves exact rows and student', async()=>{
+ const db=database();
+ const makeRoute=()=>load('app/api/teacher/live-lesson-words/route.ts',{'@supabase/supabase-js':{createClient:()=>db}});
+ let route=makeRoute();
+ const context={studentId:a,userBookId:copyA,sourceUserBookId:source};
+ const call=async(method,body)=>{
+  const response=await route[method](new Request('http://local/api/teacher/live-lesson-words',{method,headers:{authorization:'Bearer valid','Content-Type':'application/json'},body:JSON.stringify({...context,...body})}));
+  const data=await response.json();assert.equal(response.status,200,JSON.stringify(data));return data;
+ };
+ const first=await call('POST',{surface:'もってきた',pageNumber:12,positionUnit:'page',chapterNumber:2,alternativeSurface:'must not replace captured text'});
+ const sessionId=first.session.id;
+ assert.equal(first.word.surface,'もってきた');assert.equal(first.word.reading,null);assert.equal(first.word.meaning,null);assert.equal(first.word.excluded_from_flashcards,true);
+ const second=await call('POST',{sessionId,surface:'言葉',pageNumber:12,positionUnit:'page',chapterNumber:2});
+ assert.equal(second.session.id,sessionId);
+ const ids=db.tables.user_book_words.map(w=>w.id);
+ const links=structuredClone(db.tables.live_lesson_capture_session_words);
+ const end=await call('PATCH',{sessionId,action:'end-adding',saveStoppingPoint:true,stoppingPageNumber:'13',stoppingText:'Last paragraph',words:[]});
+ assert.equal(end.session.status,'reviewing');assert.equal(end.session.stopping_page_number,13);
+ const edited={id:ids[0],surface:'持ってくる',encountered_surface:'もってきた',base_form:'持ってくる',lookup_surface:'持ってくる',reading:'もってくる',meaning:'bring',meaningChoices:['bring','take'],meaningChoiceIndex:0,book_form:'持ってきた',book_form_description:'Past',follow_along_support_note:'surrounding phrase',pageNumber:'14',positionUnit:'page',chapterNumber:'2',chapterName:'Arrival',targetLanguageCode:'ja'};
+ db.tables.user_book_words[0].vocabulary_cache_id=123;
+ const deferred=await call('PATCH',{sessionId,action:'review-later',words:[edited]});
+ assert.equal(deferred.session.status,'deferred');assert.equal(db.tables.user_book_words[0].excluded_from_flashcards,true);
+ route=makeRoute(); // New handler instance; no client/local state.
+ const response=await route.GET(new Request('http://local?'+new URLSearchParams(context),{headers:{authorization:'Bearer valid'}}));
+ assert.equal(response.status,200);const restored=await response.json();
+ assert.equal(restored.session.id,sessionId);assert.equal(restored.words.length,2);
+ const word=restored.words.find(w=>w.id===ids[0]);
+ for(const field of ['surface','encountered_surface','base_form','lookup_surface','reading','meaning','book_form','book_form_description','follow_along_support_note','chapter_name']) assert.equal(word[field],field==='chapter_name'?edited.chapterName:edited[field]);
+ assert.equal(word.page_number,14);assert.equal(word.vocabulary_cache_id,null);
+ assert.equal(restored.latestStoppingPoint.pageNumber,13);
+ const finished=await call('PATCH',{sessionId,action:'finish-review',words:[edited]});
+ assert.equal(finished.session.status,'completed');assert.equal(db.tables.user_book_words[0].excluded_from_flashcards,false);assert.equal(db.tables.user_book_words[1].excluded_from_flashcards,true);
+ assert.deepEqual(db.tables.user_book_words.map(w=>w.id),ids);assert.deepEqual(db.tables.live_lesson_capture_session_words,links);
+ assert.equal(db.tables.live_lesson_capture_sessions.length,1);
+ assert.ok(db.tables.user_book_words.every(w=>w.user_book_id===copyA));assert.ok(db.mutations.every(m=>m.table!=='teacher_students'));
+});
+
+test('review endpoint rejects another student session and permits checkpoint skip with incomplete words',async()=>{
+ const db=database();const route=load('app/api/teacher/live-lesson-words/route.ts',{'@supabase/supabase-js':{createClient:()=>db}});
+ const call=(method,body)=>route[method](new Request('http://local',{method,headers:{authorization:'Bearer valid','Content-Type':'application/json'},body:JSON.stringify({studentId:a,userBookId:copyA,sourceUserBookId:source,...body})}));
+ const capture=await (await call('POST',{surface:'猫',pageNumber:1})).json();
+ assert.equal((await call('PATCH',{sessionId:capture.session.id,action:'end-adding',saveStoppingPoint:false,words:[]})).status,200);
+ const before=structuredClone(db.tables);
+ assert.equal((await call('PATCH',{studentId:b,userBookId:copyB,sessionId:capture.session.id,action:'review-later',words:[{id:capture.word.id,surface:'wrong'}]})).status,404);
+ assert.deepEqual(db.tables,before);
+});
+
+test('live capture has no enrichment controls; review keeps word context and saved definition choices',()=>{
+ const panel=fs.readFileSync('app/(protected)/teacher/students/[studentId]/books/[userBookId]/lesson-add/LiveLessonQuickAddPanel.tsx','utf8');
+ const capture=panel.slice(panel.indexOf('<form onSubmit={captureWord}'),panel.indexOf('</form>',panel.indexOf('<form onSubmit={captureWord}')));
+ for(const detail of ['WordContextFields','alternativeSurface','draft.reading','draft.meaning']) assert.ok(!capture.includes(detail));
+ for(const detail of ['currentPage','chapterNumber','chapterName']) assert.ok(capture.includes(detail));
+ assert.ok(panel.includes('<WordContextFields teacher value={draft}'));assert.ok(panel.includes('draft.meaningChoices.map'));
+ assert.ok(panel.includes('lookupVersions.current[draft.id] !== lookupVersion'));
+ assert.ok(panel.includes('Your captured words are saved. You can finish reviewing them later.'));
+ const workspace=fs.readFileSync('app/api/teacher/student-workspace/route.ts','utf8');
+ assert.ok(workspace.includes('.in("status", ["reviewing", "deferred"])'));
 });

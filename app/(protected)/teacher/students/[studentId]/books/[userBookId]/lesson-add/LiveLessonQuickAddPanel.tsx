@@ -74,6 +74,9 @@ type CapturedWord = WordContext & {
   id: string;
   vocabulary_cache_id?: number | null;
   surface: string | null;
+  encountered_surface?: string | null;
+  base_form?: string | null;
+  lookup_surface?: string | null;
   reading: string | null;
   meaning: string | null;
   page_number: number | null;
@@ -96,6 +99,9 @@ type ReviewDraft = WordContext & {
   positionUnit: ProgressTrackingMethod;
   id: string;
   surface: string;
+  encountered_surface: string;
+  base_form: string;
+  lookup_surface: string;
   reading: string;
   meaning: string;
   meaningChoices: string[];
@@ -374,6 +380,9 @@ function wordToDraft(word: CapturedWord): ReviewDraft {
     ...wordContextPayload(word),
     id: word.id,
     surface: word.surface ?? "",
+    encountered_surface: word.encountered_surface ?? word.surface ?? "",
+    base_form: word.base_form ?? word.surface ?? "",
+    lookup_surface: word.lookup_surface ?? word.surface ?? "",
     reading: word.reading ?? "",
     meaning: word.meaning ?? "",
     meaningChoices: Array.isArray(word.meaning_choices) ? word.meaning_choices : [],
@@ -432,8 +441,6 @@ export default function LiveLessonQuickAddPanel({
   const [bookPageCount, setBookPageCount] = useState<number | null>(null);
   const [session, setSession] = useState<LiveLessonSession | null>(null);
   const [word, setWord] = useState("");
-  const [alternativeSurface, setAlternativeSurface] = useState("");
-  const [wordContext, setWordContext] = useState<WordContext>({});
   const [currentPage, setCurrentPage] = useState("");
   const [chapterNumber, setChapterNumber] = useState("");
   const [chapterName, setChapterName] = useState("");
@@ -892,8 +899,6 @@ export default function LiveLessonQuickAddPanel({
           sourceUserBookId,
           sessionId: session?.id,
           surface: cleanWord,
-          alternativeSurface,
-          ...wordContextPayload(wordContext),
           page: currentPage,
           positionUnit,
           chapterNumber,
@@ -914,8 +919,6 @@ export default function LiveLessonQuickAddPanel({
       setReviewDrafts((nextWords.length ? nextWords : [...capturedWords, capturedWord]).map(wordToDraft));
       setBulkSelectedIds((prev) => uniqueStrings([...prev, capturedWord.id]));
       setWord("");
-      setAlternativeSurface("");
-      setWordContext({});
       setNotice(`Saved ${capturedWord.surface ?? cleanWord}`);
       window.setTimeout(() => {
         wordInputRef.current?.focus({ preventScroll: true });
@@ -972,7 +975,13 @@ export default function LiveLessonQuickAddPanel({
     }
   }
 
+  const lookupVersions = useRef<Record<string, number>>({});
+
   function updateReviewDraft(id: string, patch: Partial<ReviewDraft>) {
+    if (patch.surface !== undefined || patch.lookup_surface !== undefined) {
+      lookupVersions.current[id] = (lookupVersions.current[id] ?? 0) + 1;
+      setLookupChoicesById(prev => ({ ...prev, [id]: [] }));
+    }
     setReviewDrafts((prev) =>
       prev.map((draft) => (draft.id === id ? { ...draft, ...patch } : draft))
     );
@@ -1097,7 +1106,7 @@ export default function LiveLessonQuickAddPanel({
       if (action === "end-adding") {
         setNotice("Adding is finished. Review the batch below.");
       } else if (action === "review-later") {
-        setNotice("Review saved for later. This batch can be reopened from this Live Lesson page.");
+        setNotice("Your captured words and review edits are saved. Resume from Student Workspace → Needs Attention or this Live Lesson page.");
       } else {
         setNotice("Review finished. Complete rows are now available for flashcards.");
       }
@@ -1115,12 +1124,14 @@ export default function LiveLessonQuickAddPanel({
       return;
     }
 
-    const cleanSurface = draft.surface.trim();
+    const cleanSurface = (draft.lookup_surface || draft.surface).trim();
     if (!cleanSurface) {
       setNotice("Enter a word before searching.");
       return;
     }
 
+    const lookupVersion = (lookupVersions.current[draft.id] ?? 0) + 1;
+    lookupVersions.current[draft.id] = lookupVersion;
     setLookupLoadingId(draft.id);
     setMessage("");
     setNotice(`Searching ${cleanSurface}...`);
@@ -1135,6 +1146,7 @@ export default function LiveLessonQuickAddPanel({
         throw new Error(data?.error ?? "Jisho lookup failed.");
       }
 
+      if (lookupVersions.current[draft.id] !== lookupVersion) return;
       const candidates = buildJishoCandidates(data?.data ?? [], cleanSurface);
       if (candidates.length === 0) {
         setLookupChoicesById((prev) => ({ ...prev, [draft.id]: [] }));
@@ -1145,7 +1157,7 @@ export default function LiveLessonQuickAddPanel({
 
       const first = candidates[0];
       updateReviewDraft(draft.id, {
-        surface: first.surface,
+        base_form: first.surface,
         reading: first.reading,
         meaning: first.defaultMeaning,
         meaningChoices: first.meaningChoices,
@@ -1160,7 +1172,7 @@ export default function LiveLessonQuickAddPanel({
       );
     } catch (error: any) {
       console.error("Live Lesson lookup failed:", error);
-      setMessage(error?.message ?? "Could not search Jisho.");
+      if (lookupVersions.current[draft.id] === lookupVersion) setMessage(error?.message ?? "Could not search Jisho.");
     } finally {
       setLookupLoadingId(null);
     }
@@ -1168,7 +1180,7 @@ export default function LiveLessonQuickAddPanel({
 
   function applyCandidate(draftId: string, candidate: JishoCandidate) {
     updateReviewDraft(draftId, {
-      surface: candidate.surface,
+      base_form: candidate.surface,
       reading: candidate.reading,
       meaning: candidate.defaultMeaning,
       meaningChoices: candidate.meaningChoices,
@@ -1551,12 +1563,6 @@ export default function LiveLessonQuickAddPanel({
                   </div>
                 </label>
 
-                <div className="mt-2 space-y-2">
-                  <label className="block text-xs font-medium text-stone-600">Alternative spelling / kanji
-                    <input className="w-full rounded-lg border px-2 py-1.5 text-sm" value={alternativeSurface} onChange={event => setAlternativeSurface(event.target.value)} placeholder="Optional" />
-                  </label>
-                  <WordContextFields teacher value={wordContext} onChange={setWordContext} />
-                </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-stone-600">
                   <span className="rounded-full bg-amber-100 px-3 py-1 font-semibold text-amber-900">
                     {positionLabel(positionUnit)} {currentPage.trim() || "not set"}
@@ -1590,6 +1596,10 @@ export default function LiveLessonQuickAddPanel({
                 </h2>
                 <p className="mt-1 text-sm text-stone-600">
                   {readyCount} ready for flashcards. Incomplete rows stay saved but excluded.
+                </p>
+                <p className="mt-1 text-sm text-stone-600">
+                  Your captured words are saved. You can finish reviewing them later.
+                  Choose Review Later to save your review edits before leaving.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1751,7 +1761,7 @@ export default function LiveLessonQuickAddPanel({
                           <input
                             value={draft.surface}
                             onChange={(event) =>
-                              updateReviewDraft(draft.id, { surface: event.target.value })
+                              updateReviewDraft(draft.id, { surface: event.target.value, base_form: event.target.value, lookup_surface: event.target.value, meaningChoices: [], meaningChoiceIndex: null })
                             }
                             disabled={isCompleted}
                             className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-950 disabled:bg-stone-100"
@@ -1778,13 +1788,34 @@ export default function LiveLessonQuickAddPanel({
                           <input
                             value={draft.meaning}
                             onChange={(event) =>
-                              updateReviewDraft(draft.id, { meaning: event.target.value })
+                              updateReviewDraft(draft.id, { meaning: event.target.value, meaningChoiceIndex: null })
                             }
                             disabled={isCompleted}
                             className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm disabled:bg-stone-100"
                           />
                         </label>
                       </div>
+
+                      <fieldset disabled={isCompleted} className="mt-3 space-y-3">
+                        <p className="text-xs text-stone-500">Word is the preferred entry, including an alternative spelling or kanji. Changing it clears old dictionary choices; use Jisho lookup to refresh. Your reading and custom meaning remain editable.</p>
+                        <div className="grid gap-3 md:grid-cols-3">
+                          {([['encountered_surface', 'Form as encountered'], ['base_form', 'Dictionary / canonical form'], ['lookup_surface', 'Lookup form']] as const).map(([field, label]) => (
+                            <label key={field} className="block text-xs font-medium text-stone-600">{label}
+                              <input className="w-full rounded-lg border px-3 py-2 text-sm" value={draft[field]} onChange={event => updateReviewDraft(draft.id, { [field]: event.target.value })} />
+                            </label>
+                          ))}
+                        </div>
+                        <WordContextFields teacher value={draft} onChange={value => updateReviewDraft(draft.id, value)} />
+                        {draft.meaningChoices.length > 0 ? <label className="block text-xs font-medium text-stone-600">Selected definition
+                          <select className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" value={draft.meaningChoiceIndex ?? ""} onChange={event => {
+                            const index = event.target.value === "" ? null : Number(event.target.value);
+                            updateReviewDraft(draft.id, { meaningChoiceIndex: index, ...(index === null ? {} : { meaning: draft.meaningChoices[index] }) });
+                          }}>
+                            <option value="">Custom meaning</option>
+                            {draft.meaningChoices.map((meaning, index) => <option key={index} value={index}>{meaning}</option>)}
+                          </select>
+                        </label> : null}
+                      </fieldset>
 
                       <div className="mt-3 grid gap-3 md:grid-cols-3">
                         <WordPositionField value={draft.pageNumber} unit={draft.positionUnit} disabled={isCompleted} onChange={value => updateReviewDraft(draft.id, { pageNumber: value })} onUnitChange={unit => updateReviewDraft(draft.id, { positionUnit: unit })} />
