@@ -6,6 +6,9 @@
 
 "use client";
 
+import BookEditionLine from "@/components/books/BookEditionLine";
+import type { EditionDisplayFields } from "@/lib/books/editionDisplay";
+
 import Link from "next/link";
 import { isAllUserTeacher } from "@/lib/teacher/targetUserAccess";
 import { useParams } from "next/navigation";
@@ -24,7 +27,7 @@ type StudentProfile = {
   level: string | null;
 };
 
-type BookMeta = {
+type BookMeta = EditionDisplayFields & {
   id: string;
   title: string | null;
   title_reading?: string | null;
@@ -168,6 +171,7 @@ export default function StudentBookWorkspacePage() {
             isbn13,
             isbn,
             page_count,
+            edition_format, edition_note,
             book_type,
             language_code
           )
@@ -297,6 +301,7 @@ export default function StudentBookWorkspacePage() {
                 <p className="mt-2 text-sm font-semibold text-stone-600">{bookIdentity.author}</p>
               ) : null}
 
+              <BookEditionLine book={book} />
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-black uppercase tracking-wide text-stone-500">
                 <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sky-800">
                   {studentName}

@@ -236,6 +236,7 @@ function normalizeUserBook(row: any, readingSummary: any = null) {
     bookType: book?.book_type ?? null,
     languageCode: book?.language_code ?? null,
     pageCount: book?.page_count ?? null,
+    edition: book ? { edition_format: book.edition_format, edition_note: book.edition_note, page_count: book.page_count, isbn13: book.isbn13, isbn: book.isbn } : null,
     startedAt: userBook?.started_at ?? null,
     finishedAt: userBook?.finished_at ?? null,
     dnfAt: userBook?.dnf_at ?? null,
@@ -360,7 +361,7 @@ export async function GET(request: Request) {
             cover_url,
             book_type,
             language_code,
-            page_count
+            page_count, edition_format, edition_note, isbn13, isbn
           )
         )
       `
@@ -404,7 +405,7 @@ export async function GET(request: Request) {
           cover_url,
           book_type,
           language_code,
-          page_count
+          page_count, edition_format, edition_note, isbn13, isbn
         )
       `
       )

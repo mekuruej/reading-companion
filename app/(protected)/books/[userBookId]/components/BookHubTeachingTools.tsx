@@ -1,5 +1,8 @@
 "use client";
 
+import BookEditionLine from "@/components/books/BookEditionLine";
+import type { EditionDisplayFields } from "@/lib/books/editionDisplay";
+
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -11,6 +14,7 @@ type StudentStudyLinkRow = {
   studentName: string;
   userBookId: string | null;
   isAttached: boolean;
+  edition?: EditionDisplayFields | null;
   resumeAtText: string | null;
   resumeUpdatedAt: string | null;
   hasDuplicateActiveBook?: boolean;
@@ -481,6 +485,7 @@ export default function BookHubTeachingTools({
                       <h3 className="text-sm font-black text-stone-950">
                         {student.studentName}
                       </h3>
+                      <BookEditionLine book={student.edition} />
                       <p className="mt-1 text-xs font-semibold text-stone-600">
                         {student.isAttached
                           ? student.resumeAtText

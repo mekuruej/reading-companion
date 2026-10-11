@@ -1,13 +1,21 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
 import ts from 'typescript';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 function load(file, mocks = {}) {
   const mod = { exports: {} };
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-  new Function('require', 'module', 'exports', code)(name => mocks[name] ?? (name.startsWith('@/') ? load(name.replace('@/', '') + '.ts', mocks) : require(name)), mod, mod.exports);
+  new Function('require', 'module', 'exports', code)(name => {
+    if (mocks[name]) return mocks[name];
+    if (name.startsWith('@/') || name.startsWith('.')) {
+      const base = name.startsWith('@/') ? name.slice(2) : path.join(path.dirname(file), name);
+      return load([base + '.ts', base + '.tsx'].find(fs.existsSync), mocks);
+    }
+    return require(name);
+  }, mod, mod.exports);
   return mod.exports;
 }
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;

@@ -1,5 +1,8 @@
 "use client";
 
+import BookEditionLine from "@/components/books/BookEditionLine";
+import type { EditionDisplayFields } from "@/lib/books/editionDisplay";
+
 import Link from "next/link";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -33,6 +36,7 @@ type LessonBook = {
     coverUrl: string | null;
     languageCode: string | null;
     pageCount: number | null;
+    edition?: EditionDisplayFields | null;
     statusLabel: string;
     lastReadOn: string | null;
     furthestPage: number | null;
@@ -1031,6 +1035,7 @@ export default function StudentWorkspacePage() {
                       {lessonBook.book.author ? (
                         <p className="mt-1 truncate text-sm text-stone-600">{lessonBook.book.author}</p>
                       ) : null}
+                      <BookEditionLine book={lessonBook.book.edition} />
                       <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
                         <span className="rounded-full bg-white px-2.5 py-1 text-stone-600">
                           {lessonBook.book.statusLabel}

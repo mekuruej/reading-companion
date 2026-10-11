@@ -1,3 +1,4 @@
+import type { EditionDisplayFields } from "@/lib/books/editionDisplay";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
@@ -33,8 +34,9 @@ type LessonBookRow = {
         id: string;
         user_id: string;
         book_id: string;
+        books?: EditionDisplayFields | EditionDisplayFields[] | null;
       }
-    | { id: string; user_id: string; book_id: string }[]
+    | { id: string; user_id: string; book_id: string; books?: EditionDisplayFields | EditionDisplayFields[] | null }[]
     | null;
 };
 
@@ -199,7 +201,8 @@ async function loadLessonRows(teacherId: string) {
       user_books:user_book_id (
         id,
         user_id,
-        book_id
+        book_id,
+        books:book_id(edition_format, edition_note, page_count, isbn13, isbn)
       )
     `
     )
@@ -328,6 +331,8 @@ export async function GET(
     const students = activeStudentIdList
       .map((studentId) => {
         const row = activeRowsByStudentId.get(studentId);
+        const studentBook = row ? firstUserBook(row.user_books) : null;
+        const edition = Array.isArray(studentBook?.books) ? studentBook.books[0] ?? null : studentBook?.books ?? null;
         const duplicateKey = `${auth.user.id}|${studentId}|${access.bookId}`;
         return {
           lessonBookId: row?.id ?? null,
@@ -335,6 +340,7 @@ export async function GET(
           studentName: namesByStudentId.get(studentId) ?? "Student",
           userBookId: row?.user_book_id ?? null,
           isAttached: Boolean(row),
+          edition,
           resumeAtText: row?.resume_at_text ?? null,
           resumeUpdatedAt: row?.resume_updated_at ?? null,
           hasDuplicateActiveBook: (duplicateCounts.get(duplicateKey) ?? 0) > 1,

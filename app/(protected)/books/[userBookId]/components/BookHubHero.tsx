@@ -1,6 +1,8 @@
+import BookEditionLine from "@/components/books/BookEditionLine";
+import type { EditionDisplayFields } from "@/lib/books/editionDisplay";
 import { getBookIdentity } from "@/lib/books/bookIdentity";
 
-type BookHubHeroBook = {
+type BookHubHeroBook = EditionDisplayFields & {
   title: string;
   title_reading: string | null;
   author: string | null;
@@ -78,6 +80,7 @@ export default function BookHubHero({
               ) : null}
             </div>
           ) : null}
+          <BookEditionLine book={book} />
         </div>
 
       </div>
