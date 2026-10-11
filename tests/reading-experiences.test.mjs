@@ -9,7 +9,7 @@ function load(file, dependencies = {}) {
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
-  new Function('require', 'exports', code)(name => dependencies[name] ?? require(name), exports);
+  new Function('require', 'exports', code)(name => dependencies[name] ?? (name.startsWith("@/") ? load(name.replace("@/", "") + ".ts", dependencies) : require(name)), exports);
   return exports;
 }
 const model = load('lib/teacher/readingExperiences.ts');
@@ -50,7 +50,7 @@ function apiFixture() {
       const filters = [];
       let action = 'read', payload, start = 0, end = Infinity;
       const q = {
-        select() { return q; }, eq(k, v) { filters.push(row => row[k] === v); return q; },
+        select() { return q; }, is(k, v) { filters.push(row => row[k] === v); return q; }, eq(k, v) { filters.push(row => row[k] === v); return q; },
         order() { return q; }, limit(n) { end = n - 1; return q; }, range(a, b) { start = a; end = b; return q; },
         insert(p) { action = 'insert'; payload = p; return q; },
         update(p) { action = 'update'; payload = p; return q; },
@@ -204,7 +204,7 @@ test('experience form preselects the shortcut person, retains failed drafts, and
       '@/components/profile/MekuruReadingLevelGuide': { MEKURU_READING_LEVEL_GROUPS: [{ title: 'Beginner', levels: [{ value: 'Level 5', plain: 'Beginner' }] }] },
     });
     const nodes = tree => !tree || typeof tree !== 'object' ? [] : Array.isArray(tree) ? tree.flatMap(nodes) : [tree, ...nodes(tree.props?.children)];
-    const render = () => { cursor = 0; return nodes(component.default()); };
+    const render = () => { cursor = 0; const outer = component.default(); return nodes(typeof outer.type === "function" ? outer.type(outer.props) : outer); };
     const button = label => render().find(node => node.type === 'button' && node.props.children === label);
     const control = id => render().find(node => node.props?.id === id);
     const note = () => render().find(node => node.type === 'textarea' && node.props.maxLength === 4000);
@@ -290,7 +290,7 @@ test('dedicated Teaching Assessment edits only the existing teacher-book assessm
       '@/lib/teacher/teachingDiscovery': load('lib/teacher/teachingDiscovery.ts'),
     });
     const nodes = tree => !tree || typeof tree !== 'object' ? [] : Array.isArray(tree) ? tree.flatMap(nodes) : [tree, ...nodes(tree.props?.children)];
-    const render = () => { cursor = 0; return nodes(component.default()); };
+    const render = () => { cursor = 0; const outer = component.default(); return nodes(typeof outer.type === "function" ? outer.type(outer.props) : outer); };
     const settle = () => new Promise(resolve => setImmediate(resolve));
     render(); effect(); await settle();
     assert.ok(render().some(node => node.type === 'h1' && node.props.children === 'Teaching Assessment'));
@@ -309,4 +309,26 @@ test('dedicated Teaching Assessment edits only the existing teacher-book assessm
     });
     assert.deepEqual(savedSignal && savedSignal[0], 'teaching-assessment-saved');
   } finally { globalThis.fetch = originalFetch; globalThis.window = originalWindow; }
+});
+
+test('student-card reading experiences validate exact copies, filter history, and cannot change people', async () => {
+  const {api,tables,calls,request}=apiFixture();
+  const source='00000000-0000-4000-8000-000000000030';
+  const copyA='00000000-0000-4000-8000-000000000031';
+  const copyB='00000000-0000-4000-8000-000000000032';
+  tables.user_books.push({id:source,user_id:teacher,book_id:book},{id:copyA,user_id:person,book_id:book},{id:copyB,user_id:other,book_id:book});
+  tables.teacher_students.push({teacher_id:teacher,student_id:person,archived_at:null},{teacher_id:teacher,student_id:other,archived_at:null});
+  for(const [studentId,studentUserBookId] of [[person,copyA],[other,copyB],[person,copyA]]) {
+    const context={studentId,studentUserBookId,sourceUserBookId:source};
+    const result=await api.POST(request('POST','teacher',{kind:'experience',bookId:book,...valid,person_id:studentId,...context}));
+    assert.equal(result.status,200);
+    const loaded=await api.GET(request('GET','teacher',null,'&'+new URLSearchParams(context)));
+    assert.equal(loaded.status,200);
+    const data=await loaded.json();assert.equal(data.lockedPerson.id,studentId);
+    assert.ok(data.experiences.every(e=>e.person_id===studentId));
+  }
+  const context={studentId:person,studentUserBookId:copyA,sourceUserBookId:source};
+  assert.equal((await api.POST(request('POST','teacher',{kind:'experience',bookId:book,...valid,...context,person_id:other}))).status,403);
+  assert.equal((await api.POST(request('POST','teacher',{kind:'experience',bookId:book,...valid,...context,studentUserBookId:copyB}))).status,403);
+  assert.ok(calls.filter(c=>c.table==='teacher_students').every(c=>c.action==='read'));
 });

@@ -589,7 +589,7 @@ export default function LiveLessonQuickAddPanel({
   }
 
   async function loadSessionFromApi(nextSessionId?: string) {
-    const query = new URLSearchParams({ studentId, userBookId });
+    const query = new URLSearchParams({ studentId, userBookId, sourceUserBookId });
     if (nextSessionId) query.set("sessionId", nextSessionId);
     const headers = await authHeaders();
     const response = await fetch(
@@ -624,6 +624,7 @@ export default function LiveLessonQuickAddPanel({
         action: "migrate-local-session",
         studentId,
         userBookId,
+        sourceUserBookId,
         rowIds: persisted.capturedRowIds,
         startedAt: persisted.startedAt,
       }),
@@ -888,6 +889,7 @@ export default function LiveLessonQuickAddPanel({
         body: JSON.stringify({
           studentId,
           userBookId,
+          sourceUserBookId,
           sessionId: session?.id,
           surface: cleanWord,
           alternativeSurface,
@@ -947,6 +949,7 @@ export default function LiveLessonQuickAddPanel({
         body: JSON.stringify({
           studentId,
           userBookId,
+          sourceUserBookId,
           wordId: capturedWord.id,
         }),
       });
@@ -1053,6 +1056,7 @@ export default function LiveLessonQuickAddPanel({
           action,
           studentId,
           userBookId,
+          sourceUserBookId,
           sessionId: session.id,
           words: reviewDrafts,
           ...(checkpoint ?? {}),

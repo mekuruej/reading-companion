@@ -307,7 +307,10 @@ async function generateVocabularyKanjiMap(vocabularyCacheId: number) {
   }
 }
 
+import { saveStudentWord, type StudentWordContext } from "@/lib/teacher/saveStudentWord";
+
 export function CuriosityReadingExperience({
+  studentContext,
   targetUserBookId,
   wordCaptureOnly = false,
   experienceMode = "curiosity",
@@ -320,6 +323,7 @@ export function CuriosityReadingExperience({
   onActiveTimerChange,
   onReadingJournalContextChange,
 }: {
+  studentContext?: StudentWordContext;
   targetUserBookId?: string;
   wordCaptureOnly?: boolean;
   experienceMode?: WordTimerExperienceMode;
@@ -1375,7 +1379,7 @@ export function CuriosityReadingExperience({
         page_order: await getNextPageOrder(userBookId, chapterNum, pageNum),
       };
 
-      const { data, error } = await supabase
+      const { data, error } = studentContext ? await saveStudentWord(studentContext, payload) : await supabase
         .from("user_book_words")
         .insert(payload)
         .select(
@@ -1426,7 +1430,7 @@ export function CuriosityReadingExperience({
       });
       setMessage("");
     } else {
-      const { data, error } = await supabase
+      const { data, error } = studentContext ? await saveStudentWord(studentContext, basePayload, editingExisting.id) : await supabase
         .from("user_book_words")
         .update(basePayload)
         .eq("id", editingExisting.id)
@@ -1554,7 +1558,7 @@ export function CuriosityReadingExperience({
         page_order: await getNextPageOrder(userBookId, chapterNum, pageNum),
       };
 
-      const { data, error } = await supabase
+      const { data, error } = studentContext ? await saveStudentWord(studentContext, payload) : await supabase
         .from("user_book_words")
         .insert(payload)
         .select(
@@ -1606,7 +1610,7 @@ export function CuriosityReadingExperience({
       });
       setMessage("");
     } else {
-      const { data, error } = await supabase
+      const { data, error } = studentContext ? await saveStudentWord(studentContext, basePayload, editingExisting.id) : await supabase
         .from("user_book_words")
         .update(basePayload)
         .eq("id", editingExisting.id)
@@ -1667,7 +1671,7 @@ export function CuriosityReadingExperience({
   async function deleteQuickWordById(id: string) {
     if (!userBookId) return;
 
-    const { error } = await supabase
+    const { error } = studentContext ? await saveStudentWord(studentContext, {}, id, true) : await supabase
       .from("user_book_words")
       .delete()
       .eq("id", id)

@@ -1,3 +1,4 @@
+import { validateStudentToolContext, StudentContextError } from "@/lib/teacher/studentToolContext";
 import { loadContextualWordTargets } from "@/lib/teacher/contextualWordTargets";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -269,20 +270,34 @@ async function loadStudentDestinations(teacherId: string, bookId: string) {
   return destinations.sort((a, b) => a.label.localeCompare(b.label));
 }
 
+async function loadLockedDestination(teacherId: string, sourceUserBookId: string, studentId: string, targetUserBookId: string) {
+  const target = await validateStudentToolContext(supabaseAdmin, teacherId, { studentId, userBookId: targetUserBookId, sourceUserBookId });
+  const { data, error } = await supabaseAdmin.from("user_books").select("progress_tracking_method, books:book_id(page_count)").eq("id", target.studentUserBookId).single();
+  if (error) throw error;
+  return { type: "student" as const, lessonBookId: null, studentId: target.studentId, userBookId: target.studentUserBookId,
+    label: target.studentName, destinationName: target.studentName, positionUnit: data.progress_tracking_method ?? "page", pageCount: firstRow(data.books)?.page_count ?? null };
+}
+
 async function authorizeStudentDestination({
   teacherId,
   sourceUserBookId,
   lessonBookId,
   targetUserBookId,
+  studentId,
 }: {
   teacherId: string;
   sourceUserBookId: string;
   lessonBookId: string;
   targetUserBookId?: string;
+  studentId?: string;
 }) {
   const source = await authorizeSourceBook(teacherId, sourceUserBookId);
   if (!source.ok) {
     return { ok: false as const, error: source.error, status: source.status };
+  }
+
+  if (studentId !== undefined) {
+    return { ok: true as const, ...await loadLockedDestination(teacherId, sourceUserBookId, studentId, targetUserBookId ?? "") };
   }
 
   if (targetUserBookId) {
@@ -403,6 +418,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: source.error }, { status: source.status });
     }
 
+    if (url.searchParams.has("studentId") || url.searchParams.has("targetUserBookId")) {
+      const destination = await loadLockedDestination(auth.user.id, sourceUserBookId, cleanString(url.searchParams.get("studentId")), cleanString(url.searchParams.get("targetUserBookId")));
+      return NextResponse.json({ destinations: [destination] });
+    }
+
     const { data: sourceReader } = await supabaseAdmin.from("user_books").select("progress_tracking_method").eq("id", source.sourceUserBookId).single();
     const students = await loadStudentDestinations(auth.user.id, source.bookId);
     return NextResponse.json({
@@ -420,7 +440,7 @@ export async function GET(req: Request) {
     console.error("Teaching Bulk Add destinations error:", error);
     return NextResponse.json(
       { error: error?.message ?? "Could not load Teaching Bulk Add destinations." },
-      { status: 500 }
+      { status: error instanceof StudentContextError ? error.status : 500 }
     );
   }
 }
@@ -454,6 +474,7 @@ export async function POST(req: Request) {
       sourceUserBookId,
       lessonBookId,
       targetUserBookId,
+      studentId: body && "studentId" in body ? cleanString(body.studentId) : undefined,
     });
 
     if ("error" in destination) {
@@ -549,7 +570,7 @@ export async function POST(req: Request) {
     console.error("Teaching Bulk Add save error:", error);
     return NextResponse.json(
       { error: error?.message ?? "Could not save Teaching Bulk Add words." },
-      { status: 500 }
+      { status: error instanceof StudentContextError ? error.status : 500 }
     );
   }
 }

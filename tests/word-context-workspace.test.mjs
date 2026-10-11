@@ -71,16 +71,16 @@ new Function('require','module','exports',ts.transpileModule(fs.readFileSync(les
  return require(name);
 },lessonModule,lessonModule.exports);
 function lesson(students=[],view='follow',query=''){lessonQuery=`view=${view}&${query}`;lessonState=[false,'',{teacherBookId:'teacher-book',sourceUserBookId:'own-book',book:{title:'Sample book'},students,chapterSuggestions:[]}];}
-function renderLesson(){lessonCursor=0;return lessonModule.exports.default()}
+function renderLesson(){lessonCursor=0;const outer=lessonModule.exports.default();return outer.type(outer.props)}
 function nodes(tree){if(!tree||typeof tree!=='object')return [];if(Array.isArray(tree))return tree.flatMap(nodes);return [tree,...nodes(tree.props?.children)]}
 function label(tree){return typeof tree==='string'?tree:Array.isArray(tree)?tree.map(label).join(''):label(tree?.props?.children??'')}
 test('separate workspaces keep own capture, journal, and Follow-Along independent',()=>{
  lesson();let tree=renderLesson();assert.ok(nodes(tree).some(n=>n.type===StubFollow));assert.ok(!nodes(tree).some(n=>n.type===StubLive));
- lesson([],'curiosity');tree=renderLesson();
+ lesson([],'curiosity','personal=1');tree=renderLesson();
  const capture=nodes(tree).find(n=>n.type===StubCapture);assert.equal(capture.props.targetUserBookId,'own-book');
  assert.equal(capture.props.workspaceCompact,true);assert.equal(capture.props.wordCaptureOnly,true);
  assert.equal(nodes(tree).find(n=>n.type===StubProgress).props.readOnly,true);
- assert.deepEqual(nodes(tree).filter(n=>n.type==='option').map(label),['Me / My Book']);
+ assert.deepEqual(nodes(tree).filter(n=>n.type==='option').map(label),[]);
  assert.ok(!nodes(tree).some(n=>n.type===StubJournal||n.type==='nav'));
  lesson([],'journal','studentUserBookId=unrelated-book');tree=renderLesson();
  assert.ok(nodes(tree).some(n=>n.type===StubJournal&&n.props.teaching));
@@ -90,7 +90,7 @@ const studentA={studentId:'student-a',studentUserBookId:'student-book-a',lessonB
 const studentB={studentId:'student-b',studentUserBookId:'student-book-b',lessonBookId:'link-b',studentName:'Learner B'};
 for(const students of [[studentA],[studentA,studentB]])test(`${students.length} students: same full form targets words only; Follow-Along stays mine`,()=>{
  lesson(students,'curiosity');let tree=renderLesson();
- assert.equal(nodes(tree).find(n=>n.type===StubCapture).props.targetUserBookId,'own-book');
+ assert.ok(!nodes(tree).some(n=>n.type===StubCapture));
  assert.ok(!nodes(tree).some(n=>n.type===StubLive));
  const select=nodes(tree).find(n=>n.type==='select');assert.equal(select.props.value,'');
  const selected=students.at(-1);select.props.onChange({target:{value:selected.studentUserBookId}});assert.ok(lastNavigation.includes('view=curiosity'));assert.ok(lastNavigation.includes(selected.studentUserBookId));
@@ -100,7 +100,7 @@ for(const students of [[studentA],[studentA,studentB]])test(`${students.length} 
  lesson(students,'follow',`studentUserBookId=${selected.studentUserBookId}`);tree=renderLesson();
  const live=nodes(tree).find(n=>n.type===StubLive);assert.equal(live.props.userBookId,selected.studentUserBookId);assert.equal(live.props.sourceUserBookId,'own-book');
  assert.equal(nodes(tree).find(n=>n.type===StubFollow).props.teacherBookId,'teacher-book');assert.ok(!nodes(tree).some(n=>n.type===StubCapture));
- const quickPane=nodes(tree).find(n=>n.type==='div'&&nodes(n).some(child=>child.type===StubLive)&&nodes(n).some(child=>child.type==='select')&&!nodes(n).some(child=>child.type===StubFollow));assert.ok(quickPane);
+ assert.ok(!nodes(tree).some(n=>n.type==='select'));assert.ok(label(tree).includes(selected.studentName));
  lesson(students,'journal',`studentUserBookId=${selected.studentUserBookId}`);tree=renderLesson();assert.ok(!nodes(tree).some(n=>n.type==='select'));assert.ok(nodes(tree).some(n=>n.type===StubJournal));
 });
 
@@ -118,11 +118,11 @@ test('Save Words targets do not replace the independently authorized Quick Add l
  lesson([studentA],'curiosity','studentUserBookId=trial-copy');
  lessonState[2].saveWordTargets=[studentA,trial];
  let tree=renderLesson();
- assert.deepEqual(nodes(tree).filter(n=>n.type==='option').map(label),['Me / My Book','Learner A','Trial Reader']);
+ assert.deepEqual(nodes(tree).filter(n=>n.type==='option').map(label),[]);
  assert.equal(nodes(tree).find(n=>n.type===StubCapture).props.targetUserBookId,'trial-copy');
  lesson([studentA],'follow');lessonState[2].saveWordTargets=[studentA,trial];tree=renderLesson();
  assert.deepEqual(nodes(tree).filter(n=>n.type==='option').map(label),['Choose a student','Learner A']);
- assert.equal(nodes(tree).find(n=>n.type===StubLive).props.userBookId,studentA.studentUserBookId);
+ assert.ok(!nodes(tree).some(n=>n.type===StubLive));
  lesson([studentA],'journal','studentUserBookId=trial-copy');lessonState[2].saveWordTargets=[studentA,trial];tree=renderLesson();
  assert.ok(!nodes(tree).some(n=>n.type==='select'));assert.ok(nodes(tree).some(n=>n.type===StubJournal));
 });
@@ -132,8 +132,23 @@ test('Follow-Along Quick Add accepts an authorized trial target without a lesson
  const trial={lessonBookId:null,studentId:'trial-user',studentUserBookId:'trial-copy',studentName:'Trial Reader'};
  lesson([studentA,trial],'follow','studentUserBookId=trial-copy');
  const tree=renderLesson();
- assert.ok(nodes(tree).filter(n=>n.type==='option').map(label).includes('Trial Reader'));
+ assert.ok(!nodes(tree).some(n=>n.type==='select'));assert.ok(label(tree).includes('Trial Reader'));
  const quick=nodes(tree).find(n=>n.type===StubLive);
  assert.equal(quick.props.studentId,'trial-user');assert.equal(quick.props.userBookId,'trial-copy');
  assert.equal(nodes(tree).find(n=>n.type===StubFollow).props.teacherBookId,'teacher-book');
+});
+
+for (const selected of [studentB, studentA, studentB, studentA]) test(`locked context ${selected.studentId}: both capture tools ignore other loaded students`, () => {
+ for (const view of ['follow','curiosity']) {
+  lesson([studentA,studentB],view,`studentId=${selected.studentId}&studentUserBookId=${selected.studentUserBookId}`);
+  const tree=renderLesson(); const capture=nodes(tree).find(n=>n.type===(view==='follow'?StubLive:StubCapture));
+  assert.equal(view==='follow'?capture.props.userBookId:capture.props.targetUserBookId, selected.studentUserBookId);
+  assert.ok(!nodes(tree).some(n=>n.type==='select')); assert.ok(label(tree).includes(`Working with: ${selected.studentName}`));
+ }
+});
+test('mismatched student and book fail closed instead of falling back to teacher or another student',()=>{
+ for(const view of ['follow','curiosity']) {
+  lesson([studentA,studentB],view,`studentId=${studentA.studentId}&studentUserBookId=${studentB.studentUserBookId}`);
+  assert.ok(!nodes(renderLesson()).some(n=>n.type===StubLive||n.type===StubCapture));
+ }
 });

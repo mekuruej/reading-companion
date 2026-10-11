@@ -1,3 +1,4 @@
+import { validateStudentToolContext, StudentContextError } from "@/lib/teacher/studentToolContext";
 import { loadContextualWordTargets } from "@/lib/teacher/contextualWordTargets";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -366,6 +367,15 @@ export async function GET(
     const queryParams = new URL(req.url).searchParams;
     const isSaveWords = queryParams.get("view") === "curiosity";
     const selectedStudentUserBookId = queryParams.get("studentUserBookId");
+    const selectedStudentId = queryParams.get("studentId");
+    let lockedTarget = null;
+    if (queryParams.has("studentId") || queryParams.has("studentUserBookId")) {
+      if (!selectedStudentUserBookId) throw new StudentContextError("The exact student book is required.", 400);
+      // Legacy URLs carry only the exact copy; derive its owner, never a remembered selection.
+      const owner = await supabaseAdmin.from("user_books").select("user_id").eq("id", selectedStudentUserBookId).maybeSingle();
+      if (owner.error) throw owner.error;
+      lockedTarget = await validateStudentToolContext(supabaseAdmin, auth.user.id, { studentId: selectedStudentId ?? owner.data?.user_id ?? "", userBookId: selectedStudentUserBookId, sourceUserBookId: userBookId });
+    }
     const saveWordTargets = isSaveWords
       ? await loadContextualWordTargets(supabaseAdmin, loadedSourceBook.book_id, profile as ProfileRow, activeStudentIds)
       : [];
@@ -386,6 +396,12 @@ export async function GET(
         }
       }
       students.sort((a, b) => a.studentName.localeCompare(b.studentName));
+    }
+
+    if (lockedTarget) {
+      const target = { ...lockedTarget, lessonBookId: null };
+      students.splice(0, students.length, target);
+      saveWordTargets.splice(0, saveWordTargets.length, target);
     }
 
     if (
@@ -416,7 +432,7 @@ export async function GET(
     console.error("Teaching lesson context error:", error);
     return NextResponse.json(
       { error: error?.message ?? "Could not load this teaching lesson." },
-      { status: 500 }
+      { status: error instanceof StudentContextError ? error.status : 500 }
     );
   }
 }

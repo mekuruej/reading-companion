@@ -1,3 +1,4 @@
+import { validateStudentToolContext, StudentContextError } from "@/lib/teacher/studentToolContext";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { isExperienceTeacher, isUuid, validateAssessment, validateExperience, type BookAssessment } from "@/lib/teacher/readingExperiences";
@@ -18,7 +19,7 @@ async function actor(request: Request) {
   return data.user.id;
 }
 function failure(error: unknown) {
-  if (error instanceof RequestError) return NextResponse.json({ error: error.message }, { status: error.status });
+  if (error instanceof RequestError || error instanceof StudentContextError) return NextResponse.json({ error: error.message }, { status: error.status });
   console.error("Reading Experiences failed:", error);
   return NextResponse.json({ error: "Could not load or save Reading Experiences. Please try again." }, { status: 500 });
 }
@@ -34,6 +35,15 @@ export async function GET(request: Request) {
     const teacherId = await actor(request);
     const params = new URL(request.url).searchParams;
     const book = await requireBook(params.get("bookId"));
+    const contextual = params.has("studentId") || params.has("studentUserBookId");
+    const locked = contextual ? await validateStudentToolContext(db, teacherId, {
+      studentId: params.get("studentId") ?? "", userBookId: params.get("studentUserBookId") ?? "",
+      sourceUserBookId: params.get("sourceUserBookId") || undefined, bookId: book.id,
+    }) : null;
+    if (locked && (params.has("username") || params.has("personId"))) {
+      if (params.get("personId") !== locked.studentId || params.has("username")) throw new RequestError("Student context cannot be changed here.", 403);
+      return NextResponse.json({ person: locked.person });
+    }
     if (params.has("username") || params.has("personId")) {
       const personId = params.get("personId");
       let query = db.from("profiles").select("id, display_name, username");
@@ -62,10 +72,11 @@ export async function GET(request: Request) {
     }
     const offset = Math.max(0, Math.floor(Number(params.get("offset")) || 0));
     if (!Number.isSafeInteger(offset)) throw new RequestError("Invalid history offset.", 400);
+    let history = db.from("book_reading_experiences").select(experienceFields).eq("teacher_id", teacherId).eq("book_id", book.id);
+    if (locked) history = history.eq("person_id", locked.studentId);
     const [assessment, experiences, copy] = await Promise.all([
       db.from("teacher_books").select(assessmentFields).eq("teacher_id", teacherId).eq("book_id", book.id).maybeSingle(),
-      db.from("book_reading_experiences").select(experienceFields).eq("teacher_id", teacherId).eq("book_id", book.id)
-        .order("experienced_on", { ascending: false }).order("created_at", { ascending: false }).order("id").range(offset, offset + PAGE_SIZE),
+      history.order("experienced_on", { ascending: false }).order("created_at", { ascending: false }).order("id").range(offset, offset + PAGE_SIZE),
       db.from("user_books").select("id").eq("user_id", teacherId).eq("book_id", book.id).order("created_at").limit(1).maybeSingle(),
     ]);
     if (assessment.error) throw assessment.error;
@@ -73,6 +84,7 @@ export async function GET(request: Request) {
     if (experiences.error) console.error("Reading experience history failed:", experiences.error);
     // Assessment remains usable if the new migration hasn't been applied yet.
     return NextResponse.json({
+      lockedPerson: locked?.person ?? null,
       book, teacherId, userBookId: copy.data?.id ?? null, assessment: assessment.data,
       experiences: experiences.error ? [] : experiences.data?.slice(0, PAGE_SIZE) ?? [],
       experienceError: experiences.error ? "Could not load your reading experiences. Please try again." : null,
@@ -105,6 +117,16 @@ async function save(request: Request, editing: boolean) {
       return NextResponse.json({ assessment: data });
     }
     if (body.kind !== "experience") throw new RequestError("Unknown action.", 400);
+    const contextual = "studentId" in body || "studentUserBookId" in body;
+    const locked = contextual ? await validateStudentToolContext(db, teacherId, {
+      studentId: body.studentId ?? "", userBookId: body.studentUserBookId ?? "", sourceUserBookId: body.sourceUserBookId, bookId: book.id,
+    }) : null;
+    if (locked && body.person_id !== locked.studentId) throw new RequestError("The experience must belong to the selected student.", 403);
+    if (locked && editing) {
+      const existing = await db.from("book_reading_experiences").select("person_id").eq("id", body.id).eq("teacher_id", teacherId).eq("book_id", book.id).maybeSingle();
+      if (existing.error) throw existing.error;
+      if (existing.data?.person_id !== locked.studentId) throw new RequestError("This experience belongs to a different person.", 403);
+    }
     const invalid = validateExperience(body);
     if (invalid) throw new RequestError(invalid, 400);
     const { data: person, error: personError } = await db.from("profiles").select("id").eq("id", body.person_id).maybeSingle();

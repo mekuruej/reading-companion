@@ -6,6 +6,8 @@ import { savedSenseNumber, senseStudyKey, senseDefinitionKey } from "@/lib/study
 import { wordPositionText, type WordPositionRecord } from "@/lib/vocabulary/wordPosition";
 import { useStudyModeRotation } from "@/lib/study/useStudyModeRotation";
 import { canLoadJapaneseFlashcard, canStudyWord } from "@/lib/wordSupportEligibility";
+import { saveStudentWord } from "@/lib/teacher/saveStudentWord";
+import StudentToolBoundary from "@/components/teacher/StudentToolBoundary";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
@@ -365,10 +367,15 @@ function buildBookFlashcardsStudyingNowLabel({
 }
 
 export default function BookFlashcardsPage() {
+  return <StudentToolBoundary><BookFlashcardsPageContent /></StudentToolBoundary>;
+}
+
+function BookFlashcardsPageContent() {
   const params = useParams<{ userBookId: string }>();
   const userBookId = params.userBookId;
   const router = useRouter();
   const searchParams = useSearchParams();
+  const studentContext = searchParams.get("studentId") && searchParams.get("sourceUserBookId") ? { studentId: searchParams.get("studentId")!, userBookId, sourceUserBookId: searchParams.get("sourceUserBookId") ?? "" } : undefined;
 
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [filteredCards, setFilteredCards] = useState<Flashcard[]>([]);
@@ -1609,10 +1616,10 @@ export default function BookFlashcardsPage() {
 
     const today = new Date().toISOString().slice(0, 10);
 
-    const { error } = await supabase
+    const { error } = (studentContext ? await saveStudentWord(studentContext, { skipped_on: today }, cardId) : await supabase
       .from("user_book_words")
       .update({ skipped_on: today })
-      .eq("id", cardId);
+      .eq("id", cardId).eq("user_book_id", userBookId));
 
     if (error) {
       console.error("Error skipping card for today:", error);
@@ -1629,14 +1636,18 @@ export default function BookFlashcardsPage() {
       return false;
     }
 
-    const { error } = await supabase
+    const { error } = (studentContext ? await saveStudentWord(studentContext, {
+        flagged_for_review: true,
+        flagged_by_user_id: meId || null,
+        flagged_at: new Date().toISOString(),
+      }, cardId) : await supabase
       .from("user_book_words")
       .update({
         flagged_for_review: true,
         flagged_by_user_id: meId || null,
         flagged_at: new Date().toISOString(),
       })
-      .eq("id", cardId);
+      .eq("id", cardId).eq("user_book_id", userBookId));
 
     if (error) {
       console.error("Error flagging card for review:", error);
@@ -1687,10 +1698,10 @@ export default function BookFlashcardsPage() {
       return;
     }
 
-    const { error } = await supabase
+    const { error } = (studentContext ? await saveStudentWord(studentContext, { hidden: true }, cardId) : await supabase
       .from("user_book_words")
       .update({ hidden: true })
-      .eq("id", cardId);
+      .eq("id", cardId).eq("user_book_id", userBookId));
 
     if (error) {
       console.error("Error hiding card:", error);

@@ -1,4 +1,5 @@
-import { loadContextualWordTargets } from "@/lib/teacher/contextualWordTargets";
+import { validateStudentToolContext, StudentContextError } from "@/lib/teacher/studentToolContext";
+import { isAllUserTeacher } from "@/lib/teacher/targetUserAccess";
 import { wordContextPayload } from "@/lib/vocabulary/wordContext";
 import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
 import { parseWordPosition, wordPosition, wordPositionPayload } from "@/lib/vocabulary/wordPosition";
@@ -194,10 +195,12 @@ async function authorizeTeacherForStudentBook({
   actorId,
   studentId,
   userBookId,
+  sourceUserBookId,
 }: {
   actorId: string;
   studentId: string;
   userBookId: string;
+  sourceUserBookId?: string;
 }) {
   const profile = await getProfile(actorId);
 
@@ -246,14 +249,9 @@ async function authorizeTeacherForStudentBook({
     };
   }
 
-  if (profile && isSuperTeacher(profile)) {
-    const trialTargets = await loadContextualWordTargets(supabaseAdmin, loadedUserBook.book_id, profile, new Set());
-    if (trialTargets.some(target => target.studentUserBookId === userBookId && target.studentId === studentId)) {
-      const { data: ownBooks, error: ownBookError } = await supabaseAdmin.from("user_books")
-        .select("id").eq("user_id", actorId).eq("book_id", loadedUserBook.book_id).limit(1);
-      if (ownBookError) throw ownBookError;
-      if (ownBooks?.length) return { ok: true as const, profile, userBook: loadedUserBook };
-    }
+  if (sourceUserBookId || isAllUserTeacher(profile)) {
+    await validateStudentToolContext(supabaseAdmin, actorId, { studentId, userBookId, sourceUserBookId });
+    return { ok: true as const, profile, userBook: loadedUserBook };
   }
 
   const { data: link, error: linkError } = await supabaseAdmin
@@ -699,6 +697,7 @@ export async function GET(req: Request) {
       actorId: auth.user.id,
       studentId,
       userBookId,
+      sourceUserBookId: cleanString(url.searchParams.get("sourceUserBookId")) || undefined,
     });
 
     if (!access.ok) {
@@ -753,7 +752,7 @@ export async function GET(req: Request) {
     console.error("Live Lesson restore error:", error);
     return NextResponse.json(
       { error: error?.message ?? "Could not restore Live Lesson words." },
-      { status: 500 }
+      { status: error instanceof StudentContextError ? error.status : 500 }
     );
   }
 }
@@ -781,6 +780,7 @@ export async function POST(req: Request) {
       actorId: auth.user.id,
       studentId,
       userBookId,
+      sourceUserBookId: cleanString(body?.sourceUserBookId) || undefined,
     });
 
     if (!access.ok) {
@@ -910,7 +910,7 @@ export async function POST(req: Request) {
     console.error("Live Lesson capture error:", error);
     return NextResponse.json(
       { error: error?.message ?? "Could not save this word." },
-      { status: 500 }
+      { status: error instanceof StudentContextError ? error.status : 500 }
     );
   }
 }
@@ -941,6 +941,7 @@ export async function PATCH(req: Request) {
       actorId: auth.user.id,
       studentId,
       userBookId,
+      sourceUserBookId: cleanString(body?.sourceUserBookId) || undefined,
     });
 
     if (!access.ok) {
@@ -1035,7 +1036,7 @@ export async function PATCH(req: Request) {
     console.error("Live Lesson session update error:", error);
     return NextResponse.json(
       { error: error?.message ?? "Could not update this Live Lesson session." },
-      { status: 500 }
+      { status: error instanceof StudentContextError ? error.status : 500 }
     );
   }
 }
@@ -1063,6 +1064,7 @@ export async function DELETE(req: Request) {
       actorId: auth.user.id,
       studentId,
       userBookId,
+      sourceUserBookId: cleanString(body?.sourceUserBookId) || undefined,
     });
 
     if (!access.ok) {
@@ -1106,7 +1108,7 @@ export async function DELETE(req: Request) {
     console.error("Live Lesson delete error:", error);
     return NextResponse.json(
       { error: error?.message ?? "Could not delete this word." },
-      { status: 500 }
+      { status: error instanceof StudentContextError ? error.status : 500 }
     );
   }
 }

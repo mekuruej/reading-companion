@@ -5688,8 +5688,8 @@ export default function BookHubPage() {
 
   const teachingTools = (
     <BookHubTeachingTools
-      onReadingExperiences={(personId) => {
-        openTeachingTool(`/teacher/reading-experiences/${row.book_id}${personId ? `?person=${encodeURIComponent(personId)}` : ""}`);
+      onReadingExperiences={(personId, studentUserBookId) => {
+        openTeachingTool(`/teacher/reading-experiences/${row.book_id}${personId ? `?studentId=${encodeURIComponent(personId)}&studentUserBookId=${encodeURIComponent(studentUserBookId ?? "")}&sourceUserBookId=${encodeURIComponent(row.id)}` : ""}`);
       }}
       onTeachingAssessment={() => {
         openTeachingTool(`/teacher/teaching-assessment/${row.book_id}`);
@@ -5703,21 +5703,24 @@ export default function BookHubPage() {
         );
       }}
       onStoryNotes={() => openTeachingTool(`/books/${row.id}/lesson?view=journal`)}
-      onStudentFollowAlong={(studentUserBookId) => {
+      onStudentFollowAlong={(studentUserBookId, studentId) => {
         openTeachingTool(
-          `/books/${encodeURIComponent(row.id)}/lesson?studentUserBookId=${encodeURIComponent(studentUserBookId)}`
+          `/books/${encodeURIComponent(row.id)}/lesson?studentUserBookId=${encodeURIComponent(studentUserBookId)}&studentId=${encodeURIComponent(studentId)}`
         );
       }}
-      onStudentSaveWords={(studentUserBookId) => {
+      onStudentSaveWords={(studentUserBookId, studentId) => {
         openTeachingTool(
-          `/books/${encodeURIComponent(row.id)}/lesson?view=curiosity&studentUserBookId=${encodeURIComponent(studentUserBookId)}`
+          `/books/${encodeURIComponent(row.id)}/lesson?view=curiosity&studentUserBookId=${encodeURIComponent(studentUserBookId)}&studentId=${encodeURIComponent(studentId)}`
         );
       }}
-      onStudentFlashcards={(studentUserBookId) => {
-        openTeachingTool(`/books/${encodeURIComponent(studentUserBookId)}/study`);
+      onStudentBulkAdd={(studentUserBookId, studentId) => {
+        openTeachingTool(`/vocab/bulk?userBookId=${encodeURIComponent(studentUserBookId)}&studentId=${encodeURIComponent(studentId)}&sourceUserBookId=${encodeURIComponent(row.id)}&context=student-card`);
       }}
-      onStudentVocabularyList={(studentUserBookId) => {
-        openTeachingTool(`/books/${encodeURIComponent(studentUserBookId)}/words`);
+      onStudentFlashcards={(studentUserBookId, studentId) => {
+        openTeachingTool(`/books/${encodeURIComponent(studentUserBookId)}/study?studentId=${encodeURIComponent(studentId)}&sourceUserBookId=${encodeURIComponent(row.id)}`);
+      }}
+      onStudentVocabularyList={(studentUserBookId, studentId) => {
+        openTeachingTool(`/books/${encodeURIComponent(studentUserBookId)}/words?studentId=${encodeURIComponent(studentId)}&sourceUserBookId=${encodeURIComponent(row.id)}`);
       }}
     />
   );

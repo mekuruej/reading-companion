@@ -34,7 +34,7 @@ function experienceKey(value: { person?: ExperiencePerson | null; experienced_on
 function personLabel(person: ExperiencePerson | null) {
   return person ? [person.display_name, person.username ? `@${person.username}` : null].filter(Boolean).join(" · ") || "MEKURU user" : "User no longer available";
 }
-async function requestApi(bookId: string, options?: RequestInit, query = "") {
+async function baseRequestApi(bookId: string, options?: RequestInit, query = "") {
   const { data } = await supabase.auth.getSession();
   if (!data.session) throw new Error("Please sign in.");
   const response = await fetch(`/api/teacher/reading-experiences?bookId=${encodeURIComponent(bookId)}${query}`, {
@@ -45,9 +45,22 @@ async function requestApi(bookId: string, options?: RequestInit, query = "") {
   return result;
 }
 export default function ReadingExperiencesPage() {
+  const params = useParams<{ bookId: string }>();
+  const query = useSearchParams();
+  return <ReadingExperiencesContent key={`${params.bookId}:${query.toString()}`} />;
+}
+function ReadingExperiencesContent() {
   const { bookId } = useParams<{ bookId: string }>();
   const searchParams = useSearchParams();
-  const initialPersonId = searchParams.get("person");
+  const initialPersonId = searchParams.get("studentId") ?? searchParams.get("person");
+  const contextual = searchParams.has("studentId") || searchParams.has("studentUserBookId");
+  const studentUserBookId = searchParams.get("studentUserBookId") ?? "";
+  const sourceUserBookId = searchParams.get("sourceUserBookId") ?? "";
+  const [lockedPerson, setLockedPerson] = useState<ExperiencePerson | null>(null);
+  function requestApi(id: string, options?: RequestInit, query = "") {
+    const scoped = contextual ? `&${new URLSearchParams({ studentId: initialPersonId ?? "", studentUserBookId, sourceUserBookId })}` : "";
+    return baseRequestApi(id, options, query + scoped);
+  }
   const [data, setData] = useState<PageData | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [username, setUsername] = useState("");
@@ -61,7 +74,7 @@ export default function ReadingExperiencesPage() {
   const [lookingUp, setLookingUp] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [reload, setReload] = useState(0);
-  function newDraft(person: ExperiencePerson | null = null): Draft {
+  function newDraft(person: ExperiencePerson | null = lockedPerson): Draft {
     return { person, experienced_on: todayYmdAppTimeZone(), context: "", notes: "", reader_level: "", level_fit: "" };
   }
 
@@ -71,9 +84,11 @@ export default function ReadingExperiencesPage() {
     setExperienceMessage(""); setExperienceSaveFailed(false); setExperienceNoticeError(false); setLastSavedExperienceId(null);
     async function load() {
       try {
-        const result = await requestApi(bookId) as PageData;
+        const result = await requestApi(bookId) as PageData & { lockedPerson?: ExperiencePerson };
+        if (!cancelled && result.lockedPerson) setLockedPerson(result.lockedPerson);
         if (cancelled) return;
         setData(result);
+        if (contextual && result.lockedPerson) { setDraft(newDraft(result.lockedPerson)); return; }
         if (initialPersonId) {
           setDraft(newDraft());
           try {
@@ -100,8 +115,8 @@ export default function ReadingExperiencesPage() {
     finally { setLookingUp(false); }
   }
   async function saveExperience() {
-    if (!draft || savingExperience) return;
-    const payload = { kind: "experience", bookId, id: draft.id, person_id: draft.person?.id, experienced_on: draft.experienced_on, context: draft.context || null, reader_level: draft.reader_level || null, level_fit: draft.level_fit || null, notes: draft.notes };
+    if (!draft || savingExperience || (contextual && draft.person?.id !== initialPersonId)) return;
+    const payload = { ...(contextual ? { studentId: initialPersonId, studentUserBookId, sourceUserBookId } : {}), kind: "experience", bookId, id: draft.id, person_id: draft.person?.id, experienced_on: draft.experienced_on, context: draft.context || null, reader_level: draft.reader_level || null, level_fit: draft.level_fit || null, notes: draft.notes };
     const invalid = validateExperience(payload);
     if (invalid) { setExperienceNoticeError(true); setExperienceMessage(invalid); return; }
     setSavingExperience(true); setExperienceSaveFailed(false); setExperienceNoticeError(false); setExperienceMessage("");
@@ -140,7 +155,7 @@ export default function ReadingExperiencesPage() {
         {data.userBookId ? <Link href={`/books/${data.userBookId}/lesson?view=journal`}>Teacher Journal</Link> : null}
         <Link href="/teacher/library">Find Your Next Teaching Book</Link>
       </nav>
-      <header><p className="text-sm font-semibold text-violet-700">{data.book.title}</p><h1 className="mt-1 text-3xl font-black">Reading Experiences</h1><p className="mt-2 text-sm text-stone-600">Records of reading this book with specific people.</p></header>
+      <header>{lockedPerson ? <p className="mb-2 text-sm font-bold">Working with: {personLabel(lockedPerson)}</p> : null}<p className="text-sm font-semibold text-violet-700">{data.book.title}</p><h1 className="mt-1 text-3xl font-black">Reading Experiences</h1><p className="mt-2 text-sm text-stone-600">Records of reading this book with specific people.</p></header>
 
       <section className="space-y-4 rounded-3xl border border-violet-200 bg-violet-50/40 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold">Reading Experiences</h2><button className={primaryClass} disabled={!!draft || !!data.experienceError} onClick={() => { setDraft(newDraft()); setExperienceMessage(""); setUsername(""); setExperienceSaveFailed(false); setExperienceNoticeError(false); }}>+ Add Reading Experience</button></div>
@@ -150,7 +165,7 @@ export default function ReadingExperiencesPage() {
           <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-bold">{draft.id ? "Edit experience" : "New reading experience"}</h3><SaveBadge state={experienceState} /></div>
           <fieldset disabled={savingExperience || lookingUp || !!data.experienceError} className="space-y-4">
             <div>
-              {draft.person ? <div className="flex flex-wrap items-center gap-3"><span className="text-sm font-semibold">{personLabel(draft.person)}</span><button type="button" className="text-sm underline" onClick={() => { setDraft({ ...draft, person: null }); setUsername(""); }}>Change person</button></div> : <><label className="block text-sm font-semibold">MEKURU username<input className={inputClass} value={username} onChange={event => setUsername(event.target.value)} placeholder="@username" maxLength={120} /></label><button type="button" disabled={!username.trim()} className={buttonClass + " mt-2"} onClick={() => void findPerson()}>{lookingUp ? "Finding…" : "Find person"}</button></>}
+              {draft.person ? <div className="flex flex-wrap items-center gap-3"><span className="text-sm font-semibold">{personLabel(draft.person)}</span>{!contextual ? <button type="button" className="text-sm underline" onClick={() => { setDraft({ ...draft, person: null }); setUsername(""); }}>Change person</button> : null}</div> : <><label className="block text-sm font-semibold">MEKURU username<input className={inputClass} value={username} onChange={event => setUsername(event.target.value)} placeholder="@username" maxLength={120} /></label><button type="button" disabled={!username.trim()} className={buttonClass + " mt-2"} onClick={() => void findPerson()}>{lookingUp ? "Finding…" : "Find person"}</button></>}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-semibold">Date<input type="date" required className={inputClass} value={draft.experienced_on} onChange={event => setDraft({ ...draft, experienced_on: event.target.value })} /></label>

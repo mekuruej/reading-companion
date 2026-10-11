@@ -22,12 +22,13 @@ type BookHubTeachingToolsProps = {
   canUseStoryNotes: boolean;
   onBulkAdd: () => void;
   onStoryNotes: () => void;
-  onReadingExperiences: (personId?: string) => void;
+  onReadingExperiences: (personId?: string, studentUserBookId?: string) => void;
   onTeachingAssessment: () => void;
-  onStudentFollowAlong: (studentUserBookId: string) => void;
-  onStudentSaveWords: (studentUserBookId: string) => void;
-  onStudentFlashcards: (studentUserBookId: string) => void;
-  onStudentVocabularyList: (studentUserBookId: string) => void;
+  onStudentFollowAlong: (studentUserBookId: string, studentId: string) => void;
+  onStudentBulkAdd: (studentUserBookId: string, studentId: string) => void;
+  onStudentSaveWords: (studentUserBookId: string, studentId: string) => void;
+  onStudentFlashcards: (studentUserBookId: string, studentId: string) => void;
+  onStudentVocabularyList: (studentUserBookId: string, studentId: string) => void;
 };
 
 function sortStudentStudyLinks(students: StudentStudyLinkRow[]) {
@@ -138,6 +139,7 @@ export default function BookHubTeachingTools({
   onTeachingAssessment,
   onStudentFollowAlong,
   onStudentSaveWords,
+  onStudentBulkAdd,
   onStudentFlashcards,
   onStudentVocabularyList,
 }: BookHubTeachingToolsProps) {
@@ -548,30 +550,36 @@ export default function BookHubTeachingTools({
                     {student.isAttached && student.userBookId ? (
                       <>
                         <StudentCardButton
-                          onClick={() => onStudentFollowAlong(student.userBookId as string)}
+                          onClick={() => onStudentFollowAlong(student.userBookId as string, student.studentId)}
                           variant="primary"
                         >
                           Follow-Along
                         </StudentCardButton>
                         <StudentCardButton
-                          onClick={() => onStudentSaveWords(student.userBookId as string)}
+                          onClick={() => onStudentSaveWords(student.userBookId as string, student.studentId)}
                         >
                           Save Words
                         </StudentCardButton>
+                        {canUseBulkAdd ? <StudentCardButton
+                          onClick={() => onStudentBulkAdd(student.userBookId as string, student.studentId)}
+                        >
+                          Bulk Add
+                        </StudentCardButton> : null}
                         <StudentCardButton
-                          onClick={() => onStudentFlashcards(student.userBookId as string)}
+                          onClick={() => onStudentFlashcards(student.userBookId as string, student.studentId)}
                         >
                           Flashcards
                         </StudentCardButton>
                         <StudentCardButton
-                          onClick={() => onStudentVocabularyList(student.userBookId as string)}
+                          onClick={() => onStudentVocabularyList(student.userBookId as string, student.studentId)}
                         >
                           Vocabulary List
                         </StudentCardButton>
                       </>
                     ) : null}
                     <StudentCardButton
-                      onClick={() => onReadingExperiences(student.studentId)}
+                      disabled={!student.userBookId}
+                      onClick={() => onReadingExperiences(student.studentId, student.userBookId ?? undefined)}
                     >
                       Reading Experience
                     </StudentCardButton>

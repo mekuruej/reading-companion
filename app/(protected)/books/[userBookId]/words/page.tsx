@@ -5,6 +5,8 @@ import WordContextFields from "@/components/vocabulary/WordContextFields";
 import { wordContextPayload, type WordContext } from "@/lib/vocabulary/wordContext";
 
 import { isReadyForFlashcards } from "@/lib/wordSupportEligibility";
+import { saveStudentWord } from "@/lib/teacher/saveStudentWord";
+import StudentToolBoundary from "@/components/teacher/StudentToolBoundary";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
@@ -280,10 +282,15 @@ function downloadCsv(filename: string, rows: unknown[][]) {
 }
 
 export default function BookWordsPage() {
+  return <StudentToolBoundary><BookWordsPageContent /></StudentToolBoundary>;
+}
+
+function BookWordsPageContent() {
   const params = useParams<{ userBookId: string }>();
   const userBookId = params.userBookId;
   const router = useRouter();
   const searchParams = useSearchParams();
+  const studentContext = searchParams.get("studentId") && searchParams.get("sourceUserBookId") ? { studentId: searchParams.get("studentId")!, userBookId, sourceUserBookId: searchParams.get("sourceUserBookId") ?? "" } : undefined;
   const bookHubHref = `/books/${encodeURIComponent(userBookId)}${
     searchParams.get("mode") === "teaching" ? "?mode=teaching" : ""
   }`;
@@ -403,11 +410,11 @@ export default function BookWordsPage() {
 
     try {
       for (const w of updatedGroup) {
-        const { error } = await supabase
+        const { error } = (studentContext ? await saveStudentWord(studentContext, { page_order: w.page_order }, w.id) : await supabase
           .from("user_book_words")
           .update({ page_order: w.page_order })
           .eq("id", w.id)
-          .eq("user_book_id", userBookId);
+          .eq("user_book_id", userBookId));
 
         if (error) throw error;
       }
@@ -546,11 +553,11 @@ export default function BookWordsPage() {
     }
 
     try {
-      const { error } = await supabase
+      const { error } = (studentContext ? await saveStudentWord(studentContext, patch, editing.id) : await supabase
         .from("user_book_words")
         .update(patch)
         .eq("id", editing.id)
-        .eq("user_book_id", userBookId);
+        .eq("user_book_id", userBookId));
 
       if (error) throw error;
 
@@ -580,11 +587,11 @@ export default function BookWordsPage() {
     if (!ok) return;
 
     try {
-      const { error } = await supabase
+      const { error } = (studentContext ? await saveStudentWord(studentContext, {}, w.id, true) : await supabase
         .from("user_book_words")
         .delete()
         .eq("id", w.id)
-        .eq("user_book_id", userBookId);
+        .eq("user_book_id", userBookId));
 
       if (error) throw error;
       setWords((prev) => prev.filter((x) => x.id !== w.id));
@@ -610,11 +617,11 @@ export default function BookWordsPage() {
     );
 
     try {
-      const { error } = await supabase
+      const { error } = (studentContext ? await saveStudentWord(studentContext, { ...wordPositionPayload(nextPage, wordPosition(w).unit) }, w.id) : await supabase
         .from("user_book_words")
         .update({ ...wordPositionPayload(nextPage, wordPosition(w).unit) })
         .eq("id", w.id)
-        .eq("user_book_id", userBookId);
+        .eq("user_book_id", userBookId));
 
       if (error) throw error;
     } catch (e: any) {
@@ -629,11 +636,11 @@ export default function BookWordsPage() {
     if (!canUseVocabularyTools) return;
 
     try {
-      const { error } = await supabase
+      const { error } = (studentContext ? await saveStudentWord(studentContext, { hidden: true }, w.id) : await supabase
         .from("user_book_words")
         .update({ hidden: true })
         .eq("id", w.id)
-        .eq("user_book_id", userBookId);
+        .eq("user_book_id", userBookId));
 
       if (error) throw error;
 
@@ -651,11 +658,11 @@ export default function BookWordsPage() {
     if (!canUseVocabularyTools) return;
 
     try {
-      const { error } = await supabase
+      const { error } = (studentContext ? await saveStudentWord(studentContext, { hidden: false }, w.id) : await supabase
         .from("user_book_words")
         .update({ hidden: false })
         .eq("id", w.id)
-        .eq("user_book_id", userBookId);
+        .eq("user_book_id", userBookId));
 
       if (error) throw error;
 

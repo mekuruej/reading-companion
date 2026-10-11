@@ -3,7 +3,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
 import { supabase } from "@/lib/supabaseClient";
@@ -153,15 +153,24 @@ type TeachingBulkDestination =
 // Main Component
 // -------------------------------------------------------------
 export default function BulkVocabPage() {
+  const query = useSearchParams();
+  return <BulkVocabContent key={query.toString()} />;
+}
+
+function BulkVocabContent() {
+  const query = useSearchParams();
+  const lockedStudent = query.get("context") === "student-card" || query.has("studentId") || query.has("sourceUserBookId");
+  const studentId = query.get("studentId") ?? "";
+  const sourceUserBookId = query.get("sourceUserBookId") ?? "";
   const router = useRouter();
 
-  const [userBookId, setUserBookId] = useState("");
+  const userBookId = query.get("userBookId") ?? "";
   const [bookTitle, setBookTitle] = useState("");
   const [bookCover, setBookCover] = useState<string | null>(null);
   const [positionUnit, setPositionUnit] = useState<ProgressTrackingMethod>("page");
   const [teacherStudentContext, setTeacherStudentContext] =
     useState<TeacherStudentBulkContext | null>(null);
-  const [isTeachingModeBulkAdd, setIsTeachingModeBulkAdd] = useState(false);
+  const isTeachingModeBulkAdd = lockedStudent || (query.get("from") === "book-hub" && (query.get("context") === "teaching" || query.get("mode") === "teaching"));
   const [teachingDestinations, setTeachingDestinations] = useState<TeachingBulkDestination[]>([]);
   const [selectedTeachingDestination, setSelectedTeachingDestination] = useState("teacher");
   const [teachingDestinationsLoading, setTeachingDestinationsLoading] = useState(false);
@@ -203,14 +212,15 @@ export default function BulkVocabPage() {
 
   const selectedDestination = useMemo(() => {
     return teachingDestinations.find((destination) =>
+      lockedStudent ? destination.type === "student" && destination.studentId === studentId && destination.userBookId === userBookId :
       destination.type === "teacher"
         ? selectedTeachingDestination === "teacher"
         : selectedTeachingDestination === `student:${destination.userBookId}`
     ) ?? null;
-  }, [selectedTeachingDestination, teachingDestinations]);
+  }, [lockedStudent, studentId, userBookId, selectedTeachingDestination, teachingDestinations]);
 
   const backToBookHubHref = `/books/${encodeURIComponent(
-    isTeachingModeBulkAdd ? userBookId : authorizedUserBookId
+    lockedStudent ? sourceUserBookId : isTeachingModeBulkAdd ? userBookId : authorizedUserBookId
   )}`;
 
   const destinationClarification = selectedDestination?.type === "student"
@@ -230,22 +240,9 @@ export default function BulkVocabPage() {
 
   const [recentAction, setRecentAction] = useState<string | null>(null);
 
-  // -------------------------------------------------------------
-  // Get userBookId from URL
-  // -------------------------------------------------------------
+  // Notebook handoffs are only for generic/personal entry points.
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get("userBookId") || "";
-    setUserBookId(id);
-    setIsTeachingModeBulkAdd(
-      params.get("from") === "book-hub" &&
-      (params.get("context") === "teaching" || params.get("mode") === "teaching")
-    );
-  }, []);
-
-  useEffect(() => {
-    if (!userBookId || typeof window === "undefined") return;
+    if (lockedStudent || !userBookId || typeof window === "undefined") return;
 
     const storageKey = `teacherNotebookBulkWords:${userBookId}`;
     const storedWords = sessionStorage.getItem(storageKey);
@@ -253,7 +250,7 @@ export default function BulkVocabPage() {
 
     setRawInput((current) => current || storedWords);
     sessionStorage.removeItem(storageKey);
-  }, [userBookId]);
+  }, [lockedStudent, userBookId]);
 
   // -------------------------------------------------------------
   // Load authorized book info
@@ -385,6 +382,21 @@ export default function BulkVocabPage() {
 
         if (cancelled) return;
 
+        let lockedDestination: TeachingBulkDestination | null = null;
+        if (lockedStudent) {
+          if (!studentId || !sourceUserBookId) throw new Error("Student and source book context are required.");
+          const { data: { session } } = await supabase.auth.getSession();
+          const response = await fetch(`/api/vocab/bulk/teaching?${new URLSearchParams({ sourceUserBookId, studentId, targetUserBookId: userBookId })}`, {
+            headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error ?? "Invalid student context.");
+          lockedDestination = result.destinations?.find((target: TeachingBulkDestination) => target.type === "student" && target.studentId === studentId && target.userBookId === userBookId) ?? null;
+          if (!lockedDestination) throw new Error("The selected student's exact book is unavailable.");
+          if (cancelled) return;
+          setTeachingDestinations([lockedDestination]);
+        }
+
         const b = (data as any)?.books;
         const ownerUserId = (data as any).user_id as string;
         setAuthorizedUserBookId((data as any).id);
@@ -392,7 +404,7 @@ export default function BulkVocabPage() {
         setBookCover(b?.cover_url ?? null);
         setPositionUnit(data.progress_tracking_method ?? "page");
 
-        if (isTeachingModeBulkAdd) {
+        if (isTeachingModeBulkAdd && !lockedStudent) {
           if (!canUseTeachingBulkAdd) {
             setMessage("❌ Teaching Bulk Add is only available for your own eligible book.");
             setAuthorizedUserBookId("");
@@ -424,7 +436,9 @@ export default function BulkVocabPage() {
           setTeachingDestinationsLoading(false);
         }
 
-        if (!isOwner && (isLinkedTeacher || isSuperTeacher)) {
+        if (lockedDestination?.type === "student") {
+          setTeacherStudentContext({ studentId, studentName: lockedDestination.label, backHref: `/books/${encodeURIComponent(sourceUserBookId)}?mode=teaching` });
+        } else if (!isOwner && (isLinkedTeacher || isSuperTeacher)) {
           const { data: studentProfile, error: studentProfileError } = await supabase
             .from("profiles")
             .select("display_name, username")
@@ -470,6 +484,8 @@ export default function BulkVocabPage() {
         console.error("Could not load authorized book info:", error);
 
         if (!cancelled) {
+          setAuthorizedUserBookId("");
+          setTeachingDestinations([]);
           setTeachingDestinationsLoading(false);
           setMessage(`❌ Could not load book info: ${error?.message ?? "Unknown error"}`);
         }
@@ -481,7 +497,7 @@ export default function BulkVocabPage() {
     return () => {
       cancelled = true;
     };
-  }, [isTeachingModeBulkAdd, userBookId]);
+  }, [isTeachingModeBulkAdd, lockedStudent, studentId, sourceUserBookId, userBookId]);
 
   useEffect(() => {
     if (!authorizedUserBookId) return;
@@ -589,6 +605,7 @@ export default function BulkVocabPage() {
   }
 
   function changeTeachingDestination(value: string) {
+    if (lockedStudent) return;
     const destination = teachingDestinations.find((item) =>
       item.type === "teacher"
         ? value === "teacher"
@@ -988,7 +1005,8 @@ export default function BulkVocabPage() {
               : {}),
           },
           body: JSON.stringify({
-            sourceUserBookId: userBookId,
+            sourceUserBookId: lockedStudent ? sourceUserBookId : userBookId,
+            ...(lockedStudent ? { studentId } : {}),
             targetUserBookId: selectedDestination.userBookId,
             positionUnit,
             items,
@@ -1163,7 +1181,7 @@ export default function BulkVocabPage() {
             {teacherStudentContext && bookTitle ? (
               <div className="mt-2">
                 <p className="text-lg font-black text-stone-950">
-                  {teacherStudentContext.studentName} · {bookTitle}
+                  {lockedStudent ? `Adding words to ${teacherStudentContext.studentName}` : teacherStudentContext.studentName} · {bookTitle}
                 </p>
                 <p className="mt-1 text-sm font-semibold text-stone-600">
                   Adding vocabulary to this student's book.
@@ -1178,7 +1196,7 @@ export default function BulkVocabPage() {
               onClick={() => router.push(teacherStudentContext.backHref)}
               className="self-start rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-black text-stone-700 shadow-sm transition hover:bg-stone-50"
             >
-              ← Back to Workspace
+              ← {lockedStudent ? "Back to Book Hub" : "Back to Workspace"}
             </button>
           ) : null}
         </div>
@@ -1234,7 +1252,7 @@ export default function BulkVocabPage() {
 
               <button
                 type="button"
-                onClick={() => router.push(`/books/${encodeURIComponent(authorizedUserBookId)}/words`)}
+                onClick={() => router.push(`/books/${encodeURIComponent(authorizedUserBookId)}/words${lockedStudent ? `?${new URLSearchParams({ studentId, sourceUserBookId })}` : ""}`)}
                 className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-semibold text-stone-700 transition hover:bg-stone-100"
               >
                 Vocab List
@@ -1242,7 +1260,7 @@ export default function BulkVocabPage() {
 
             </div>
           </div>
-          {isTeachingModeBulkAdd ? (
+          {isTeachingModeBulkAdd && !lockedStudent ? (
             <section className="mb-4 rounded-xl border border-blue-100 bg-blue-50/70 p-4 shadow-sm">
               <label className="block">
                 <span className="mb-1 block text-xs font-black uppercase tracking-[0.16em] text-blue-700">
