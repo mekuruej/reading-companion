@@ -6,7 +6,7 @@ const guidance = {
   teacherAlternative: "Alternative spelling/kanji. Flashcards (answer side)",
   reading: "Flashcards・Follow-Along・Vocabulary List",
   meaning: "Flashcards・Follow-Along・Vocabulary List",
-  bookForm: "Form/Tense. Used in Follow-Along",
+  bookForm: "Form/Tense. Replace main word in Follow-Along",
   encountered: "Keeps the text you captured. To change the spelling shown in Follow-Along, use Form in the book.",
   dictionary: "Reference form for this word. Changing it does not change your main flashcard word.",
   lookup: "Used by Jisho lookup in this review. Changing it alone does not change the saved word shown in study tools.",

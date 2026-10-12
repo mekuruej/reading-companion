@@ -33,6 +33,7 @@ export default function CuriosityQuickSearchRow({
         <p id={`${inputId}-hint`} className="text-xs leading-4 text-stone-500">
           <span className="block">Already know the kanji?</span>
           <span className="block">Search with a simple Enter tap.</span>
+          <span className="block">Flashcards・Follow-Along・Vocabulary List</span>
         </p>
 
       </div>
