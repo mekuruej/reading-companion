@@ -457,7 +457,7 @@ export default function StoryTab({
     characters: "Characters",
     plot: "Plot",
     detective: "Detective",
-    setting: "Settings",
+    setting: "Story setting",
     cultural: languageNoteLabel,
     quotes: "Quotes",
     notes: "Notes",
@@ -849,7 +849,7 @@ export default function StoryTab({
         <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
           {settingReadOnly ? <LearningArchiveNotice /> : null}
           <div className="mb-3 flex items-center justify-between gap-3">
-            <div className="text-sm font-semibold text-stone-900">Setting</div>
+            <div className="text-sm font-semibold text-stone-900">{tabLabels.setting}</div>
 
             <div className="flex gap-2">
               <button

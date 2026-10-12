@@ -115,3 +115,35 @@ test('actual reflection save writes null or changed levels to both destinations 
     assert.equal(signals[0].readerLevel, updates[0].fields.reader_level);
   }
 });
+
+test('setup level chooser starts compact, shows saved selection, and can return to unanswered without clearing saved level', () => {
+  const nodes = tree => !tree || typeof tree !== 'object' ? [] : Array.isArray(tree) ? tree.flatMap(nodes) : [tree, ...nodes(tree.props?.children)];
+  const text = tree => typeof tree === 'string' ? tree : Array.isArray(tree) ? tree.map(text).join('') : tree && typeof tree === 'object' ? text(tree.props?.children) : '';
+  for (const saved of ['', 'Level 4']) {
+    const state = [false, false, '', 'Reader', 'Reader', 'English', '', true, saved, saved];
+    let cursor = 0;
+    const Page = load('app/(protected)/community/profile/setup/page.tsx', {
+      react: { ...React, useEffect() {}, useState(initial) { const i = cursor++; return [state[i] ?? initial, next => { state[i] = next; }]; } },
+      'next/navigation': { useRouter: () => ({}) },
+      '@/components/profile/ProfileShell': { default: 'ProfileShell', __esModule: true },
+      '@/components/profile/MekuruReadingLevelGuide': { default: 'Guide', __esModule: true },
+      '@/lib/access/japaneseLearningIntent': { wantsJapaneseLearning: () => true },
+      '@/lib/supabaseClient': { supabase: {} },
+    }).default;
+    const render = () => { cursor = 0; return Page(); };
+    let tree = render();
+    assert.ok(text(tree).includes(saved || 'Not sure yet'));
+    const details = nodes(tree).find(node => node.type === 'details');
+    assert.equal(details.props.open, undefined);
+    assert.ok(text(details).includes('Help me choose'));
+    assert.ok(!text(details).includes('Save quick setup'));
+    assert.ok(nodes(tree).some(node => node.type === 'button' && text(node) === 'Save quick setup'));
+    nodes(details).find(node => node.type === 'Guide').props.onSelect('Level 6');
+    tree = render(); assert.ok(text(tree).includes('Level 6'));
+    nodes(tree).find(node => node.type === 'button' && text(node) === 'Not sure yet').props.onClick();
+    tree = render(); assert.equal(state[8], ''); assert.equal(state[9], saved);
+    assert.deepEqual(levels.profileReadingLevelFields(true, state[8]), {});
+    if (saved) assert.ok(text(tree).includes('Your saved Level 4 will be kept.'));
+    else assert.ok(text(tree).includes('Not sure yet'));
+  }
+});

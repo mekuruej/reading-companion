@@ -45,6 +45,7 @@ export default function ProfileSetupPage() {
   const [customNativeLanguage, setCustomNativeLanguage] = useState("");
   const [japaneseLearningEnabled, setJapaneseLearningEnabled] = useState<boolean | null>(null);
   const [level, setLevel] = useState("");
+  const [savedLevel, setSavedLevel] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -85,6 +86,7 @@ export default function ProfileSetupPage() {
       setExistingDisplayName(profile?.display_name ?? "");
       setJapaneseLearningEnabled(profile ? wantsJapaneseLearning(profile) : null);
       setLevel(profile?.level ?? "");
+      setSavedLevel(profile?.level ?? "");
 
       const loadedNativeLanguage = profile?.native_language?.trim() ?? "";
       if (
@@ -270,7 +272,32 @@ export default function ProfileSetupPage() {
         </div>
 
         {japaneseLearningEnabled ? (
-          <MekuruReadingLevelGuide optional selectedLevel={level} onSelect={setLevel} />
+          <section aria-label="Optional reading level" className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-medium text-stone-700">Reading level (optional)</h2>
+                <p className="mt-1 font-semibold text-stone-900" aria-live="polite">{level || "Not sure yet"}</p>
+              </div>
+              {level ? (
+                <button type="button" onClick={() => setLevel("")} className="rounded-lg px-2 py-1 text-sm text-stone-600 underline underline-offset-4">
+                  Not sure yet
+                </button>
+              ) : null}
+            </div>
+            <p className="mt-2 text-sm text-stone-500">
+              {!level && savedLevel
+                ? `No new level selected. Your saved ${savedLevel} will be kept.`
+                : "You can finish setup without choosing a level."}
+            </p>
+            <details className="mt-3">
+              <summary className="cursor-pointer rounded text-sm font-semibold text-stone-800 underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4">
+                Help me choose
+              </summary>
+              <div className="mt-3">
+                <MekuruReadingLevelGuide optional selectedLevel={level} onSelect={setLevel} />
+              </div>
+            </details>
+          </section>
         ) : null}
 
         {message ? <p className="text-sm text-red-600">{message}</p> : null}
