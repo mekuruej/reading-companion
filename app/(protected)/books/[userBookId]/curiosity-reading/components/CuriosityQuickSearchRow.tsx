@@ -33,11 +33,11 @@ export default function CuriosityQuickSearchRow({
         <p id={`${inputId}-hint`} className="text-xs leading-4 text-stone-500">
           <span className="block">Already know the kanji?</span>
           <span className="block">Search with a simple Enter tap.</span>
-          <span className="block">Flashcards・Follow-Along・Vocabulary List</span>
         </p>
-
       </div>
-        <div className="flex min-w-0 flex-[1_1_17rem] items-center gap-2">
+
+      <div className="min-w-0 flex-[1_1_17rem]">
+        <div className="flex items-center gap-2">
           <input
             id={inputId}
             aria-describedby={`${inputId}-hint`}
@@ -59,6 +59,11 @@ export default function CuriosityQuickSearchRow({
             {quickLoading ? "Searching..." : "Search"}
           </button>
         </div>
+
+        <p className="mt-2 text-xs text-stone-500">
+          Flashcards · Follow-Along · Vocabulary List
+        </p>
+      </div>
 
       {surface.trim() && reading.trim() ? (
         <div className="flex min-h-10 shrink-0 items-center gap-2 text-xs text-stone-500">

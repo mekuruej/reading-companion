@@ -67,7 +67,6 @@ export default function CuriosityWordDetailFields({
         <div className="text-xs leading-5 text-stone-500">
           <span className="font-semibold text-stone-900">Manual entry:</span>{" "}
           1. Type the word. 2. Add the reading. 3. Add the meaning. 4. Save.
-          <WordFieldGuide field="captureWord" />
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">

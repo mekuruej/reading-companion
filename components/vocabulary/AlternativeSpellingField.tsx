@@ -8,6 +8,6 @@ export default function AlternativeSpellingField({ main, value, onChange, onProm
       <input className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" disabled={disabled} value={value} onChange={event => onChange(event.target.value)} placeholder="Optional" />
       <WordFieldGuide field="alternative" />
     </label>
-    {value.trim() && value.trim() !== main.trim() ? <button type="button" disabled={disabled} className="text-xs font-semibold text-sky-800 underline" onClick={() => { const forms = promotedSpelling(main, value); if (forms) onPromote(forms); }}>Make this the main word</button> : null}
+    {value.trim() && value.trim() !== main.trim() ? <button type="button" disabled={disabled} className="text-xs font-semibold text-sky-800 underline" onClick={() => { const forms = promotedSpelling(main, value); if (forms) onPromote(forms); }}>Swap with main word</button> : null}
   </div>;
 }

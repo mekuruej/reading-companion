@@ -1,9 +1,9 @@
 const guidance = {
   word: "This is the form you’ll study on your book flashcards and see as your main vocabulary word.",
   captureWord: "Flashcards・Follow-Along・Vocabulary List",
-  alternative: "Alternative spelling/kanji. Flashcards (answer side)",
+  alternative: "Other spelling/kanji. Flashcards・Follow-Along・Vocabulary List",
   teacherWord: "Flashcards・Follow-Along・Vocabulary List",
-  teacherAlternative: "Alternative spelling/kanji. Flashcards (answer side)",
+  teacherAlternative: "Other spelling/kanji. Flashcards・Follow-Along・Vocabulary List",
   reading: "Flashcards・Follow-Along・Vocabulary List",
   meaning: "Flashcards・Follow-Along・Vocabulary List",
   bookForm: "Form/Tense. Replace main word in Follow-Along",
