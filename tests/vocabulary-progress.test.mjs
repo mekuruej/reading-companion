@@ -76,14 +76,14 @@ for(const method of ['page','kindle_location','percent'])test(`${method} UI asks
  assert.equal(nodes(tree).find(n=>n.type==='input').props.value,method==='page'?'37':'');
  nodes(tree).find(n=>n.type==='button'&&n.props.children==='Not now').props.onClick();assert.equal(render(),null);assert.deepEqual(calls,['GET']);
 });
-test('new prompts are wired at completion; Live Lesson has no competing prompt',()=>{
+test('new prompts are wired at completion; Live Lesson offers progress only for its saved checkpoint',()=>{
  const base='app/(protected)/books/[userBookId]/';
  assert.ok(fs.readFileSync('app/(protected)/vocab/bulk/page.tsx','utf8').includes('step === "done" && <><BulkDonePanel />'));
  assert.ok(fs.readFileSync(base+'add-word/page.tsx','utf8').includes('actionLabel="Update progress"'));
  for(const file of ['curiosity-reading/WordTimerExperience.tsx','readalong/page.tsx']) {
   const source=fs.readFileSync(base+file,'utf8');assert.ok(source.includes('!showTimedSessionForm && !hasFinishedTimer && elapsed === 0'));
  }
- const live=fs.readFileSync('app/(protected)/teacher/students/[studentId]/books/[userBookId]/lesson-add/LiveLessonQuickAddPanel.tsx','utf8');assert.ok(!live.includes('VocabularyProgressPrompt'));
+ const live=fs.readFileSync('app/(protected)/teacher/students/[studentId]/books/[userBookId]/lesson-add/LiveLessonQuickAddPanel.tsx','utf8');assert.ok(live.includes('latestStoppingPoint.unit && latestStoppingPoint.value != null'));assert.ok(live.includes('actionLabel="Update student reading progress"'));
 });
 
 test('Bulk Add completion supplies one prompt with the exact saved target and current batch only',()=>{
@@ -106,4 +106,14 @@ test('audiobook keeps explicit rewind semantics and equal positions create no du
  assert.equal(f.tables.user_book_reading_sessions.length,2);
  assert.equal(f.tables.user_book_reading_sessions[0].session_mode,'listening');
  assert.ok(f.tables.user_book_reading_sessions.every(row=>row.end_page===null&&row.minutes_read===null));
+});
+
+
+test('saved cross-edition checkpoint can explicitly update target-only progress without source parameters or backwards overwrite',async()=>{
+ const f=fixture();const target=f.tables.user_books.find(r=>r.id===studentCopy);target.book_id=id(200);target.progress_tracking_method='kindle_location';target.books={kindle_location_count:3000};
+ const context={studentId:student,confirmed:true,method:'kindle_location'};
+ assert.equal((await f.request(studentCopy,{...context,value:1867})).status,200);
+ assert.equal(f.tables.user_book_reading_sessions[0].user_book_id,studentCopy);assert.equal(f.tables.user_book_reading_sessions[0].end_page,null);
+ assert.equal((await f.request(studentCopy,{...context,value:1867})).status,200);assert.equal(f.mutations.length,1);
+ assert.equal((await f.request(studentCopy,{...context,value:1800})).status,409);assert.equal(f.mutations.length,1);
 });

@@ -49,7 +49,7 @@ test('review loader scopes evidence to owner/book, pages results, and propagates
       query[method] = (...args) => { steps.push([method, ...args]); return query; };
     }
     query.then = resolve => Promise.resolve({
-      data: table === 'user_book_words' ? words : table === 'study_logs' ? [{ user_book_word_id: 'b' }] : [],
+      data: table === 'finalized_user_book_words' ? words : table === 'study_logs' ? [{ user_book_word_id: 'b' }] : [],
       error: null,
     }).then(resolve);
     return query;
@@ -65,7 +65,7 @@ test('review loader scopes evidence to owner/book, pages results, and propagates
 
   for (const query of queries) {
     assert.ok(query.steps.some(step => step[0] === 'range'));
-    assert.ok(query.steps.some(step => step[0] === 'eq' && step[1] === (query.table === 'user_book_words' ? 'user_book_id' : 'user_id') && step[2] === (query.table === 'user_book_words' ? 'book' : 'owner')));
+    assert.ok(query.steps.some(step => step[0] === 'eq' && step[1] === (query.table === 'finalized_user_book_words' ? 'user_book_id' : 'user_id') && step[2] === (query.table === 'finalized_user_book_words' ? 'book' : 'owner')));
   }
 });
 

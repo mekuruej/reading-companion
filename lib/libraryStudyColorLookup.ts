@@ -153,8 +153,8 @@ export async function fetchLibraryStudyColorInfoByWord(
     const senseSummaries = new Map<string, LibrarySummaryRow>();
     for (let from = 0; ; from += 1000) {
       const { data: rows, error } = await supabaseClient
-        .from("user_book_words")
-        .select("id, surface, reading, meaning_choice_index, user_books!inner(user_id)")
+        .from("finalized_user_book_words")
+        .select("id, surface, study_identity_key, reading, meaning_choice_index, user_books!inner(user_id)")
         .eq("user_books.user_id", userId)
         .in("surface", surfaces)
         .not("hidden", "is", true)
@@ -169,7 +169,7 @@ export async function fetchLibraryStudyColorInfoByWord(
         const previous = senseSummaries.get(key);
         senseSummaries.set(key, {
           surface: row.surface, reading: row.reading, senseNumber,
-          study_identity_key: `${(row.surface ?? "").trim().replace(/\s+/g, " ").toLowerCase()}||${normalizeKanaReading(row.reading ?? "")}`,
+          study_identity_key: row.study_identity_key || `${(row.surface ?? "").trim().replace(/\s+/g, " ").toLowerCase()}||${normalizeKanaReading(row.reading ?? "")}`,
           total_encounter_count: (previous?.total_encounter_count ?? 0) + 1,
         });
       }

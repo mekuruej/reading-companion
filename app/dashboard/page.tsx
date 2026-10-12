@@ -24,12 +24,14 @@ const WARMUP_WORD_COUNT = 4;
 const WARMUP_ENABLED_STORAGE_KEY = "mekuru-dashboard-word-warmup-enabled";
 
 type WarmupWord = {
+  study_identity_key?: string | null;
   surface: string;
   reading: string;
   meaning: string;
 };
 
 type WordSkyPoolRow = {
+  study_identity_key?: string | null;
   surface: string | null;
   reading: string | null;
   meaning: string | null;
@@ -89,15 +91,15 @@ function dailyWarmupWords(words: WarmupWord[], userId: string) {
 
   return words
     .filter((word) => {
-      const key = studyIdentityKey(word.surface, word.reading);
+      const key = (word.study_identity_key || studyIdentityKey(word.surface, word.reading));
       if (!key || seen.has(key)) return false;
       seen.add(key);
       return true;
     })
     .sort(
       (a, b) =>
-        seededScore(seed, studyIdentityKey(a.surface, a.reading)) -
-        seededScore(seed, studyIdentityKey(b.surface, b.reading))
+        seededScore(seed, (a.study_identity_key || studyIdentityKey(a.surface, a.reading))) -
+        seededScore(seed, (b.study_identity_key || studyIdentityKey(b.surface, b.reading)))
     )
     .slice(0, WARMUP_WORD_COUNT);
 }
@@ -297,7 +299,7 @@ export default function DashboardPage() {
             const reading = (row.reading ?? "").trim();
             const meaning = (row.meaning ?? "").trim();
             if (!surface || !reading || !meaning) return null;
-            return { surface, reading, meaning };
+            return { surface, reading, meaning, study_identity_key: row.study_identity_key };
           })
           .filter((word): word is WarmupWord => Boolean(word));
 
@@ -308,7 +310,7 @@ export default function DashboardPage() {
         console.warn("Dashboard warm-up pool did not load:", poolError);
       }
 
-      const keys = words.map((word) => studyIdentityKey(word.surface, word.reading));
+      const keys = words.map((word) => (word.study_identity_key || studyIdentityKey(word.surface, word.reading)));
       const { data, error } = await supabase
         .from("user_library_word_claims")
         .select("study_identity_key")
@@ -350,7 +352,7 @@ export default function DashboardPage() {
   async function claimWarmupWord(word: WarmupWord) {
     if (!userId) return;
 
-    const key = studyIdentityKey(word.surface, word.reading);
+    const key = (word.study_identity_key || studyIdentityKey(word.surface, word.reading));
 
     if (warmupClaimKeys.has(key)) {
       setWarmupClaimKeys((prev) => {
@@ -427,7 +429,7 @@ export default function DashboardPage() {
                 <DashboardWarmupPanel
                   words={warmupWords}
                   claimedKeys={warmupClaimKeys}
-                  getKey={(word) => studyIdentityKey(word.surface, word.reading)}
+                  getKey={(word) => (word.study_identity_key || studyIdentityKey(word.surface, word.reading))}
                   onToggleWord={claimWarmupWord}
                 />
               )

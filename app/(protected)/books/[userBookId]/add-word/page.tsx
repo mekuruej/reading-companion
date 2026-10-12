@@ -238,8 +238,8 @@ function AddWordContent() {
   const [word, setWord] = useState("");
   const [scratchWord, setScratchWord] = useState("");
   const [wordContext, setWordContext] = useState<WordContext>({});
+  const [dictionaryForm, setDictionaryForm] = useState("");
   const [alternateSurface, setAlternateSurface] = useState("");
-  const [useAlternateSurface, setUseAlternateSurface] = useState(false);
 
   const [reading, setReading] = useState("");
   const [meaning, setMeaning] = useState("");
@@ -577,7 +577,7 @@ function AddWordContent() {
         return;
       }
 
-      const currentSurface = useAlternateSurface ? alternateSurface : word;
+      const currentSurface = word;
       const wordsToCheck = [
         ...sessionWords.map((item) => ({
           surface: item.surface,
@@ -623,7 +623,7 @@ function AddWordContent() {
     return () => {
       cancelled = true;
     };
-  }, [sessionWords, word, alternateSurface, useAlternateSurface, reading, editingSessionWordId, isEnglishBook]);
+  }, [sessionWords, word, alternateSurface, reading, editingSessionWordId, isEnglishBook]);
 
   function prepareForNextWord() {
     window.setTimeout(() => {
@@ -659,7 +659,8 @@ function AddWordContent() {
     setWord("");
     setWordContext({});
     setAlternateSurface("");
-    setUseAlternateSurface(false);
+    setDictionaryForm("");
+
     setReading("");
     setMeaning("");
     setJlpt("NON-JLPT");
@@ -686,6 +687,7 @@ function AddWordContent() {
 
   function applyJisho(entry: JishoChoice) {
     setWord(entry.surface);
+    setDictionaryForm(entry.surface);
     setReading(entry.reading);
     setJlpt(entry.jlpt);
     setIsCommon(entry.isCommon);
@@ -696,10 +698,11 @@ function AddWordContent() {
 
   function loadSessionWordIntoForm(sessionWord: SessionWord) {
     setEditingSessionWordId(sessionWord.id);
-    setWord(sessionWord.base_form || sessionWord.surface);
+    setWord(sessionWord.surface);
+    setDictionaryForm(sessionWord.base_form ?? sessionWord.surface);
     setWordContext(wordContextPayload(sessionWord));
-    setAlternateSurface(sessionWord.base_form && sessionWord.base_form !== sessionWord.surface ? sessionWord.surface : "");
-    setUseAlternateSurface(Boolean(sessionWord.base_form && sessionWord.base_form !== sessionWord.surface));
+    setAlternateSurface(sessionWord.alternative_surface ?? "");
+
     setReading(sessionWord.reading ?? "");
     setMeaning(sessionWord.meaning ?? "");
     setJlpt(sessionWord.jlpt || "NON-JLPT");
@@ -1055,7 +1058,7 @@ function AddWordContent() {
     const cleanAlternateSurface = alternateSurface.trim();
     const cleanReading = reading.trim();
     const cleanMeaning = meaning.trim();
-    const finalSurface = useAlternateSurface ? cleanAlternateSurface : cleanWord;
+    const finalSurface = cleanWord;
     const cleanedMeanings = meaningChoices.map((choice) => choice.trim()).filter(Boolean);
     const meanings = cleanMeaning
       ? [cleanMeaning, ...cleanedMeanings.filter((choice) => choice !== cleanMeaning)]
@@ -1149,10 +1152,7 @@ function AddWordContent() {
       return;
     }
 
-    if (useAlternateSurface && !cleanAlternateSurface) {
-      setMessage("❌ Add the alternate kanji form or uncheck the box.");
-      return;
-    }
+
 
     if (!cleanReading) {
       setMessage("❌ Add a reading.");
@@ -1189,7 +1189,7 @@ function AddWordContent() {
         return;
       }
 
-      const finalSurface = useAlternateSurface ? cleanAlternateSurface : cleanWord;
+      const finalSurface = cleanWord;
       const hasVerifiedDictionaryMatch = lookupCandidates.some(
         (candidate) =>
           candidate.surface === finalSurface &&
@@ -1272,8 +1272,9 @@ function AddWordContent() {
         user_book_id: userBookId,
         vocabulary_cache_id: vocabularyCacheId,
         surface: finalSurface,
-        base_form: cleanWord,
+        base_form: dictionaryForm || cleanWord,
         ...wordContextPayload(wordContext),
+        alternative_surface: cleanAlternateSurface || null,
         reading: cleanReading,
         meaning: cleanMeaning,
         other_definition: meaningChoiceIndex == null ? cleanMeaning : null,
@@ -1315,7 +1316,7 @@ function AddWordContent() {
             page_number, position_unit, position_value, percent_location,
             chapter_number,
             chapter_name,
-            base_form, book_form, book_form_description, follow_along_support_note,
+            base_form, alternative_surface, book_form, book_form_description, follow_along_support_note,
             hide_kanji_in_reading_support,
             page_order,
             vocabulary_cache_id
@@ -1383,7 +1384,7 @@ function AddWordContent() {
             page_number, position_unit, position_value, percent_location,
             chapter_number,
             chapter_name,
-            base_form, book_form, book_form_description, follow_along_support_note,
+            base_form, alternative_surface, book_form, book_form_description, follow_along_support_note,
             hide_kanji_in_reading_support,
             page_order,
             vocabulary_cache_id
@@ -1471,7 +1472,7 @@ function AddWordContent() {
     setMessage("✅ Word deleted from Vocab List.");
   }
 
-  const currentColorSurface = useAlternateSurface ? alternateSurface : word;
+  const currentColorSurface = word;
 
   const currentLibraryColorInfo =
     libraryColorByWordKey[
@@ -1637,10 +1638,16 @@ function AddWordContent() {
             />
 
             <AddWordDetailFields
+              lookupLoading={lookupLoading}
               wordFieldsRef={wordFieldsRef}
               reading={reading}
               contextFields={<WordContextFields value={wordContext} onChange={setWordContext} teacher={isSuperTeacher || superTeacherRole === "teacher" || superTeacherRole === "admin"} />}
               alternateSurface={alternateSurface}
+              onPromoteAlternative={() => {
+                setDictionaryForm(current => current || word);
+                setWord(alternateSurface.trim());
+                setAlternateSurface(word);
+              }}
               meaning={meaning}
               meaningChoices={meaningChoices}
               meaningChoiceIndex={meaningChoiceIndex}
@@ -1658,7 +1665,7 @@ function AddWordContent() {
               onReadingChange={setReading}
               onAlternateSurfaceChange={(value) => {
                 setAlternateSurface(value);
-                setUseAlternateSurface(value.trim().length > 0);
+
               }}
               onMeaningChoiceChange={(index, choice) => {
                 setMeaningChoiceIndex(index);

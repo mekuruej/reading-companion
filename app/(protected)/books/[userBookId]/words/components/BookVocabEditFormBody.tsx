@@ -1,9 +1,14 @@
+import AlternativeSpellingField from "@/components/vocabulary/AlternativeSpellingField";
+import WordFieldGuide from "@/components/vocabulary/WordFieldGuide";
 import WordPositionField from "@/components/vocabulary/WordPositionField";
 import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
 type BookVocabEditFormBodyProps = {
   cacheSurface?: string | null;
 
   editSurface: string;
+  alternativeSurface: string;
+  onAlternativeSurfaceChange: (value: string) => void;
+  onPromoteAlternative: () => void;
   editReading: string;
   editJlpt: string;
   editMeaning: string;
@@ -33,6 +38,7 @@ type BookVocabEditFormBodyProps = {
 export default function BookVocabEditFormBody({
   cacheSurface,
   editSurface,
+  alternativeSurface, onAlternativeSurfaceChange, onPromoteAlternative,
   editReading,
   editJlpt,
   editMeaning,
@@ -58,29 +64,27 @@ export default function BookVocabEditFormBody({
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
       {cacheSurface ? (
         <div className="flex flex-col gap-1 sm:col-span-2">
-          <span className="text-xs text-gray-600">Common usage (dictionary form)</span>
+          <span className="text-xs text-gray-600">Dictionary form (reference)</span>
           <span className="font-medium">{cacheSurface}</span>
+          <span className="text-xs text-gray-500">Dictionary reference. The saved word below is used for this book’s flashcards.</span>
         </div>
       ) : null}
 
       <label className="flex flex-col gap-1">
         <span className="text-xs text-gray-600">
-          {cacheSurface ? "Alternative spelling / kanji" : "Word"}
+          Main word
         </span>
         <input
           value={editSurface}
           onChange={(e) => onEditSurfaceChange(e.target.value)}
-          placeholder={cacheSurface ? "Optional spelling / kanji" : "Word as it appears in the book"}
+          placeholder="Main word"
           className="border p-2 rounded"
         />
+        <WordFieldGuide field="word" />
 
-        <span className="text-[11px] text-gray-500">
-          {cacheSurface
-            ? "Optional. Leave blank to use the common form shown above."
-            : "Use the spelling as it appears in this book."}
-        </span>
       </label>
 
+      <AlternativeSpellingField main={editSurface} value={alternativeSurface} onChange={onAlternativeSurfaceChange} onPromote={onPromoteAlternative} />
       <label className="flex flex-col gap-1">
         <span className="text-xs text-gray-600">Reading</span>
         <input
@@ -88,6 +92,7 @@ export default function BookVocabEditFormBody({
           onChange={(e) => onEditReadingChange(e.target.value)}
           className="border p-2 rounded"
         />
+        <WordFieldGuide field="reading" />
       </label>
 
       <label className="flex flex-col gap-1">
@@ -138,6 +143,7 @@ export default function BookVocabEditFormBody({
 
       <label className="flex flex-col gap-1 sm:col-span-2">
         <span className="text-xs text-gray-600">Meaning</span>
+        <WordFieldGuide field="meaning" />
         <textarea
           value={editMeaning}
           onChange={(e) => onEditMeaningChange(e.target.value)}

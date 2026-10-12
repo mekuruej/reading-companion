@@ -14,7 +14,6 @@ import { isAllUserTeacher } from "@/lib/teacher/targetUserAccess";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { ensureTeacherBookSupport } from "@/lib/teacher/ensureTeacherBookSupport";
 import { getBookIdentity } from "@/lib/books/bookIdentity";
 import { bookTypeTitleLabel } from "@/lib/books/bookTypes";
 import TeacherNotebookPanel from "../../../../../components/TeacherNotebookPanel";
@@ -66,7 +65,6 @@ function firstBook(book: StudentUserBook["books"]) {
 
 function isSuperTeacherRole(profile: any) {
   return (
-    profile?.role === "admin" ||
     profile?.role === "super_teacher" ||
     profile?.is_super_teacher === true ||
     profile?.is_super_teacher === "true"
@@ -221,9 +219,10 @@ export default function StudentBookWorkspacePage() {
 
       setStudent((studentProfile ?? null) as StudentProfile | null);
       setStudentBook(loadedStudentBook);
-      setTeacherBook(
-        await ensureTeacherBookSupport(supabase, currentUser.id, loadedStudentBook.book_id)
-      );
+      const { data: existingSupport, error: supportError } = await supabase.from("teacher_books")
+        .select("id,user_book_id").eq("teacher_id", currentUser.id).eq("book_id", loadedStudentBook.book_id).maybeSingle();
+      if (supportError) throw supportError;
+      setTeacherBook(existingSupport);
     } catch (error: any) {
       console.error("Error loading Student Book Workspace:", error);
       setMessage(error?.message ?? "Could not load Student Book Workspace.");
@@ -345,6 +344,7 @@ export default function StudentBookWorkspacePage() {
             </p>
           </div>
 
+          <Link className="mb-4 inline-block rounded-xl bg-stone-900 px-4 py-2 text-sm font-bold text-white" href={`/teacher/students/${encodeURIComponent(studentId)}/books/${encodeURIComponent(userBookId)}/follow`}>Open Follow-Along with my edition</Link>
           {teacherBook ? (
             <div className="grid min-w-0 gap-4 xl:grid-cols-2">
               <div className="min-w-0">
@@ -374,7 +374,7 @@ export default function StudentBookWorkspacePage() {
             </div>
           ) : (
             <div className="rounded-2xl border border-stone-200 bg-white p-5 text-sm text-stone-600">
-              Teacher Follow-Along support could not be prepared for this book.
+              Choose your teaching edition above to open Follow-Along. Opening this workspace does not add a copy to your Library.
             </div>
           )}
         </section>

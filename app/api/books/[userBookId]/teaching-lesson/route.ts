@@ -1,3 +1,4 @@
+import { loadTeachingEdition, validateTeachingSourceContext } from "@/lib/teacher/teachingSource";
 import { validateStudentToolContext, StudentContextError } from "@/lib/teacher/studentToolContext";
 import { loadContextualWordTargets } from "@/lib/teacher/contextualWordTargets";
 import { NextResponse } from "next/server";
@@ -52,18 +53,6 @@ type LessonBookRow = {
     | null;
 };
 
-type ChapterSuggestion = {
-  key: string;
-  chapterNumber: number | null;
-  chapterName: string | null;
-  label: string;
-  pageSummary: string;
-  firstPage: number | null;
-  lastPage: number | null;
-  entryCount: number;
-  pages: number[];
-};
-
 function isSuperTeacherFlag(value: unknown) {
   return value === true || value === "true";
 }
@@ -71,7 +60,6 @@ function isSuperTeacherFlag(value: unknown) {
 function isTeachingRole(profile: ProfileRow | null) {
   return (
     profile?.role === "teacher" ||
-    profile?.role === "admin" ||
     profile?.role === "super_teacher" ||
     isSuperTeacherFlag(profile?.is_super_teacher)
   );
@@ -80,97 +68,6 @@ function isTeachingRole(profile: ProfileRow | null) {
 function firstRow<T>(value: T | T[] | null | undefined) {
   if (Array.isArray(value)) return value[0] ?? null;
   return value ?? null;
-}
-
-function normalizeChapterName(value: string | null | undefined) {
-  return String(value ?? "").trim().replace(/\s+/g, " ");
-}
-
-function suggestionLabel(chapterNumber: number | null, chapterName: string | null) {
-  if (chapterNumber != null && chapterName) return `Chapter ${chapterNumber} · ${chapterName}`;
-  if (chapterNumber != null) return `Chapter ${chapterNumber}`;
-  return chapterName ?? "Chapter";
-}
-
-function pageSummaryForPages(pages: number[]) {
-  if (pages.length === 0) return "No saved page";
-  if (pages.length <= 4) return `Pages ${pages.join(", ")}`;
-  return `Pages ${pages[0]}-${pages[pages.length - 1]}`;
-}
-
-async function loadTeacherChapterSuggestions(sourceUserBookId: string): Promise<ChapterSuggestion[]> {
-  const { data, error } = await supabaseAdmin
-    .from("user_book_words")
-    .select("id, chapter_number, chapter_name, page_number, created_at")
-    .eq("user_book_id", sourceUserBookId)
-    .eq("hidden", false)
-    .order("chapter_number", { ascending: true, nullsFirst: false })
-    .order("page_number", { ascending: true, nullsFirst: false })
-    .order("created_at", { ascending: true });
-
-  if (error) throw error;
-
-  const grouped = new Map<
-    string,
-    {
-      chapterNumber: number | null;
-      chapterName: string | null;
-      pages: Set<number>;
-      entryCount: number;
-    }
-  >();
-
-  for (const row of data ?? []) {
-    const chapterNumber =
-      row.chapter_number == null || !Number.isFinite(Number(row.chapter_number))
-        ? null
-        : Number(row.chapter_number);
-    const chapterName = normalizeChapterName(row.chapter_name) || null;
-    if (chapterNumber == null && !chapterName) continue;
-
-    const key = `${chapterNumber ?? "null"}||${normalizeChapterName(chapterName).toLowerCase()}`;
-    const existing =
-      grouped.get(key) ??
-      {
-        chapterNumber,
-        chapterName,
-        pages: new Set<number>(),
-        entryCount: 0,
-      };
-
-    if (row.page_number != null && Number.isFinite(Number(row.page_number))) {
-      existing.pages.add(Number(row.page_number));
-    }
-    existing.entryCount += 1;
-    grouped.set(key, existing);
-  }
-
-  return Array.from(grouped.entries())
-    .map(([key, suggestion]) => {
-      const pages = Array.from(suggestion.pages).sort((a, b) => a - b);
-      return {
-        key,
-        chapterNumber: suggestion.chapterNumber,
-        chapterName: suggestion.chapterName,
-        label: suggestionLabel(suggestion.chapterNumber, suggestion.chapterName),
-        pageSummary: pageSummaryForPages(pages),
-        firstPage: pages[0] ?? null,
-        lastPage: pages[pages.length - 1] ?? null,
-        entryCount: suggestion.entryCount,
-        pages,
-      };
-    })
-    .sort((a, b) => {
-      const aChapter = a.chapterNumber ?? Number.MAX_SAFE_INTEGER;
-      const bChapter = b.chapterNumber ?? Number.MAX_SAFE_INTEGER;
-      if (aChapter !== bChapter) return aChapter - bChapter;
-
-      const aPage = a.firstPage ?? Number.MAX_SAFE_INTEGER;
-      const bPage = b.firstPage ?? Number.MAX_SAFE_INTEGER;
-      if (aPage !== bPage) return aPage - bPage;
-
-      return a.label.localeCompare(b.label);
-    });
 }
 
 async function getAuthenticatedUser(req: Request) {
@@ -194,75 +91,6 @@ async function loadActiveStudentIds(teacherId: string) {
 
   if (error) throw error;
   return new Set((data ?? []).map((row: any) => row.student_id as string));
-}
-
-async function ensureTeacherBookRelationship({
-  teacherId,
-  bookId,
-  userBookId,
-}: {
-  teacherId: string;
-  bookId: string;
-  userBookId: string;
-}) {
-  const { data: existingRows, error: existingError } = await supabaseAdmin
-    .from("teacher_books")
-    .select("id, user_book_id")
-    .eq("teacher_id", teacherId)
-    .eq("book_id", bookId)
-    .order("created_at", { ascending: true });
-
-  if (existingError) throw existingError;
-
-  const rows = existingRows ?? [];
-  if (rows.length > 1) {
-    throw new Error("Multiple Teacher Book records match this book.");
-  }
-
-  const existing = rows[0];
-  if (existing?.id) {
-    if (!existing.user_book_id) {
-      const { error: updateError } = await supabaseAdmin
-        .from("teacher_books")
-        .update({ user_book_id: userBookId })
-        .eq("id", existing.id);
-
-      if (updateError) throw updateError;
-    }
-
-    if (existing.user_book_id && existing.user_book_id !== userBookId) {
-      throw new Error("This Teacher Book is linked to a different Book Hub.");
-    }
-
-    return existing.id as string;
-  }
-
-  const { data: inserted, error: insertError } = await supabaseAdmin
-    .from("teacher_books")
-    .insert({
-      teacher_id: teacherId,
-      book_id: bookId,
-      user_book_id: userBookId,
-    })
-    .select("id")
-    .single();
-
-  if (insertError) {
-    if (insertError.code !== "23505") throw insertError;
-
-    const { data: raced, error: racedError } = await supabaseAdmin
-      .from("teacher_books")
-      .select("id, user_book_id")
-      .eq("teacher_id", teacherId)
-      .eq("book_id", bookId)
-      .maybeSingle();
-
-    if (racedError) throw racedError;
-    if (!raced?.id) throw insertError;
-    return raced.id as string;
-  }
-
-  return inserted.id as string;
 }
 
 export async function GET(
@@ -302,11 +130,14 @@ export async function GET(
       return NextResponse.json({ error: "Teacher access is required." }, { status: 403 });
     }
 
-    const teacherBookId = await ensureTeacherBookRelationship({
-      teacherId: auth.user.id,
-      bookId: loadedSourceBook.book_id,
-      userBookId,
-    });
+    // Navigation never creates or repairs a Teacher Book relationship.
+    const { data: teacherBooks, error: teacherBooksError } = await supabaseAdmin.from("teacher_books")
+      .select("id,user_book_id").eq("teacher_id", auth.user.id).eq("book_id", loadedSourceBook.book_id);
+    if (teacherBooksError) throw teacherBooksError;
+    if ((teacherBooks?.length ?? 0) > 1) throw new Error("Multiple Teacher Books match this edition.");
+    const candidateTeacherBook = teacherBooks?.[0];
+    const teacherBookId = !candidateTeacherBook?.user_book_id || candidateTeacherBook.user_book_id === userBookId
+      ? candidateTeacherBook?.id ?? null : null;
 
     const [activeStudentIds, lessonRowsResult] = await Promise.all([
       loadActiveStudentIds(auth.user.id),
@@ -374,7 +205,7 @@ export async function GET(
       // Legacy URLs carry only the exact copy; derive its owner, never a remembered selection.
       const owner = await supabaseAdmin.from("user_books").select("user_id").eq("id", selectedStudentUserBookId).maybeSingle();
       if (owner.error) throw owner.error;
-      lockedTarget = await validateStudentToolContext(supabaseAdmin, auth.user.id, { studentId: selectedStudentId ?? owner.data?.user_id ?? "", userBookId: selectedStudentUserBookId, sourceUserBookId: userBookId });
+      lockedTarget = await (isSaveWords ? validateStudentToolContext : validateTeachingSourceContext)(supabaseAdmin, auth.user.id, { studentId: selectedStudentId ?? owner.data?.user_id ?? "", userBookId: selectedStudentUserBookId, sourceUserBookId: userBookId });
     }
     const saveWordTargets = isSaveWords
       ? await loadContextualWordTargets(supabaseAdmin, loadedSourceBook.book_id, profile as ProfileRow, activeStudentIds)
@@ -414,7 +245,8 @@ export async function GET(
       );
     }
 
-    const chapterSuggestions = students.length ? await loadTeacherChapterSuggestions(userBookId) : [];
+    const sourceEdition = await loadTeachingEdition(supabaseAdmin, loadedSourceBook.book_id);
+    const targetEdition = lockedTarget ? await loadTeachingEdition(supabaseAdmin, lockedTarget.bookId) : null;
     const book = firstRow(loadedSourceBook.books);
     return NextResponse.json({
       teacherBookId,
@@ -426,7 +258,7 @@ export async function GET(
       },
       students,
       ...(isSaveWords ? { saveWordTargets } : {}),
-      chapterSuggestions,
+      sourceEdition, targetEdition,
     });
   } catch (error: any) {
     console.error("Teaching lesson context error:", error);

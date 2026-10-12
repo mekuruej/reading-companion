@@ -1,3 +1,4 @@
+import TeacherAttentionBadge from "@/components/TeacherAttentionBadge";
 import Link from "next/link";
 
 type TeacherHubCard = {
@@ -9,9 +10,10 @@ type TeacherHubCard = {
 
 type TeacherHubCardGridProps = {
   cards: TeacherHubCard[];
+  attentionCount?: number;
 };
 
-export function TeacherHubCardGrid({ cards }: TeacherHubCardGridProps) {
+export function TeacherHubCardGrid({ cards, attentionCount = 0 }: TeacherHubCardGridProps) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {cards.map((card) => (
@@ -22,7 +24,7 @@ export function TeacherHubCardGrid({ cards }: TeacherHubCardGridProps) {
             </p>
 
             <h2 className="mt-3 text-xl font-black text-stone-900">
-              {card.title}
+              {card.title}{card.href === "/teacher/students" ? <TeacherAttentionBadge count={attentionCount} /> : null}
             </h2>
 
             <p className="mt-3 text-sm leading-6 text-stone-600">

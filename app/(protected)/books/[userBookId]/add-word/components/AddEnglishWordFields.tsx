@@ -1,3 +1,4 @@
+import WordFieldGuide from "@/components/vocabulary/WordFieldGuide";
 import WordPositionField from "@/components/vocabulary/WordPositionField";
 import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
 import ChapterNameCombobox from "@/components/ChapterNameCombobox";
@@ -80,6 +81,7 @@ export default function AddEnglishWordFields({
           placeholder="bring oneself to do"
           className="min-h-[72px] w-full rounded border bg-white px-3 py-2 text-sm"
         />
+        <WordFieldGuide field="word" />
       </label>
 
       <label className="block">
@@ -92,6 +94,7 @@ export default function AddEnglishWordFields({
           placeholder="思い切って〜する / 〜する気になる"
           className="min-h-[96px] w-full rounded border bg-white px-3 py-2 text-sm"
         />
+        <WordFieldGuide field="meaning" />
       </label>
 
       <div className="grid gap-3 sm:grid-cols-3">

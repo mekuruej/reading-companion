@@ -31,13 +31,13 @@ test('Follow-Along overrides spelling without mutating flashcard surface or mean
 test('teacher-only form controls; optional note available to readers and safe normalization',()=>{
  const render=teacher=>renderToStaticMarkup(React.createElement(Fields,{value:sample,onChange(){},teacher}));
  assert.ok(render(true).includes('Form in the book'));assert.ok(!render(false).includes('Form in the book'));assert.ok(render(false).includes('Optional context'));
- assert.deepEqual(wordContextPayload({book_form:'  ',book_form_description:3,follow_along_support_note:' note '}),{book_form:null,book_form_description:null,follow_along_support_note:'note'});
+ assert.deepEqual(wordContextPayload({book_form:'  ',book_form_description:3,follow_along_support_note:' note '}),{alternative_surface:null,book_form:null,book_form_description:null,follow_along_support_note:'note'});
 });
 test('shared teacher vocabulary reload keeps form and note separate from flashcard spelling',async()=>{
  const row={id:'teacher-word',surface:sample.surface,reading:sample.reading,meaning:sample.meaning,...wordContextPayload(sample),alternative_surface:'ふくらませる',included_in_follow_along:true};
- const client={from(table){assert.equal(table,'teacher_book_vocabulary');return {select(){return this},eq(){return Promise.resolve({data:[{...row}]})}}}};
+ const client={from(table){assert.equal(table,'finalized_teacher_book_vocabulary');return {select(){return this},eq(){return Promise.resolve({data:[{...row}]})}}}};
  const [word]=await vocabulary.loadSharedTeacherVocabulary(client,{teacherBookId:'book',personalUserBookId:null,linkedUserBookId:null});
- assert.equal(word.surface,'ふくらませる');assert.equal(followAlongSurface(word),'膨らませて');assert.equal(word.followAlongSupportNote,sample.follow_along_support_note);assert.equal(word.meaning,'inflate');
+ assert.equal(word.surface,sample.surface);assert.equal(followAlongSurface(word),'膨らませて');assert.equal(word.followAlongSupportNote,sample.follow_along_support_note);assert.equal(word.meaning,'inflate');
 });
 test('migration is repeatable and context survives PostgreSQL reload without changing primary word', {skip:!process.env.PGLITE_MODULE},async()=>{
  const {PGlite}=await import(process.env.PGLITE_MODULE);const db=new PGlite();try{
@@ -65,6 +65,7 @@ new Function('require','module','exports',ts.transpileModule(fs.readFileSync(les
  if(name.includes('StoryNotesExperience'))return {default:StubJournal,__esModule:true};
  if(name.includes('WordTimerExperience'))return {CuriosityReadingExperience:StubCapture};
  if(name.includes('BookProgressProvider'))return {BookProgressProvider:StubProgress};
+ if(name.includes('BookEditionLine'))return {default:()=>null,__esModule:true};
  if(name.includes('TeacherFollowAlongPanel'))return {TeacherFollowAlongPanel:StubFollow};
  if(name.includes('LiveLessonQuickAddPanel'))return {default:StubLive,__esModule:true};
  if(name.includes('supabaseClient'))return {supabase:{}};
@@ -99,7 +100,7 @@ for(const students of [[studentA],[studentA,studentB]])test(`${students.length} 
  const provider=nodes(tree).find(n=>n.type===StubProgress);assert.equal(provider.props.userBookId,selected.studentUserBookId);assert.equal(provider.key,selected.studentUserBookId);
  lesson(students,'follow',`studentUserBookId=${selected.studentUserBookId}`);tree=renderLesson();
  const live=nodes(tree).find(n=>n.type===StubLive);assert.equal(live.props.userBookId,selected.studentUserBookId);assert.equal(live.props.sourceUserBookId,'own-book');
- assert.equal(nodes(tree).find(n=>n.type===StubFollow).props.teacherBookId,'teacher-book');assert.ok(!nodes(tree).some(n=>n.type===StubCapture));
+ assert.equal(nodes(tree).find(n=>n.type===StubFollow).props.sourceUserBookId,'own-book');assert.ok(!('chapterSuggestions' in nodes(tree).find(n=>n.type===StubLive).props));assert.equal(nodes(tree).find(n=>n.type===StubFollow).props.teacherBookId,'teacher-book');assert.ok(!nodes(tree).some(n=>n.type===StubCapture));
  assert.ok(!nodes(tree).some(n=>n.type==='select'));assert.ok(label(tree).includes(selected.studentName));
  lesson(students,'journal',`studentUserBookId=${selected.studentUserBookId}`);tree=renderLesson();assert.ok(!nodes(tree).some(n=>n.type==='select'));assert.ok(nodes(tree).some(n=>n.type===StubJournal));
 });
@@ -135,7 +136,7 @@ test('Follow-Along Quick Add accepts an authorized trial target without a lesson
  assert.ok(!nodes(tree).some(n=>n.type==='select'));assert.ok(label(tree).includes('Trial Reader'));
  const quick=nodes(tree).find(n=>n.type===StubLive);
  assert.equal(quick.props.studentId,'trial-user');assert.equal(quick.props.userBookId,'trial-copy');
- assert.equal(nodes(tree).find(n=>n.type===StubFollow).props.teacherBookId,'teacher-book');
+ assert.equal(nodes(tree).find(n=>n.type===StubFollow).props.sourceUserBookId,'own-book');assert.ok(!('chapterSuggestions' in nodes(tree).find(n=>n.type===StubLive).props));assert.equal(nodes(tree).find(n=>n.type===StubFollow).props.teacherBookId,'teacher-book');
 });
 
 for (const selected of [studentB, studentA, studentB, studentA]) test(`locked context ${selected.studentId}: both capture tools ignore other loaded students`, () => {

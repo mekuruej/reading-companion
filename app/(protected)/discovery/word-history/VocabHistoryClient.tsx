@@ -298,7 +298,7 @@ export default function VocabHistoryClient() {
             }));
         } else {
           const { data, error } = await supabase
-            .from("user_book_words")
+            .from("finalized_user_book_words")
             .select(
               `
               surface,
@@ -462,7 +462,7 @@ export default function VocabHistoryClient() {
       }
 
       const { data: seen, error: seenError } = await supabase
-        .from("user_book_words")
+        .from("finalized_user_book_words")
         .select(
           `
           id,

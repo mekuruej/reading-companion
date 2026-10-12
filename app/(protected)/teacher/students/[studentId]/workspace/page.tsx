@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshTeacherAttention } from "@/lib/teacher/useTeacherAttention";
 import BookEditionLine from "@/components/books/BookEditionLine";
 import type { EditionDisplayFields } from "@/lib/books/editionDisplay";
 
@@ -25,6 +26,7 @@ type StudentProfile = {
 };
 
 type LessonBook = {
+  checkpoint?: { label: string; note: string | null } | null;
   id: string;
   userBookId: string;
   addedAt: string | null;
@@ -359,6 +361,7 @@ export default function StudentWorkspacePage() {
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error ?? "Could not update complimentary access.");
+      refreshTeacherAttention();
       await loadWorkspace();
       setComplimentaryAccessMessage(action === "grant" ? "Complimentary access saved." : "Complimentary access removed.");
     } catch (error) {
@@ -437,6 +440,12 @@ export default function StudentWorkspacePage() {
     if (!studentId) return;
     void loadWorkspace();
   }, [studentId]);
+
+  useEffect(() => {
+    if (!loading && data && window.location.hash === "#needs-attention") {
+      document.getElementById("needs-attention")?.scrollIntoView();
+    }
+  }, [loading, data]);
 
   useEffect(() => {
     setTaskLearnerId(studentId);
@@ -518,6 +527,7 @@ export default function StudentWorkspacePage() {
         router.push("/teacher/students");
         return;
       }
+      refreshTeacherAttention();
       await loadWorkspace();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not update this relationship.");
@@ -531,6 +541,7 @@ export default function StudentWorkspacePage() {
     setMessage("");
     try {
       await apiFetch("PATCH", { studentId, action: "make-student" });
+      refreshTeacherAttention();
       await loadWorkspace();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not create the student relationship.");
@@ -555,6 +566,7 @@ export default function StudentWorkspacePage() {
         userBookId: book.userBookId,
         action: "remove",
       });
+      refreshTeacherAttention();
       await loadWorkspace();
     } catch (error: any) {
       console.error("Error removing lesson book:", error);
@@ -570,6 +582,7 @@ export default function StudentWorkspacePage() {
     setMessage("");
     try {
       await apiFetch("POST", { studentId, userBookId: selectedEligibleBookId });
+      refreshTeacherAttention();
       await loadWorkspace();
       setMessage("Book connected to this workspace.");
     } catch (error) {
@@ -1036,6 +1049,7 @@ export default function StudentWorkspacePage() {
                         <p className="mt-1 truncate text-sm text-stone-600">{lessonBook.book.author}</p>
                       ) : null}
                       <BookEditionLine book={lessonBook.book.edition} />
+                      {lessonBook.checkpoint ? <p className="mt-1 text-sm text-amber-900">Stopped at: {lessonBook.checkpoint.label || "saved note"}{lessonBook.checkpoint.note ? ` · ${lessonBook.checkpoint.note}` : ""}</p> : null}
                       <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
                         <span className="rounded-full bg-white px-2.5 py-1 text-stone-600">
                           {lessonBook.book.statusLabel}
@@ -1056,7 +1070,7 @@ export default function StudentWorkspacePage() {
                     <Link
                       href={`/teacher/students/${encodeURIComponent(
                         studentId
-                      )}/books/${encodedUserBookId}/workspace#student-lesson-follow-along`}
+                      )}/books/${encodedUserBookId}/follow`}
                       className="rounded-xl bg-stone-900 px-3 py-2 text-center text-sm font-bold text-white hover:bg-stone-800"
                     >
                       Follow-Along
@@ -1137,9 +1151,9 @@ export default function StudentWorkspacePage() {
           )}
         </section>
 
-        <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+        <section id="needs-attention" className="scroll-mt-24 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-black text-stone-950">Needs Attention</h2>
-          <p className="mt-1 text-sm text-stone-500">Unfinished Live Lesson word reviews.</p>
+          <p className="mt-1 text-sm text-stone-500">Unfinished Live Lesson reviews and pending book requests.</p>
 
           <div className="mt-4 space-y-3">
             {data.needsAttention.map((session) => (
@@ -1159,15 +1173,51 @@ export default function StudentWorkspacePage() {
                   )}/lesson-add?sessionId=${encodeURIComponent(session.id)}&${workspaceContext(studentId)}`}
                   className="rounded-xl bg-amber-700 px-4 py-2 text-center text-sm font-bold text-white hover:bg-amber-800"
                 >
-                  Resume Review
+                  Review captured words
                 </Link>
               </article>
             ))}
           </div>
 
-          {data.needsAttention.length === 0 ? (
+          <div className="mt-3 space-y-3">
+            {data.bookRequests.map((request) => {
+              const displayTitle =
+                String(request.title ?? "").trim() ||
+                String(request.asin ?? "").trim() ||
+                String(request.isbn13 ?? "").trim() ||
+                "Untitled book request";
+
+              return (
+                <article
+                  key={request.id}
+                  className="flex flex-col gap-3 rounded-xl border border-sky-200 bg-sky-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-black text-stone-950">{displayTitle}</p>
+                    <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-sky-800">
+                      Book request · {request.status || "pending"} · {formatDate(request.createdAt)}
+                    </p>
+                    <p className="mt-1 text-xs text-stone-600">
+                      {request.author ? `Author: ${request.author}` : "Author: —"}
+                      {request.isbn13 ? ` · ISBN: ${request.isbn13}` : ""}
+                      {request.asin ? ` · ASIN: ${request.asin}` : ""}
+                    </p>
+                  </div>
+                  <Link
+                    href={`/teacher/books/add?requestId=${encodeURIComponent(request.id)}&from=student-workspace`}
+                    className="rounded-xl bg-sky-700 px-4 py-2 text-center text-sm font-bold text-white hover:bg-sky-800"
+                  >
+                    Open in Catalog Editor
+                  </Link>
+                </article>
+              );
+            })}
+
+          </div>
+
+          {data.needsAttention.length === 0 && data.bookRequests.length === 0 ? (
             <p className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-600">
-              No unfinished Quick Add reviews right now.
+              No unfinished reviews or pending book requests.
             </p>
           ) : null}
         </section>
@@ -1238,39 +1288,6 @@ export default function StudentWorkspacePage() {
         <details className="rounded-2xl border border-stone-200 bg-white p-4 text-sm">
           <summary className="cursor-pointer font-semibold text-stone-700">Other student follow-up</summary>
           <div className="mt-3 space-y-3">
-            {data.bookRequests.map((request) => {
-              const displayTitle =
-                String(request.title ?? "").trim() ||
-                String(request.asin ?? "").trim() ||
-                String(request.isbn13 ?? "").trim() ||
-                "Untitled book request";
-
-              return (
-                <article
-                  key={request.id}
-                  className="flex flex-col gap-3 rounded-xl border border-sky-200 bg-sky-50 p-4 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-black text-stone-950">{displayTitle}</p>
-                    <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-sky-800">
-                      Book request · {request.status || "pending"} · {formatDate(request.createdAt)}
-                    </p>
-                    <p className="mt-1 text-xs text-stone-600">
-                      {request.author ? `Author: ${request.author}` : "Author: —"}
-                      {request.isbn13 ? ` · ISBN: ${request.isbn13}` : ""}
-                      {request.asin ? ` · ASIN: ${request.asin}` : ""}
-                    </p>
-                  </div>
-                  <Link
-                    href={`/teacher/books/add?requestId=${encodeURIComponent(request.id)}&from=student-workspace`}
-                    className="rounded-xl bg-sky-700 px-4 py-2 text-center text-sm font-bold text-white hover:bg-sky-800"
-                  >
-                    Open in Catalog Editor
-                  </Link>
-                </article>
-              );
-            })}
-
             {data.ratingFollowUps.map((item) => (
               <article
                 key={item.id}
@@ -1292,8 +1309,8 @@ export default function StudentWorkspacePage() {
             ))}
           </div>
 
-          {data.bookRequests.length === 0 && data.ratingFollowUps.length === 0 ? (
-            <p className="mt-3 text-xs text-stone-500">No pending requests or rating follow-up.</p>
+          {data.ratingFollowUps.length === 0 ? (
+            <p className="mt-3 text-xs text-stone-500">No rating follow-up.</p>
           ) : null}
         </details>
 

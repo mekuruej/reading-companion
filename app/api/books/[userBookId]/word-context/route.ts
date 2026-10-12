@@ -121,12 +121,12 @@ export async function POST(
     const [{ count: repeatCount, error: repeatError }, { data: seen, error: seenError }] =
       await Promise.all([
         supabaseAdmin
-          .from("user_book_words")
+          .from("finalized_user_book_words")
           .select("id", { count: "exact", head: true })
           .eq("user_book_id", userBookId)
           .eq("surface", surface),
         supabaseAdmin
-          .from("user_book_words")
+          .from("finalized_user_book_words")
           .select(
             `
             id,

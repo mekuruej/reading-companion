@@ -607,7 +607,7 @@ function ReadAlongContent() {
             }
 
             const { data, error } = await supabase
-                .from("user_book_words")
+                .from("finalized_user_book_words")
                 .select(`
                     id,
                     surface,
@@ -619,7 +619,7 @@ function ReadAlongContent() {
                     page_order,
                     chapter_number,
                     chapter_name,
-                    hide_kanji_in_reading_support, book_form, book_form_description, follow_along_support_note
+                    hide_kanji_in_reading_support, alternative_surface, book_form, book_form_description, follow_along_support_note
                     `)
                 .eq("user_book_id", userBookId)
                 .eq("hidden", false)

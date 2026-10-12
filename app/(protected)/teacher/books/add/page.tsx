@@ -2,6 +2,8 @@
 
 "use client";
 
+import BookWorkMaintenance from "./components/BookWorkMaintenance";
+import { refreshTeacherAttention } from "@/lib/teacher/useTeacherAttention";
 import EditionCoreFields from "@/components/books/EditionCoreFields";
 import { missingCoreBookFields } from "@/lib/books/bookMetadata";
 import { normalizeBookLanguageCode } from "@/lib/books/bookLanguage";
@@ -789,6 +791,7 @@ export default function TeacherAddBookPage() {
                     .update({ status: "reviewed" })
                     .eq("id", bookRequest.id);
 
+                if (!requestUpdateError) refreshTeacherAttention();
                 if (requestUpdateError) {
                     console.warn("Could not mark book request as reviewed:", requestUpdateError);
                 }
@@ -821,6 +824,7 @@ export default function TeacherAddBookPage() {
 
         try {
             await rejectBookRequestWithSession(bookRequest.id);
+            refreshTeacherAttention();
             setMessage("Book request marked as rejected.");
             router.replace("/teacher/books");
         } catch (error: any) {
@@ -1237,6 +1241,8 @@ export default function TeacherAddBookPage() {
 
                 </TeacherBookInfoSection>
             ) : null}
+
+            {currentBookId && currentBook ? <BookWorkMaintenance key={currentBookId} bookId={currentBookId} /> : null}
 
             <TeacherBookAddMessageBanner message={message} tone={messageTone(message)} />
         </TeacherBookAddPageShell>

@@ -11,6 +11,7 @@ export default function LiveLessonAddWordPage() {
 
   return (
     <LiveLessonQuickAddPanel
+      key={`${studentId}:${userBookId}:${searchParams.get("sourceUserBookId") ?? ""}:${searchParams.get("sessionId") ?? ""}`}
       studentId={studentId}
       userBookId={userBookId}
       requestedSessionId={searchParams.get("sessionId") ?? ""}

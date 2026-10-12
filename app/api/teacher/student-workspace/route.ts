@@ -1,3 +1,5 @@
+import { readStoppingPoint, stoppingPointLabel } from "@/lib/teacher/stoppingPoint";
+import { REVIEW_ATTENTION_STATUSES, PENDING_BOOK_REQUEST_FILTER } from "@/lib/teacher/attention";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -378,6 +380,23 @@ export async function GET(request: Request) {
       .filter(Boolean) as string[];
     const readingSummaries = await loadReadingSummaries(activeUserBookIds);
 
+    // Latest saved checkpoint stays scoped to this teacher, student, and exact active copy.
+    const checkpoints = new Map<string, { label: string; note: string | null }>();
+    if (activeUserBookIds.length) {
+      for (let offset = 0; ; offset += 500) {
+        const result = await supabaseAdmin.from("live_lesson_capture_sessions")
+          .select("user_book_id,stopping_value,stopping_unit,stopping_page_number,stopping_text,stopping_point_saved_at")
+          .eq("teacher_id", auth.user.id).eq("student_id", studentId).in("user_book_id", activeUserBookIds)
+          .neq("status", "cancelled").not("stopping_point_saved_at", "is", null)
+          .order("stopping_point_saved_at", { ascending: false }).order("id").range(offset, offset + 499);
+        if (result.error) throw result.error;
+        for (const row of result.data ?? []) if (!checkpoints.has(row.user_book_id)) {
+          checkpoints.set(row.user_book_id, { label: stoppingPointLabel(readStoppingPoint(row)), note: row.stopping_text });
+        }
+        if (!result.data || result.data.length < 500) break;
+      }
+    }
+
     const activeLessonBooks = ((lessonRows ?? []) as any[]).map((row) => ({
       id: row.id,
       userBookId: row.user_book_id,
@@ -386,6 +405,7 @@ export async function GET(request: Request) {
       removedAt: row.removed_at,
       updatedAt: row.updated_at,
       book: normalizeUserBook(row, readingSummaries.get(row.user_book_id)),
+      checkpoint: checkpoints.get(row.user_book_id) ?? null,
     }));
 
     const { data: libraryRows, error: libraryError } = await supabaseAdmin
@@ -473,7 +493,7 @@ export async function GET(request: Request) {
       )
       .eq("teacher_id", auth.user.id)
       .eq("student_id", studentId)
-      .in("status", ["reviewing", "deferred"])
+      .in("status", REVIEW_ATTENTION_STATUSES)
       .order("updated_at", { ascending: false });
 
     if (sessionsError) throw sessionsError;
@@ -529,7 +549,7 @@ export async function GET(request: Request) {
       `
       )
       .eq("user_id", studentId)
-      .or("status.eq.pending,status.is.null")
+      .or(PENDING_BOOK_REQUEST_FILTER)
       .order("created_at", { ascending: false });
 
     if (bookRequestsError) throw bookRequestsError;

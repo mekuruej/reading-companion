@@ -24,7 +24,7 @@ export default function AddWordQuickSearchForm({
       className="space-y-1"
     >
       <label className="block text-sm font-medium text-stone-700">
-        Rapid search
+        Main word
       </label>
 
       <p className="text-xs text-stone-500">

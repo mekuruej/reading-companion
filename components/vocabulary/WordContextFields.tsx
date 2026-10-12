@@ -1,3 +1,4 @@
+import WordFieldGuide from "@/components/vocabulary/WordFieldGuide";
 import { BOOK_FORM_DESCRIPTIONS, type WordContext } from "@/lib/vocabulary/wordContext";
 
 export default function WordContextFields({ value, onChange, teacher = false }: {
@@ -9,6 +10,7 @@ export default function WordContextFields({ value, onChange, teacher = false }: 
       {teacher ? <>
         <label className="min-w-0 text-xs font-medium text-stone-600">Form in the book
           <input className={inputClass} value={value.book_form ?? ""} onChange={e => onChange({ ...value, book_form: e.target.value })} placeholder="Optional" />
+          <WordFieldGuide field="bookForm" />
         </label>
         <label className="min-w-0 text-xs font-medium text-stone-600">Form description
           <select className={inputClass} value={value.book_form_description ?? ""} onChange={e => onChange({ ...value, book_form_description: e.target.value })}>

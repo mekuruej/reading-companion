@@ -1,4 +1,5 @@
 export type WordContext = {
+  alternative_surface?: string | null;
   book_form?: string | null;
   book_form_description?: string | null;
   follow_along_support_note?: string | null;
@@ -8,6 +9,7 @@ export function wordContextPayload(input: object): WordContext {
   const value = input as WordContext;
   const clean = (entry: unknown) => typeof entry === "string" ? entry.trim() || null : null;
   return {
+    alternative_surface: clean(value.alternative_surface),
     book_form: clean(value.book_form),
     book_form_description: clean(value.book_form_description),
     follow_along_support_note: clean(value.follow_along_support_note),

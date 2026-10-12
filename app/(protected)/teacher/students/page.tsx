@@ -1,5 +1,7 @@
 "use client";
 
+import TeacherAttentionBadge from "@/components/TeacherAttentionBadge";
+import { useTeacherAttention, refreshTeacherAttention } from "@/lib/teacher/useTeacherAttention";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -39,6 +41,7 @@ function formatLastEngaged(value: string | null) {
 
 export default function TeacherStudentsPage() {
   const searchParams = useSearchParams();
+  const attention = useTeacherAttention();
   const backLink = getTeacherBackLink(searchParams.get("from"));
   const [category, setCategory] = useState<StudentsCategory>("current");
   const [search, setSearch] = useState("");
@@ -110,9 +113,12 @@ export default function TeacherStudentsPage() {
       if (error) throw error;
       if (!changed?.length) throw new Error("This relationship could not be restored. Refresh and try again.");
       setRevision(value => value + 1);
+      refreshTeacherAttention();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not restore this relationship.");
-    } finally { setRestoring(null); }
+    } finally {
+      setRestoring(null);
+    }
   }
 
   return (
@@ -173,7 +179,7 @@ export default function TeacherStudentsPage() {
                       <div className="flex min-w-0 flex-1 items-start gap-3">
                         <div aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-lg font-bold text-stone-500">{name.charAt(0).toUpperCase()}</div>
                         <div className="min-w-0 flex-1">
-                          <h3 className="break-words font-bold text-stone-900">{name}</h3>
+                          <h3 className="break-words font-bold text-stone-900">{name}{(attention.byStudent[student.id] ?? 0) > 0 ? <Link href={`${workspace}#needs-attention`}><TeacherAttentionBadge count={attention.byStudent[student.id]} /></Link> : null}</h3>
                           {student.username ? <p className="break-words text-xs text-stone-500">@{student.username}</p> : null}
                           <div className="mt-1 flex flex-wrap gap-1 text-xs text-stone-600">
                             {globalSearch ? <span className={`rounded px-2 py-0.5 ${globalStatusClass}`}>{student.searchStatus ?? "Other"}</span> : <>

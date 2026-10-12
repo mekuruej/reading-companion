@@ -17,6 +17,7 @@ import JapaneseDictionaryCapture, {
 } from "@/components/vocabulary/JapaneseDictionaryCapture";
 import {
   loadSharedTeacherVocabulary,
+  loadOwnedTeachingSource,
   loadTeacherBookContext,
   saveTeacherVocabularyAndInclude,
   type SharedTeacherVocabularyWord,
@@ -333,7 +334,8 @@ function teacherSupportToFollowAlongItem(item: TeacherBookItem): TeacherFollowAl
 }
 
 type TeacherFollowAlongPanelProps = {
-  teacherBookId: string;
+  teacherBookId?: string;
+  sourceUserBookId?: string;
   refreshKey?: number;
   presentation?: "standalone" | "embedded";
   ownerTeacherId?: string;
@@ -349,7 +351,8 @@ type TeacherFollowAlongPanelProps = {
 };
 
 export function TeacherFollowAlongPanel({
-  teacherBookId,
+  teacherBookId = "",
+  sourceUserBookId,
   refreshKey = 0,
   presentation = "standalone",
   ownerTeacherId,
@@ -360,9 +363,10 @@ export function TeacherFollowAlongPanel({
   notebookUserBookId = null,
   enableNotebookWordCapture = false,
   hideHeader = false,
-  lessonDisplayOnly = false,
+  lessonDisplayOnly: requestedLessonDisplayOnly = false,
   emptyMessage,
 }: TeacherFollowAlongPanelProps) {
+  const lessonDisplayOnly = requestedLessonDisplayOnly || Boolean(sourceUserBookId);
 
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -382,7 +386,7 @@ export function TeacherFollowAlongPanel({
 
   useEffect(() => {
     void loadFollowAlong();
-  }, [teacherBookId]);
+  }, [teacherBookId, sourceUserBookId]);
 
   useEffect(() => {
     if (refreshKey > 0) void loadFollowAlong(true);
@@ -414,6 +418,25 @@ export function TeacherFollowAlongPanel({
       if (!isTeacherRole(profile)) {
         setCanAccess(false);
         setMessage("Teacher access is required.");
+        return;
+      }
+
+      if (sourceUserBookId) {
+        const reference = await loadOwnedTeachingSource(supabase, user.id, sourceUserBookId);
+        const referenceItems = reference.vocabulary.filter(shouldShowInLessonDisplay).map(sharedVocabularyToFollowAlongItem);
+        if (reference.context.teacherBookId) {
+          const { data: support, error: supportError } = await supabase.from("teacher_book_items")
+            .select("id,item_type,surface_text,reading,meaning,page_number,position_unit,position_value,percent_location,page_order,chapter_number,chapter_name,teacher_note,explanation,translation,support_url,created_at")
+            .eq("teacher_book_id", reference.context.teacherBookId).neq("item_type", "word");
+          if (supportError) throw supportError;
+          referenceItems.push(...(support ?? []).map((item: TeacherBookItem) => teacherSupportToFollowAlongItem(item)));
+        }
+        setTeacherBook({ id: reference.context.teacherBookId, teacher_id: user.id, book_id: reference.source.book_id,
+          user_book_id: sourceUserBookId, books: reference.source.books });
+        setTeacherVocabContext(reference.context);
+        setVocabularyPool(reference.vocabulary);
+        setItems(sortTeacherFollowAlongItems(referenceItems));
+        setCanAccess(true);
         return;
       }
 
@@ -466,7 +489,7 @@ export function TeacherFollowAlongPanel({
           .map(sharedVocabularyToFollowAlongItem);
       } else if (nextTeacherVocabContext.personalUserBookId) {
         const { data: wordRows, error: wordError } = await supabase
-          .from("user_book_words")
+          .from("finalized_user_book_words")
           .select(
             "id, surface, reading, meaning, jlpt, meaning_choice_index, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, created_at"
           )
@@ -487,7 +510,7 @@ export function TeacherFollowAlongPanel({
       let teachingVocabItems: TeacherFollowAlongItem[] = [];
       if (!lessonDisplayOnly) {
         const { data: teachingVocabRows, error: teachingVocabError } = await supabase
-          .from("teacher_book_vocabulary")
+          .from("finalized_teacher_book_vocabulary")
           .select(
             "id, linked_user_book_word_id, surface, reading, meaning, page_number, position_unit, position_value, percent_location, page_order, follow_along_order, chapter_number, chapter_name, follow_along_support_note, hidden_from_teaching, included_in_follow_along, origin_my_library, origin_teaching, meaning_choice_index, created_at"
           )
@@ -623,7 +646,7 @@ export function TeacherFollowAlongPanel({
     setPageIndex(0);
     setJumpPageInput("");
     setFadedThroughIndex(-1);
-  }, [teacherBookId]);
+  }, [teacherBookId, sourceUserBookId]);
 
   useEffect(() => {
     const previousLabel = previousPages.current[pageIndex]?.label;
@@ -775,7 +798,7 @@ export function TeacherFollowAlongPanel({
         <TeacherFollowAlongHeader contextLabel={contextLabel} contextDetail={contextDetail} />
       )}
 
-      {isEmbedded ? null : (
+      {isEmbedded || !teacherBookId ? null : (
         <TeacherFollowAlongBookBar teacherBookId={teacherBookId} book={book} />
       )}
 

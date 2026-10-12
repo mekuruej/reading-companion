@@ -44,7 +44,7 @@ async function canGenerateKanjiMapRows(userId: string, vocabularyCacheId: number
   if (isSuperTeacher) return { ok: true };
 
   const { data: ownedRows, error: ownedError } = await supabaseAdmin
-    .from("user_book_words")
+    .from("finalized_user_book_words")
     .select(
       `
       id,
@@ -88,7 +88,7 @@ async function canGenerateKanjiMapRows(userId: string, vocabularyCacheId: number
   }
 
   const { data: studentRows, error: studentError } = await supabaseAdmin
-    .from("user_book_words")
+    .from("finalized_user_book_words")
     .select(
       `
       id,

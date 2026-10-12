@@ -4,6 +4,12 @@
 // student's existing user_book_words rows.
 
 "use client";
+import VocabularyProgressPrompt from "@/components/books/VocabularyProgressPrompt";
+import { targetStoppingUnit, stoppingPointLabel, suggestLessonStoppingPoint, type StoppingUnit } from "@/lib/teacher/stoppingPoint";
+import { refreshTeacherAttention } from "@/lib/teacher/useTeacherAttention";
+import WordFieldGuide from "@/components/vocabulary/WordFieldGuide";
+
+import AlternativeSpellingField from "@/components/vocabulary/AlternativeSpellingField";
 import WordContextFields from "@/components/vocabulary/WordContextFields";
 import { wordContextPayload, type WordContext } from "@/lib/vocabulary/wordContext";
 
@@ -13,7 +19,6 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
 import { parseWordPosition, wordPosition, wordPositionInput, positionLabel, wordPositionText } from "@/lib/vocabulary/wordPosition";
-import { parseOptionalPageLocationInput } from "@/lib/pageLocation";
 import WordPositionField from "@/components/vocabulary/WordPositionField";
 import { TeacherFollowAlongPanel } from "../../../../../library/[teacherBookId]/follow/components/TeacherFollowAlongPanel";
 
@@ -31,6 +36,8 @@ type BookMeta = {
   cover_url: string | null;
   language_code: string | null;
   page_count: number | null;
+  kindle_location_count?: number | null;
+  edition_format?: string | null;
 };
 
 type StudentUserBook = {
@@ -129,28 +136,19 @@ type TeacherFollowAlongMatch =
 
 type LiveLessonStoppingPoint = {
   sessionId: string;
+  unit: StoppingUnit | null;
+  value: number | null;
   pageNumber: number | null;
   endingText: string | null;
   savedAt: string | null;
   status: string | null;
 };
 
-type ChapterSuggestion = {
-  key: string;
-  chapterNumber: number | null;
-  chapterName: string | null;
-  label: string;
-  pageSummary: string;
-  firstPage: number | null;
-  lastPage: number | null;
-  entryCount: number;
-  pages: number[];
-};
-
 const INITIAL_DICTIONARY_CHOICE_LIMIT = 2;
 
 type PersistedLiveLessonSession = {
   positionUnit?: ProgressTrackingMethod;
+  targetLocationVersion?: 2;
   version: 1;
   teacherId: string;
   studentId: string;
@@ -170,7 +168,6 @@ function firstBook(book: StudentUserBook["books"]) {
 
 function isSuperTeacherRole(profile: any) {
   return (
-    profile?.role === "admin" ||
     profile?.role === "super_teacher" ||
     profile?.is_super_teacher === true ||
     profile?.is_super_teacher === "true"
@@ -336,8 +333,8 @@ function readPersistedSession(
       currentPage: typeof parsed.currentPage === "string" ? parsed.currentPage : "",
       positionUnit: parsed.positionUnit,
       chapterNumber:
-        typeof parsed.chapterNumber === "string" ? parsed.chapterNumber : "",
-      chapterName: typeof parsed.chapterName === "string" ? parsed.chapterName : "",
+        parsed.targetLocationVersion === 2 && typeof parsed.chapterNumber === "string" ? parsed.chapterNumber : "",
+      chapterName: parsed.targetLocationVersion === 2 && typeof parsed.chapterName === "string" ? parsed.chapterName : "",
       startedAt:
         typeof parsed.startedAt === "number" && Number.isFinite(parsed.startedAt)
           ? parsed.startedAt
@@ -407,7 +404,6 @@ type LiveLessonQuickAddPanelProps = {
   userBookId: string;
   requestedSessionId?: string;
   sourceUserBookId?: string;
-  chapterSuggestions?: ChapterSuggestion[];
   fromStudentWorkspace?: boolean;
   embedded?: boolean;
 };
@@ -417,7 +413,6 @@ export default function LiveLessonQuickAddPanel({
   userBookId,
   requestedSessionId = "",
   sourceUserBookId = "",
-  chapterSuggestions = [],
   fromStudentWorkspace = false,
   embedded = false,
 }: LiveLessonQuickAddPanelProps) {
@@ -425,6 +420,7 @@ export default function LiveLessonQuickAddPanel({
 
   const wordInputRef = useRef<HTMLInputElement | null>(null);
   const skipNextPersistRef = useRef(false);
+  const lookupVersions = useRef<Record<string, number>>({});
 
   const [indexElevated, setIndexElevated] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -437,6 +433,7 @@ export default function LiveLessonQuickAddPanel({
   const [teacherId, setTeacherId] = useState("");
   const [student, setStudent] = useState<StudentProfile | null>(null);
   const [studentBook, setStudentBook] = useState<StudentUserBook | null>(null);
+  const checkpointUnit = targetStoppingUnit(studentBook?.progress_tracking_method, firstBook(studentBook?.books ?? null) ?? {});
   const positionUnit = studentBook?.progress_tracking_method ?? "page";
   const [bookPageCount, setBookPageCount] = useState<number | null>(null);
   const [session, setSession] = useState<LiveLessonSession | null>(null);
@@ -444,8 +441,6 @@ export default function LiveLessonQuickAddPanel({
   const [currentPage, setCurrentPage] = useState("");
   const [chapterNumber, setChapterNumber] = useState("");
   const [chapterName, setChapterName] = useState("");
-  const [chapterManuallyEdited, setChapterManuallyEdited] = useState(false);
-  const [chapterSuggestionNotice, setChapterSuggestionNotice] = useState("");
   const [capturedWords, setCapturedWords] = useState<CapturedWord[]>([]);
   const [reviewDrafts, setReviewDrafts] = useState<ReviewDraft[]>([]);
   const [startedAt, setStartedAt] = useState(() => Date.now());
@@ -471,7 +466,7 @@ export default function LiveLessonQuickAddPanel({
   const [latestStoppingPoint, setLatestStoppingPoint] =
     useState<LiveLessonStoppingPoint | null>(null);
   const [checkpointOpen, setCheckpointOpen] = useState(false);
-  const [stoppingPageDraft, setStoppingPageDraft] = useState("");
+  const [stoppingValueDraft, setStoppingValueDraft] = useState("");
   const [stoppingTextDraft, setStoppingTextDraft] = useState("");
 
   const key = teacherId ? storageKey(teacherId, studentId, userBookId) : "";
@@ -501,54 +496,10 @@ export default function LiveLessonQuickAddPanel({
   const readyCount = reviewDrafts.filter(draftReady).length;
   const canShowMyFollowAlong = teacherFollowAlongMatch.status === "found";
   const canSaveStoppingPoint =
-    stoppingPageDraft.trim() !== "" || stoppingTextDraft.trim() !== "";
-  const selectedChapterSuggestionKey = useMemo(() => {
-    const currentNumber = chapterNumber.trim();
-    const currentName = chapterName.trim();
-    const match = chapterSuggestions.find((suggestion) => {
-      const suggestionNumber =
-        suggestion.chapterNumber == null ? "" : String(suggestion.chapterNumber);
-      return suggestionNumber === currentNumber && (suggestion.chapterName ?? "") === currentName;
-    });
-    return match?.key ?? "";
-  }, [chapterName, chapterNumber, chapterSuggestions]);
-
+    stoppingValueDraft.trim() !== "" || stoppingTextDraft.trim() !== "";
   useEffect(() => {
     void loadContextAndRestore();
-  }, [studentId, userBookId, requestedSessionId]);
-
-  useEffect(() => {
-    if (chapterManuallyEdited) return;
-    if (chapterNumber.trim() || chapterName.trim()) return;
-
-    if (positionUnit !== "page") return;
-    const parsedPage = parseWordPosition(currentPage, positionUnit);
-    const pageNumber = parsedPage.value;
-    if (pageNumber == null) return;
-
-    const exactMatches = chapterSuggestions.filter((suggestion) =>
-      suggestion.pages.includes(pageNumber)
-    );
-
-    if (exactMatches.length > 1) {
-      setChapterSuggestionNotice("Multiple chapters are saved for this page. Choose one if it fits.");
-      return;
-    }
-
-    if (exactMatches.length !== 1) return;
-
-    const [suggestion] = exactMatches;
-    setChapterNumber(suggestion.chapterNumber == null ? "" : String(suggestion.chapterNumber));
-    setChapterName(suggestion.chapterName ?? "");
-    setChapterSuggestionNotice("Chapter filled from your book.");
-  }, [
-    bookPageCount,
-    chapterManuallyEdited,
-    chapterName,
-    chapterNumber,
-    chapterSuggestions,
-    currentPage,
-    positionUnit,  ]);
+  }, [studentId, userBookId, requestedSessionId, sourceUserBookId]);
 
   useEffect(() => {
     if (!key || !sessionReady || session?.status !== "capturing") return;
@@ -560,6 +511,7 @@ export default function LiveLessonQuickAddPanel({
 
     writePersistedSession(key, {
       version: 1,
+      targetLocationVersion: 2,
       teacherId,
       studentId,
       userBookId,
@@ -580,7 +532,8 @@ export default function LiveLessonQuickAddPanel({
     userBookId,
     capturedIds,
     currentPage,
-    positionUnit,    chapterNumber,
+    positionUnit,
+    chapterNumber,
     chapterName,
     startedAt,
   ]);
@@ -718,10 +671,8 @@ export default function LiveLessonQuickAddPanel({
     setShowMyFollowAlong(false);
       setLatestStoppingPoint(null);
       setCheckpointOpen(false);
-      setStoppingPageDraft("");
+      setStoppingValueDraft("");
       setStoppingTextDraft("");
-      setChapterSuggestionNotice("");
-      setChapterManuallyEdited(false);
     setTeacherFollowAlongMatch({
       status: "unchecked",
       teacherBookId: null,
@@ -766,7 +717,7 @@ export default function LiveLessonQuickAddPanel({
             author,
             cover_url,
             language_code,
-            page_count
+            page_count, kindle_location_count, edition_format
           )
         `
         )
@@ -818,14 +769,12 @@ export default function LiveLessonQuickAddPanel({
         setCurrentPage(persisted.positionUnit === (loadedStudentBook.progress_tracking_method ?? "page") ? persisted.currentPage : "");
         setChapterNumber(persisted.chapterNumber);
         setChapterName(persisted.chapterName);
-        setChapterManuallyEdited(Boolean(persisted.chapterNumber.trim() || persisted.chapterName.trim()));
         setStartedAt(persisted.startedAt);
         setRestoredOlderSession(isOlderSession(persisted.savedAt));
       } else if (persisted && !restored.session) {
         setCurrentPage(persisted.positionUnit === (loadedStudentBook.progress_tracking_method ?? "page") ? persisted.currentPage : "");
         setChapterNumber(persisted.chapterNumber);
         setChapterName(persisted.chapterName);
-        setChapterManuallyEdited(Boolean(persisted.chapterNumber.trim() || persisted.chapterName.trim()));
         setStartedAt(persisted.startedAt);
         setRestoredOlderSession(isOlderSession(persisted.savedAt));
       } else {
@@ -835,7 +784,6 @@ export default function LiveLessonQuickAddPanel({
         setCurrentPage("");
         setChapterNumber("");
         setChapterName("");
-        setChapterManuallyEdited(false);
         setStartedAt(startedValue);
       }
 
@@ -864,16 +812,6 @@ export default function LiveLessonQuickAddPanel({
     setCurrentPage(String(Math.min(positionUnit === "percent" ? 100 : Infinity, Math.max(0, (value ?? 0) + delta))));
   }
 
-  function applyChapterSuggestion(suggestionKey: string) {
-    const suggestion = chapterSuggestions.find((item) => item.key === suggestionKey);
-    if (!suggestion) return;
-
-    setChapterNumber(suggestion.chapterNumber == null ? "" : String(suggestion.chapterNumber));
-    setChapterName(suggestion.chapterName ?? "");
-    setChapterManuallyEdited(true);
-    setChapterSuggestionNotice("Chapter filled from your book.");
-    window.setTimeout(() => wordInputRef.current?.focus({ preventScroll: true }), 0);
-  }
 
   async function captureWord(event: FormEvent) {
     event.preventDefault();
@@ -975,11 +913,11 @@ export default function LiveLessonQuickAddPanel({
     }
   }
 
-  const lookupVersions = useRef<Record<string, number>>({});
-
   function updateReviewDraft(id: string, patch: Partial<ReviewDraft>) {
+    // An in-flight lookup must not overwrite edits made after it started.
+    lookupVersions.current[id] = (lookupVersions.current[id] ?? 0) + 1;
     if (patch.surface !== undefined || patch.lookup_surface !== undefined) {
-      lookupVersions.current[id] = (lookupVersions.current[id] ?? 0) + 1;
+      patch = { ...patch, meaningChoices: [], meaningChoiceIndex: null };
       setLookupChoicesById(prev => ({ ...prev, [id]: [] }));
     }
     setReviewDrafts((prev) =>
@@ -1026,7 +964,7 @@ export default function LiveLessonQuickAddPanel({
 
     setMessage("");
     setNotice("");
-    setStoppingPageDraft(positionUnit === "page" ? currentPage : "");
+    setStoppingValueDraft(suggestLessonStoppingPoint(capturedWords, checkpointUnit, firstBook(studentBook?.books ?? null) ?? {}));
     setStoppingTextDraft("");
     setCheckpointOpen(true);
   }
@@ -1035,7 +973,8 @@ export default function LiveLessonQuickAddPanel({
     action: "end-adding" | "review-later" | "finish-review",
     checkpoint?: {
       saveStoppingPoint?: boolean;
-      stoppingPageNumber?: string;
+      stoppingValue?: string;
+      stoppingUnit?: StoppingUnit | null;
       stoppingText?: string;
     }
   ) {
@@ -1084,15 +1023,6 @@ export default function LiveLessonQuickAddPanel({
       setBulkSelectedIds(nextWords.map((item) => item.id));
       if (data.latestStoppingPoint !== undefined) {
         setLatestStoppingPoint(data.latestStoppingPoint ?? null);
-      } else if (action === "end-adding" && checkpoint?.saveStoppingPoint) {
-        const cleanStoppingPage = checkpoint.stoppingPageNumber?.trim() ?? "";
-        setLatestStoppingPoint({
-          sessionId: nextSession.id,
-          pageNumber: parseOptionalPageLocationInput(cleanStoppingPage, bookPageCount).value,
-          endingText: checkpoint.stoppingText?.trim() || null,
-          savedAt: nextSession.stopping_point_saved_at,
-          status: nextSession.status,
-        });
       }
       if (action === "end-adding") {
         setCheckpointOpen(false);
@@ -1104,10 +1034,13 @@ export default function LiveLessonQuickAddPanel({
       }
 
       if (action === "end-adding") {
+        refreshTeacherAttention();
         setNotice("Adding is finished. Review the batch below.");
       } else if (action === "review-later") {
+        refreshTeacherAttention();
         setNotice("Your captured words and review edits are saved. Resume from Student Workspace → Needs Attention or this Live Lesson page.");
       } else {
+        refreshTeacherAttention();
         setNotice("Review finished. Complete rows are now available for flashcards.");
       }
     } catch (error: any) {
@@ -1310,27 +1243,13 @@ export default function LiveLessonQuickAddPanel({
 
         {latestStoppingPoint && !checkpointOpen ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
-            {latestStoppingPoint.pageNumber != null && latestStoppingPoint.endingText ? (
-              <>
-                <span className="font-black">
-                  Last lesson ended on page {latestStoppingPoint.pageNumber} at:
-                </span>
-                <span className="mt-1 block text-stone-800">
-                  「{latestStoppingPoint.endingText}」
-                </span>
-              </>
-            ) : latestStoppingPoint.pageNumber != null ? (
-              <span className="font-black">
-                Last lesson ended on page {latestStoppingPoint.pageNumber}.
-              </span>
-            ) : latestStoppingPoint.endingText ? (
-              <>
-                <span className="font-black">Last lesson ended at:</span>
-                <span className="mt-1 block text-stone-800">
-                  「{latestStoppingPoint.endingText}」
-                </span>
-              </>
-            ) : null}
+            <span className="font-black">Stopped at: {stoppingPointLabel(latestStoppingPoint) || "saved note"}</span>
+            {latestStoppingPoint.endingText ? <span className="mt-1 block">{latestStoppingPoint.endingText}</span> : null}
+            {latestStoppingPoint.unit && latestStoppingPoint.value != null ? <VocabularyProgressPrompt
+              key={`${latestStoppingPoint.sessionId}:${latestStoppingPoint.savedAt}`}
+              userBookId={userBookId} studentId={studentId}
+              positions={[{ unit: latestStoppingPoint.unit, value: latestStoppingPoint.value }]}
+              actionLabel="Update student reading progress" /> : null}
             {formatShortDateTime(latestStoppingPoint.savedAt) ? (
               <span className="mt-1 block text-xs font-semibold text-amber-800">
                 Saved {formatShortDateTime(latestStoppingPoint.savedAt)}
@@ -1362,7 +1281,7 @@ export default function LiveLessonQuickAddPanel({
                   Where did you stop today?
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-stone-600">
-                  Save a quick checkpoint for next time, or skip and go straight to review.
+                  Save a checkpoint for this student’s copy, or skip. Locations from this lesson are suggestions—confirm or edit before saving. Reading progress is a separate optional update.
                 </p>
               </div>
               <button
@@ -1383,15 +1302,15 @@ export default function LiveLessonQuickAddPanel({
             <div className="mt-4 grid gap-3 md:grid-cols-[160px_1fr]">
               <label className="block">
                 <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-amber-900">
-                  Page or %
+                  {checkpointUnit === "percent" ? "Percentage (%)" : checkpointUnit === "kindle_location" ? "Location" : checkpointUnit === "page" ? "Page" : "Location unavailable — note only"}
                 </span>
                 <input
                   type="text"
                   inputMode="decimal"
-                  value={stoppingPageDraft}
-                  onChange={(event) => setStoppingPageDraft(event.target.value)}
-                  disabled={reviewSaving}
-                  placeholder="Optional, e.g. p. 42 or 18%"
+                  value={stoppingValueDraft}
+                  onChange={(event) => setStoppingValueDraft(event.target.value)}
+                  disabled={reviewSaving || !checkpointUnit}
+                  placeholder="Optional student stopping point"
                   className="w-full rounded-xl border border-amber-200 bg-white px-3 py-3 text-base font-semibold text-stone-950 shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100 disabled:bg-stone-100"
                 />
               </label>
@@ -1417,7 +1336,8 @@ export default function LiveLessonQuickAddPanel({
                 onClick={() =>
                   void transitionSession("end-adding", {
                     saveStoppingPoint: true,
-                    stoppingPageNumber: stoppingPageDraft,
+                    stoppingValue: stoppingValueDraft,
+                    stoppingUnit: checkpointUnit,
                     stoppingText: stoppingTextDraft,
                   })
                 }
@@ -1456,8 +1376,6 @@ export default function LiveLessonQuickAddPanel({
                     value={chapterNumber}
                     onChange={(event) => {
                       setChapterNumber(event.target.value);
-                      setChapterManuallyEdited(true);
-                      setChapterSuggestionNotice("");
                     }}
                     placeholder="Optional"
                     className="w-full rounded-xl border border-stone-200 bg-white px-3 py-3 text-base shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
@@ -1472,8 +1390,6 @@ export default function LiveLessonQuickAddPanel({
                     value={chapterName}
                     onChange={(event) => {
                       setChapterName(event.target.value);
-                      setChapterManuallyEdited(true);
-                      setChapterSuggestionNotice("");
                     }}
                     placeholder="Optional"
                     className="w-full rounded-xl border border-stone-200 bg-white px-3 py-3 text-base shadow-sm focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
@@ -1482,7 +1398,7 @@ export default function LiveLessonQuickAddPanel({
 
                 <label className="block">
                   <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-stone-500">
-                    Current {positionLabel(positionUnit).toLowerCase()}
+                    Student copy · {positionLabel(positionUnit)}
                   </span>
                   <div className="flex rounded-xl border border-amber-300 bg-amber-50 p-1 shadow-sm">
                     <button
@@ -1512,33 +1428,6 @@ export default function LiveLessonQuickAddPanel({
                   </div>
                 </label>
               </div>
-
-              {chapterSuggestions.length > 0 ? (
-                <div className="mt-3 flex flex-col gap-2 rounded-xl border border-sky-100 bg-sky-50 px-3 py-3 sm:flex-row sm:items-end">
-                  <label className="block min-w-0 flex-1">
-                    <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-sky-900">
-                      Chapter from your book
-                    </span>
-                    <select
-                      value={selectedChapterSuggestionKey}
-                      onChange={(event) => applyChapterSuggestion(event.target.value)}
-                      className="w-full rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm font-semibold text-stone-900 shadow-sm focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
-                    >
-                      <option value="">Choose a saved chapter</option>
-                      {chapterSuggestions.map((suggestion) => (
-                        <option key={suggestion.key} value={suggestion.key}>
-                          {suggestion.label} ({suggestion.pageSummary})
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  {chapterSuggestionNotice ? (
-                    <p className="text-xs font-semibold leading-5 text-sky-900">
-                      {chapterSuggestionNotice}
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
 
               <form onSubmit={captureWord} className="mt-4">
                 <label className="block">
@@ -1595,7 +1484,7 @@ export default function LiveLessonQuickAddPanel({
                   {reviewDrafts.length} captured item{reviewDrafts.length === 1 ? "" : "s"}
                 </h2>
                 <p className="mt-1 text-sm text-stone-600">
-                  {readyCount} ready for flashcards. Incomplete rows stay saved but excluded.
+                  {readyCount} ready for flashcards. Incomplete rows stay saved but excluded from flashcards.
                 </p>
                 <p className="mt-1 text-sm text-stone-600">
                   Your captured words are saved. You can finish reviewing them later.
@@ -1756,7 +1645,7 @@ export default function LiveLessonQuickAddPanel({
                       <div className="mt-3 grid gap-3 lg:grid-cols-[1.2fr_1fr_1.4fr]">
                         <label className="block">
                           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-stone-500">
-                            Word
+                            Main word
                           </span>
                           <input
                             value={draft.surface}
@@ -1766,6 +1655,7 @@ export default function LiveLessonQuickAddPanel({
                             disabled={isCompleted}
                             className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-semibold text-stone-950 disabled:bg-stone-100"
                           />
+                          <WordFieldGuide field="word" />
                         </label>
                         <label className="block">
                           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-stone-500">
@@ -1780,6 +1670,7 @@ export default function LiveLessonQuickAddPanel({
                             placeholder={draft.targetLanguageCode === "en" ? "Not required" : ""}
                             className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm disabled:bg-stone-100"
                           />
+                          <WordFieldGuide field="reading" />
                         </label>
                         <label className="block">
                           <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-stone-500">
@@ -1793,19 +1684,29 @@ export default function LiveLessonQuickAddPanel({
                             disabled={isCompleted}
                             className="w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm disabled:bg-stone-100"
                           />
+                          <WordFieldGuide field="meaning" />
                         </label>
                       </div>
 
+                      <fieldset disabled={isCompleted} className="mt-3">
+                        <AlternativeSpellingField main={draft.surface} value={draft.alternative_surface ?? ""}
+                          onChange={value => updateReviewDraft(draft.id, { alternative_surface: value })}
+                          onPromote={() => {
+                            lookupVersions.current[draft.id] = (lookupVersions.current[draft.id] ?? 0) + 1;
+                            setReviewDrafts(current => current.map(row => row.id === draft.id ? { ...row, surface: row.alternative_surface?.trim() || row.surface, alternative_surface: row.surface } : row));
+                          }} />
+                      </fieldset>
                       <fieldset disabled={isCompleted} className="mt-3 space-y-3">
-                        <p className="text-xs text-stone-500">Word is the preferred entry, including an alternative spelling or kanji. Changing it clears old dictionary choices; use Jisho lookup to refresh. Your reading and custom meaning remain editable.</p>
+                        <p className="text-xs text-stone-500">Main word is the preferred study form. Changing it clears old dictionary choices; use Jisho lookup to refresh. Your reading and custom meaning remain editable.</p>
                         <div className="grid gap-3 md:grid-cols-3">
                           {([['encountered_surface', 'Form as encountered'], ['base_form', 'Dictionary / canonical form'], ['lookup_surface', 'Lookup form']] as const).map(([field, label]) => (
                             <label key={field} className="block text-xs font-medium text-stone-600">{label}
                               <input className="w-full rounded-lg border px-3 py-2 text-sm" value={draft[field]} onChange={event => updateReviewDraft(draft.id, { [field]: event.target.value })} />
+                              <WordFieldGuide field={field === "encountered_surface" ? "encountered" : field === "base_form" ? "dictionary" : "lookup"} />
                             </label>
                           ))}
                         </div>
-                        <WordContextFields teacher value={draft} onChange={value => updateReviewDraft(draft.id, value)} />
+                        <WordContextFields teacher value={wordContextPayload(draft)} onChange={value => updateReviewDraft(draft.id, value)} />
                         {draft.meaningChoices.length > 0 ? <label className="block text-xs font-medium text-stone-600">Selected definition
                           <select className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" value={draft.meaningChoiceIndex ?? ""} onChange={event => {
                             const index = event.target.value === "" ? null : Number(event.target.value);

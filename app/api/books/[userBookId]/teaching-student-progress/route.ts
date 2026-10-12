@@ -1,3 +1,4 @@
+import { relatedTeachingBookIds } from "@/lib/teacher/teachingSource";
 import type { EditionDisplayFields } from "@/lib/books/editionDisplay";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -57,7 +58,6 @@ function isSuperTeacherFlag(value: unknown) {
 function isTeachingRole(profile: ProfileRow | null) {
   return (
     profile?.role === "teacher" ||
-    profile?.role === "admin" ||
     profile?.role === "super_teacher" ||
     isSuperTeacherFlag(profile?.is_super_teacher)
   );
@@ -313,6 +313,7 @@ export async function GET(
       bookId: access.bookId,
       teacherId: auth.user.id,
     });
+    const compatibleBookIds = new Set(await relatedTeachingBookIds(supabaseAdmin, access.bookId));
     const activeStudentIdList = [...activeStudentIds].sort();
     const namesByStudentId = await loadStudentNames(activeStudentIdList);
 
@@ -341,6 +342,14 @@ export async function GET(
           userBookId: row?.user_book_id ?? null,
           isAttached: Boolean(row),
           edition,
+          // Keep every exact target explicit; never pick a related student copy by title or order.
+          relatedEditions: lessonResult.rows.flatMap(lesson => {
+            const copy = firstUserBook(lesson.user_books);
+            if (lesson.student_id !== studentId || lesson.status !== "active" || !copy ||
+                copy.user_id !== studentId || copy.id !== lesson.user_book_id ||
+                copy.book_id === access.bookId || !compatibleBookIds.has(copy.book_id)) return [];
+            return [{ userBookId: copy.id, edition: Array.isArray(copy.books) ? copy.books[0] : copy.books }];
+          }),
           resumeAtText: row?.resume_at_text ?? null,
           resumeUpdatedAt: row?.resume_updated_at ?? null,
           hasDuplicateActiveBook: (duplicateCounts.get(duplicateKey) ?? 0) > 1,

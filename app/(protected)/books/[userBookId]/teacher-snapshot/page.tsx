@@ -337,7 +337,7 @@ export default function TeacherReadingSnapshotPage() {
             .order("read_on", { ascending: false })
             .order("created_at", { ascending: false }),
           supabase
-            .from("user_book_words")
+            .from("finalized_user_book_words")
             .select("id", { count: "exact", head: true })
             .eq("user_book_id", userBookId),
           supabase

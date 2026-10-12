@@ -72,7 +72,7 @@ type QuickPreview = WordContext & {
   selectedMeaningIndex: number;
   meaning: string;
   isCustomMeaning: boolean;
-  useAlternateSurface: boolean;
+
   alternateSurface: string;
   positionUnit?: ProgressTrackingMethod;
   page: string;
@@ -94,7 +94,7 @@ type QuickSessionWord = WordContext & {
   selectedMeaningIndex: number | null;
   isCustomMeaning: boolean;
   cacheSurface: string;
-  useAlternateSurface: boolean;
+
   alternateSurface: string;
   hideKanjiInReadingSupport: boolean;
   pageOrder: number | null;
@@ -136,7 +136,7 @@ function makeBlankQuickPreview(meta: { page: string; positionUnit?: ProgressTrac
     selectedMeaningIndex: 0,
     meaning: "",
     isCustomMeaning: true,
-    useAlternateSurface: false,
+
     alternateSurface: "",
     page: meta.page,
     positionUnit: meta.positionUnit,
@@ -1126,7 +1126,7 @@ function CuriosityReadingContent({
     invalidateQuickLookup();
     setQuickPreview({
       id: item.id,
-      surface: item.useAlternateSurface ? item.cacheSurface || item.surface : item.surface,
+      surface: item.surface,
       cacheSurface: item.cacheSurface,
       reading: item.reading,
       meanings: item.meanings,
@@ -1135,7 +1135,7 @@ function CuriosityReadingContent({
       meaning: item.meaning,
       isCustomMeaning: item.isCustomMeaning,
       ...wordContextPayload(item),
-      useAlternateSurface: item.useAlternateSurface,
+
       alternateSurface: item.alternateSurface,
       page: item.page,
       positionUnit: item.positionUnit ?? "page",
@@ -1192,7 +1192,7 @@ function CuriosityReadingContent({
           selectedMeaningIndex: 0,
           meaning: "",
           isCustomMeaning: true,
-          useAlternateSurface: false,
+
           alternateSurface: "",
           pageOrder: null,
         }));
@@ -1213,7 +1213,7 @@ function CuriosityReadingContent({
         selectedMeaningIndex: first.selectedMeaningIndex,
         meaning: first.meaning,
         isCustomMeaning: first.isCustomMeaning,
-        useAlternateSurface: false,
+
         alternateSurface: "",
         page: savedMeta.page,
         positionUnit: savedMeta.positionUnit,
@@ -1240,7 +1240,7 @@ function CuriosityReadingContent({
         selectedMeaningIndex: 0,
         meaning: "",
         isCustomMeaning: true,
-        useAlternateSurface: false,
+
         alternateSurface: "",
         pageOrder: null,
       }));
@@ -1278,7 +1278,7 @@ function CuriosityReadingContent({
 
     const selectedMeaning = quickPreview.meaning ?? "";
     const normalizedSurface = (
-      quickPreview.useAlternateSurface ? quickPreview.alternateSurface : quickPreview.surface
+      quickPreview.surface
     )?.trim() ?? "";
     const normalizedCacheSurface = quickPreview.cacheSurface?.trim() || normalizedSurface;
     const normalizedReading = quickPreview.reading?.trim() ?? "";
@@ -1360,8 +1360,9 @@ function CuriosityReadingContent({
       user_book_id: userBookId,
       vocabulary_cache_id: vocabularyCacheId,
       surface: normalizedSurface || null,
-      base_form: quickPreview.surface,
+      base_form: quickPreview.cacheSurface || quickPreview.surface,
       ...wordContextPayload(quickPreview),
+      alternative_surface: quickPreview.alternateSurface.trim() || null,
       reading: quickPreview.reading || null,
       meaning: selectedMeaning || null,
       meaning_choices: quickPreview.meanings,
@@ -1389,7 +1390,7 @@ function CuriosityReadingContent({
         .from("user_book_words")
         .insert(payload)
         .select(
-          "id, surface, reading, meaning, meaning_choices, meaning_choice_index, position_unit, position_value, percent_location, page_number, page_order, chapter_number, chapter_name, hide_kanji_in_reading_support, book_form, book_form_description, follow_along_support_note"
+          "id, surface, reading, meaning, meaning_choices, meaning_choice_index, position_unit, position_value, percent_location, page_number, page_order, chapter_number, chapter_name, hide_kanji_in_reading_support, alternative_surface, book_form, book_form_description, follow_along_support_note"
         )
         .single();
 
@@ -1414,7 +1415,7 @@ function CuriosityReadingContent({
           data.meaning_choice_index == null ? null : Number(data.meaning_choice_index),
         isCustomMeaning: data.meaning_choice_index == null,
         cacheSurface: normalizedCacheSurface,
-        useAlternateSurface: quickPreview.useAlternateSurface,
+
         alternateSurface: quickPreview.alternateSurface,
         hideKanjiInReadingSupport: !!data.hide_kanji_in_reading_support,
         pageOrder: data.page_order ?? null,
@@ -1442,7 +1443,7 @@ function CuriosityReadingContent({
         .eq("id", editingExisting.id)
         .eq("user_book_id", userBookId)
         .select(
-          "id, surface, reading, meaning, meaning_choices, meaning_choice_index, position_unit, position_value, percent_location, page_number, page_order, chapter_number, chapter_name, hide_kanji_in_reading_support, book_form, book_form_description, follow_along_support_note"
+          "id, surface, reading, meaning, meaning_choices, meaning_choice_index, position_unit, position_value, percent_location, page_number, page_order, chapter_number, chapter_name, hide_kanji_in_reading_support, alternative_surface, book_form, book_form_description, follow_along_support_note"
         )
         .single();
 
@@ -1467,7 +1468,7 @@ function CuriosityReadingContent({
           data.meaning_choice_index == null ? null : Number(data.meaning_choice_index),
         isCustomMeaning: data.meaning_choice_index == null,
         cacheSurface: normalizedCacheSurface,
-        useAlternateSurface: quickPreview.useAlternateSurface,
+
         alternateSurface: quickPreview.alternateSurface,
         hideKanjiInReadingSupport: !!data.hide_kanji_in_reading_support,
         pageOrder: data.page_order ?? null,
@@ -1593,7 +1594,7 @@ function CuriosityReadingContent({
         selectedMeaningIndex: null,
         isCustomMeaning: true,
         cacheSurface: "",
-        useAlternateSurface: false,
+
         alternateSurface: "",
         hideKanjiInReadingSupport: false,
         pageOrder: data.page_order ?? null,
@@ -1647,7 +1648,7 @@ function CuriosityReadingContent({
         selectedMeaningIndex: null,
         isCustomMeaning: true,
         cacheSurface: "",
-        useAlternateSurface: false,
+
         alternateSurface: "",
         hideKanjiInReadingSupport: false,
         pageOrder: data.page_order ?? null,
@@ -2104,7 +2105,7 @@ function CuriosityReadingContent({
                     meanings: [],
                     selectedMeaningIndex: 0,
                     isCustomMeaning: true,
-                    useAlternateSurface: false,
+
                     alternateSurface: "",
                     pageOrder: null,
                   }));
@@ -2179,7 +2180,7 @@ function CuriosityReadingContent({
                 selectedMeaningIndex: 0,
                 meaning: "",
                 isCustomMeaning: true,
-                useAlternateSurface: false,
+
                 alternateSurface: "",
                 pageOrder: null,
               }));
@@ -2274,7 +2275,7 @@ function CuriosityReadingContent({
                       meanings: [],
                       selectedMeaningIndex: 0,
                       isCustomMeaning: true,
-                      useAlternateSurface: false,
+
                       alternateSurface: "",
                       pageOrder: null,
                     }));
@@ -2388,11 +2389,15 @@ function CuriosityReadingContent({
                       setQuickPreview((prev) => ({ ...prev, reading: value }))
                     }
                     contextFields={<WordContextFields value={quickPreview} onChange={value => setQuickPreview(current => ({ ...current, ...value }))} teacher={canTeachWordForms} />}
+                    onPromoteAlternative={() => {
+                      invalidateQuickLookup();
+                      setQuickPreview(current => ({ ...current, cacheSurface: current.cacheSurface || current.surface, surface: current.alternateSurface.trim(), alternateSurface: current.surface }));
+                    }}
                     onAlternateSurfaceChange={(value) =>
                       setQuickPreview((prev) => ({
                         ...prev,
                         alternateSurface: value,
-                        useAlternateSurface: value.trim().length > 0,
+
                       }))
                     }
                     onMeaningChoiceChange={(index, meaning) =>

@@ -1,3 +1,5 @@
+import AlternativeSpellingField from "@/components/vocabulary/AlternativeSpellingField";
+import WordFieldGuide from "@/components/vocabulary/WordFieldGuide";
 import WordPositionField from "@/components/vocabulary/WordPositionField";
 import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
 import type { RefObject } from "react";
@@ -18,11 +20,13 @@ type AddWordDetailFieldsProps = {
   chapterNameOptions: string[];
   hideKanjiInReadingSupport: boolean;
   saving: boolean;
+  lookupLoading: boolean;
   isEditing: boolean;
   word: string;
   savedNotice: string;
   onReadingChange: (value: string) => void;
   contextFields?: React.ReactNode;
+  onPromoteAlternative: () => void;
   onAlternateSurfaceChange: (value: string) => void;
   onMeaningChoiceChange: (index: number, choice: string) => void;
   onCustomMeaningChange: (value: string) => void;
@@ -48,12 +52,13 @@ export default function AddWordDetailFields({
   chapterName,
   chapterNameOptions,
   hideKanjiInReadingSupport,
-  saving,
+  saving, lookupLoading,
   isEditing,
   word,
   savedNotice,
   onReadingChange,
   contextFields,
+  onPromoteAlternative,
   onAlternateSurfaceChange,
   onMeaningChoiceChange,
   onCustomMeaningChange,
@@ -70,6 +75,7 @@ export default function AddWordDetailFields({
         <div className="rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-600">
           <span className="font-semibold text-stone-900">Manual entry:</span>{" "}
           1. Type the word. 2. Add the reading. 3. Add the meaning. 4. Save.
+          <WordFieldGuide field="captureWord" />
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
@@ -83,19 +89,10 @@ export default function AddWordDetailFields({
               placeholder="Reading"
               className="w-full rounded border bg-white px-3 py-2 text-sm"
             />
+            <WordFieldGuide field="reading" />
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-stone-700">
-              Alternative spelling / kanji
-            </label>
-            <input
-              value={alternateSurface}
-              onChange={(event) => onAlternateSurfaceChange(event.target.value)}
-              placeholder="Optional spelling / kanji"
-              className="w-full rounded border bg-white px-3 py-2 text-sm"
-            />
-          </div>
+          <AlternativeSpellingField disabled={saving || lookupLoading} main={word} value={alternateSurface} onChange={onAlternateSurfaceChange} onPromote={onPromoteAlternative} />
         </div>
       </div>
 
@@ -105,6 +102,7 @@ export default function AddWordDetailFields({
         <label className="mb-2 block text-sm font-medium text-stone-700">
           Meaning
         </label>
+        <WordFieldGuide field="meaning" />
 
         <div className="space-y-2">
           {meaningChoices.length > 0 ? (

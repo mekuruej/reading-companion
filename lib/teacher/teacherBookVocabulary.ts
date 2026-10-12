@@ -222,7 +222,7 @@ async function findMatchingPersonalWord(
 
   const { data, error } = await supabase
     .from("user_book_words")
-    .select("id, surface, reading, meaning, meaning_choices, meaning_choice_index, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, vocabulary_cache_id, book_form, book_form_description, follow_along_support_note, created_at")
+    .select("id, surface, reading, meaning, meaning_choices, meaning_choice_index, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, vocabulary_cache_id, alternative_surface, book_form, book_form_description, follow_along_support_note, created_at")
     .eq("user_book_id", personalUserBookId);
 
   if (error) throw error;
@@ -297,7 +297,7 @@ function personalToShared(row: any): SharedTeacherVocabularyWord {
     teacherVocabularyId: null,
     ...wordContextPayload(row),
     alternativeSurface: row.alternative_surface ?? null,
-    surface: row.alternative_surface?.trim() || row.surface || "",
+    surface: row.surface || "",
     reading: row.reading ?? null,
     meaning: row.meaning ?? null,
     meaningChoices: asStringArray(row.meaning_choices),
@@ -327,7 +327,7 @@ function teachingToShared(row: any): SharedTeacherVocabularyWord {
     teacherVocabularyId: row.id,
     ...wordContextPayload(row),
     alternativeSurface: row.alternative_surface ?? null,
-    surface: row.alternative_surface?.trim() || row.surface || "",
+    surface: row.surface || "",
     reading: row.reading ?? null,
     meaning: row.meaning ?? null,
     meaningChoices: asStringArray(row.meaning_choices),
@@ -385,7 +385,7 @@ function mergeSharedVocabulary(personalRows: any[], teachingRows: any[]) {
       book_form: word.book_form ?? existing.book_form,
       book_form_description: word.book_form_description ?? existing.book_form_description,
       alternativeSurface: word.alternativeSurface ?? existing.alternativeSurface,
-      surface: word.alternativeSurface?.trim() || existing.surface,
+      surface: word.surface || existing.surface,
       followAlongSupportNote: word.followAlongSupportNote ?? existing.followAlongSupportNote,
       origins: Array.from(new Set([...existing.origins, ...word.origins])),
     });
@@ -457,8 +457,8 @@ export async function loadSharedTeacherVocabulary(
   const personalUserBookId = context.personalUserBookId ?? context.linkedUserBookId;
   const personalRows = personalUserBookId
     ? await supabase
-        .from("user_book_words")
-        .select("id, user_book_id, surface, reading, meaning, jlpt, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, created_at, hidden, meaning_choices, meaning_choice_index, target_language_code, vocabulary_cache_id, book_form, book_form_description, follow_along_support_note")
+        .from("finalized_user_book_words")
+        .select("id, user_book_id, surface, reading, meaning, jlpt, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, created_at, hidden, meaning_choices, meaning_choice_index, target_language_code, vocabulary_cache_id, alternative_surface, book_form, book_form_description, follow_along_support_note")
         .eq("user_book_id", personalUserBookId)
         .or("target_language_code.is.null,target_language_code.eq.ja")
         .then((result: any) => {
@@ -467,8 +467,11 @@ export async function loadSharedTeacherVocabulary(
         })
     : [];
 
+  // Read-only source display can use an owned copy without creating a Teacher Book.
+  if (!context.teacherBookId) return mergeSharedVocabulary(personalRows, []);
+
   const teachingResult = await supabase
-    .from("teacher_book_vocabulary")
+    .from("finalized_teacher_book_vocabulary")
     .select("id, linked_user_book_word_id, source_teacher_book_item_id, vocabulary_cache_id, surface, reading, meaning, meaning_choices, meaning_choice_index, page_number, position_unit, position_value, percent_location, page_order, chapter_number, chapter_name, origin_my_library, origin_teaching, hidden_from_my_library, hidden_from_teaching, included_in_follow_along, follow_along_order, follow_along_support_note, book_form, book_form_description, alternative_surface, created_at")
     .eq("teacher_book_id", context.teacherBookId);
 
@@ -570,19 +573,20 @@ export async function saveTeacherVocabularyAndInclude(
       meaning_choices: meaningChoices, meaning_choice_index: meaningChoiceIndex,
       ...wordPositionPayload(pageNumber, context.positionUnit ?? "page"),
       chapter_number: chapterNumber, chapter_name: chapterName,
-      ...wordContextPayload(values), follow_along_support_note: supportNote,
+      ...wordContextPayload(values), alternative_surface: values.alternativeSurface?.trim() || null, follow_along_support_note: supportNote,
       excluded_from_flashcards: !isReadyForFlashcards({ surface, reading, meaning }),
     };
     // Existing personal words keep their study state; only the teacher-specific
     // context is updated here. A retry reuses the same personal word.
     const write = personalWord?.id
       ? supabase.from("user_book_words").update({
+          alternative_surface: values.alternativeSurface === undefined ? personalWord.alternative_surface ?? null : values.alternativeSurface.trim() || null,
           book_form: values.book_form === undefined ? personalWord.book_form ?? null : values.book_form?.trim() || null,
           book_form_description: values.book_form_description === undefined ? personalWord.book_form_description ?? null : values.book_form_description?.trim() || null,
           follow_along_support_note: supportNote ?? personalWord.follow_along_support_note ?? null,
         }).eq("id", personalWord.id).eq("user_book_id", context.personalUserBookId)
       : supabase.from("user_book_words").insert(personalPayload);
-    const { data: savedPersonal, error: personalSaveError } = await write.select("id, book_form, book_form_description, follow_along_support_note").single();
+    const { data: savedPersonal, error: personalSaveError } = await write.select("id, alternative_surface, book_form, book_form_description, follow_along_support_note").single();
     if (personalSaveError) throw personalSaveError;
     personalWord = savedPersonal;
   }
@@ -765,6 +769,7 @@ export async function updateTeachingVocabularyVisibility(
   supabase: SupabaseClientLike,
   word: SharedTeacherVocabularyWord,
   patch: Partial<{
+    surface: string;
     hidden_from_my_library: boolean;
     hidden_from_teaching: boolean;
     included_in_follow_along: boolean;
@@ -796,4 +801,26 @@ export async function updateTeachingVocabularyVisibility(
     .eq("id", teacherVocabularyId);
 
   if (error) throw error;
+}
+
+// Source display is read-only. It never ensures ownership or a teaching relationship.
+export async function loadOwnedTeachingSource(supabase: SupabaseClientLike, actorId: string, sourceUserBookId: string) {
+  const { data: source, error } = await supabase.from("user_books")
+    .select("id,user_id,book_id,progress_tracking_method,books:book_id(title,author,cover_url,page_count)")
+    .eq("id", sourceUserBookId).maybeSingle();
+  if (error) throw error;
+  if (!source || source.user_id !== actorId) throw new Error("The teaching source must belong to you.");
+  const { data: rows, error: relationshipError } = await supabase.from("teacher_books")
+    .select("id,user_book_id").eq("teacher_id", actorId).eq("book_id", source.book_id);
+  if (relationshipError) throw relationshipError;
+  if ((rows?.length ?? 0) > 1) throw new Error("Multiple Teacher Books match this source edition.");
+  // An edition-level relationship may point at another owned copy. Do not
+  // repair it or import that copy’s prepared material into the chosen source.
+  const candidate = rows?.[0];
+  const relationship = !candidate?.user_book_id || candidate.user_book_id === source.id ? candidate : undefined;
+  const book = Array.isArray(source.books) ? source.books[0] : source.books;
+  const context: TeacherBookContext = { teacherBookId: relationship?.id ?? "", teacherId: actorId,
+    bookId: source.book_id, personalUserBookId: source.id, linkedUserBookId: source.id,
+    positionUnit: source.progress_tracking_method ?? "page", pageCount: book?.page_count ?? null };
+  return { source, context, vocabulary: await loadSharedTeacherVocabulary(supabase, context, { view: "teaching", showHidden: true }) };
 }

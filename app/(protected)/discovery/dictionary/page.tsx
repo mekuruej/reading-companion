@@ -363,7 +363,7 @@ export default function DictionaryPage() {
       }
 
       const { data: savedRows, error: savedError } = await supabase
-        .from("user_book_words")
+        .from("finalized_user_book_words")
         .select(
           `
             id,

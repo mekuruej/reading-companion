@@ -457,7 +457,7 @@ async function loadKanjiWordRows(userBookIds: string[]) {
 
     while (true) {
       const { data, error } = await supabase
-        .from("user_book_words")
+        .from("finalized_user_book_words")
         .select(
           "id, user_book_id, surface, reading, vocabulary_cache_id, created_at, ignore_kanji_enrichment"
         )

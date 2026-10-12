@@ -3,6 +3,7 @@
 
 "use client";
 
+import { useTeacherAttention } from "@/lib/teacher/useTeacherAttention";
 import { missingCoreBookFields } from "@/lib/books/bookMetadata";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -150,6 +151,7 @@ export default function TeacherHubPage() {
   const [canAccessTeacherHub, setCanAccessTeacherHub] = useState(false);
   const [isSuperTeacher, setIsSuperTeacher] = useState(false);
   const [canAccessStudents, setCanAccessStudents] = useState(false);
+  const attention = useTeacherAttention(canAccessStudents);
   const [alertsLoading, setAlertsLoading] = useState(true);
   const [teacherAlerts, setTeacherAlerts] = useState<TeacherAlertSummary[]>([]);
 
@@ -326,7 +328,7 @@ export default function TeacherHubPage() {
             {isSuperTeacher ? "Users" : "Students"}, lessons, and teaching books
           </h2>
         </div>
-        <TeacherHubCardGrid cards={teachingCards.filter(card => card.href !== "/teacher/students" || canAccessStudents).map(card => card.href === "/teacher/students" && isSuperTeacher ? { ...card, title: "Users" } : card)} />
+        <TeacherHubCardGrid attentionCount={attention.total} cards={teachingCards.filter(card => card.href !== "/teacher/students" || canAccessStudents).map(card => card.href === "/teacher/students" && isSuperTeacher ? { ...card, title: "Users" } : card)} />
       </section>
 
       <TeacherHubTodaySection

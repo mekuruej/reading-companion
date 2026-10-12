@@ -1,4 +1,7 @@
 "use client";
+import AlternativeSpellingField from "./AlternativeSpellingField";
+import WordFieldGuide from "@/components/vocabulary/WordFieldGuide";
+
 import WordContextFields from "./WordContextFields";
 import type { WordContext } from "@/lib/vocabulary/wordContext";
 
@@ -297,25 +300,28 @@ export default function JapaneseDictionaryCapture({
       {showManualFields ? (
         <div className="mt-3 grid gap-3 md:grid-cols-3">
           <label className="block">
-            <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-400">Word</span>
+            <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-400">Main word</span>
             <input value={draft.surface} onChange={(event) => setDraft((current) => ({ ...current, surface: event.target.value, isManual: true }))} className="w-full rounded-2xl border border-stone-300 px-3 py-2 text-sm" />
+            <WordFieldGuide field="teacherWord" />
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-400">Reading</span>
             <input value={draft.reading} onChange={(event) => setDraft((current) => ({ ...current, reading: event.target.value, isManual: true }))} className="w-full rounded-2xl border border-stone-300 px-3 py-2 text-sm" />
+            <WordFieldGuide field="reading" />
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-black uppercase tracking-[0.14em] text-stone-400">Meaning</span>
             <input value={draft.meaning} onChange={(event) => setDraft((current) => ({ ...current, meaning: event.target.value, meaningChoices: [], meaningChoiceIndex: null, isManual: true }))} className="w-full rounded-2xl border border-stone-300 px-3 py-2 text-sm" />
+            <WordFieldGuide field="meaning" />
           </label>
         </div>
       ) : null}
 
       <div className="mt-3 space-y-2">
-        <label className="block text-xs font-medium text-stone-600">Alternative spelling / kanji
-          <input className="w-full rounded-lg border px-2 py-1.5 text-sm" value={draft.alternativeSurface ?? ""}
-            onChange={event => setDraft(current => ({ ...current, alternativeSurface: event.target.value }))} placeholder="Optional" />
-        </label>
+        <AlternativeSpellingField disabled={searching || saving} main={draft.surface} value={draft.alternativeSurface ?? ""} onChange={value => setDraft(current => ({ ...current, alternativeSurface: value }))} onPromote={() => {
+          setDraft(current => ({ ...current, surface: current.alternativeSurface?.trim() || current.surface, alternativeSurface: current.surface }));
+          setShowManualFields(true);
+        }} />
         <WordContextFields teacher value={{ ...draft, follow_along_support_note: draft.followAlongSupportNote }}
           onChange={value => setDraft(current => ({ ...current, ...value, followAlongSupportNote: value.follow_along_support_note ?? "" }))} />
       </div>

@@ -61,6 +61,8 @@ type UserBookJoinRow = {
 };
 
 type UserBookWordRow = {
+  study_identity_key?: string | null;
+  alternative_surface?: string | null;
   id: string;
   user_book_id: string;
   surface: string | null;
@@ -118,6 +120,7 @@ type LibraryWordClaimRow = {
 type LibraryCheckGate = "readiness" | "reading" | "meaning";
 
 type StudyCard = {
+  alternative_surface?: string | null;
   id: string;
   userBookId: string;
   bookTitle: string;
@@ -382,11 +385,12 @@ async function loadAllLibraryCheckWords(userBookIds: string[]) {
   while (true) {
     const to = from + LIBRARY_CHECK_WORD_PAGE_SIZE - 1;
     const { data, error } = await supabase
-      .from("user_book_words")
-      .select("id, user_book_id, surface, reading, meaning, meaning_choice_index, jlpt, hidden, created_at")
+      .from("finalized_user_book_words")
+      .select("id, user_book_id, surface, alternative_surface, study_identity_key, reading, meaning, meaning_choice_index, jlpt, hidden, created_at")
       .in("user_book_id", userBookIds)
       .not("hidden", "is", true)
       .or("target_language_code.is.null,target_language_code.eq.ja")
+      .order("study_identity_key", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
       .order("id")
       .range(from, to)
@@ -1909,7 +1913,7 @@ export default function LibraryStudyPage() {
 
         const progressByKey = new Map<string, LibraryWordProgressRow>();
         const studyKeys = uniqueStrings([
-          ...words.map((row) => studyIdentityKey(row.surface, row.reading)),
+          ...words.map((row) => (row.study_identity_key || studyIdentityKey(row.surface, row.reading))),
           ...claimRows.map((row) => row.study_identity_key).filter(Boolean),
         ]);
 
@@ -1921,8 +1925,8 @@ export default function LibraryStudyPage() {
         }
 
         const cards: StudyCard[] = Array.from(groupedWords.entries())
-          .map(([senseKey, group]) => {
-            const key = studyIdentityKey(group[0].surface, group[0].reading);
+          .map<StudyCard | null>(([senseKey, group]) => {
+            const key = (group[0].study_identity_key || studyIdentityKey(group[0].surface, group[0].reading));
             const primarySense = savedSenseNumber(group[0].meaning_choice_index) === 1;
             const representative = group[0];
             const meta = metaById.get(representative.user_book_id);
@@ -1959,6 +1963,7 @@ export default function LibraryStudyPage() {
               surface,
               reading,
               meaning: representative.meaning!.trim(),
+              alternative_surface: representative.alternative_surface,
               jlpt: representative.jlpt ?? null,
               encounterCount: group.length,
               encounterIds: group.map((word) => word.id),
@@ -1988,7 +1993,7 @@ export default function LibraryStudyPage() {
           filteredCards: allStudyCards.length,
           topCompleteGroups: Array.from(groupedWords.entries())
             .map(([senseKey, group]) => {
-            const key = studyIdentityKey(group[0].surface, group[0].reading);
+            const key = (group[0].study_identity_key || studyIdentityKey(group[0].surface, group[0].reading));
             const primarySense = savedSenseNumber(group[0].meaning_choice_index) === 1;
               const representative = group[0];
               const progress = progressWithWordSkyClaim(

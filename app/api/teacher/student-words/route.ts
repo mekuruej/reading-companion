@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { StudentContextError, validateStudentToolContext } from "@/lib/teacher/studentToolContext";
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 // Only vocabulary fields used by Save Words. Identity always comes from validated context.
-const fields = new Set("hidden seen_on skipped_on flagged_for_review flagged_by_user_id flagged_at vocabulary_cache_id surface base_form encountered_surface lookup_surface target_language_code support_language_code item_type reading meaning other_definition meaning_choices meaning_choice_index jlpt is_common position_unit position_value percent_location page_number page_order chapter_number chapter_name hide_kanji_in_reading_support excluded_from_flashcards book_form book_form_description follow_along_support_note".split(" "));
+const fields = new Set("hidden seen_on skipped_on flagged_for_review flagged_by_user_id flagged_at vocabulary_cache_id surface alternative_surface base_form encountered_surface lookup_surface target_language_code support_language_code item_type reading meaning other_definition meaning_choices meaning_choice_index jlpt is_common position_unit position_value percent_location page_number page_order chapter_number chapter_name hide_kanji_in_reading_support excluded_from_flashcards book_form book_form_description follow_along_support_note".split(" "));
 async function write(req: Request) {
   try {
     const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");

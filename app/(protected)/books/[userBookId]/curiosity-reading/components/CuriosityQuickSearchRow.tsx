@@ -28,7 +28,7 @@ export default function CuriosityQuickSearchRow({
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
       <div className="max-w-56 shrink-0">
         <label htmlFor={inputId} className="block text-sm font-medium text-stone-700">
-          Rapid search
+          Main word
         </label>
         <p id={`${inputId}-hint`} className="text-xs leading-4 text-stone-500">
           <span className="block">Already know the kanji?</span>

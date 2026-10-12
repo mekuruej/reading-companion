@@ -1,6 +1,7 @@
 // Vocab Flashcards
 //
 "use client";
+import AlsoWritten from "@/components/vocabulary/AlsoWritten";
 
 import { savedSenseNumber, senseStudyKey, senseDefinitionKey } from "@/lib/studySenseIdentity";
 import { wordPositionText, type WordPositionRecord } from "@/lib/vocabulary/wordPosition";
@@ -116,6 +117,7 @@ type KanjiMetaItem = {
 };
 
 type WordRow = {
+  alternative_surface?: string | null;
   id: string;
   user_book_id: string;
   surface: string;
@@ -147,6 +149,7 @@ type WordRow = {
 };
 
 type Flashcard = {
+  alternative_surface?: string | null;
   id: string;
   word: string;
   reading: string | null;
@@ -729,12 +732,12 @@ function BookFlashcardsPageContent() {
 
           const today = new Date().toISOString().slice(0, 10);
           const { data: englishWords, error: englishWordsErr } = await supabase
-            .from("user_book_words")
+            .from("finalized_user_book_words")
             .select(
               `
               id,
               user_book_id,
-              surface,
+              surface, alternative_surface,
               reading,
               meaning,
               jlpt,
@@ -789,6 +792,7 @@ function BookFlashcardsPageContent() {
               return {
                 id: w.id,
                 word: source,
+                alternative_surface: w.alternative_surface,
                 reading: null,
                 meaning,
                 jlpt: "NON-JLPT",
@@ -834,12 +838,12 @@ function BookFlashcardsPageContent() {
 
           if (ownedBookIds.length > 0) {
             const { data: libraryWords, error: libraryWordsErr } = await supabase
-              .from("user_book_words")
+              .from("finalized_user_book_words")
               .select(
                 `
                 id,
                 user_book_id,
-                surface,
+                surface, alternative_surface,
                 reading,
                 meaning,
                 jlpt,
@@ -898,6 +902,7 @@ function BookFlashcardsPageContent() {
               return {
                 id: w.id,
                 word: w.surface,
+                alternative_surface: w.alternative_surface,
                 reading: w.reading ?? null,
                 meaning: savedMeaning || null,
                 jlpt: normalizeJlpt(w.jlpt),
@@ -938,12 +943,12 @@ function BookFlashcardsPageContent() {
         const today = new Date().toISOString().slice(0, 10);
 
         const { data: words, error: wordsErr } = await supabase
-          .from("user_book_words")
+          .from("finalized_user_book_words")
           .select(
             `
             id,
             user_book_id,
-            surface,
+            surface, alternative_surface,
             reading,
             meaning,
             jlpt,
@@ -998,6 +1003,7 @@ function BookFlashcardsPageContent() {
           return {
             id: w.id,
             word: w.surface,
+                alternative_surface: w.alternative_surface,
             reading: w.reading ?? null,
             meaning: savedMeaning || null,
             jlpt: normalizeJlpt(w.jlpt),
@@ -2492,6 +2498,7 @@ function BookFlashcardsPageContent() {
               />
             </>
           ) : null}
+          <AlsoWritten value={card?.alternative_surface} visible={isMultipleChoiceMode ? mcAnswered : typeModeEnabled ? readyForNextCard : stepIndex >= steps.length - 1} />
         </div>
       </StudyFlashcardShell>
 

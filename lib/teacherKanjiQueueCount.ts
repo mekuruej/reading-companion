@@ -131,7 +131,7 @@ async function loadKanjiWordRows(
 
     while (true) {
       let query = supabase
-        .from("user_book_words")
+        .from("finalized_user_book_words")
         .select("id, user_book_id, surface, reading, vocabulary_cache_id, ignore_kanji_enrichment, created_at")
         .in("user_book_id", userBookIdChunk)
         .eq("is_manual_override", false)

@@ -3,6 +3,8 @@
 
 "use client";
 
+import TeacherAttentionBadge from "@/components/TeacherAttentionBadge";
+import { useTeacherAttention } from "@/lib/teacher/useTeacherAttention";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -26,6 +28,7 @@ export default function Header() {
   const [showStudyMenu, setShowStudyMenu] = useState(false);
   const [showTeacherMenu, setShowTeacherMenu] = useState(false);
   const pathname = usePathname();
+  const attention = useTeacherAttention(profileRole === "teacher" || profileRole === "super_teacher" || profileIsSuperTeacher);
   const libraryMenuRef = useRef<HTMLDivElement | null>(null);
   const studyMenuRef = useRef<HTMLDivElement | null>(null);
   const teacherMenuRef = useRef<HTMLDivElement | null>(null);
@@ -537,7 +540,7 @@ export default function Header() {
                         }`}
                       onClick={() => setShowTeacherMenu(false)}
                     >
-                      {profileRole === "super_teacher" || profileIsSuperTeacher ? "Users" : "Students"}
+                      {profileRole === "super_teacher" || profileIsSuperTeacher ? "Users" : "Students"}<TeacherAttentionBadge count={attention.total} />
                     </Link>
                     ) : null}
 

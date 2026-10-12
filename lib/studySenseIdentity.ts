@@ -21,6 +21,7 @@ export function cardSenseKey(card: { studyIdentityKey: string; definitionNumber?
 }
 
 export function groupSavedSenseEncounters<T extends {
+  study_identity_key?: string | null;
   surface?: string | null;
   reading?: string | null;
   meaning?: string | null;
@@ -29,7 +30,7 @@ export function groupSavedSenseEncounters<T extends {
   const groups = new Map<string, T[]>();
   for (const row of rows) {
     if (!row.surface?.trim() || !row.reading?.trim() || !row.meaning?.trim()) continue;
-    const wordKey = wordIdentity(row.surface, row.reading);
+    const wordKey = row.study_identity_key || wordIdentity(row.surface, row.reading);
     if (!wordKey) continue;
     const senseKey = senseStudyKey(wordKey, senseDefinitionKey(savedSenseNumber(row.meaning_choice_index)));
     const group = groups.get(senseKey) ?? [];

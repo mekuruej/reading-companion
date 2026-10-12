@@ -130,7 +130,7 @@ async function loadAllGlobalEncounterRows(ownerUserId: string) {
   while (true) {
     const to = from + GLOBAL_ENCOUNTER_PAGE_SIZE - 1;
     const { data, error } = await supabase
-      .from("user_book_words")
+      .from("finalized_user_book_words")
       .select(
         `
           surface,
@@ -433,7 +433,7 @@ function BookWordsPageContent() {
     setEditing(w);
 
     setEditContext(wordContextPayload(w));
-    setEditSurface(w.cache_surface && w.surface === w.cache_surface ? "" : w.surface ?? "");
+    setEditSurface(w.surface ?? "");
     setEditReading(w.reading ?? "");
     setEditMeaning(w.meaning ?? "");
     setEditOtherDefinition(w.other_definition ?? "");
@@ -524,7 +524,7 @@ function BookWordsPageContent() {
 
     const patch: any = {
       ...wordContextPayload(editContext),
-      surface: editSurface.trim() || editing.cache_surface?.trim() || "",
+      surface: editSurface.trim(),
       reading: editReading.trim() ? editReading.trim() : null,
       meaning: editMeaning.trim() ? editMeaning.trim() : null,
       other_definition: null,
@@ -900,7 +900,7 @@ function BookWordsPageContent() {
         }
 
         let wordsQuery = supabase
-          .from("user_book_words")
+          .from("finalized_user_book_words")
           .select(
             `
               id,
@@ -920,7 +920,7 @@ function BookWordsPageContent() {
               hidden,
               meaning_choices,
               meaning_choice_index,
-              hide_kanji_in_reading_support, book_form, book_form_description, follow_along_support_note,
+              hide_kanji_in_reading_support, alternative_surface, book_form, book_form_description, follow_along_support_note,
               target_language_code,
               vocabulary_cache_id,
               vocabulary_cache: vocabulary_cache_id (
@@ -1311,13 +1311,16 @@ function BookWordsPageContent() {
           wordId={editing.id}
           editErr={editErr}
           editSaving={editSaving}
-          saveDisabled={editSaving || !(editSurface.trim() || editing.cache_surface?.trim())}
+          saveDisabled={editSaving || !editSurface.trim()}
           onClose={closeEdit}
           onSave={saveEdit}
         >
           <BookVocabEditFormBody
             cacheSurface={editing.cache_surface}
             editSurface={editSurface}
+              alternativeSurface={editContext.alternative_surface ?? ""}
+              onAlternativeSurfaceChange={value => setEditContext(current => ({ ...current, alternative_surface: value }))}
+              onPromoteAlternative={() => { const previous = editSurface; setEditSurface(editContext.alternative_surface?.trim() || previous); setEditContext(current => ({ ...current, alternative_surface: previous })); }}
             editReading={editReading}
             editJlpt={editJlpt}
             editMeaning={editMeaning}

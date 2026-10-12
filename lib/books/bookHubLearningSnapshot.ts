@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type SnapshotWord = { id: string; surface: string | null; meaning: string | null; reading: string | null };
+export type SnapshotWord = { study_identity_key?: string | null; id: string; surface: string | null; meaning: string | null; reading: string | null };
 type ReviewEvidence = { user_book_word_id: string | null };
 type LibraryEvidence = { study_identity_key: string; last_studied_at: string | null };
 
@@ -19,7 +19,7 @@ export function countReviewedBookWords(words: SnapshotWord[], events: ReviewEvid
     const surface = (word.surface ?? "").trim();
     const meaning = (word.meaning ?? "").trim();
     if (!surface && !meaning) continue;
-    if (reviewedIds.has(word.id) || (surface && studiedIdentities.has(identity(word.surface, word.reading)))) {
+    if (reviewedIds.has(word.id) || (surface && studiedIdentities.has((word.study_identity_key || identity(word.surface, word.reading))))) {
       // Match the existing Saved Words count: unique surface + meaning, not encounter rows.
       reviewedWords.add(`${surface}|||${meaning}`);
     }
@@ -39,8 +39,8 @@ async function allRows<T>(queryPage: (from: number, to: number) => PromiseLike<{
 }
 
 export async function loadReviewedBookWordCount(client: SupabaseClient, userBookId: string, ownerId: string) {
-  const words = await allRows<SnapshotWord>((from, to) => client.from("user_book_words")
-    .select("id, surface, meaning, reading").eq("user_book_id", userBookId).order("id").range(from, to));
+  const words = await allRows<SnapshotWord>((from, to) => client.from("finalized_user_book_words")
+    .select("id, surface, study_identity_key, meaning, reading").eq("user_book_id", userBookId).order("id").range(from, to));
   if (!words.length) return 0;
   const [events, legacyEvents, progress] = await Promise.all([
     allRows<ReviewEvidence>((from, to) => client.from("user_study_events")

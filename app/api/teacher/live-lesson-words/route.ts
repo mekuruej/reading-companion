@@ -1,5 +1,6 @@
-import { validateStudentToolContext, StudentContextError } from "@/lib/teacher/studentToolContext";
-import { isAllUserTeacher } from "@/lib/teacher/targetUserAccess";
+import { parseStoppingPoint, readStoppingPoint } from "@/lib/teacher/stoppingPoint";
+import { validateTeachingSourceContext } from "@/lib/teacher/teachingSource";
+import { StudentContextError } from "@/lib/teacher/studentToolContext";
 import { wordContextPayload } from "@/lib/vocabulary/wordContext";
 import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
 import { parseWordPosition, wordPosition, wordPositionPayload } from "@/lib/vocabulary/wordPosition";
@@ -28,6 +29,8 @@ type AuthorizedBook = {
     cover_url?: string | null;
     language_code?: string | null;
     page_count?: number | null;
+    kindle_location_count?: number | null;
+    edition_format?: string | null;
   } | null;
 };
 
@@ -50,6 +53,8 @@ type LiveLessonSessionRow = {
   review_deferred_at: string | null;
   completed_at: string | null;
   cancelled_at: string | null;
+  stopping_value: number | null;
+  stopping_unit: string | null;
   stopping_page_number: number | null;
   stopping_text: string | null;
   stopping_point_saved_at: string | null;
@@ -61,6 +66,7 @@ type LiveLessonWordUpdate = {
   positionUnit?: ProgressTrackingMethod;
   id?: string;
   surface?: unknown;
+  alternative_surface?: unknown;
   encountered_surface?: unknown;
   base_form?: unknown;
   lookup_surface?: unknown;
@@ -86,7 +92,6 @@ function isSuperTeacherFlag(value: unknown) {
 
 function isSuperTeacher(profile: ProfileRow | null) {
   return (
-    profile?.role === "admin" ||
     profile?.role === "super_teacher" ||
     isSuperTeacherFlag(profile?.is_super_teacher)
   );
@@ -226,7 +231,7 @@ async function authorizeTeacherForStudentBook({
         title,
         cover_url,
         language_code,
-        page_count
+        page_count, kindle_location_count, edition_format
       )
     `
     )
@@ -252,53 +257,10 @@ async function authorizeTeacherForStudentBook({
     };
   }
 
-  if (sourceUserBookId || isAllUserTeacher(profile)) {
-    await validateStudentToolContext(supabaseAdmin, actorId, { studentId, userBookId, sourceUserBookId });
-    return { ok: true as const, profile, userBook: loadedUserBook };
-  }
-
-  const { data: link, error: linkError } = await supabaseAdmin
-    .from("teacher_students")
-    .select("teacher_id")
-    .eq("teacher_id", actorId)
-    .eq("student_id", studentId)
-    .is("archived_at", null)
-    .maybeSingle();
-
-  if (linkError) throw linkError;
-
-  if (!link) {
-    return {
-      ok: false as const,
-      error: "You do not have access to this student's book.",
-      status: 403,
-    };
-  }
-
-  const { data: lessonBook, error: lessonBookError } = await supabaseAdmin
-    .from("teacher_student_lesson_books")
-    .select("id")
-    .eq("teacher_id", actorId)
-    .eq("student_id", studentId)
-    .eq("user_book_id", userBookId)
-    .eq("status", "active")
-    .maybeSingle();
-
-  if (lessonBookError) throw lessonBookError;
-
-  if (!lessonBook) {
-    return {
-      ok: false as const,
-      error: "This student is not actively connected to this book.",
-      status: 403,
-    };
-  }
-
-  return {
-    ok: true as const,
-    profile,
-    userBook: loadedUserBook,
-  };
+  // The exact target remains authorized even when a deferred session is resumed
+  // without its optional reference source. No lesson/ownership row is created.
+  await validateTeachingSourceContext(supabaseAdmin, actorId, { studentId, userBookId, sourceUserBookId });
+  return { ok: true as const, profile, userBook: loadedUserBook };
 }
 
 async function nextPageOrder(
@@ -336,7 +298,7 @@ function wordSelect() {
     id,
     vocabulary_cache_id,
     surface, encountered_surface, base_form, lookup_surface,
-    book_form, book_form_description, follow_along_support_note,
+    alternative_surface, book_form, book_form_description, follow_along_support_note,
     reading,
     meaning,
     page_number, position_unit, position_value, percent_location,
@@ -369,7 +331,7 @@ function sessionSelect() {
     review_deferred_at,
     completed_at,
     cancelled_at,
-    stopping_page_number,
+    stopping_value, stopping_unit, stopping_page_number,
     stopping_text,
     stopping_point_saved_at,
     created_at,
@@ -389,7 +351,7 @@ async function loadLatestStoppingPoint({
   const { data, error } = await supabaseAdmin
     .from("live_lesson_capture_sessions")
     .select(
-      "id, stopping_page_number, stopping_text, stopping_point_saved_at, status"
+      "id, stopping_value, stopping_unit, stopping_page_number, stopping_text, stopping_point_saved_at, status"
     )
     .eq("teacher_id", actorId)
     .eq("student_id", studentId)
@@ -406,7 +368,8 @@ async function loadLatestStoppingPoint({
 
   return {
     sessionId: (data as any).id as string,
-    pageNumber: (data as any).stopping_page_number as number | null,
+    ...readStoppingPoint(data),
+    pageNumber: readStoppingPoint(data).unit === "page" ? readStoppingPoint(data).value : null,
     endingText: (data as any).stopping_text as string | null,
     savedAt: (data as any).stopping_point_saved_at as string | null,
     status: (data as any).status as string | null,
@@ -620,7 +583,7 @@ async function saveReviewWords({
     const id = cleanString(word.id);
     if (!id || !allowedIds.has(id)) continue;
 
-    const { data: savedWord, error: savedError } = await supabaseAdmin.from("user_book_words").select("position_unit,position_value,page_number,percent_location,surface,encountered_surface,base_form,lookup_surface").eq("id", id).eq("user_book_id", userBookId).single();
+    const { data: savedWord, error: savedError } = await supabaseAdmin.from("user_book_words").select("position_unit,position_value,page_number,percent_location,surface,alternative_surface,encountered_surface,base_form,lookup_surface").eq("id", id).eq("user_book_id", userBookId).single();
     if (savedError) throw savedError;
     const unit = word.positionUnit ?? wordPosition(savedWord).unit;
     if (!["page", "kindle_location", "percent"].includes(unit)) throw new Error("Invalid position unit");
@@ -628,6 +591,7 @@ async function saveReviewWords({
     if (parsedPosition.error) throw new Error(parsedPosition.error);
     const surface = cleanString(word.surface);
     if (!surface) throw new Error("Enter a word before saving review.");
+    const isPromotion = surface !== savedWord.surface && nullableText(word.alternative_surface) === savedWord.surface;
     const targetLanguageCode = cleanString(
       word.target_language_code ?? word.targetLanguageCode
     );
@@ -636,7 +600,7 @@ async function saveReviewWords({
       encountered_surface: word.encountered_surface === undefined ? savedWord.encountered_surface || savedWord.surface : nullableText(word.encountered_surface),
       base_form: word.base_form === undefined ? (surface === savedWord.surface ? savedWord.base_form || surface : surface) : nullableText(word.base_form),
       lookup_surface: word.lookup_surface === undefined ? (surface === savedWord.surface ? savedWord.lookup_surface || surface : surface) : nullableText(word.lookup_surface),
-      ...(surface !== savedWord.surface || (word.lookup_surface !== undefined && nullableText(word.lookup_surface) !== savedWord.lookup_surface) ? { vocabulary_cache_id: null, jlpt: null, is_common: null } : {}),
+      ...(!isPromotion && (surface !== savedWord.surface || (word.base_form !== undefined && nullableText(word.base_form) !== savedWord.base_form) || (word.lookup_surface !== undefined && nullableText(word.lookup_surface) !== savedWord.lookup_surface)) ? { vocabulary_cache_id: null, jlpt: null, is_common: null } : {}),
       reading: nullableText(word.reading),
       ...(Object.prototype.hasOwnProperty.call(word, "book_form") ? wordContextPayload(word) : {}),
       meaning: nullableText(word.meaning),
@@ -889,21 +853,13 @@ export async function POST(req: Request) {
       seen_on: todayYmd(),
     };
 
-    const { data, error } = await supabaseAdmin
-      .from("user_book_words")
-      .insert(payload)
-      .select(wordSelect())
-      .single();
-
+    const { data, error } = await supabaseAdmin.rpc("capture_live_lesson_word", {
+      p_session_id: session.id,
+      p_word: payload,
+      p_position: await nextSessionPosition(session.id),
+    }).single();
     if (error) throw error;
-
     const insertedWord = data as any;
-
-    await attachWordToSession({
-      sessionId: session.id,
-      wordId: insertedWord.id,
-      position: await nextSessionPosition(session.id),
-    });
 
     return NextResponse.json({
       session,
@@ -969,15 +925,6 @@ export async function PATCH(req: Request) {
       );
     }
 
-    const words = Array.isArray(body?.words) ? body.words : [];
-    await saveReviewWords({
-      sessionId,
-      userBookId,
-      pageCount: access.userBook.books?.page_count ?? null,
-      words,
-      finalizeReadiness: nextStatus === "completed",
-    });
-
     const timestamp = new Date().toISOString();
     const payload: Record<string, unknown> = {};
 
@@ -987,20 +934,22 @@ export async function PATCH(req: Request) {
         payload.ended_adding_at = timestamp;
         payload.review_started_at = session.review_started_at ?? timestamp;
         if (shouldSaveStoppingPoint) {
-          const stoppingPageNumber = parsePageLocationForBook(
-            body?.stoppingPageNumber,
-            access.userBook.books?.page_count ?? null
-          );
-          const stoppingText = nullableLimitedText(body?.stoppingText, 500);
-
-          if (stoppingPageNumber == null && !stoppingText) {
-            return NextResponse.json(
-              { error: "Add a stopping page or ending text, or choose Skip." },
-              { status: 400 }
-            );
+          const book = access.userBook.books ?? {};
+          const parsed = parseStoppingPoint(body?.stoppingValue ?? body?.stoppingPageNumber,
+            access.userBook.progress_tracking_method, book);
+          // A legacy page-only request must never be interpreted as a Kindle location.
+          if (body?.stoppingValue == null && body?.stoppingPageNumber != null && parsed.unit !== "page") {
+            throw new StudentContextError("Reopen the checkpoint to use this student copy's tracking method.", 409);
           }
-
-          payload.stopping_page_number = stoppingPageNumber;
+          if (body?.stoppingUnit !== undefined && body.stoppingUnit !== parsed.unit) {
+            throw new StudentContextError("The student's tracking method changed. Reopen the checkpoint.", 409);
+          }
+          if (parsed.error) throw new StudentContextError(parsed.error, 400);
+          const stoppingText = nullableLimitedText(body?.stoppingText, 500);
+          if (parsed.value == null && !stoppingText) throw new StudentContextError("Add a stopping point or note, or choose Skip.", 400);
+          payload.stopping_value = parsed.value;
+          payload.stopping_unit = parsed.value == null ? null : parsed.unit;
+          payload.stopping_page_number = parsed.unit === "page" ? parsed.value : null;
           payload.stopping_text = stoppingText;
           payload.stopping_point_saved_at = timestamp;
         }
@@ -1012,6 +961,16 @@ export async function PATCH(req: Request) {
         payload.completed_at = timestamp;
       }
     }
+
+    const words = Array.isArray(body?.words) ? body.words : [];
+    await saveReviewWords({
+      sessionId,
+      userBookId,
+      pageCount: access.userBook.books?.page_count ?? null,
+      words,
+      finalizeReadiness: nextStatus === "completed",
+    });
+
 
     const { data: updatedSession, error } = await supabaseAdmin
       .from("live_lesson_capture_sessions")
@@ -1094,11 +1053,7 @@ export async function DELETE(req: Request) {
       );
     }
 
-    await supabaseAdmin
-      .from("live_lesson_capture_session_words")
-      .delete()
-      .eq("user_book_word_id", wordId);
-
+    // The word foreign key cascades its session links in the same transaction.
     const { error } = await supabaseAdmin
       .from("user_book_words")
       .delete()

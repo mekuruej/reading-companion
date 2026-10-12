@@ -121,7 +121,7 @@ export default function BookStudyPage() {
         }
 
         const { data: savedWordRows, error: savedWordError } = await supabase
-          .from("user_book_words")
+          .from("finalized_user_book_words")
           .select("id")
           .limit(1);
 

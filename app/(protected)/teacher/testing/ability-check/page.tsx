@@ -144,7 +144,7 @@ export default function AbilityCheckTestHelperPage() {
         }
 
         const { count: loadedSavedWordCount, error: savedWordErr } = await supabase
-          .from("user_book_words")
+          .from("finalized_user_book_words")
           .select("id", { count: "exact", head: true })
           .in("user_book_id", userBookIds);
 
@@ -154,7 +154,7 @@ export default function AbilityCheckTestHelperPage() {
 
         const { count: loadedVisibleSavedWordCount, error: visibleWordErr } =
           await supabase
-            .from("user_book_words")
+            .from("finalized_user_book_words")
             .select("id", { count: "exact", head: true })
             .in("user_book_id", userBookIds)
             .or("hidden.is.null,hidden.eq.false");

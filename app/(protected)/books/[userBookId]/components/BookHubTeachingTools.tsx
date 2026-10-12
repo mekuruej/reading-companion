@@ -15,6 +15,7 @@ type StudentStudyLinkRow = {
   userBookId: string | null;
   isAttached: boolean;
   edition?: EditionDisplayFields | null;
+  relatedEditions?: { userBookId: string; edition?: EditionDisplayFields | null }[];
   resumeAtText: string | null;
   resumeUpdatedAt: string | null;
   hasDuplicateActiveBook?: boolean;
@@ -589,6 +590,14 @@ export default function BookHubTeachingTools({
                       Reading Experience
                     </StudentCardButton>
                   </div>
+
+                  {student.relatedEditions?.length ? <div className="mt-2 space-y-2">
+                    <p className="text-xs font-semibold text-stone-600">Other active editions of this work</p>
+                    {student.relatedEditions.map(target => <div key={target.userBookId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-stone-200 p-2">
+                      <BookEditionLine book={target.edition} />
+                      <StudentCardButton onClick={() => onStudentFollowAlong(target.userBookId, student.studentId)}>Follow-Along</StudentCardButton>
+                    </div>)}
+                  </div> : null}
 
                   <div className="mt-2.5 border-t border-stone-200/80 pt-2">
                     {student.isAttached ? (

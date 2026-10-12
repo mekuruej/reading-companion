@@ -89,7 +89,7 @@ export default function TeacherWordsQueuePage() {
       }
 
       const { data: flaggedWords, error: wordsError } = await supabase
-        .from("user_book_words")
+        .from("finalized_user_book_words")
         .select("id, user_book_id, surface, reading, meaning, flag_note, flagged_at")
         .in("user_book_id", userBookIds)
         .eq("flagged_for_review", true)

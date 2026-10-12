@@ -26,6 +26,7 @@ type ClaimedColor = "green" | "blue" | "purple";
 type SkyBubbleColor = ClaimedColor | LibraryStudyColor;
 
 type SkyWord = {
+  study_identity_key?: string | null;
   surface: string;
   reading: string;
   meaning: string;
@@ -214,7 +215,7 @@ function makeVisibleWords(words: SkyWord[]) {
 
     return {
       ...word,
-      skyId: `${studyIdentityKey(word.surface, word.reading)}-${index}-${Date.now()}`,
+      skyId: `${(word.study_identity_key || studyIdentityKey(word.surface, word.reading))}-${index}-${Date.now()}`,
       lane: clampPercent(laneBase + laneNudge),
       duration: 225 + ((index * 31) % 155),
       bobDuration: 14 + ((index * 7) % 24),
@@ -259,7 +260,7 @@ export default function WordSkyPage() {
   const [message, setMessage] = useState("");
 
   const selectedKey = selectedWord
-    ? studyIdentityKey(selectedWord.surface, selectedWord.reading)
+    ? (selectedWord.study_identity_key || studyIdentityKey(selectedWord.surface, selectedWord.reading))
     : "";
 
   const claimedCount = useMemo(() => Object.keys(claims).length, [claims]);
@@ -397,6 +398,7 @@ export default function WordSkyPage() {
 
                 return {
                   surface,
+                  study_identity_key: row.study_identity_key,
                   reading,
                   meaning,
                   level: levelForWord(row, index),
@@ -450,6 +452,7 @@ export default function WordSkyPage() {
 
                   return {
                     surface,
+                    study_identity_key: row.study_identity_key,
                     reading,
                     meaning,
                     level: levelForWord(
@@ -473,14 +476,14 @@ export default function WordSkyPage() {
 
         const seenKeys = new Set<string>();
         const loadedPool = [...starterPool, ...personalPool].filter((word) => {
-          const key = studyIdentityKey(word.surface, word.reading);
+          const key = (word.study_identity_key || studyIdentityKey(word.surface, word.reading));
           if (seenKeys.has(key)) return false;
           seenKeys.add(key);
           return true;
         });
 
         const starterKeysWithoutColor = starterPool
-          .map((word) => studyIdentityKey(word.surface, word.reading))
+          .map((word) => (word.study_identity_key || studyIdentityKey(word.surface, word.reading)))
           .filter((key) => !libraryColorByKey[key]);
 
         if (starterKeysWithoutColor.length > 0) {
@@ -512,7 +515,7 @@ export default function WordSkyPage() {
         }
 
         const finalPool = loadedPool.filter((word) => {
-          const key = studyIdentityKey(word.surface, word.reading);
+          const key = (word.study_identity_key || studyIdentityKey(word.surface, word.reading));
           return !shouldHideFromWordSkyByLibraryColor(libraryColorByKey[key]);
         });
 
@@ -521,7 +524,7 @@ export default function WordSkyPage() {
         setVisibleWords(makeVisibleWords(shuffledPool));
         setLibraryColors(libraryColorByKey);
 
-        const keys = shuffledPool.map((word) => studyIdentityKey(word.surface, word.reading));
+        const keys = shuffledPool.map((word) => (word.study_identity_key || studyIdentityKey(word.surface, word.reading)));
         const { data, error } = await withTimeout(
           supabase
             .from("user_library_word_claims")
@@ -576,7 +579,7 @@ export default function WordSkyPage() {
   async function saveClaim(word: SkyWord, color: ClaimedColor) {
     if (!userId || !canUseWordSky) return;
 
-    const key = studyIdentityKey(word.surface, word.reading);
+    const key = (word.study_identity_key || studyIdentityKey(word.surface, word.reading));
     setSavingKey(key);
     setMessage("");
 
@@ -622,7 +625,7 @@ export default function WordSkyPage() {
   async function clearClaim(word: SkyWord) {
     if (!userId || !canUseWordSky) return;
 
-    const key = studyIdentityKey(word.surface, word.reading);
+    const key = (word.study_identity_key || studyIdentityKey(word.surface, word.reading));
     setSavingKey(key);
     setMessage("");
 
@@ -699,7 +702,7 @@ export default function WordSkyPage() {
 
           <div className="absolute inset-0">
             {visibleWords.map((word) => {
-              const key = studyIdentityKey(word.surface, word.reading);
+              const key = (word.study_identity_key || studyIdentityKey(word.surface, word.reading));
               const claim = claims[key]?.claimed_color ?? null;
               const bubbleColor = claim ?? libraryColors[key] ?? null;
               const isSelected = selectedKey === key;

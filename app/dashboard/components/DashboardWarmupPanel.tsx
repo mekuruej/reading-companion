@@ -1,4 +1,5 @@
 type WarmupWord = {
+  study_identity_key?: string | null;
   surface: string;
   reading: string;
 };

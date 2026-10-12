@@ -308,7 +308,7 @@ export default function TeacherNeedsAttentionPage() {
                 "language_code, edition_format, title, isbn13, asin, cover_url, book_type, author, publisher, published_date, page_count, kindle_location_count, audiobook_duration_minutes, missing_info_cleared_at"
               ),
             supabase
-              .from("user_book_words")
+              .from("finalized_user_book_words")
               .select("id", { count: "exact", head: true })
               .eq("flagged_for_review", true),
             supabase

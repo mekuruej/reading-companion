@@ -1,5 +1,7 @@
 "use client";
 
+import BookEditionLine from "@/components/books/BookEditionLine";
+import type { TeachingEdition } from "@/lib/teacher/teachingSource";
 import StoryNotesExperience from "../story/StoryNotesExperience";
 import { CuriosityReadingExperience } from "../curiosity-reading/WordTimerExperience";
 import { BookProgressProvider } from "@/components/books/BookProgressProvider";
@@ -17,20 +19,8 @@ type LessonStudent = {
   studentName: string;
 };
 
-type ChapterSuggestion = {
-  key: string;
-  chapterNumber: number | null;
-  chapterName: string | null;
-  label: string;
-  pageSummary: string;
-  firstPage: number | null;
-  lastPage: number | null;
-  entryCount: number;
-  pages: number[];
-};
-
 type LessonContext = {
-  teacherBookId: string;
+  teacherBookId: string | null;
   sourceUserBookId: string;
   book: {
     title: string | null;
@@ -39,7 +29,8 @@ type LessonContext = {
   };
   students: LessonStudent[];
   saveWordTargets?: Omit<LessonStudent, "lessonBookId">[];
-  chapterSuggestions: ChapterSuggestion[];
+  sourceEdition: TeachingEdition;
+  targetEdition: TeachingEdition | null;
 };
 
 export default function TeachingLessonPage() {
@@ -220,12 +211,14 @@ function TeachingLessonContent() {
 
         {view === "follow" ? <section className="mt-4 grid min-w-0 gap-4 xl:grid-cols-2">
           <aside className="min-w-0">
-            <h2 className="mb-3 text-lg font-bold">My Follow-Along</h2>
-            <TeacherFollowAlongPanel teacherBookId={lessonContext.teacherBookId} presentation="embedded" lessonDisplayOnly hideHeader
+            <h2 className="mb-1 text-lg font-bold">My Follow-Along</h2>
+            <p className="text-xs font-semibold">Teaching from: your source copy</p><BookEditionLine book={lessonContext.sourceEdition} />
+            <TeacherFollowAlongPanel sourceUserBookId={lessonContext.sourceUserBookId} teacherBookId={lessonContext.teacherBookId ?? undefined} presentation="embedded" lessonDisplayOnly hideHeader
               emptyMessage="No Follow-Along words have been prepared for this book yet." />
           </aside>
           <div className="min-w-0 overflow-hidden rounded-2xl border border-stone-200 bg-white p-3">
-            <h2 className="mb-3 text-lg font-bold">Student Quick Add</h2>
+            <h2 className="mb-1 text-lg font-bold">Student Quick Add</h2>
+            <p className="text-xs font-semibold">Student reading: target copy</p><BookEditionLine book={lessonContext.targetEdition} />
             {!contextual ? <label className="mb-3 block">
               <span className="mb-1 block text-xs font-bold text-stone-500">Student Quick Add for</span>
               <select value={quickAddStudent?.studentUserBookId ?? ""} onChange={event => selectStudent(event.target.value)}
@@ -236,7 +229,7 @@ function TeachingLessonContent() {
             </label> : null}
             {quickAddStudent ? <LiveLessonQuickAddPanel key={quickAddStudent.studentUserBookId}
               studentId={quickAddStudent.studentId} userBookId={quickAddStudent.studentUserBookId}
-              sourceUserBookId={lessonContext.sourceUserBookId} chapterSuggestions={lessonContext.chapterSuggestions ?? []} embedded />
+              sourceUserBookId={lessonContext.sourceUserBookId} requestedSessionId={searchParams.get("sessionId") ?? ""} embedded />
               : <p className="text-sm text-stone-600">{lessonContext.students.length ? "Choose a student to add words to their vocabulary." : "No students are assigned to this book yet. My Follow-Along is ready to use on its own."}</p>}
           </div>
         </section> : view === "curiosity" ? (

@@ -209,7 +209,7 @@ export default function WordHistorySearchPage() {
 
       try {
         const { data, error } = await supabase
-          .from("user_book_words")
+          .from("finalized_user_book_words")
           .select("surface, reading, meaning, created_at")
           .eq("user_book_id", authorizedUserBookId)
           .eq("hidden", false);
@@ -317,7 +317,7 @@ export default function WordHistorySearchPage() {
 
     try {
       const { data: seen, error: seenError } = await supabase
-        .from("user_book_words")
+        .from("finalized_user_book_words")
         .select(
           `
           id,

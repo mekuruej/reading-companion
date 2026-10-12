@@ -2109,7 +2109,7 @@ export default function BookHubPage() {
     const KANJI_ENRICHMENT_TEST_START = "2026-04-20T00:00:00";
 
     const { data: bookWordRows, error: bookWordErr } = await supabase
-      .from("user_book_words")
+      .from("finalized_user_book_words")
       .select(
         "id, user_book_id, vocabulary_cache_id, surface, reading, is_manual_override, created_at"
       )
@@ -2243,7 +2243,7 @@ export default function BookHubPage() {
     ];
 
     let bookWordQuery = supabase
-      .from("user_book_words")
+      .from("finalized_user_book_words")
       .select(
         "id, surface, reading, vocabulary_cache_id, is_manual_override, created_at, ignore_kanji_enrichment"
       )
@@ -2934,7 +2934,7 @@ export default function BookHubPage() {
     // e.g. saved word 出所 / cache word 出どころ.
     if (workingWord.userBookWordId) {
       const { data: savedWord, error: savedWordError } = await supabase
-        .from("user_book_words")
+        .from("finalized_user_book_words")
         .select("surface, reading")
         .eq("id", workingWord.userBookWordId)
         .maybeSingle();
@@ -3634,7 +3634,7 @@ export default function BookHubPage() {
   const loadUniqueLookupCount = async (id: string) => {
     const fields = "surface, meaning, page_number, chapter_number, chapter_name, created_at";
     const { data, error } = await supabase
-      .from("user_book_words")
+      .from("finalized_user_book_words")
       .select(fields)
       .eq("user_book_id", id)
       .order("created_at", { ascending: false });
@@ -5705,7 +5705,7 @@ export default function BookHubPage() {
       onStoryNotes={() => openTeachingTool(`/books/${row.id}/lesson?view=journal`)}
       onStudentFollowAlong={(studentUserBookId, studentId) => {
         openTeachingTool(
-          `/books/${encodeURIComponent(row.id)}/lesson?studentUserBookId=${encodeURIComponent(studentUserBookId)}&studentId=${encodeURIComponent(studentId)}`
+          `/teacher/students/${encodeURIComponent(studentId)}/books/${encodeURIComponent(studentUserBookId)}/follow`
         );
       }}
       onStudentSaveWords={(studentUserBookId, studentId) => {
