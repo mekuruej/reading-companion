@@ -105,10 +105,19 @@ export default function MekuruHomepage() {
                             rel="noopener noreferrer"
                             className="inline-block rounded-2xl border border-stone-900 bg-white px-6 py-3 text-base font-semibold text-stone-950 shadow-sm hover:bg-emerald-50 hover:shadow-md"
                         >
-                            Trial Lesson — ¥2,000 / 30 minutes
+                            Trial Lesson — 30 minutes
                         </a>
                         <p className="mt-3 text-sm text-stone-600">
-                            The trial is a 30-minute private lesson where we&apos;ll read Japanese together, talk about your reading goals, and get a sense of your current reading level. It&apos;s a chance to experience what lessons are like and decide whether they&apos;re a good fit for you.
+                            The trial is a 30-minute private lesson where we&apos;ll
+                            read Japanese together, talk about your reading goals,
+                            and get a sense of your current reading level.
+                            It&apos;s a chance to experience what lessons are like
+                            and decide whether they&apos;re a good fit for you.
+                        </p>
+
+                        <p className="mt-2 text-xs text-stone-500">
+                            Trial tuition: ¥2,000 for students residing in Japan.
+                            International trial rates are provided when booking.
                         </p>
                     </div>
                 </section>
@@ -134,8 +143,13 @@ export default function MekuruHomepage() {
                     </p>
                 </section>
 
+
                 <section className="mt-16 space-y-4">
                     <h2 className="text-2xl font-semibold">Tuition</h2>
+
+                    <p className="text-sm font-medium text-stone-600">
+                        For students residing in Japan
+                    </p>
 
                     <div className="space-y-3 text-stone-700">
                         <p>
@@ -150,18 +164,26 @@ export default function MekuruHomepage() {
                     </div>
 
                     <p className="text-sm text-stone-600">
-                        Four session plans are available to fit different schedules and reading goals.
+                        Four session plans are available to fit different schedules
+                        and reading goals.
                     </p>
 
                     <p className="text-xs text-stone-500">
-                        Monthly installments are a payment schedule for the full 16-week term, not a month-to-month enrollment option.
+                        Monthly installments are a payment schedule for the full
+                        16-week term, not a month-to-month enrollment option.
                     </p>
 
                     <p className="text-xs text-stone-500">
-                        Detailed regular session pricing is provided after your trial session.
+                        International tuition rates are available for students
+                        residing outside Japan.
+                    </p>
+
+                    <p className="text-xs text-stone-500">
+                        Detailed regular session pricing is provided after your
+                        trial session.
                     </p>
                 </section>
-                
+
                 <div className="mx-auto mt-12 max-w-3xl px-6">
                     <div className="rounded-2xl border border-stone-200 bg-stone-50 p-6">
                         <h3 className="text-base font-semibold text-stone-900">Included with Japanese Reading Lessons</h3>
@@ -259,10 +281,19 @@ export default function MekuruHomepage() {
                         rel="noopener noreferrer"
                         className="inline-block rounded-2xl border border-stone-900 bg-white px-6 py-3 text-base font-semibold text-stone-950 shadow-sm hover:bg-emerald-50 hover:shadow-md"
                     >
-                        Trial Lesson — ¥2,000 / 30 minutes
+                        Trial Lesson — 30 minutes
                     </a>
-                    <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-stone-600">
-                        The trial is a 30-minute private lesson where we&apos;ll read Japanese together, talk about your reading goals, and get a sense of your current reading level. It&apos;s a chance to experience what lessons are like and decide whether they&apos;re a good fit for you.
+                    <p className="mt-3 text-sm text-stone-600">
+                        The trial is a 30-minute private lesson where we&apos;ll
+                        read Japanese together, talk about your reading goals,
+                        and get a sense of your current reading level.
+                        It&apos;s a chance to experience what lessons are like
+                        and decide whether they&apos;re a good fit for you.
+                    </p>
+
+                    <p className="mt-2 text-xs text-stone-500">
+                        Trial tuition: ¥2,000 for students residing in Japan.
+                        International trial rates are provided when booking.
                     </p>
                 </div>
 
