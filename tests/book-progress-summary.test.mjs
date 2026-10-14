@@ -87,6 +87,7 @@ test('shared bar uses provider data, refreshes on entry/focus and refuses anothe
       react: { useEffect(fn) { effect = fn; } },
       './BookProgressProvider': { useBookProgress: () => tracking },
       '@/lib/books/bookProgressSummary': { summarizeBookProgress: summary },
+      '@/lib/books/readingProgress': progress,
       '@/app/(protected)/books/[userBookId]/components/BookHubProgressSummary': { default: 'ExistingProgressCard' },
     }).default;
     const nodes = tree => !tree || typeof tree !== 'object' ? [] : Array.isArray(tree) ? tree.flatMap(nodes) : [tree, ...nodes(tree.props?.children)];
@@ -99,4 +100,29 @@ test('shared bar uses provider data, refreshes on entry/focus and refuses anothe
     assert.equal(Component({ userBookId: 'copy-B' }), null);
     effect(); assert.equal(refreshes, 2);
   } finally { globalThis.window = originalWindow; }
+});
+test('listening summary uses the Read-style resume bar and latest listening position', () => {
+  const tracking = {
+    userBookId: 'copy-A', method: 'page', totals: { page_count: 200 }, loaded: true,
+    summaryData: { ...data, sessions: [
+      ...data.sessions,
+      { read_on: '2026-10-01', created_at: '2026-10-01', tracking_unit: 'page', end_page: 53, minutes_read: 20, session_mode: 'listening', ending_phrase: '次の章でまた聞こう' },
+    ] },
+    summaryError: null, refreshSummary: async () => {},
+  };
+  const Component = load('components/books/BookProgressSummaryBar.tsx', {
+    react: { useEffect() {} },
+    './BookProgressProvider': { useBookProgress: () => tracking },
+    '@/lib/books/bookProgressSummary': { summarizeBookProgress: summary },
+    '@/lib/books/readingProgress': progress,
+    '@/app/(protected)/books/[userBookId]/components/BookHubProgressSummary': { default: 'ExistingProgressCard' },
+  }).default;
+  const nodes = tree => !tree || typeof tree !== 'object' ? [] : Array.isArray(tree) ? tree.flatMap(nodes) : [tree, ...nodes(tree.props?.children)];
+  const tree = nodes(Component({ userBookId: 'copy-A', listening: true }));
+  const status = tree.find(node => node.props?.role === 'status');
+  assert.ok(status);
+  assert.match(JSON.stringify(status), /Where did I leave off/);
+  assert.match(JSON.stringify(status), /Resume from page 53/);
+  assert.match(JSON.stringify(status), /次の章でまた聞こう/);
+  assert.equal(tree.some(node => node.type === 'ExistingProgressCard'), false);
 });

@@ -65,6 +65,7 @@ test('listening form is visible before Start, but capture stays timer-gated and 
  assert.match(source,/capture\.identity && !capture\.completed && \(isRunning \|\| isPaused \|\| showTimedSessionForm\)/);
  assert.match(source,/capture\.isFinalizing \|\| !canCaptureListeningWord/);
  assert.match(source,/Start the listening timer to enable word capture/);
+ assert.match(source,/shown in Reading History, separate from your reading vocabulary/);
  assert.match(source,/isListeningMode && capture\.identity && <ListeningSessionWords words=\{capture\.words\}/);
  assert.match(source,/startDisabled=\{isListeningMode && \(!capture\.ready \|\| !capture\.owner\)\}/);
  assert.match(source,/listening-capture migration may be missing/);

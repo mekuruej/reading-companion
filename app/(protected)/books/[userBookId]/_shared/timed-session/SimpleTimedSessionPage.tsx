@@ -3,7 +3,6 @@
 
 "use client";
 import BookProgressSummaryBar from "@/components/books/BookProgressSummaryBar";
-import { ListeningStoppingPoint } from "@/components/listening/ListeningStoppingPoint";
 import { useSessionEndingPhrase, SessionEndingPhraseField, LatestEndingPhrase } from "@/components/books/SessionEndingPhrase";
 import AudioTimeInput from "@/components/books/AudioTimeInput";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
@@ -849,7 +848,7 @@ export default function SimpleTimedSessionPage({
                 </p>
             ) : null}
 
-            {activeSessionMode === "listening" ? <ListeningStoppingPoint userBookId={userBookId} refreshKey={showTimedSessionForm} /> : <LatestEndingPhrase phrase={latestEndingPhrase} />}
+            {activeSessionMode === "listening" ? null : <LatestEndingPhrase phrase={latestEndingPhrase} />}
             {timerSaveMessage ? (
                 <p className="mt-3 text-xs text-emerald-600">{timerSaveMessage}</p>
             ) : null}
