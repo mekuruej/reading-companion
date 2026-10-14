@@ -299,6 +299,7 @@ export default function ListeningPage() {
                 type="button"
                 onClick={() => setViewMode("workspace")}
                 aria-pressed={Boolean(showReadingWorkspace)}
+                aria-label={`Show ${isNativeListeningWorkspace ? nativeSessionMode === "listening" ? "listening" : "reading" : "listening"} with the Reading Journal`}
                 className={`rounded-full px-3 py-1.5 text-sm font-bold transition ${
                   viewMode === "workspace"
                     ? isNativeListeningWorkspace && nativeSessionMode !== "listening"
@@ -309,7 +310,9 @@ export default function ListeningPage() {
                       : "text-stone-600 hover:bg-violet-50"
                 }`}
               >
-                Reading Journal
+                {isNativeListeningWorkspace
+                  ? `${nativeSessionMode === "listening" ? "Listening" : "Reading"} + Journal`
+                  : "Listening + Reading Journal"}
               </button>
             </div>
           ) : null}
