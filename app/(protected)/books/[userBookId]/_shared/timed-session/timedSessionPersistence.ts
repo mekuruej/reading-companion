@@ -1,5 +1,8 @@
 export type PersistedTimedSessionState = {
   version: 1;
+  captureSessionId?: string;
+  captureOwnerId?: string;
+  captureStartedAt?: number;
   sessionMode: string;
   userBookId: string;
   startedAt: number | null;
@@ -64,15 +67,16 @@ export function hasUnfinishedTimedSession(state: PersistedTimedSessionState | nu
 }
 
 export function writePersistedTimedSession(state: PersistedTimedSessionState) {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined") return false;
 
   try {
     window.localStorage.setItem(
       timedSessionStorageKey(state.sessionMode, state.userBookId),
       JSON.stringify({ ...state, savedAt: Date.now() })
     );
+    return true;
   } catch {
-    // Local timer persistence is best-effort only.
+    return false;
   }
 }
 

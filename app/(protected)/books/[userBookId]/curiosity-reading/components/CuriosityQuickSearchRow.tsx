@@ -3,6 +3,7 @@ import LibraryColorBadge from "@/components/LibraryColorBadge";
 import type { LibraryStudyWordColorInfo } from "@/lib/libraryStudyColorLookup";
 
 type CuriosityQuickSearchRowProps = {
+  listening?: boolean;
   surface: string;
   reading: string;
   quickLoading: boolean;
@@ -14,6 +15,7 @@ type CuriosityQuickSearchRowProps = {
 };
 
 export default function CuriosityQuickSearchRow({
+  listening = false,
   surface,
   reading,
   quickLoading,
@@ -60,12 +62,12 @@ export default function CuriosityQuickSearchRow({
           </button>
         </div>
 
-        <p className="mt-2 text-xs text-stone-500">
+        {!listening && <p className="mt-2 text-xs text-stone-500">
           Flashcards · Follow-Along · Vocabulary List
-        </p>
+        </p>}
       </div>
 
-      {surface.trim() && reading.trim() ? (
+      {!listening && surface.trim() && reading.trim() ? (
         <div className="flex min-h-10 shrink-0 items-center gap-2 text-xs text-stone-500">
           <span className="sr-only">Current library status:</span>
           {quickPreviewLibraryColorInfo ? (

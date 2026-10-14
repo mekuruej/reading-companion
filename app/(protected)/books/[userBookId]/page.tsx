@@ -2660,7 +2660,7 @@ export default function BookHubPage() {
   }
 
   async function deleteReadingSession(sessionId: string) {
-    const ok = window.confirm("Delete this reading session?");
+    const ok = window.confirm(readingSessions.find(s => s.id === sessionId)?.session_mode === "listening" ? "Delete this listening session and all words captured in it? This cannot be undone." : "Delete this reading session?");
     if (!ok) return;
 
     const { error } = await supabase

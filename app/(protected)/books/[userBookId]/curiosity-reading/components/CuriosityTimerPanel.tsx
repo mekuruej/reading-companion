@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
 import AudioTimeInput from "@/components/books/AudioTimeInput";
 type CuriosityTimerPanelProps = {
+  sessionSaving?: boolean;
   isRunning: boolean;
   isPaused: boolean;
   elapsed: number;
@@ -30,6 +31,7 @@ type CuriosityTimerPanelProps = {
 };
 
 export default function CuriosityTimerPanel({
+  sessionSaving = false,
   isRunning,
   isPaused,
   elapsed,
@@ -58,7 +60,7 @@ export default function CuriosityTimerPanel({
 }: CuriosityTimerPanelProps) {
   const tracking = useBookProgress();
   return (
-    <div className={compact ? "rounded-2xl" : "mb-6 rounded-2xl border border-stone-300 bg-white p-4"}>
+    <fieldset disabled={sessionSaving} className={compact ? "rounded-2xl" : "mb-6 rounded-2xl border border-stone-300 bg-white p-4"}>
       <div className={compact ? "mb-1 text-center text-xs font-black uppercase tracking-[0.16em] text-stone-500" : "mb-2 text-sm font-medium text-stone-900"}>
         {title}
       </div>
@@ -69,7 +71,7 @@ export default function CuriosityTimerPanel({
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-2">
-          {!isRunning && !isPaused ? (
+          {!isRunning && !isPaused && (!listeningProgressOnly || !showTimedSessionForm) ? (
             <button
               type="button"
               onClick={onStart}
@@ -212,6 +214,6 @@ export default function CuriosityTimerPanel({
       {timerSaveMessage ? (
         <p className="mt-2 text-xs text-emerald-600">{timerSaveMessage}</p>
       ) : null}
-    </div>
+    </fieldset>
   );
 }

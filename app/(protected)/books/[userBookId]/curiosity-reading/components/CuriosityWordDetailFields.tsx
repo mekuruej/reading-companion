@@ -19,6 +19,7 @@ type CuriosityWordDetailPreview = {
 };
 
 type CuriosityWordDetailFieldsProps = {
+  listening?: boolean;
   quickPreview: CuriosityWordDetailPreview;
   chapterNameOptions: string[];
   isEditing: boolean;
@@ -41,6 +42,7 @@ type CuriosityWordDetailFieldsProps = {
 };
 
 export default function CuriosityWordDetailFields({
+  listening = false,
   quickPreview,
   chapterNameOptions,
   isEditing,
@@ -80,20 +82,20 @@ export default function CuriosityWordDetailFields({
               placeholder="Reading"
               className="w-full rounded border bg-white px-3 py-2 text-sm"
             />
-            <WordFieldGuide field="reading" />
+            {!listening && <WordFieldGuide field="reading" />}
           </div>
 
-          <AlternativeSpellingField main={quickPreview.surface} value={quickPreview.alternateSurface} onChange={onAlternateSurfaceChange} onPromote={onPromoteAlternative} />
+          <AlternativeSpellingField hideStudyGuide={listening} main={quickPreview.surface} value={quickPreview.alternateSurface} onChange={onAlternateSurfaceChange} onPromote={onPromoteAlternative} />
         </div>
       </div>
 
-      {contextFields}
+      {!listening && contextFields}
 
       <div>
         <label className="mb-2 block text-sm font-medium text-stone-700">
           Meaning
         </label>
-        <WordFieldGuide field="meaning" />
+        {!listening && <WordFieldGuide field="meaning" />}
 
         {quickPreview.meanings.length > 0 ? (
           <div className="mb-3 space-y-2 rounded-xl border border-stone-200 bg-white p-3">
@@ -125,7 +127,7 @@ export default function CuriosityWordDetailFields({
         />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      {!listening && <div className="grid gap-3 sm:grid-cols-3">
         <WordPositionField value={quickPreview.page} unit={positionUnit} onChange={onPageChange} onUnitChange={isEditing ? onPositionUnitChange : undefined} />
 
         <ChapterNameCombobox
@@ -147,6 +149,7 @@ export default function CuriosityWordDetailFields({
         </label>
       </div>
 
+      }
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"

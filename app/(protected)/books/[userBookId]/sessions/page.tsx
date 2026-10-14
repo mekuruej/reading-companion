@@ -2,6 +2,7 @@
 //
 "use client";
 
+import { ListeningHistoryWords } from "@/components/listening/ListeningSessionWords";
 import AudioTimeInput from "@/components/books/AudioTimeInput";
 import { DNF_REASON_OPTIONS } from "@/lib/books/dnf";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
@@ -110,6 +111,7 @@ export default function ReadingSessionsPage() {
   const params = useParams<{ userBookId: string }>();
   const userBookId = params?.userBookId;
 
+  const [ownsBook, setOwnsBook] = useState(false);
   const [loading, setLoading] = useState(true);
   const [accessMessage, setAccessMessage] = useState("");
   const [row, setRow] = useState<UserBookRow | null>(null);
@@ -220,6 +222,7 @@ export default function ReadingSessionsPage() {
       }
 
       const loadedRow = data as unknown as UserBookRow;
+      setOwnsBook(loadedRow.user_id === user.id);
       let canAccessBook = loadedRow.user_id === user.id || isSuperTeacher;
 
       if (!canAccessBook && role === "teacher") {
@@ -426,7 +429,7 @@ export default function ReadingSessionsPage() {
   }
 
   async function deleteSession(id: string) {
-    const ok = window.confirm("Delete this reading session?");
+    const ok = window.confirm(sessions.find(s => s.id === id)?.session_mode === "listening" ? "Delete this listening session and all words captured in it? This cannot be undone." : "Delete this reading session?");
     if (!ok || !row?.id) return;
 
     try {
@@ -716,6 +719,7 @@ export default function ReadingSessionsPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="font-medium">{session.read_on}</div>
+                        {session.session_mode === "listening" && <div className="mt-1 text-stone-500">Listening · {new Date(session.created_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</div>}
                         {session.session_mode === "curiosity" ? (
                           <div className="mt-1 text-stone-500">Curiosity Reading</div>
                         ) : null}
@@ -743,6 +747,7 @@ export default function ReadingSessionsPage() {
                         </button>
                       </div>
                     </div>
+                    {ownsBook && session.session_mode === "listening" && <ListeningHistoryWords sessionId={session.id} />}
                   </div>
                 );
               })}

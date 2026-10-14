@@ -31,10 +31,10 @@ export default function RemoveFromLibraryDialog({
 
         <p className="mt-3 text-sm leading-6 text-stone-700">
           {teachingOnly
-            ? "Delete this copy, its saved words, reading history and journal, plus your teaching-book entry, prep items and teaching vocabulary for this edition. Private Teacher Notebook notes and lists, student copies, and the shared catalog book remain."
+            ? "Delete this copy, its saved words, listening captures, reading history and journal, plus your teaching-book entry, prep items and teaching vocabulary for this edition. Private Teacher Notebook notes and lists, student copies, and the shared catalog book remain."
             : retainForTeaching
             ? "Do you want to keep this book in My Teaching Books?"
-            : "This will remove the book from your Mekuru library, including your saved words, reading sessions, and stats for this book. The shared book record will stay in Mekuru."}
+            : "This will remove the book from your Mekuru library, including your saved words, listening captures, reading sessions, and stats for this book. The shared book record will stay in Mekuru."}
         </p>
 
         {retainForTeaching && !teachingOnly ? (
@@ -43,12 +43,12 @@ export default function RemoveFromLibraryDialog({
             <label className="block rounded-xl border border-stone-200 p-3">
               <input type="radio" name="teaching-removal" checked={choice === "keep"} onChange={() => setChoice("keep")} className="mr-2" />
               <span className="font-semibold">Keep in My Teaching Books</span>
-              <span className="mt-1 block text-xs leading-5">Stop personal tracking and preserve reading history, journal, vocabulary, and teaching work.</span>
+              <span className="mt-1 block text-xs leading-5">Stop personal tracking and preserve reading history, listening captures, journal, vocabulary, and teaching work.</span>
             </label>
             <label className="block rounded-xl border border-stone-200 p-3">
               <input type="radio" name="teaching-removal" checked={choice === "remove"} onChange={() => setChoice("remove")} className="mr-2" />
               <span className="font-semibold">Remove from both</span>
-              <span className="mt-1 block text-xs leading-5">Delete this personal copy, its saved words, reading history and journal, plus your teaching-book entry, prep items and teaching vocabulary for this edition. Private Teacher Notebook notes and lists, student copies, and the shared catalog book remain.</span>
+              <span className="mt-1 block text-xs leading-5">Delete this personal copy, its saved words, listening captures, reading history and journal, plus your teaching-book entry, prep items and teaching vocabulary for this edition. Private Teacher Notebook notes and lists, student copies, and the shared catalog book remain.</span>
             </label>
           </fieldset>
         ) : null}

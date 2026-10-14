@@ -3,6 +3,7 @@
 
 "use client";
 import BookProgressSummaryBar from "@/components/books/BookProgressSummaryBar";
+import { ListeningStoppingPoint } from "@/components/listening/ListeningStoppingPoint";
 import { useSessionEndingPhrase, SessionEndingPhraseField, LatestEndingPhrase } from "@/components/books/SessionEndingPhrase";
 import AudioTimeInput from "@/components/books/AudioTimeInput";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
@@ -27,6 +28,7 @@ type SessionMode = "fluid" | "listening";
 type SimpleTimedSessionPageProps = {
     sessionMode: SessionMode;
     allowNativeReadListenToggle?: boolean;
+    nativeListeningPosition?: boolean;
     onActiveSessionModeChange?: (mode: SessionMode) => void;
     eyebrow: string;
     title: string;
@@ -61,6 +63,7 @@ function formatTimer(totalSeconds: number) {
 export default function SimpleTimedSessionPage({
     sessionMode,
     allowNativeReadListenToggle = false,
+    nativeListeningPosition = false,
     onActiveSessionModeChange,
     eyebrow,
     title,
@@ -115,7 +118,7 @@ export default function SimpleTimedSessionPage({
     const [progressUpdateMessage, setProgressUpdateMessage] = useState("");
     const [savingProgressUpdate, setSavingProgressUpdate] = useState(false);
     const skippedInitialPersistenceWriteRef = useRef(false);
-    const isNativeListeningMode = allowNativeReadListenToggle && activeSessionMode === "listening";
+    const isNativeListeningMode = (allowNativeReadListenToggle || nativeListeningPosition) && activeSessionMode === "listening";
     const activeEyebrow = allowNativeReadListenToggle
         ? activeSessionMode === "listening"
             ? "Listening"
@@ -846,7 +849,7 @@ export default function SimpleTimedSessionPage({
                 </p>
             ) : null}
 
-            <LatestEndingPhrase phrase={latestEndingPhrase} />
+            {activeSessionMode === "listening" ? <ListeningStoppingPoint userBookId={userBookId} refreshKey={showTimedSessionForm} /> : <LatestEndingPhrase phrase={latestEndingPhrase} />}
             {timerSaveMessage ? (
                 <p className="mt-3 text-xs text-emerald-600">{timerSaveMessage}</p>
             ) : null}
@@ -946,7 +949,7 @@ export default function SimpleTimedSessionPage({
         </div>
     ) : null;
 
-    const progressUpdatePanel = allowNativeReadListenToggle ? (
+    const progressUpdatePanel = (allowNativeReadListenToggle || nativeListeningPosition) ? (
         <div className={workspaceCompact ? "mt-3 rounded-2xl bg-stone-50 p-4" : "mt-4 rounded-3xl bg-stone-50 p-5"}>
             {!showProgressUpdateForm ? (
                 <button

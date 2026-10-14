@@ -1,6 +1,9 @@
 // Curiosity Reading / Listening word timer experience
 //
 "use client";
+import { useListeningCapture } from "@/lib/listening/useListeningCapture";
+import { ListeningSessionWords } from "@/components/listening/ListeningSessionWords";
+import { ListeningStoppingPoint } from "@/components/listening/ListeningStoppingPoint";
 import VocabularyProgressPrompt from "@/components/books/VocabularyProgressPrompt";
 import BookProgressSummaryBar from "@/components/books/BookProgressSummaryBar";
 import { useSessionEndingPhrase, SessionEndingPhraseField, LatestEndingPhrase } from "@/components/books/SessionEndingPhrase";
@@ -367,6 +370,8 @@ function CuriosityReadingContent({
   const [userBookId, setUserBookId] = useState(routeUserBookId);
   const { sessionEndingPhrase, setSessionEndingPhrase, latestEndingPhrase, markPhraseSaved } = useSessionEndingPhrase(userBookId, timedSessionMode);
 
+  const capture = useListeningCapture(userBookId, isListeningMode);
+
   const progressTotal = matchingTotal(tracking.method, tracking.totals);
   const labels = progressLabels(tracking.method);
   const [username, setUsername] = useState("");
@@ -451,6 +456,13 @@ function CuriosityReadingContent({
   const [sessionDate, setSessionDate] = useState("");
   const [timerPersistenceReady, setTimerPersistenceReady] = useState(false);
   const skippedInitialPersistenceWriteRef = useRef(false);
+
+  useEffect(() => {
+    if (!isListeningMode || !capture.completed) return;
+    setIsRunning(false); setIsPaused(false); setShowTimedSessionForm(false);
+    setStartTime(null); setAccumulatedElapsedMs(0); setElapsed(0);
+    clearPersistedTimedSession("listening", userBookId);
+  }, [isListeningMode, capture.completed, userBookId]);
 
   const quickMetaStorageKey = `${experienceMode}-add-meta:${userBookId}`;
   const getSavedQuickMeta = useCallback(() => {
@@ -613,7 +625,7 @@ function CuriosityReadingContent({
       }
 
       const ownerUserId = (userBook as any)?.user_id ?? "";
-      const allowed = await canAccessUserBook(user.id, ownerUserId, profile ?? null);
+      const allowed = isListeningMode ? user.id === ownerUserId : await canAccessUserBook(user.id, ownerUserId, profile ?? null);
 
       if (!allowed) {
         setAccessMessage("You do not have access to this book.");
@@ -783,7 +795,7 @@ function CuriosityReadingContent({
   }, [isRunning, isPaused, showTimedSessionForm, onActiveTimerChange]);
 
   useEffect(() => {
-    if (wordCaptureOnly || !userBookId || !tracking.loaded) return;
+    if (wordCaptureOnly || !userBookId || !tracking.loaded || (isListeningMode && (!capture.ready || !canAccessBook))) return;
     if (!tracking.timersEnabled) {
       setIsRunning(false);
       setIsPaused(false);
@@ -795,7 +807,7 @@ function CuriosityReadingContent({
 
     skippedInitialPersistenceWriteRef.current = false;
     const persisted = readPersistedTimedSession(timedSessionMode, userBookId);
-    if (persisted) {
+    if (persisted && (!isListeningMode || (persisted.captureOwnerId === capture.owner && !capture.completed))) {
       const restoredElapsedMs = elapsedMsForPersistedTimedSession(persisted);
       const restoredRunning =
         !persisted.isPaused &&
@@ -816,7 +828,7 @@ function CuriosityReadingContent({
     }
 
     setTimerPersistenceReady(true);
-  }, [timedSessionMode, userBookId, tracking.loaded, tracking.method, wordCaptureOnly]);
+  }, [timedSessionMode, userBookId, tracking.loaded, tracking.method, wordCaptureOnly, isListeningMode, capture.ready, capture.owner, capture.completed, canAccessBook]);
 
   useEffect(() => {
     if (isRunning && startTime) {
@@ -842,7 +854,7 @@ function CuriosityReadingContent({
   }, [accumulatedElapsedMs, isRunning, startTime]);
 
   useEffect(() => {
-    if (!timerPersistenceReady || !userBookId || !tracking.timersEnabled) return;
+    if (!timerPersistenceReady || !userBookId || !tracking.timersEnabled || (isListeningMode && (!capture.ready || !capture.identity || !canAccessBook))) return;
 
     if (!skippedInitialPersistenceWriteRef.current) {
       skippedInitialPersistenceWriteRef.current = true;
@@ -856,6 +868,7 @@ function CuriosityReadingContent({
 
     writePersistedTimedSession({
       version: 1,
+      ...(isListeningMode && capture.identity ? { captureSessionId: capture.identity.id, captureOwnerId: capture.identity.owner, captureStartedAt: capture.identity.startedAt } : {}),
       sessionMode: timedSessionMode,
       trackingUnit: tracking.method,
       userBookId,
@@ -882,18 +895,23 @@ function CuriosityReadingContent({
     timedSessionMode,
     tracking.method,
     tracking.timersEnabled,
+    capture.identity,
+    capture.ready,
+    canAccessBook,
+    isListeningMode,
     timerPersistenceReady,
     userBookId,
   ]);
 
   useEffect(() => {
-    if (!timerPersistenceReady || !userBookId || !tracking.timersEnabled) return;
+    if (!timerPersistenceReady || !userBookId || !tracking.timersEnabled || (isListeningMode && (!capture.ready || !capture.identity || !canAccessBook))) return;
 
     const persistCurrentTimer = () => {
       if (!isRunning && !isPaused && !showTimedSessionForm && accumulatedElapsedMs <= 0) return;
 
       writePersistedTimedSession({
         version: 1,
+        ...(isListeningMode && capture.identity ? { captureSessionId: capture.identity.id, captureOwnerId: capture.identity.owner, captureStartedAt: capture.identity.startedAt } : {}),
         sessionMode: timedSessionMode,
         trackingUnit: tracking.method,
         userBookId,
@@ -933,6 +951,10 @@ function CuriosityReadingContent({
     timedSessionMode,
     tracking.method,
     tracking.timersEnabled,
+    capture.identity,
+    capture.ready,
+    canAccessBook,
+    isListeningMode,
     timerPersistenceReady,
     userBookId,
   ]);
@@ -954,7 +976,7 @@ function CuriosityReadingContent({
     let cancelled = false;
 
     async function loadLibraryColors() {
-      if (isEnglishBook) {
+      if (isListeningMode || isEnglishBook) {
         setLibraryColorByWordKey({});
         return;
       }
@@ -1004,7 +1026,7 @@ function CuriosityReadingContent({
     return () => {
       cancelled = true;
     };
-  }, [quickSessionWords, quickPreview.surface, quickPreview.reading, quickPreview.id, isEnglishBook]);
+  }, [quickSessionWords, quickPreview.surface, quickPreview.reading, quickPreview.id, isEnglishBook, isListeningMode]);
 
   function prepareForNextQuickWord() {
     window.setTimeout(() => {
@@ -1253,6 +1275,13 @@ function CuriosityReadingContent({
   }
 
   async function saveQuickWord(options: { requireSelectedLookup?: boolean } = {}) {
+    if (isListeningMode) {
+      if (!capture.identity || capture.completed || !(isRunning || isPaused || showTimedSessionForm)) return;
+      if (!quickPreview.surface.trim()) return;
+      const saved = await capture.save({ surface: quickPreview.surface.trim(), reading: quickPreview.reading.trim(), meaning: quickPreview.meaning, alternative_surface: quickPreview.alternateSurface.trim() });
+      if (saved) clearQuickWordFields({ preserveSavedNotice: false });
+      return;
+    }
     if (isEnglishBook) {
       await saveEnglishQuickWord();
       return;
@@ -1739,19 +1768,16 @@ function CuriosityReadingContent({
     const minutes = Math.max(1, Math.round(elapsed / 60));
     const readOn = isListeningMode ? sessionDate || todayYmdAppTimeZone() : todayYmdAppTimeZone();
 
-    const { error } = await supabase.from("user_book_reading_sessions").insert({
-      user_book_id: userBookId,
-      read_on: readOn,
-      ...parsed.payload,
-      minutes_read: minutes,
-      session_mode: isListeningMode ? "listening" : "curiosity",
+    const historyPayload = {
+      user_book_id: userBookId, read_on: readOn, ...parsed.payload,
+      minutes_read: minutes, session_mode: isListeningMode ? "listening" : "curiosity",
       ...(sessionEndingPhrase.trim() ? { ending_phrase: sessionEndingPhrase.trim() } : {}),
-    });
-
-    if (error) {
-      console.error("Error saving reading session:", error);
-      setMessage(`❌ Could not save reading session: ${error.message}`);
-      return;
+    };
+    if (isListeningMode) {
+      if (!await capture.finish(historyPayload)) return;
+    } else {
+      const { error } = await supabase.from("user_book_reading_sessions").insert(historyPayload);
+      if (error) { setMessage(`❌ Could not save reading session: ${error.message}`); return; }
     }
 
     if (!isListeningMode) {
@@ -1890,6 +1916,7 @@ function CuriosityReadingContent({
       startPageLabel={`Start ${labels.unit.toLowerCase()}`}
       endPageLabel={`End ${labels.unit.toLowerCase()}`}
       listeningProgressOnly={isListeningMode}
+      sessionSaving={isListeningMode && capture.isFinalizing}
       isRunning={isRunning}
       isPaused={isPaused}
       elapsed={elapsed}
@@ -1897,20 +1924,29 @@ function CuriosityReadingContent({
       sessionStartPage={sessionStartPage}
       sessionEndPage={sessionEndPage}
       endingPhraseField={<SessionEndingPhraseField value={sessionEndingPhrase} onChange={setSessionEndingPhrase} listening={isListeningMode} />}
-      latestEndingPhrase={wordCaptureOnly || isListeningMode ? <LatestEndingPhrase phrase={latestEndingPhrase} /> : null}
+      latestEndingPhrase={isListeningMode ? <ListeningStoppingPoint userBookId={userBookId} refreshKey={capture.completed} /> : wordCaptureOnly ? <LatestEndingPhrase phrase={latestEndingPhrase} /> : null}
       timerSaveMessage={timerSaveMessage}
       formatTimer={formatTimer}
       compact={workspaceCompact || useCompactSessionBar}
       onStart={() => {
+        if (isListeningMode && (showTimedSessionForm || (capture.identity && !capture.completed))) return;
         if (!tracking.timersEnabled) return;
         if (!tracking.requireMethod()) return;
+        const startedAt = Date.now();
+        if (isListeningMode) {
+          const identity = capture.start(identity => writePersistedTimedSession({version:1, sessionMode:"listening", userBookId, captureSessionId:identity.id, captureOwnerId:identity.owner, captureStartedAt:identity.startedAt, startedAt, accumulatedElapsedMs:0, isPaused:false, sessionDate:todayYmdAppTimeZone(), sessionStartPage:"", sessionEndPage:"", showTimedSessionForm:false, savedAt:startedAt, trackingUnit:tracking.method}));
+          if (!identity) return;
+          clearQuickWordFields();
+          void capture.ensure(identity).catch(() => setMessage("Your timer is running. The capture session will retry connecting when you save."));
+        }
         setSessionDate(todayYmdAppTimeZone());
-        setStartTime(Date.now());
+        setStartTime(startedAt);
         setAccumulatedElapsedMs(0);
         setElapsed(0);
         setIsRunning(true);
         setIsPaused(false);
         setHasFinishedTimer(false);
+        setShowTimedSessionForm(false);
       }}
       onPause={() => {
         const nextElapsedMs =
@@ -1944,6 +1980,10 @@ function CuriosityReadingContent({
       }}
       onSaveSession={() => void saveReadingSession()}
       onCancelSession={() => {
+        if (isListeningMode) {
+          setShowTimedSessionForm(false); setHasFinishedTimer(false); setIsPaused(true);
+          return;
+        }
         setSessionEndingPhrase("");
         setShowTimedSessionForm(false);
         setElapsed(0);
@@ -2033,7 +2073,7 @@ function CuriosityReadingContent({
 
   const content = (
     <>
-      {quickSessionWords.length > 0 && !isRunning && !isPaused && !showTimedSessionForm && !hasFinishedTimer && elapsed === 0 ?
+      {!isListeningMode && quickSessionWords.length > 0 && !isRunning && !isPaused && !showTimedSessionForm && !hasFinishedTimer && elapsed === 0 ?
         <VocabularyProgressPrompt userBookId={userBookId} studentId={studentContext?.studentId} sourceUserBookId={studentContext?.sourceUserBookId}
           positions={quickSessionWords.map(word => ({ value: word.page, unit: word.positionUnit }))} /> : null}
       {!wordCaptureOnly && showProgressSummaryBar ? <BookProgressSummaryBar userBookId={userBookId} listening={isListeningMode} showBackLink={workspaceCompact} /> : null}
@@ -2073,7 +2113,7 @@ function CuriosityReadingContent({
         </>
       )}
 
-      <div className={workspaceCompact ? "hidden" : "md:hidden"}>
+      {!isListeningMode && <div className={workspaceCompact ? "hidden" : "md:hidden"}>
         {isEnglishBook ? (
           <CuriosityAddEditWordCard
             title="Save English Word / Phrase"
@@ -2230,9 +2270,12 @@ function CuriosityReadingContent({
         )}
       </div>
 
+      }
+      {isListeningMode && capture.error && <p role="alert" className="my-3 text-sm text-red-700">{capture.error}<button type="button" className="ml-2 underline" disabled={capture.busy} onClick={() => void capture.recover()}>Retry recovery</button></p>}
+      {(!isListeningMode || (capture.identity && !capture.completed && (isRunning || isPaused || showTimedSessionForm))) && <fieldset disabled={isListeningMode && (capture.busy || capture.isFinalizing)} className="min-w-0">
       <div
         className={
-          workspaceCompact && workspaceAside
+          isListeningMode ? "block" : workspaceCompact && workspaceAside
             ? onCloseWorkspaceAside
               ? "grid min-w-0 md:grid-cols-[minmax(0,1fr)_minmax(24rem,30rem)] md:items-start md:gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(26rem,32rem)]"
               : "hidden md:grid md:grid-cols-[minmax(0,1fr)_minmax(24rem,30rem)] md:items-start md:gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(26rem,32rem)]"
@@ -2313,6 +2356,7 @@ function CuriosityReadingContent({
               ) : (
                 <>
                   <CuriosityQuickSearchRow
+                    listening={isListeningMode}
                     surface={quickPreview.surface}
                     reading={quickPreview.reading}
                     quickLoading={quickLoading}
@@ -2380,6 +2424,7 @@ function CuriosityReadingContent({
                   />
 
                   <CuriosityWordDetailFields
+                    listening={isListeningMode}
                     quickPreview={quickPreview}
                     chapterNameOptions={sortedChapterNameOptions}
                     isEditing={quickPreview.id != null}
@@ -2444,7 +2489,7 @@ function CuriosityReadingContent({
                 </>
               )}
             </CuriosityAddEditWordFormShell>
-            <CuriosityRecentSessionWords wordCount={quickSessionWords.length}>
+            {!isListeningMode && <CuriosityRecentSessionWords wordCount={quickSessionWords.length}>
 
               <div className="mt-3 space-y-3">
                 {quickSessionWords.slice(0, 2).map((item, index) => {
@@ -2520,7 +2565,7 @@ function CuriosityReadingContent({
                   </div>
                 </details>
               ) : null}
-            </CuriosityRecentSessionWords>
+            </CuriosityRecentSessionWords>}
           </CuriosityAddEditWordCard>
         </div>
         {workspaceCompact && workspaceAside ? (
@@ -2541,6 +2586,9 @@ function CuriosityReadingContent({
           </div>
         ) : null}
       </div>
+      </fieldset>}
+      {isListeningMode && capture.identity && <ListeningSessionWords words={capture.words} />}
+
     </>
   );
 

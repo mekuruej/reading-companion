@@ -101,6 +101,17 @@ async function requireAuthorizedBook(req: Request, userBookId: string) {
 }
 
 
+async function requireCaptureOwner(req: Request, sessionId: string) {
+  const { data, error } = await supabaseAdmin.from("listening_capture_sessions")
+    .select("user_id").eq("reading_session_id", sessionId).maybeSingle();
+  if (error) throw error;
+  if (!data) return;
+  const auth = await getAuthenticatedUser(req);
+  if (!("user" in auth) || auth.user.id !== data.user_id) {
+    throw Object.assign(new Error("Only the owner may change captured listening history."), { status: 403 });
+  }
+}
+
 export async function GET(
   req: Request,
   context: { params: Promise<{ userBookId: string }> }
@@ -141,7 +152,7 @@ export async function GET(
     console.error("Error loading reading sessions:", error);
     return NextResponse.json(
       { error: error?.message ?? "Could not load reading sessions." },
-      { status: error?.status === 400 ? 400 : 500 }
+      { status: error?.status === 403 ? 403 : error?.status === 400 ? 400 : 500 }
     );
   }
 }
@@ -204,7 +215,7 @@ export async function POST(
     console.error("Error saving reading session:", error);
     return NextResponse.json(
       { error: error?.message ?? "Could not save reading session." },
-      { status: error?.status === 400 ? 400 : 500 }
+      { status: error?.status === 403 ? 403 : error?.status === 400 ? 400 : 500 }
     );
   }
 }
@@ -252,6 +263,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Session id is required." }, { status: 400 });
     }
 
+    await requireCaptureOwner(req, sessionId);
     const { data: existing, error: existingError } = await supabaseAdmin.from("user_book_reading_sessions")
       .select("tracking_unit, progress_total").eq("id", sessionId).eq("user_book_id", userBookId).maybeSingle();
     if (existingError) throw existingError;
@@ -275,7 +287,7 @@ export async function PATCH(
     console.error("Error updating reading sessions:", error);
     return NextResponse.json(
       { error: error?.message ?? "Could not update reading sessions." },
-      { status: error?.status === 400 ? 400 : 500 }
+      { status: error?.status === 403 ? 403 : error?.status === 400 ? 400 : 500 }
     );
   }
 }
@@ -302,6 +314,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Session id is required." }, { status: 400 });
     }
 
+    await requireCaptureOwner(req, sessionId);
     const { error } = await supabaseAdmin
       .from("user_book_reading_sessions")
       .delete()
@@ -314,7 +327,7 @@ export async function DELETE(
     console.error("Error deleting reading session:", error);
     return NextResponse.json(
       { error: error?.message ?? "Could not delete reading session." },
-      { status: error?.status === 400 ? 400 : 500 }
+      { status: error?.status === 403 ? 403 : error?.status === 400 ? 400 : 500 }
     );
   }
 }

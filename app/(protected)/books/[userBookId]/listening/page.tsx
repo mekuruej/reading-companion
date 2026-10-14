@@ -214,10 +214,10 @@ export default function ListeningPage() {
   const listeningExperience = isNativeListeningWorkspace ? (
     <SimpleTimedSessionPage
       sessionMode="listening"
-      allowNativeReadListenToggle
+      nativeListeningPosition
       onActiveSessionModeChange={setNativeSessionMode}
       eyebrow="Listening"
-      title="Read / Listen"
+      title="Listening"
       subtitle="Timed listening"
       description="Listen to your audiobook and log the time separately from reading pace."
       saveSuccessMessage="Your listening session has been saved in Reading History."
