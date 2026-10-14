@@ -162,6 +162,7 @@ export default function TeacherBookReviewPage() {
     const [saveMessage, setSaveMessage] = useState("");
 
     const [row, setRow] = useState<UserBook | null>(null);
+    const [teacherId, setTeacherId] = useState<string | null>(null);
 
     const [recommendedLevel, setRecommendedLevel] = useState("");
     const [teacherStudentUseRating, setTeacherStudentUseRating] = useState("");
@@ -189,6 +190,8 @@ export default function TeacherBookReviewPage() {
                 setLoading(false);
                 return;
             }
+
+            setTeacherId(user.id);
 
             const { data: profile, error: profileError } = await supabase
                 .from("profiles")
@@ -219,7 +222,6 @@ export default function TeacherBookReviewPage() {
                 .select(`
           id,
           user_id,
-          notes,
           recommended_level,
           teacher_student_use_rating,
           finished_at,
@@ -245,6 +247,21 @@ export default function TeacherBookReviewPage() {
                 ...(data as any),
                 books: getBook(data),
             };
+
+            const { data: assessmentNotes, error: assessmentNotesError } = await supabase
+                .from("teacher_user_book_assessment_notes")
+                .select("notes")
+                .eq("teacher_id", user.id)
+                .eq("user_book_id", userBookId)
+                .maybeSingle();
+            if (cancelled) return;
+            if (assessmentNotesError) {
+                console.error("Error loading teacher assessment notes:", assessmentNotesError);
+                setErrorMessage("Could not load teacher assessment notes.");
+                setLoading(false);
+                return;
+            }
+            nextRow.notes = assessmentNotes?.notes ?? null;
 
             setRow(nextRow);
             setRecommendedLevel(nextRow.recommended_level ?? "");
@@ -281,7 +298,6 @@ export default function TeacherBookReviewPage() {
         const { error } = await supabase
             .from("user_books")
             .update({
-                notes: notes.trim() || null,
                 recommended_level: recommendedLevel || null,
                 teacher_student_use_rating: teacherStudentUseRating
                     ? clampRating5(teacherStudentUseRating)
@@ -289,13 +305,35 @@ export default function TeacherBookReviewPage() {
             })
             .eq("id", row.id);
 
-        setSaving(false);
-
         if (error) {
+            setSaving(false);
             console.error("Error saving teacher review:", error);
             setErrorMessage(error.message || "Could not save teacher review.");
             return;
         }
+
+        if (!teacherId) {
+            setSaving(false);
+            setErrorMessage("Could not verify teacher access.");
+            return;
+        }
+
+        const { error: assessmentNotesError } = await supabase
+            .from("teacher_user_book_assessment_notes")
+            .upsert({
+                teacher_id: teacherId,
+                user_book_id: row.id,
+                notes: notes.trim(),
+                updated_at: new Date().toISOString(),
+            }, { onConflict: "teacher_id,user_book_id" });
+        if (assessmentNotesError) {
+            console.error("Error saving teacher assessment notes:", assessmentNotesError);
+            setSaving(false);
+            setErrorMessage(assessmentNotesError?.message || "Could not save teacher assessment notes.");
+            return;
+        }
+
+        setSaving(false);
 
         setRow((prev) =>
             prev

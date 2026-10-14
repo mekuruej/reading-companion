@@ -9,6 +9,7 @@ import { getFeatureAccess } from "@/lib/access/featureAccess";
 import { canUseFullAccessFeature } from "@/lib/access/requireFullAccess";
 import { getEnglishNativeTrackerBookMode } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
+import { loadPrivateJournalFields } from "@/lib/books/privateJournal";
 import ReadingJournalPanel from "../components/ReadingJournalPanel";
 import {
   CuriosityReadingExperience,
@@ -71,7 +72,7 @@ export default function CuriosityReadingPage() {
 
       const { data: userBook, error: userBookError } = await supabase
         .from("user_books")
-        .select("id, user_id, favorite_quotes, books ( language_code, page_count )")
+        .select("id, user_id, books ( language_code, page_count )")
         .eq("id", userBookId)
         .maybeSingle();
 
@@ -163,11 +164,19 @@ export default function CuriosityReadingPage() {
       });
       const canUseCuriosityReading = canUseFullAccessFeature(featureAccess, "curiosity_reading");
 
+      const ownsBook = ownerUserId === user.id;
       setCanUseReadingWorkspace(
-        Boolean(canAccessBook && ownerUserId && canUseCuriosityReading && featureAccess.canUseStoryNotes)
+        Boolean(ownsBook && canUseCuriosityReading && featureAccess.canUseStoryNotes)
       );
-      setJournalOwnerUserId(canAccessBook ? ownerUserId : null);
-      setFavoriteQuotes(canAccessBook ? ((userBook as any).favorite_quotes ?? null) : null);
+      setJournalOwnerUserId(ownsBook ? ownerUserId : null);
+      if (ownsBook) {
+        const { data: privateJournal, error: privateJournalError } = await loadPrivateJournalFields(userBookId);
+        if (cancelled) return;
+        if (privateJournalError) console.error("Error loading private Reading Journal fields:", privateJournalError);
+        setFavoriteQuotes(privateJournal.favorite_quotes);
+      } else {
+        setFavoriteQuotes(null);
+      }
       setChecking(false);
     }
 

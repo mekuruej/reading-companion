@@ -15,6 +15,7 @@ import { isReadyForFlashcards } from "@/lib/wordSupportEligibility";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { loadPrivateJournalFields } from "@/lib/books/privateJournal";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
 import { displayBookTitle } from "@/lib/books/bookIdentity";
@@ -500,7 +501,6 @@ function ReadAlongContent() {
                 .select(`
                     id,
                     user_id,
-                    favorite_quotes,
                     books:book_id (
                         title,
                         cover_url,
@@ -577,7 +577,13 @@ function ReadAlongContent() {
             setBookCover(book?.cover_url ?? "");
             setBookLanguageCode(book?.language_code ?? null);
             setBookPageCount(book?.page_count ?? null);
-            setFavoriteQuotes((userBook as any)?.favorite_quotes ?? null);
+            if (ownerUserId === user.id) {
+                const { data: privateJournal, error: privateJournalError } = await loadPrivateJournalFields(userBookId);
+                if (privateJournalError) console.error("Error loading private Reading Journal fields:", privateJournalError);
+                setFavoriteQuotes(privateJournal.favorite_quotes);
+            } else {
+                setFavoriteQuotes(null);
+            }
 
             const appAccessStatus = profile
                 ? getAppAccessStatus(profile)
@@ -599,6 +605,7 @@ function ReadAlongContent() {
             setCanUseSavedWordReading(canUseSavedWordReadingNow);
             setCanUseReadingJournal(
                 Boolean(
+                    ownerUserId === user.id &&
                     (featureAccess.canUseStoryNotes || featureAccess.isTrial) &&
                     book?.language_code !== "en"
                 )
@@ -2364,7 +2371,7 @@ function ReadAlongContent() {
 
                 <div className={showReadingWorkspace ? "grid min-w-0 grid-cols-2 items-start gap-4" : "min-w-0"}>
                     <div className="min-w-0">{readerShell}</div>
-                    {canUseReadingJournal && learnerUserId && hasWorkspaceWidth ? (
+                    {canUseReadingJournal && ownsBook && learnerUserId && hasWorkspaceWidth ? (
                         <aside data-reading-journal className={showReadingWorkspace ? "min-w-0 overflow-x-auto" : "hidden"} aria-label="Reading Journal">
                             <ReadingJournalPanel
                                 userBookId={userBookId}
@@ -2383,7 +2390,7 @@ function ReadAlongContent() {
                         </aside>
                     ) : null}
                 </div>
-                {canUseReadingJournal && learnerUserId && !hasWorkspaceWidth ? (
+                {canUseReadingJournal && ownsBook && learnerUserId && !hasWorkspaceWidth ? (
                     <dialog
                         ref={mobileJournalRef}
                         data-reading-journal

@@ -198,7 +198,6 @@ export default function TeacherRatingsPage() {
                   id,
                   user_id,
                   book_id,
-                  notes,
                   recommended_level,
                   teacher_student_use_rating,
                   finished_at,
@@ -226,13 +225,27 @@ export default function TeacherRatingsPage() {
         if (bookError) throw bookError;
         if (cancelled) return;
 
+        const bookIds = ((bookRows ?? []) as UserBookRow[]).map((row) => row.id);
+        const { data: assessmentNotes, error: assessmentNotesError } = bookIds.length
+          ? await supabase
+              .from("teacher_user_book_assessment_notes")
+              .select("user_book_id, notes")
+              .eq("teacher_id", user.id)
+              .in("user_book_id", bookIds)
+          : { data: [], error: null };
+        if (assessmentNotesError) throw assessmentNotesError;
+        if (cancelled) return;
+        const notesByBook = new Map(
+          ((assessmentNotes ?? []) as Array<{ user_book_id: string; notes: string | null }>).map((item) => [item.user_book_id, item.notes])
+        );
+
         const learnerById = new Map(
           ((learnerRows ?? []) as ProfileRow[]).map((learner) => [learner.id, learner])
         );
         if (profile) learnerById.set(user.id, profile);
 
         const nextItems = ((bookRows ?? []) as UserBookRow[]).map((row) =>
-          toItem(row, learnerById)
+          toItem({ ...row, notes: notesByBook.get(row.id) ?? null }, learnerById)
         );
 
         setItems(nextItems);

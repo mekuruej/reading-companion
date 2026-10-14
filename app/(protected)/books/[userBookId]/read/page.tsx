@@ -25,6 +25,7 @@ import SimpleTimedSessionPage from "../_shared/timed-session/SimpleTimedSessionP
 import { CuriosityReadingExperience } from "../curiosity-reading/WordTimerExperience";
 import ReadingJournalPanel from "../components/ReadingJournalPanel";
 import { supabase } from "@/lib/supabaseClient";
+import { loadPrivateJournalFields } from "@/lib/books/privateJournal";
 
 type ReadingMode = "fluid" | "curiosity";
 type ReaderJournalContext = {
@@ -109,7 +110,7 @@ export default function ReadPage() {
         const [{ data: userBook, error: userBookError }, profileResult] = await Promise.all([
           supabase
             .from("user_books")
-            .select("user_id, favorite_quotes, books(language_code, page_count)")
+            .select("user_id, books(language_code, page_count)")
             .eq("id", userBookId)
             .maybeSingle(),
           supabase
@@ -148,6 +149,11 @@ export default function ReadPage() {
         // The reader journal belongs to the signed-in owner. Teacher/super-teacher
         // access to another user's Book Hub must not expose that user's private journal.
         if (ownerUserId === user.id) {
+          const { data: privateJournal, error: privateJournalError } = await loadPrivateJournalFields(userBookId);
+          if (cancelled) return;
+          if (privateJournalError) {
+            console.error("Error loading private Reading Journal fields:", privateJournalError);
+          }
           let canUseJapaneseLearningJournal = false;
           let japaneseLearningArchiveTabs = emptyJapaneseLearningJournalArchiveTabs;
 
@@ -175,7 +181,7 @@ export default function ReadPage() {
           }
 
           if (!cancelled) {
-            setJournalFavoriteQuotes(userBook.favorite_quotes ?? null);
+            setJournalFavoriteQuotes(privateJournal.favorite_quotes ?? null);
             setJournalContext({
               userBookId,
               ownerUserId: user.id,

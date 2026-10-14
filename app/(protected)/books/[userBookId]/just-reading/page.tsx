@@ -16,6 +16,7 @@ import {
 } from "@/lib/access/readingCompanion";
 import { wantsJapaneseLearning } from "@/lib/access/japaneseLearningIntent";
 import { supabase } from "@/lib/supabaseClient";
+import { loadPrivateJournalFields } from "@/lib/books/privateJournal";
 import ReadingJournalPanel from "../components/ReadingJournalPanel";
 import SimpleTimedSessionPage from "../_shared/timed-session/SimpleTimedSessionPage";
 
@@ -92,7 +93,7 @@ export default function JustReadingPage() {
 
             const { data: userBook, error: userBookError } = await supabase
                 .from("user_books")
-                .select("id, user_id, favorite_quotes, books ( language_code, page_count )")
+                .select("id, user_id, books ( language_code, page_count )")
                 .eq("id", userBookId)
                 .maybeSingle();
 
@@ -193,9 +194,17 @@ export default function JustReadingPage() {
 
                 if (cancelled) return;
 
-                setCanUseReadingJournal(Boolean(canAccessBook && ownerUserId));
-                setJournalOwnerUserId(canAccessBook ? ownerUserId : null);
-                setFavoriteQuotes(canAccessBook ? ((userBook as any).favorite_quotes ?? null) : null);
+                const ownsBook = ownerUserId === user.id;
+                setCanUseReadingJournal(ownsBook);
+                setJournalOwnerUserId(ownsBook ? ownerUserId : null);
+                if (ownsBook) {
+                    const { data: privateJournal, error: privateJournalError } = await loadPrivateJournalFields(userBookId);
+                    if (cancelled) return;
+                    if (privateJournalError) console.error("Error loading private Reading Journal fields:", privateJournalError);
+                    setFavoriteQuotes(privateJournal.favorite_quotes);
+                } else {
+                    setFavoriteQuotes(null);
+                }
                 setCanUseJapaneseLearningJournal(activeJapaneseLearningJournal);
                 setJapaneseLearningArchiveTabs(archiveTabs);
             } else {

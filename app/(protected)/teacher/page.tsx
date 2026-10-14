@@ -63,7 +63,6 @@ type TeacherRatingCountUserBookRow = {
   book_id: string | null;
   finished_at: string | null;
   dnf_at: string | null;
-  notes: string | null;
   recommended_level: string | null;
   teacher_student_use_rating: number | null;
   teacher_review_cleared_at: string | null;
@@ -232,7 +231,7 @@ export default function TeacherHubPage() {
             .is("teacher_review_cleared_at", null),
           supabase
             .from("user_books")
-            .select("id, book_id, finished_at, dnf_at, notes, recommended_level, teacher_student_use_rating, teacher_review_cleared_at")
+            .select("id, book_id, finished_at, dnf_at, recommended_level, teacher_student_use_rating, teacher_review_cleared_at")
             .in("user_id", studentIds),
         ]);
 

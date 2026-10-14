@@ -11,6 +11,7 @@ import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/
 import { getFeatureAccess } from "@/lib/access/featureAccess";
 import { getEnglishNativeTrackerBookMode } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
+import { loadPrivateJournalFields } from "@/lib/books/privateJournal";
 import ReadingJournalPanel from "../components/ReadingJournalPanel";
 import SimpleTimedSessionPage from "../_shared/timed-session/SimpleTimedSessionPage";
 import { CuriosityReadingExperience } from "../curiosity-reading/WordTimerExperience";
@@ -61,7 +62,6 @@ export default function ListeningPage() {
           `
           id,
           user_id,
-          favorite_quotes,
           books (
             language_code,
             page_count
@@ -155,11 +155,19 @@ export default function ListeningPage() {
         });
 
         setCanSaveWordsWhileListening(featureAccess.canUseListeningWordCapture);
+        const ownsBook = ownerUserId === user.id;
         setCanUseReadingJournal(
-          Boolean(canAccessBook && ownerUserId && (trackerMode.isEnglishNativeTrackerBook || featureAccess.canUseStoryNotes))
+          Boolean(ownsBook && (trackerMode.isEnglishNativeTrackerBook || featureAccess.canUseStoryNotes))
         );
-        setJournalOwnerUserId(canAccessBook ? ownerUserId : null);
-        setFavoriteQuotes(canAccessBook ? ((userBook as any).favorite_quotes ?? null) : null);
+        setJournalOwnerUserId(ownsBook ? ownerUserId : null);
+        if (ownsBook) {
+          const { data: privateJournal, error: privateJournalError } = await loadPrivateJournalFields(userBookId);
+          if (cancelled) return;
+          if (privateJournalError) console.error("Error loading private Reading Journal fields:", privateJournalError);
+          setFavoriteQuotes(privateJournal.favorite_quotes);
+        } else {
+          setFavoriteQuotes(null);
+        }
         setIsNativeListeningWorkspace(Boolean(canAccessBook && nativeListeningWorkspace));
         setAccessMessage(canAccessBook ? "" : "You do not have access to this book.");
       } else {

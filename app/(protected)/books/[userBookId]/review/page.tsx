@@ -11,6 +11,7 @@ import { getFeatureAccess } from "@/lib/access/featureAccess";
 import { getBookIdentity } from "@/lib/books/bookIdentity";
 import { isNativeLanguageBook } from "@/lib/books/englishNativeTracker";
 import { supabase } from "@/lib/supabaseClient";
+import { loadPrivateJournalFields, savePrivateJournalFields } from "@/lib/books/privateJournal";
 
 type ProfileRole = "teacher" | "member" | "super_teacher" | "admin";
 const REVIEW_RATING_VALUES = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
@@ -36,7 +37,6 @@ type BookRow = {
 type UserBookRow = {
   id: string;
   user_id: string;
-  notes: string | null;
   my_review: string | null;
   my_review_en: string | null;
   my_review_ja: string | null;
@@ -133,7 +133,6 @@ export default function ReviewNotesPage() {
           `
           id,
           user_id,
-          notes,
           my_review,
           my_review_en,
           my_review_ja,
@@ -168,10 +167,19 @@ export default function ReviewNotesPage() {
       }
 
       const loadedRow = data as unknown as UserBookRow;
-      const canAccessBook = loadedRow.user_id === user.id || isSuperTeacher;
+      const canAccessBook = loadedRow.user_id === user.id;
 
       if (!canAccessBook) {
         setAccessMessage("You do not have access to this private review.");
+        setLoading(false);
+        return;
+      }
+
+      const { data: privateJournal, error: privateJournalError } = await loadPrivateJournalFields(loadedRow.id);
+      if (cancelled) return;
+      if (privateJournalError) {
+        console.error("Error loading private Review & Notes fields:", privateJournalError);
+        setAccessMessage("Could not load your private review notes.");
         setLoading(false);
         return;
       }
@@ -200,7 +208,7 @@ export default function ReviewNotesPage() {
       }
 
       setRow(loadedRow);
-      setNotes(nativeLanguageBook ? loadedRow.notes ?? "" : loadedRow.my_review_ja ?? loadedRow.notes ?? "");
+      setNotes(nativeLanguageBook ? privateJournal.notes ?? "" : loadedRow.my_review_ja ?? privateJournal.notes ?? "");
       setMyReview(nativeLanguageBook ? loadedRow.my_review ?? "" : loadedRow.my_review_en ?? loadedRow.my_review ?? "");
       setRatingOverall(loadedRow.rating_overall == null ? "" : String(loadedRow.rating_overall));
       setIsEnglishNativeTrackerBook(nativeLanguageBook);
@@ -222,7 +230,6 @@ export default function ReviewNotesPage() {
 
     const reviewPatch = isEnglishNativeTrackerBook
       ? {
-          notes: notes.trim() || null,
           my_review: myReview.trim() || null,
           rating_overall: ratingOverall ? Number(ratingOverall) : null,
         }
@@ -236,21 +243,31 @@ export default function ReviewNotesPage() {
       .update(reviewPatch)
       .eq("id", row.id);
 
-    setSaving(false);
-
     if (error) {
+      setSaving(false);
       console.error("Error saving Review & Notes:", error);
       setSaveMessage("Could not save your review.");
       return;
     }
 
+    if (isEnglishNativeTrackerBook) {
+      const { error: privateJournalError } = await savePrivateJournalFields(row.id, { notes: notes.trim() || null });
+      if (privateJournalError) {
+        console.error("Error saving private Review & Notes fields:", privateJournalError);
+        setSaving(false);
+        setSaveMessage("Your review was saved, but private notes could not be saved.");
+        return;
+      }
+    }
+
+    setSaving(false);
+
     setRow((prev) =>
       prev
         ? {
-            ...prev,
-            ...(isEnglishNativeTrackerBook
+              ...prev,
+              ...(isEnglishNativeTrackerBook
               ? {
-                  notes: notes.trim() || null,
                   my_review: myReview.trim() || null,
                 }
               : {

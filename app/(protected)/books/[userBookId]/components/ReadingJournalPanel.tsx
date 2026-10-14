@@ -6,6 +6,7 @@ import type {
   JapaneseLearningJournalArchiveTabs,
 } from "@/lib/access/readingCompanion";
 import { supabase } from "@/lib/supabaseClient";
+import { loadPrivateJournalFields, savePrivateJournalFields } from "@/lib/books/privateJournal";
 import StoryTab from "./tabs/StoryTab";
 import { normalizeLanguageCode } from "@/lib/books/englishNativeTracker";
 import { DEFAULT_BOOK_JOURNAL_TAB, getBookJournalTabOrder } from "./tabs/bookJournalConfig";
@@ -359,24 +360,27 @@ export default function ReadingJournalPanel({
     let cancelled = false;
 
     async function loadReadingCompanionFields() {
-      const { data, error } = await supabase
-        .from("user_books")
-        .select("notes, rating_overall")
-        .eq("id", userBookId)
-        .eq("user_id", ownerUserId)
-        .maybeSingle();
+      const [{ data: journal, error: journalError }, { data: book, error: bookError }] = await Promise.all([
+        loadPrivateJournalFields(userBookId),
+        supabase
+          .from("user_books")
+          .select("rating_overall")
+          .eq("id", userBookId)
+          .eq("user_id", ownerUserId)
+          .maybeSingle(),
+      ]);
 
       if (cancelled) return;
 
-      if (error) {
-        console.error("Error loading Reading Journal companion fields:", error);
+      if (journalError || bookError) {
+        console.error("Error loading Reading Journal companion fields:", journalError ?? bookError);
         return;
       }
 
-      setNotes(data?.notes ?? "");
-      setSavedNotes(data?.notes ?? null);
-      setRatingOverall(data?.rating_overall == null ? "" : String(data.rating_overall));
-      setSavedRatingOverall(data?.rating_overall ?? null);
+      setNotes(journal.notes ?? "");
+      setSavedNotes(journal.notes ?? null);
+      setRatingOverall(book?.rating_overall == null ? "" : String(book.rating_overall));
+      setSavedRatingOverall(book?.rating_overall ?? null);
       setNotesSaveMessage("");
       setReviewSaveMessage("");
     }
@@ -1045,10 +1049,9 @@ export default function ReadingJournalPanel({
     setQuotesSaveMessage("");
 
     const nextFavoriteQuotes = favoriteQuoteInputsToText(favoriteQuoteInputs);
-    const { error } = await supabase
-      .from("user_books")
-      .update({ favorite_quotes: nextFavoriteQuotes || null })
-      .eq("id", userBookId);
+    const { error } = await savePrivateJournalFields(userBookId, {
+      favorite_quotes: nextFavoriteQuotes || null,
+    });
 
     setSavingQuotes(false);
 
@@ -1067,11 +1070,7 @@ export default function ReadingJournalPanel({
     setNotesSaveMessage("");
 
     const nextNotes = notes.trim() || null;
-    const { error } = await supabase
-      .from("user_books")
-      .update({ notes: nextNotes })
-      .eq("id", userBookId)
-      .eq("user_id", ownerUserId);
+    const { error } = await savePrivateJournalFields(userBookId, { notes: nextNotes });
 
     setSavingNotes(false);
 

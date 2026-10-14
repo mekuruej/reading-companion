@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
+import { createRequire } from 'node:module';
 import ts from 'typescript';
+const require = createRequire(import.meta.url);
 function productionFunction(file,name,env){
  const source=fs.readFileSync(new URL('../'+file,import.meta.url),'utf8');
  const ast=ts.createSourceFile(file,source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);let declaration;
@@ -11,6 +14,42 @@ function productionFunction(file,name,env){
  return new Function(...Object.keys(env),code+`;return ${name};`)(...Object.values(env));
 }
 function client(rows){return {from(table){return {select(){return this},eq(){return this},is(){return this},async maybeSingle(){return {data:rows[table]??null,error:null}}}}}}
+function loadModule(file,mocks={},cache=new Map()){
+ file=path.resolve(file);
+ if(cache.has(file))return cache.get(file).exports;
+ const mod={exports:{}};cache.set(file,mod);
+ const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
+ new Function('require','module','exports',code)(name=>{
+  if(mocks[name])return mocks[name];
+  if(name.startsWith('@/')||name.startsWith('.')){
+   const base=name.startsWith('@/')?name.slice(2):path.join(path.dirname(file),name);
+   return loadModule([base+'.ts',base+'.tsx'].find(fs.existsSync),mocks,cache);
+  }
+  return require(name);
+ },mod,mod.exports);
+ return mod.exports;
+}
+const uuid=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+const [teacherId,studentId,bookCopyId]=[uuid(201),uuid(202),uuid(203)];
+const {validateTeachingSourceContext}=loadModule('lib/teacher/teachingSource.ts');
+function authorizationDb({role='teacher',linked=false,archived=false,ownerId=studentId,appAccessType='reading_access',appAccessExpiresAt=null}={}){
+ const tables={
+  profiles:[{id:teacherId,role},{id:studentId,role:'member',app_access_type:appAccessType,app_access_expires_at:appAccessExpiresAt}],
+  user_books:[{id:bookCopyId,user_id:ownerId,book_id:uuid(204)}],
+  teacher_students:linked?[{teacher_id:teacherId,student_id:studentId,archived_at:archived?'2026-01-01T00:00:00Z':null}]:[],
+ };
+ return {from(table){const filters=[];return {select(){return this},eq(key,value){filters.push(row=>row[key]===value);return this},is(key,value){filters.push(row=>row[key]===value);return this},async maybeSingle(){return {data:(tables[table]??[]).find(row=>filters.every(filter=>filter(row)))??null,error:null}}}}};
+}
+function quickAddAuthorizer(options={}){
+ const profile={id:teacherId,role:options.role??'teacher'};
+ const db=authorizationDb(options);
+ const flag=productionFunction('app/api/teacher/live-lesson-words/route.ts','isSuperTeacherFlag',{});
+ const superTeacher=productionFunction('app/api/teacher/live-lesson-words/route.ts','isSuperTeacher',{isSuperTeacherFlag:flag});
+ const isTeacher=productionFunction('app/api/teacher/live-lesson-words/route.ts','isTeacher',{isSuperTeacher:superTeacher});
+ return productionFunction('app/api/teacher/live-lesson-words/route.ts','authorizeTeacherForStudentBook',{
+  getProfile:async()=>profile,isTeacher,isSuperTeacher:superTeacher,supabaseAdmin:db,validateTeachingSourceContext,
+ });
+}
 const curiosityFile='app/(protected)/books/[userBookId]/curiosity-reading/WordTimerExperience.tsx';
 test('existing Curiosity permission permits super teachers without a relationship; ordinary teachers need one',async()=>{
  const check=productionFunction(curiosityFile,'canAccessUserBook',{supabase:client({})});
@@ -21,20 +60,15 @@ test('existing Curiosity permission permits super teachers without a relationshi
  const linked=productionFunction(curiosityFile,'canAccessUserBook',{supabase:client({teacher_students:{teacher_id:'teacher'}})});
  assert.equal(await linked('teacher','other',{role:'teacher'}),true);
 });
-test('existing Quick Add restricts even super teachers to linked, assigned, correctly owned books',async()=>{
- const file='app/api/teacher/live-lesson-words/route.ts';
- const flag=productionFunction(file,'isSuperTeacherFlag',{});
- const superTeacher=productionFunction(file,'isSuperTeacher',{isSuperTeacherFlag:flag});
- const isTeacher=productionFunction(file,'isTeacher',{isSuperTeacher:superTeacher});
- for(const role of ['teacher','super_teacher']){
-  for(const [linked,assigned,owner,allowed] of [[false,false,'student',false],[true,false,'student',false],[true,true,'wrong-owner',false],[true,true,'student',true]]){
-   const authorize=productionFunction(file,'authorizeTeacherForStudentBook',{
-    getProfile:async()=>({id:'teacher',role}),isTeacher,isSuperTeacher:superTeacher,loadContextualWordTargets:async()=>[],
-    supabaseAdmin:client({user_books:{id:'copy',user_id:owner,book_id:'catalog'},teacher_students:linked?{teacher_id:'teacher'}:null,teacher_student_lesson_books:assigned?{id:'assignment'}:null}),
-   });
-   assert.equal((await authorize({actorId:'teacher',studentId:'student',userBookId:'copy'})).ok,allowed);
-  }
- }
+test('Quick Add permits super teachers without a link and regular teachers with an active link, without requiring a lesson-book assignment',async()=>{
+ const context={actorId:teacherId,studentId,userBookId:bookCopyId};
+ assert.equal((await quickAddAuthorizer({role:'super_teacher'})({...context})).ok,true);
+ assert.equal((await quickAddAuthorizer({role:'teacher',linked:true})({...context})).ok,true);
+ await assert.rejects(quickAddAuthorizer({role:'teacher'})({...context}),error=>error.status===403);
+ await assert.rejects(quickAddAuthorizer({role:'teacher',linked:true,archived:true})({...context}),error=>error.status===403);
+ assert.equal((await quickAddAuthorizer({role:'teacher',linked:true,ownerId:uuid(299)})({...context})).ok,false);
+ assert.equal((await quickAddAuthorizer({role:'admin',linked:true})({...context})).ok,false);
+ assert.equal((await quickAddAuthorizer({role:'member',linked:true})({...context})).ok,false);
 });
 
 const accessModule={exports:{}};
@@ -84,20 +118,11 @@ test('Bulk Add revalidates the existing target copy at save time',async()=>{
  assert.equal((await authorize({...input,targetUserBookId:'other-copy'})).status,403);
  assert.equal((await authorize({...input,sourceUserBookId:'foreign-source'})).status,403);
 });
-test('Quick Add allows an eligible trial only for super teachers owning the same book',async()=>{
- const file='app/api/teacher/live-lesson-words/route.ts';
- const flag=productionFunction(file,'isSuperTeacherFlag',{});
- const superTeacher=productionFunction(file,'isSuperTeacher',{isSuperTeacherFlag:flag});
- const isTeacher=productionFunction(file,'isTeacher',{isSuperTeacher:superTeacher});
- for(const role of ['teacher','super_teacher'])for(const eligible of [true,false])for(const own of [true,false]){
-  const db=client({user_books:{id:'trial-copy',user_id:'trial',book_id:'catalog'}});
-  const from=db.from;
-  db.from=table=>{const q=from(table);q.limit=async()=>({data:own?[{id:'own-copy'}]:[],error:null});return q};
-  const authorize=productionFunction(file,'authorizeTeacherForStudentBook',{
-   getProfile:async()=>({id:'actor',role}),isTeacher,isSuperTeacher:superTeacher,supabaseAdmin:db,
-   loadContextualWordTargets:async()=>eligible?[{studentUserBookId:'trial-copy',studentId:'trial'}]:[],
-  });
-  assert.equal((await authorize({actorId:'actor',studentId:'trial',userBookId:'trial-copy'})).ok,role==='super_teacher'&&eligible&&own);
-  assert.equal((await authorize({actorId:'actor',studentId:'wrong-owner',userBookId:'trial-copy'})).ok,false);
+test('Quick Add authorization does not depend on trial eligibility, but still requires the exact student-owned book',async()=>{
+ const context={actorId:teacherId,studentId,userBookId:bookCopyId};
+ const tomorrow=new Date(Date.now()+86400000).toISOString();
+ for(const appAccessExpiresAt of [tomorrow,'2000-01-01T00:00:00.000Z']){
+  assert.equal((await quickAddAuthorizer({role:'super_teacher',appAccessType:'trial',appAccessExpiresAt})({...context})).ok,true);
  }
+ assert.equal((await quickAddAuthorizer({role:'super_teacher',ownerId:uuid(299)})({...context})).ok,false);
 });

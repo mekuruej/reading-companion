@@ -18,6 +18,7 @@ import {
 } from "@/lib/access/readingCompanion";
 import { wantsJapaneseLearning } from "@/lib/access/japaneseLearningIntent";
 import { getBookIdentity } from "@/lib/books/bookIdentity";
+import { loadPrivateJournalFields } from "@/lib/books/privateJournal";
 import { supabase } from "@/lib/supabaseClient";
 import ReadingJournalPanel from "../components/ReadingJournalPanel";
 import TeacherNotebookPanel from "../../../teacher/components/TeacherNotebookPanel";
@@ -208,7 +209,6 @@ export default function StoryNotesExperience({ teaching = false, embedded = fals
             language_code,
             page_count
           ),
-          favorite_quotes
         `
         )
         .eq("id", userBookId)
@@ -255,6 +255,12 @@ export default function StoryNotesExperience({ teaching = false, embedded = fals
         return;
       }
 
+      if (!isTeachingJournal && loadedRow.user_id !== user.id) {
+        setAccessMessage("Reading Journals are private to their owners.");
+        setLoading(false);
+        return;
+      }
+
       if (!canUseReadingCompanionJournal({ canAccessBook })) {
         setAccessMessage("You do not have access to Reading Journal.");
         setLoading(false);
@@ -284,16 +290,23 @@ export default function StoryNotesExperience({ teaching = false, embedded = fals
           // Either may refer to another person's user_book in a teaching context.
           const { data: ownBook, error: ownBookError } = await supabase
             .from("user_books")
-            .select("id, user_id, book_id, favorite_quotes")
+            .select("id, user_id, book_id")
             .eq("user_id", user.id)
             .eq("book_id", loadedRow.book_id)
             .maybeSingle();
 
           if (cancelled) return;
           if (ownBookError) throw ownBookError;
-          const personalRow = ownBook as PersonalJournalRow | null;
+          let personalRow: PersonalJournalRow | null = ownBook
+            ? { ...(ownBook as Omit<PersonalJournalRow, "favorite_quotes">), favorite_quotes: null }
+            : null;
           if (personalRow && (personalRow.user_id !== user.id || personalRow.book_id !== loadedRow.book_id)) {
             throw new Error("Could not verify personal journal ownership.");
+          }
+          if (personalRow) {
+            const { data: privateJournal, error: privateJournalError } = await loadPrivateJournalFields(personalRow.id);
+            if (privateJournalError) throw privateJournalError;
+            personalRow = { ...personalRow, favorite_quotes: privateJournal.favorite_quotes };
           }
           journalUserBookId = personalRow?.id ?? null;
           setPersonalJournal(personalRow);
@@ -325,9 +338,24 @@ export default function StoryNotesExperience({ teaching = false, embedded = fals
 
       if (cancelled) return;
 
+      let privateFields: { notes: string | null; favorite_quotes: string | null } = {
+        notes: null,
+        favorite_quotes: null,
+      };
+      if (!isTeachingJournal) {
+        const { data, error: privateJournalError } = await loadPrivateJournalFields(loadedRow.id);
+        if (privateJournalError) {
+          console.error("Error loading private Reading Journal fields:", privateJournalError);
+          setAccessMessage("Could not load your private Reading Journal.");
+          setLoading(false);
+          return;
+        }
+        privateFields = data;
+      }
+
       setCanUseJapaneseLearningJournal(activeJapaneseLearningJournal);
       setJapaneseLearningArchiveTabs(archiveTabs);
-      setRow(loadedRow);
+      setRow({ ...loadedRow, favorite_quotes: isTeachingJournal ? null : privateFields.favorite_quotes });
       setLoading(false);
     }
 

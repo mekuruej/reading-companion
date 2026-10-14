@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { loadPrivateJournalFields, savePrivateJournalFields } from "@/lib/books/privateJournal";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
 import { getJapaneseLearningBookHubCta } from "@/lib/access/japaneseLearningBookHubCta";
@@ -1603,12 +1604,9 @@ export default function BookHubPage() {
   }
 
   async function saveNotes() {
-    if (!userBookId) return false;
+    if (!userBookId || row?.user_id !== userId) return false;
 
-    const { error } = await supabase
-      .from("user_books")
-      .update({ notes })
-      .eq("id", userBookId);
+    const { error } = await savePrivateJournalFields(userBookId, { notes: notes || null });
 
     if (error) {
       console.error("Error saving notes:", error);
@@ -3839,7 +3837,6 @@ export default function BookHubPage() {
         dnf_reason,
         dnf_note,
         would_retry,
-        notes,
         my_review,
         reader_advice,
         rating_overall,
@@ -3848,7 +3845,6 @@ export default function BookHubPage() {
         teacher_student_use_rating,
         reader_level,
         recommended_level,
-        favorite_quotes,
         memorable_words,
         format_type,
         progress_mode,
@@ -3986,6 +3982,21 @@ export default function BookHubPage() {
       setError("You do not have access to this book.");
       setLoading(false);
       return;
+    }
+
+    if (r.user_id === user.id) {
+      const { data: privateJournal, error: privateJournalError } = await loadPrivateJournalFields(r.id);
+      if (privateJournalError) {
+        console.error("Error loading private Book Hub journal fields:", privateJournalError);
+        setError("Could not load your private Reading Journal notes and quotes.");
+        setLoading(false);
+        return;
+      }
+      r.notes = privateJournal.notes;
+      r.favorite_quotes = privateJournal.favorite_quotes;
+    } else {
+      r.notes = null;
+      r.favorite_quotes = null;
     }
 
     setRow(r);
@@ -4856,7 +4867,6 @@ export default function BookHubPage() {
         dnf_reason: nextDnfReason,
         dnf_note: nextDnfNote,
         would_retry: nextWouldRetry,
-        notes: notes || null,
         my_review: myReview || null,
         reader_advice: canSaveReadingReflection
           ? readerAdvice.trim().slice(0, 200) || null
@@ -4865,7 +4875,6 @@ export default function BookHubPage() {
         rating_recommend: rr,
         rating_difficulty: canSaveReadingReflection ? rd : row.rating_difficulty ?? null,
         teacher_student_use_rating: tsur,
-        favorite_quotes: favoriteQuotes.trim() || null,
         memorable_words: memorableWords.trim() || null,
         reader_level: canSaveReadingReflection
           ? reflectionReaderLevelForSave(readerLevel)
@@ -4947,6 +4956,19 @@ export default function BookHubPage() {
       );
       setSaving(false);
       return;
+    }
+
+    if (row.user_id === userId) {
+      const { error: privateJournalError } = await savePrivateJournalFields(row.id, {
+        notes: notes || null,
+        favorite_quotes: favoriteQuotes.trim() || null,
+      });
+      if (privateJournalError) {
+        console.error("Error saving private Book Hub journal fields:", privateJournalError);
+        setError("Book details saved, but private Reading Journal notes and quotes could not be saved.");
+        setSaving(false);
+        return;
+      }
     }
 
     if (canSaveReadingReflection) {
