@@ -2315,7 +2315,7 @@ function CuriosityReadingContent({
 
       }
       {isListeningMode && capture.error && <p role="alert" className="my-3 text-sm text-red-700">{capture.error}<button type="button" className="ml-2 underline" disabled={capture.busy} onClick={() => void capture.recover()}>Retry recovery</button></p>}
-      {isListeningMode && !capture.completed && !canCaptureListeningWord && <p className="my-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">Start the listening timer to enable word capture. Your words will be saved with that listening session and shown in Reading History, separate from your reading vocabulary.</p>}
+      {isListeningMode && !capture.completed && !canCaptureListeningWord && <p className="my-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">Start the listening timer to enable word capture. Your words will be saved per listening session in Reading History, separate from your reading vocabulary.</p>}
       {(!isListeningMode || !capture.completed) && <fieldset disabled={isListeningMode && (capture.busy || capture.isFinalizing || !canCaptureListeningWord)} className="min-w-0">
       <div
         className={
