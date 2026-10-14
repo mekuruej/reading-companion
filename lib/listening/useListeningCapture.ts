@@ -37,8 +37,14 @@ export function useListeningCapture(book: string, enabled: boolean) {
     const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
     async function ensure(s: Identity) {
         const { data, error } = await supabase.rpc("start_listening_capture", { p_id: s.id, p_book: book, p_started_at: new Date(s.startedAt).toISOString() });
-        if (error)
-            throw new Error(error.message);
+        if (error) {
+            const migrationHint = /PGRST202|PGRST205|42883|42P01|schema cache|does not exist/i.test(`${error.code ?? ""} ${error.message}`)
+                ? " The listening-capture migration may be missing from this database."
+                : "";
+            const failure = new Error(`Could not initialize listening capture.${migrationHint} ${error.message}`);
+            setError(failure.message);
+            throw failure;
+        }
         return data;
     }
     useEffect(() => {
@@ -61,6 +67,9 @@ export function useListeningCapture(book: string, enabled: boolean) {
                     await ensure(legacy); // Verifies book ownership before adopting local state.
                     saved = { ...saved, captureSessionId: legacy.id, captureOwnerId: legacy.owner, captureStartedAt: legacy.startedAt };
                     if (!writePersistedTimedSession(saved)) throw new Error("Could not preserve the recovered timer. Allow local storage and reload.");
+                }
+                if (saved?.captureSessionId && saved.captureOwnerId && saved.captureOwnerId !== user.id && hasUnfinishedTimedSession(saved)) {
+                    throw new Error("An unfinished listening session belongs to another account. Sign in as its owner to recover it.");
                 }
                 if (saved?.captureSessionId && saved.captureOwnerId === user.id && saved.captureStartedAt) {
                     const s = { id: saved.captureSessionId, owner: user.id, startedAt: saved.captureStartedAt };

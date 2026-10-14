@@ -1049,6 +1049,11 @@ export default function BookHubPage() {
     bookLanguageCode: book?.language_code ?? null,
     ownerNativeLanguage: bookHubOwnerNativeLanguage,
   });
+  const canUseCuriosityReading = Boolean(
+    canUseSavedWordReading &&
+    wantsJapaneseStudyTools &&
+    isJapaneseLearningBook(book?.language_code ?? null)
+  );
   const isNativeAudiobook =
     isEnglishNativeTrackerBook &&
     (row?.format_type === "audiobook" || book?.edition_format === "audiobook");
@@ -3640,12 +3645,15 @@ export default function BookHubPage() {
       .order("created_at", { ascending: false });
 
     if (error) {
+      const errorMessage = typeof error.message === "string" && error.message.trim()
+        ? error.message
+        : "The database returned an empty lookup error. Check that finalized_user_book_words is installed and accessible.";
       console.error("Error loading lookup count:", {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
-        table: "user_book_words",
+        message: errorMessage,
+        details: error.details ?? null,
+        hint: error.hint ?? "Verify the finalized_user_book_words view and its dependent database migrations.",
+        code: error.code ?? null,
+        table: "finalized_user_book_words",
         select: fields,
         userBookId: id,
         order: "created_at descending",
@@ -5928,11 +5936,7 @@ export default function BookHubPage() {
                   if (!confirmLeaveIfTimerActive()) event.preventDefault();
                 }}
                 canUseJapaneseLearningActions={canUseJapaneseLearningActions}
-                canUseCuriosityReading={
-                  canUseSavedWordReading &&
-                  wantsJapaneseStudyTools &&
-                  isJapaneseLearningBook(row.books?.language_code ?? null)
-                }
+                canUseCuriosityReading={canUseCuriosityReading}
                 canUseSavedWordReading={canUseSavedWordReading}
                 canUseStudyFlashcards={canUseStudyFlashcards}
                 canUseVocabularyList={canUseVocabularyList}
@@ -5957,7 +5961,7 @@ export default function BookHubPage() {
                 }}
                 onFluidReadingJustReading={() => {
                   if (!confirmLeaveIfTimerActive()) return;
-                  router.push(`/books/${row.id}/read?mode=fluid`);
+                  router.push(`/books/${row.id}/read?mode=${canUseCuriosityReading ? "curiosity" : "fluid"}`);
                 }}
                 onListening={() => {
                   if (!confirmLeaveIfTimerActive()) return;

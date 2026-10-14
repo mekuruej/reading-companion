@@ -29,7 +29,7 @@ async function runQuery(result){
 }
 test('Book Hub selects only consumed schema fields, scoped to the copy and newest first',async()=>{
  const {calls}=await runQuery({data:[],error:null});
- assert.deepEqual(calls,[['from','user_book_words'],['select','surface, meaning, page_number, chapter_number, chapter_name, created_at'],['eq','user_book_id','reader-copy'],['order','created_at',{ascending:false}]]);
+ assert.deepEqual(calls,[['from','finalized_user_book_words'],['select','surface, meaning, page_number, chapter_number, chapter_name, created_at'],['eq','user_book_id','reader-copy'],['order','created_at',{ascending:false}]]);
 });
 test('Lookup count deduplicates word/meaning pairs while recent word and furthest chapter load',async()=>{
  const {state,logs}=await runQuery({error:null,data:[
@@ -52,5 +52,12 @@ test('Supabase failures expose message/details/hint/code even for non-enumerable
  const {state,logs}=await runQuery({error,data:null});
  assert.deepEqual(state,{count:null,word:'',page:null,chapter:''});
  assert.equal(logs.length,1);assert.equal(logs[0][0],'Error loading lookup count:');
- assert.deepEqual(logs[0][1],{message:'column does not exist',details:'missing column',hint:'check migration',code:'42703',table:'user_book_words',select:'surface, meaning, page_number, chapter_number, chapter_name, created_at',userBookId:'reader-copy',order:'created_at descending'});
+ assert.deepEqual(logs[0][1],{message:'column does not exist',details:'missing column',hint:'check migration',code:'42703',table:'finalized_user_book_words',select:'surface, meaning, page_number, chapter_number, chapter_name, created_at',userBookId:'reader-copy',order:'created_at descending'});
+});
+test('empty lookup errors still log an actionable message and clear stale values',async()=>{
+ const {state,logs}=await runQuery({error:{},data:null});
+ assert.deepEqual(state,{count:null,word:'',page:null,chapter:''});
+ assert.match(logs[0][1].message,/finalized_user_book_words is installed and accessible/);
+ assert.match(logs[0][1].hint,/dependent database migrations/);
+ assert.equal(logs[0][1].table,'finalized_user_book_words');
 });

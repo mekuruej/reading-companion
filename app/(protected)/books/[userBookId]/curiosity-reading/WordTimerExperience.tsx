@@ -1916,6 +1916,7 @@ function CuriosityReadingContent({
       startPageLabel={`Start ${labels.unit.toLowerCase()}`}
       endPageLabel={`End ${labels.unit.toLowerCase()}`}
       listeningProgressOnly={isListeningMode}
+      startDisabled={isListeningMode && (!capture.ready || !capture.owner)}
       sessionSaving={isListeningMode && capture.isFinalizing}
       isRunning={isRunning}
       isPaused={isPaused}
@@ -1937,7 +1938,13 @@ function CuriosityReadingContent({
           const identity = capture.start(identity => writePersistedTimedSession({version:1, sessionMode:"listening", userBookId, captureSessionId:identity.id, captureOwnerId:identity.owner, captureStartedAt:identity.startedAt, startedAt, accumulatedElapsedMs:0, isPaused:false, sessionDate:todayYmdAppTimeZone(), sessionStartPage:"", sessionEndPage:"", showTimedSessionForm:false, savedAt:startedAt, trackingUnit:tracking.method}));
           if (!identity) return;
           clearQuickWordFields();
-          void capture.ensure(identity).catch(() => setMessage("Your timer is running. The capture session will retry connecting when you save."));
+          void capture.ensure(identity).catch((error) => {
+            const details = error instanceof Error ? error.message : String(error);
+            const migrationHint = /PGRST202|PGRST205|42883|42P01|schema cache|does not exist/i.test(details)
+              ? " The listening-capture migration may be missing from this database."
+              : "";
+            setMessage(`❌ Listening capture could not connect. Your timer is running and recoverable.${migrationHint} ${details}`);
+          });
         }
         setSessionDate(todayYmdAppTimeZone());
         setStartTime(startedAt);

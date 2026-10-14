@@ -48,3 +48,12 @@ test('Japanese Learning keeps two primary cards and a compact wrapping utility r
   assert.match(bookHub, /onVocabularyList=\{\(\) => \{[\s\S]*?confirmLeaveIfTimerActive\(\)[\s\S]*?router\.push\(`\/books\/\$\{row\.id\}\/words`\)/);
   assert.match(bookHub, /onBulkAdd=\{\(\) => \{[\s\S]*?confirmLeaveIfTimerActive\(\)[\s\S]*?router\.push\(`\/vocab\/bulk\?userBookId=/);
 });
+
+test('eligible Book Hub Read opens Curiosity Reading while the Read page keeps its guarded selector',()=>{
+  assert.match(bookHub, /const canUseCuriosityReading = Boolean\([\s\S]*?canUseCuriosityReading=\{canUseCuriosityReading\}/);
+  assert.match(bookHub, /mode=\$\{canUseCuriosityReading \? "curiosity" : "fluid"\}/);
+  const readPage = fs.readFileSync('app/(protected)/books/[userBookId]/read/page.tsx', 'utf8');
+  assert.match(readPage, /canUseFullAccessFeature\(featureAccess, "curiosity_reading"\)/);
+  assert.match(readPage, /checkingCuriosityAccess \|\| curiosityAvailable \|\| mode !== "curiosity"/);
+  assert.match(readPage, /aria-pressed=\{mode === "curiosity"\}[\s\S]*Curiosity Reading/);
+});

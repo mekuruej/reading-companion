@@ -46,6 +46,16 @@ test('isolated SQL: start/save/finish retries are idempotent, history preserves 
  await db.exec('reset role');assert.deepEqual((await rows(db,'user_book_words')).map(w=>w.surface),['歴史']);assert.equal((await rows(db,'user_library_word_progress'))[0].mastered,true);
  }finally{await db.close();}
 });
+test('isolated SQL: migration can repair an existing capture schema and install missing RPCs',async()=>{
+ const db=await fixture();try{
+ await db.exec('reset role');
+ await db.exec(migration);
+ await db.exec(`set role authenticated;set app.actor_id='${id(1)}';`);
+ const functions=(await db.query(`select proname from pg_proc where pronamespace='public'::regnamespace and proname like '%listening_capture' order by proname`)).rows.map(row=>row.proname);
+ assert.deepEqual(functions,['finish_listening_capture','start_listening_capture']);
+ await start(db);assert.equal((await rows(db,'listening_capture_sessions')).length,1);
+ }finally{await db.close();}
+});
 test('isolated SQL: stranger cannot read, mutate, forge owner/book, save, or finalize another user capture',async()=>{
  const db=await fixture();try{
  await start(db);await save(db);await db.exec(`set app.actor_id='${id(2)}';`);

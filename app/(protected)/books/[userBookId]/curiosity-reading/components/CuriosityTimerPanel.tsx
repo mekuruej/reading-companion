@@ -3,6 +3,7 @@ import { useBookProgress } from "@/components/books/BookProgressProvider";
 import AudioTimeInput from "@/components/books/AudioTimeInput";
 type CuriosityTimerPanelProps = {
   sessionSaving?: boolean;
+  startDisabled?: boolean;
   isRunning: boolean;
   isPaused: boolean;
   elapsed: number;
@@ -32,6 +33,7 @@ type CuriosityTimerPanelProps = {
 
 export default function CuriosityTimerPanel({
   sessionSaving = false,
+  startDisabled = false,
   isRunning,
   isPaused,
   elapsed,
@@ -75,7 +77,8 @@ export default function CuriosityTimerPanel({
             <button
               type="button"
               onClick={onStart}
-              className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
+              disabled={startDisabled}
+              className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Start Timer
             </button>

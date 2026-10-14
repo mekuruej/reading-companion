@@ -41,3 +41,28 @@ test('listening finish form cannot start over before save; reading timer retains
  assert.ok(!renderToStaticMarkup(React.createElement(Timer,{...props,listeningProgressOnly:true})).includes('Start Timer'));
  assert.ok(renderToStaticMarkup(React.createElement(Timer,props)).includes('Start Timer'));
 });
+test('capture controls wait for identity initialization and still allow reading timers',()=>{
+ const Timer=load(base+'CuriosityTimerPanel.tsx').default;
+ const props={isRunning:false,isPaused:false,elapsed:0,showTimedSessionForm:false,sessionStartPage:'',sessionEndPage:'',timerSaveMessage:'',endingPhraseField:null,latestEndingPhrase:null,formatTimer:()=> '00:00',onStart:noop,onPause:noop,onFinish:noop,onResume:noop,onSaveSession:noop,onCancelSession:noop,onSessionStartPageChange:noop,onSessionEndPageChange:noop};
+ const listening=renderToStaticMarkup(React.createElement(Timer,{...props,listeningProgressOnly:true,startDisabled:true}));
+ const reading=renderToStaticMarkup(React.createElement(Timer,props));
+ assert.match(listening,/disabled=""[^>]*>\s*Start Timer/);assert.doesNotMatch(reading,/disabled=""[^>]*>\s*Start Timer/);
+});
+test('Listening keeps the current book cover in its shared page context card',()=>{
+ const page=fs.readFileSync('app/(protected)/books/[userBookId]/listening/page.tsx','utf8');
+ const experience=fs.readFileSync('app/(protected)/books/[userBookId]/curiosity-reading/WordTimerExperience.tsx','utf8');
+ const ContextCard=load(base+'CuriosityBookContextCard.tsx').default;
+ assert.match(page,/<CuriosityReadingExperience\s+experienceMode="listening"/);
+ assert.match(experience,/bookCover=\{bookCover\}/);
+ const html=renderToStaticMarkup(React.createElement(ContextCard,{bookTitle:'The Book',bookCover:'https://example.test/cover.jpg',bookHubHref:'/books/book',vocabListHref:'/books/book/words'}));
+ assert.match(html,/src="https:\/\/example\.test\/cover\.jpg"/);
+ assert.match(html,/alt="Go to The Book Book Hub"/);
+});
+
+test('listening capture view requires a started unfinished identity and retains the saved list after completion',()=>{
+ const source=fs.readFileSync('app/(protected)/books/[userBookId]/curiosity-reading/WordTimerExperience.tsx','utf8');
+ assert.match(source,/capture\.identity && !capture\.completed && \(isRunning \|\| isPaused \|\| showTimedSessionForm\)/);
+ assert.match(source,/isListeningMode && capture\.identity && <ListeningSessionWords words=\{capture\.words\}/);
+ assert.match(source,/startDisabled=\{isListeningMode && \(!capture\.ready \|\| !capture\.owner\)\}/);
+ assert.match(source,/listening-capture migration may be missing/);
+});

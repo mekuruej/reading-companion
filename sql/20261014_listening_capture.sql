@@ -1,6 +1,6 @@
 -- Apply to development/test first. No historical vocabulary is changed.
 begin;
-create table public.listening_capture_sessions (
+create table if not exists public.listening_capture_sessions (
  id uuid primary key,
  user_id uuid not null references auth.users(id) on delete cascade,
  user_book_id uuid not null references public.user_books(id) on delete cascade,
@@ -9,8 +9,8 @@ create table public.listening_capture_sessions (
  completed_at timestamptz,
  check ((reading_session_id is null) = (completed_at is null))
 );
-create index listening_capture_book on public.listening_capture_sessions(user_book_id);
-create table public.listening_session_words (
+create index if not exists listening_capture_book on public.listening_capture_sessions(user_book_id);
+create table if not exists public.listening_session_words (
  id uuid primary key,
  capture_session_id uuid not null references public.listening_capture_sessions(id) on delete cascade,
  surface text not null check (length(trim(surface)) between 1 and 1000),
@@ -19,18 +19,20 @@ create table public.listening_session_words (
  alternative_surface text not null default '' check (length(alternative_surface)<=1000),
  created_at timestamptz not null default now()
 );
-create index listening_words_session on public.listening_session_words(capture_session_id,created_at,id);
+create index if not exists listening_words_session on public.listening_session_words(capture_session_id,created_at,id);
 alter table public.listening_capture_sessions enable row level security;
 alter table public.listening_session_words enable row level security;
+drop policy if exists listening_capture_owner on public.listening_capture_sessions;
 create policy listening_capture_owner on public.listening_capture_sessions for select to authenticated
  using (user_id=auth.uid() and exists(select 1 from public.user_books b where b.id=user_book_id and b.user_id=auth.uid()));
+drop policy if exists listening_words_owner on public.listening_session_words;
 create policy listening_words_owner on public.listening_session_words for select to authenticated
  using (exists(select 1 from public.listening_capture_sessions s where s.id=capture_session_id and s.user_id=auth.uid()));
 -- Mutations are only through validated functions. No teacher or public write grants.
 revoke all on public.listening_capture_sessions, public.listening_session_words from public, anon, authenticated;
 grant select on public.listening_capture_sessions, public.listening_session_words to authenticated;
 
-create function public.start_listening_capture(p_id uuid,p_book uuid,p_started_at timestamptz)
+create or replace function public.start_listening_capture(p_id uuid,p_book uuid,p_started_at timestamptz)
 returns public.listening_capture_sessions language plpgsql security definer set search_path=public as $$
 declare s public.listening_capture_sessions;
 begin
@@ -42,7 +44,7 @@ begin
  return s;
 end $$;
 
-create function public.save_listening_word(p_session uuid,p_id uuid,p_word jsonb)
+create or replace function public.save_listening_word(p_session uuid,p_id uuid,p_word jsonb)
 returns public.listening_session_words language plpgsql security definer set search_path=public as $$
 declare s public.listening_capture_sessions; w public.listening_session_words;
 begin
@@ -60,7 +62,7 @@ begin
  return w;
 end $$;
 
-create function public.finish_listening_capture(p_session uuid,p_history jsonb)
+create or replace function public.finish_listening_capture(p_session uuid,p_history jsonb)
 returns uuid language plpgsql security definer set search_path=public as $$
 declare s public.listening_capture_sessions; h uuid;
 begin
@@ -77,7 +79,7 @@ revoke all on function public.start_listening_capture(uuid,uuid,timestamptz),pub
 grant execute on function public.start_listening_capture(uuid,uuid,timestamptz),public.save_listening_word(uuid,uuid,jsonb),public.finish_listening_capture(uuid,jsonb) to authenticated;
 -- Linked history cannot be reclassified or moved; direct teacher mutations cannot
 -- alter/delete private capture history. Service-role routes must validate ownership.
-create function public.protect_listening_capture_history() returns trigger
+create or replace function public.protect_listening_capture_history() returns trigger
 language plpgsql security definer set search_path=public as $$
 declare owner_id uuid;
 begin
@@ -90,6 +92,7 @@ begin
  return new;
 end $$;
 revoke all on function public.protect_listening_capture_history() from public;
+drop trigger if exists protect_listening_capture_history on public.user_book_reading_sessions;
 create trigger protect_listening_capture_history before update or delete on public.user_book_reading_sessions
  for each row execute function public.protect_listening_capture_history();
 commit;
