@@ -42,6 +42,7 @@ type LibraryBookActionIndexProps = {
     emptyText?: string;
     accent?: "stone" | "rose" | "emerald" | "sky" | "violet" | "amber" | "indigo";
     requireSavedWords?: boolean;
+    flashcardsOnly?: boolean;
     filterJapaneseBooks?: boolean;
     hrefForBook: (userBookId: string) => string;
 };
@@ -70,19 +71,21 @@ function isCurrentlyReading(row: LibraryBookRow) {
     return resolvePersonalTrackingStatus(row) === "reading";
 }
 
-async function loadUserBookIdsWithSavedWords(userBookIds: string[]) {
+async function loadUserBookIdsWithSavedWords(userBookIds: string[], flashcardsOnly: boolean) {
     const idsWithWords = new Set<string>();
     let from = 0;
 
     while (true) {
         const to = from + SAVED_WORD_PAGE_SIZE - 1;
-        const { data, error } = await supabase
-            .from("user_book_words")
+        let query = supabase
+            .from(flashcardsOnly ? "study_visible_user_book_words" : "finalized_user_book_words")
             .select("user_book_id")
             .in("user_book_id", userBookIds)
             .order("user_book_id", { ascending: true })
             .order("id", { ascending: true })
             .range(from, to);
+        if (flashcardsOnly) query = query.not("hidden", "is", true).not("excluded_from_flashcards", "is", true);
+        const { data, error } = await query;
 
         if (error) throw error;
 
@@ -210,7 +213,7 @@ function BookSection({
                                     <div
                                         className={`mt-3 text-xs font-semibold ${disabled ? "text-slate-400" : actionClass}`}
                                     >
-                                        {disabled ? "No saved words yet" : "Open →"}
+                                        {disabled ? "No available words" : "Open →"}
                                     </div>
                                 </div>
                             </div>
@@ -255,6 +258,7 @@ export default function LibraryBookActionIndex({
     emptyText = "No books in this section yet.",
     accent = "stone",
     requireSavedWords = false,
+    flashcardsOnly = false,
     filterJapaneseBooks = false,
     hrefForBook,
 }: LibraryBookActionIndexProps) {
@@ -322,7 +326,7 @@ export default function LibraryBookActionIndex({
 
                 if (requireSavedWords && nextRows.length > 0) {
                     const userBookIds = nextRows.map((row) => row.id);
-                    const userBookIdsWithWords = await loadUserBookIdsWithSavedWords(userBookIds);
+                    const userBookIdsWithWords = await loadUserBookIdsWithSavedWords(userBookIds, flashcardsOnly);
 
                     nextRows = nextRows.map((row) => ({
                         ...row,
@@ -354,7 +358,7 @@ export default function LibraryBookActionIndex({
         return () => {
             isMounted = false;
         };
-    }, [requireSavedWords, filterJapaneseBooks]);
+    }, [requireSavedWords, filterJapaneseBooks, flashcardsOnly]);
 
     const filteredRows = useMemo(() => {
         const cleanSearch = search.trim().toLowerCase();

@@ -3,6 +3,8 @@
 
 "use client";
 
+import { loadPersonallyHiddenStudyKeys } from "@/lib/vocabulary/personalVisibilityData";
+import { visibleStudyEncounters } from "@/lib/vocabulary/personalVisibility";
 import { savedSenseNumber, senseDefinitionKey, senseStudyKey, cardSenseKey, groupSavedSenseEncounters } from "@/lib/studySenseIdentity";
 import { studyCardPromptClass, studyCardSenseClass, resolveSenseNumber, STUDY_CARD_INPUT_CLASS, STUDY_CARD_CHECK_BUTTON_CLASS, STUDY_CARD_CHECK_LABEL } from "@/lib/studyCardPresentation";
 
@@ -71,6 +73,7 @@ type UserBookWordRow = {
   meaning_choice_index: number | null;
   jlpt: string | null;
   hidden: boolean | null;
+  flashcard_hidden?: boolean;
   created_at: string;
 };
 
@@ -385,8 +388,8 @@ async function loadAllLibraryCheckWords(userBookIds: string[]) {
   while (true) {
     const to = from + LIBRARY_CHECK_WORD_PAGE_SIZE - 1;
     const { data, error } = await supabase
-      .from("finalized_user_book_words")
-      .select("id, user_book_id, surface, alternative_surface, study_identity_key, reading, meaning, meaning_choice_index, jlpt, hidden, created_at")
+      .from("personal_user_book_words")
+      .select("id, user_book_id, surface, alternative_surface, study_identity_key, reading, meaning, meaning_choice_index, jlpt, hidden, flashcard_hidden, created_at")
       .in("user_book_id", userBookIds)
       .not("hidden", "is", true)
       .or("target_language_code.is.null,target_language_code.eq.ja")
@@ -1928,7 +1931,9 @@ export default function LibraryStudyPage() {
           .map<StudyCard | null>(([senseKey, group]) => {
             const key = (group[0].study_identity_key || studyIdentityKey(group[0].surface, group[0].reading));
             const primarySense = savedSenseNumber(group[0].meaning_choice_index) === 1;
-            const representative = group[0];
+            const activeGroup = visibleStudyEncounters(group);
+            if (!activeGroup.length) return null;
+            const representative = activeGroup[0];
             const meta = metaById.get(representative.user_book_id);
             const surface = representative.surface!.trim();
             const reading = representative.reading!.trim();
@@ -1966,7 +1971,7 @@ export default function LibraryStudyPage() {
               alternative_surface: representative.alternative_surface,
               jlpt: representative.jlpt ?? null,
               encounterCount: group.length,
-              encounterIds: group.map((word) => word.id),
+              encounterIds: activeGroup.map((word) => word.id),
               colorStatus,
               activeGate: pickLibraryCheckGate(colorStatus, key, surface),
               studyIdentityKey: key,
@@ -1977,9 +1982,9 @@ export default function LibraryStudyPage() {
           })
           .filter((card): card is StudyCard => Boolean(card));
 
-        const groupedCardKeys = new Set(cards.map(cardSenseKey));
+        const personallyHidden = await loadPersonallyHiddenStudyKeys();
         const claimCards = claimRows
-          .filter((claim) => !groupedCardKeys.has(senseStudyKey(claim.study_identity_key)))
+          .filter((claim) => !personallyHidden.has(claim.study_identity_key) && !groupedWords.has(senseStudyKey(claim.study_identity_key)))
           .map((claim) => makeClaimStudyCard(user.id, claim, colorSettings, progressByKey))
           .filter((card): card is StudyCard => Boolean(card));
         const allStudyCards = [...cards, ...claimCards];
@@ -1988,14 +1993,15 @@ export default function LibraryStudyPage() {
         setDebugInfo({
           threshold: encounterThreshold,
           rawRows: words?.length ?? 0,
-          completeGroups: groupedWords.size,
+          completeGroups: cards.length,
           eligibleCards: allStudyCards.length,
           filteredCards: allStudyCards.length,
           topCompleteGroups: Array.from(groupedWords.entries())
+            .filter(([, group]) => visibleStudyEncounters(group).length > 0)
             .map(([senseKey, group]) => {
             const key = (group[0].study_identity_key || studyIdentityKey(group[0].surface, group[0].reading));
             const primarySense = savedSenseNumber(group[0].meaning_choice_index) === 1;
-              const representative = group[0];
+              const representative = visibleStudyEncounters(group)[0];
               const progress = progressWithWordSkyClaim(
                 user.id,
                 key,

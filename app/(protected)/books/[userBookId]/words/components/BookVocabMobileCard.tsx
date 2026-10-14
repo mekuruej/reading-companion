@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
 import { positionLabel } from "@/lib/vocabulary/wordPosition";
 import { KeyboardEvent, useEffect, useState } from "react";
@@ -5,6 +6,7 @@ import BookVocabKatakanaBadge from "./BookVocabKatakanaBadge";
 
 type BookVocabMobileCardProps = {
   hidden: boolean;
+  visibilityControls?: ReactNode;
   surface: string | null | undefined;
   reading: string | null | undefined;
   meaning: string | null | undefined;
@@ -24,6 +26,7 @@ type BookVocabMobileCardProps = {
 
 export default function BookVocabMobileCard({
   hidden,
+  visibilityControls,
   surface,
   reading,
   meaning,
@@ -88,6 +91,7 @@ export default function BookVocabMobileCard({
 
       <div className="mt-3 rounded-xl bg-stone-50 px-3 py-2 text-sm leading-6 text-stone-800">
         <div className="break-words">{meaning || "—"}</div>
+        {visibilityControls}
       </div>
 
       <div className="mt-3 flex items-center gap-2">

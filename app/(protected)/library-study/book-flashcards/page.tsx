@@ -160,6 +160,7 @@ export default function BookFlashcardsIndexPage() {
       description="Choose a book to study its saved vocabulary with flashcards."
       actionLabel="Book Flashcards"
       accent="stone"
+      flashcardsOnly
       requireSavedWords
       backHref={backDestination.href}
       backLabel={backDestination.label}

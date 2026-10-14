@@ -1,6 +1,7 @@
 // Vocab List
 //
 "use client";
+import { usePersonalVisibility } from "@/components/vocabulary/usePersonalVisibility";
 import WordContextFields from "@/components/vocabulary/WordContextFields";
 import { wordContextPayload, type WordContext } from "@/lib/vocabulary/wordContext";
 
@@ -84,6 +85,8 @@ type WordRow = WordContext & {
   chapter_name: string | null;
   seen_on: string | null;
   created_at: string;
+  follow_along_hidden?: boolean;
+  flashcard_hidden?: boolean;
   hidden: boolean | null;
   meaning_choices: any | null;
   meaning_choice_index: number | null;
@@ -322,6 +325,17 @@ function BookWordsPageContent() {
   const [userId, setUserId] = useState<string | null>(null);
 
   const [words, setWords] = useState<WordRow[]>([]);
+  const [ownsBook, setOwnsBook] = useState(false);
+  const visibility = usePersonalVisibility(({ wordId, feature, hidden }) => {
+    setWords(rows => rows.map(row => row.id === wordId ? { ...row, [feature === "flashcard" ? "flashcard_hidden" : "follow_along_hidden"]: hidden } : row));
+  });
+  function visibilityControls(word: WordRow) {
+    return <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-normal text-stone-500">
+      {([ ["follow_along", word.follow_along_hidden, "Follow-Along"], ["flashcard", word.flashcard_hidden, "flashcards"] ] as const).map(([feature, hidden, label]) => hidden ?
+        <span key={feature}>Hidden from {label}{ownsBook ? <> · <button type="button" disabled={visibility.busy} className="underline"
+          onClick={(event) => { event.stopPropagation(); void visibility.save({ wordId: word.id, bookId: userBookId, feature, hidden: false }); }}>Restore {label}</button></> : null}</span> : null)}
+    </div>;
+  }
   const [teacherVocabContext, setTeacherVocabContext] = useState<TeacherBookContext | null>(null);
   const [sharedTeachingWords, setSharedTeachingWords] = useState<SharedTeacherVocabularyWord[]>([]);
   const [query, setQuery] = useState("");
@@ -756,6 +770,7 @@ function BookWordsPageContent() {
         const bookId = (ub as any)?.book_id ?? null;
 
         const isOwner = ownerUserId === authedUser.id;
+        setOwnsBook(isOwner);
         const isSuperTeacher =
           meProfile?.role === "super_teacher" || Boolean((meProfile as any)?.is_super_teacher);
         let isLinkedTeacher = false;
@@ -900,7 +915,7 @@ function BookWordsPageContent() {
         }
 
         let wordsQuery = supabase
-          .from("finalized_user_book_words")
+          .from("personal_user_book_words")
           .select(
             `
               id,
@@ -917,7 +932,7 @@ function BookWordsPageContent() {
               chapter_name,
               seen_on,
               created_at,
-              hidden,
+              hidden, follow_along_hidden, flashcard_hidden,
               meaning_choices,
               meaning_choice_index,
               hide_kanji_in_reading_support, alternative_surface, book_form, book_form_description, follow_along_support_note,
@@ -936,7 +951,7 @@ function BookWordsPageContent() {
           .order("id", { ascending: true });
 
         if (showHidden) {
-          wordsQuery = wordsQuery.eq("hidden", true);
+          wordsQuery = wordsQuery.or("hidden.eq.true,follow_along_hidden.eq.true,flashcard_hidden.eq.true");
         } else {
           wordsQuery = wordsQuery.eq("hidden", false);
         }
@@ -1080,6 +1095,7 @@ function BookWordsPageContent() {
     const q = query.trim().toLowerCase();
 
     return words.filter((w) => {
+      if (showHidden && !w.hidden && !w.follow_along_hidden && !w.flashcard_hidden) return false;
       const chValue = chapterKey(w);
       const chLabel = chapterDisplayParts(w).fallback;
 
@@ -1100,7 +1116,7 @@ function BookWordsPageContent() {
 
       return hay.includes(q);
     });
-  }, [words, query, chapterFilter]);
+  }, [words, query, chapterFilter, showHidden]);
 
   const filteredSorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -1295,6 +1311,7 @@ function BookWordsPageContent() {
 
   return (
     <main className="max-w-6xl mx-auto p-6 pb-24">
+      {visibility.notice}
       {studentWorkspaceBackContext ? (
         <button
           type="button"
@@ -1437,7 +1454,8 @@ function BookWordsPageContent() {
           return (
             <BookVocabMobileCard
               key={w.id}
-              hidden={w.hidden}
+              visibilityControls={visibilityControls(w)}
+                hidden={w.hidden}
               surface={w.surface}
               reading={w.reading}
               meaning={w.meaning}
@@ -1484,6 +1502,7 @@ function BookWordsPageContent() {
             return (
               <BookVocabRow
                 key={w.id}
+                visibilityControls={visibilityControls(w)}
                 hidden={w.hidden}
                 surface={w.surface}
                 reading={w.reading}

@@ -121,7 +121,7 @@ export default function BookStudyPage() {
         }
 
         const { data: savedWordRows, error: savedWordError } = await supabase
-          .from("finalized_user_book_words")
+          .from("study_visible_user_book_words")
           .select("id")
           .limit(1);
 
@@ -177,6 +177,7 @@ export default function BookStudyPage() {
       actionLabel="Book Flashcards"
       emptyText="No books with saved words yet."
       accent="stone"
+      flashcardsOnly
       requireSavedWords
       backHref={backDestination.href}
       backLabel={backDestination.label}

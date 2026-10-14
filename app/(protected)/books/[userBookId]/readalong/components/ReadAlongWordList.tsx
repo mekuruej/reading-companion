@@ -10,6 +10,8 @@ type WordColorInfo = ReadAlongWordCardProps["colorInfo"];
 
 type ReadAlongWordListProps = {
   words: ReadAlongWord[];
+  onHide?: (word: ReadAlongWord) => void;
+  hideBusy?: boolean;
   supportMode: SupportMode;
   fadedThroughIndex: number;
   getColorInfo: (word: ReadAlongWord) => WordColorInfo;
@@ -27,6 +29,8 @@ type ReadAlongWordListProps = {
 // fade progress, and tap-to-scroll behavior.
 export default function ReadAlongWordList({
   words,
+  onHide,
+  hideBusy,
   supportMode,
   fadedThroughIndex,
   getColorInfo,
@@ -41,6 +45,7 @@ export default function ReadAlongWordList({
   return (
     <div className="mx-auto max-w-2xl space-y-3 pb-[60vh]">
       {words.map((word, index) => {
+        if (word.follow_along_hidden) return null;
         const isFaded = index <= fadedThroughIndex;
         const colorInfo = getColorInfo(word);
 
@@ -48,6 +53,8 @@ export default function ReadAlongWordList({
           <ReadAlongWordCard
             key={word.id}
             word={word}
+            onHide={onHide ? () => onHide(word) : undefined}
+            hideBusy={hideBusy}
             supportMode={supportMode}
             isFaded={isFaded}
             colorInfo={colorInfo}

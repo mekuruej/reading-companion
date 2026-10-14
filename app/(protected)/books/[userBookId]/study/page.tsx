@@ -1,6 +1,8 @@
 // Vocab Flashcards
 //
 "use client";
+import { changeGroupedCardVisibility } from "@/lib/vocabulary/personalVisibility";
+import { usePersonalVisibility } from "@/components/vocabulary/usePersonalVisibility";
 import AlsoWritten from "@/components/vocabulary/AlsoWritten";
 
 import { savedSenseNumber, senseStudyKey, senseDefinitionKey } from "@/lib/studySenseIdentity";
@@ -136,6 +138,7 @@ type WordRow = {
   meaning_choices: any | null;
   meaning_choice_index: number | null;
   item_type?: string | null;
+  flashcard_hidden?: boolean;
   hidden: boolean | null;
   skipped_on: string | null;
   kanji_meta: KanjiMetaItem[] | null;
@@ -149,6 +152,7 @@ type WordRow = {
 };
 
 type Flashcard = {
+  visibilityEntries?: Flashcard[];
   alternative_surface?: string | null;
   id: string;
   word: string;
@@ -391,6 +395,29 @@ function BookFlashcardsPageContent() {
   const studyOnceMode = true;
 
   const [sessionOrder, setSessionOrder] = useState<number[]>([]);
+  const [ownsBook, setOwnsBook] = useState(false);
+  const hiddenCardsRef = useRef(new Map<string, (typeof cards)[number]>());
+  const visibilityOrderRef = useRef<{ ids: string[]; index: number } | null>(null);
+  const visibility = usePersonalVisibility(({ wordId, hidden }) => {
+    const source = hidden ? cards.find(entry => entry.id === wordId) : hiddenCardsRef.current.get(wordId);
+    if (!source) return;
+    const sameGroup = (a: Flashcard, b: Flashcard) =>
+      makeLibraryStudyColorKey(a.word, a.reading) === makeLibraryStudyColorKey(b.word, b.reading)
+      && a.meaningChoiceIndex === b.meaningChoiceIndex;
+    const entry = { ...source, visibilityEntries: undefined };
+    if (hidden) hiddenCardsRef.current.set(wordId, entry);
+    const nextCards = changeGroupedCardVisibility(cards, entry, hidden, sameGroup);
+    const replacement = nextCards.find(card => sameGroup(card, entry));
+    const ids = sessionOrder.map(index => filteredCards[index]?.id).filter(Boolean);
+    const oldGroup = cards.find(card => sameGroup(card, entry));
+    const oldIndex = oldGroup ? ids.indexOf(oldGroup.id) : -1;
+    if (oldIndex >= 0) ids.splice(oldIndex, 1, ...(replacement ? [replacement.id] : []));
+    else if (replacement) ids.splice(sessionIndex, 0, replacement.id);
+    visibilityOrderRef.current = { ids, index: sessionIndex };
+    setCards(nextCards);
+    if (hidden) setLibraryCards(rows => rows.filter(card => card.id !== wordId));
+    if (!hidden) hiddenCardsRef.current.delete(wordId);
+  });
   const [sessionIndex, setSessionIndex] = useState(0);
 
   const settingsKey = useMemo(
@@ -674,6 +701,7 @@ function BookFlashcardsPageContent() {
         }
 
         const ownerUserId = (ub as any)?.user_id ?? "";
+        setOwnsBook(ownerUserId === user.id);
         const allowed = await canAccessUserBook(user.id, ownerUserId, profile ?? null);
 
         if (!allowed) {
@@ -732,7 +760,7 @@ function BookFlashcardsPageContent() {
 
           const today = new Date().toISOString().slice(0, 10);
           const { data: englishWords, error: englishWordsErr } = await supabase
-            .from("finalized_user_book_words")
+            .from("study_visible_user_book_words")
             .select(
               `
               id,
@@ -838,7 +866,7 @@ function BookFlashcardsPageContent() {
 
           if (ownedBookIds.length > 0) {
             const { data: libraryWords, error: libraryWordsErr } = await supabase
-              .from("finalized_user_book_words")
+              .from("personal_user_book_words")
               .select(
                 `
                 id,
@@ -855,7 +883,7 @@ function BookFlashcardsPageContent() {
                 created_at,
                 meaning_choices,
                 meaning_choice_index,
-                hidden,
+                hidden, flashcard_hidden,
                 skipped_on,
                 flagged_for_review,
                 excluded_from_flashcards,
@@ -888,7 +916,7 @@ function BookFlashcardsPageContent() {
               libraryRepeatCounts.set(key, (libraryRepeatCounts.get(key) ?? 0) + 1);
             }
 
-            const normalizedLibrary: Flashcard[] = ((libraryWords ?? []) as WordRow[]).filter(canLoadJapaneseFlashcard).map((w) => {
+            const normalizedLibrary: Flashcard[] = ((libraryWords ?? []) as WordRow[]).filter(w => !w.flashcard_hidden).filter(canLoadJapaneseFlashcard).map((w) => {
               const ch = chapterInfoFromRow(w);
               const meaningChoices = asStringArray(w.meaning_choices);
 
@@ -943,7 +971,7 @@ function BookFlashcardsPageContent() {
         const today = new Date().toISOString().slice(0, 10);
 
         const { data: words, error: wordsErr } = await supabase
-          .from("finalized_user_book_words")
+          .from("study_visible_user_book_words")
           .select(
             `
             id,
@@ -1028,8 +1056,9 @@ function BookFlashcardsPageContent() {
           const existingSense = dedupedMap.get(key);
           if (existingSense) {
             existingSense.senseEncounterCount = (existingSense.senseEncounterCount ?? 1) + 1;
+            existingSense.visibilityEntries?.push(c);
           } else {
-            dedupedMap.set(key, { ...c, senseEncounterCount: 1 });
+            dedupedMap.set(key, { ...c, senseEncounterCount: 1, visibilityEntries: [c] });
           }
         }
 
@@ -1191,8 +1220,15 @@ function BookFlashcardsPageContent() {
 
   useEffect(() => {
     const order = filteredCards.map((_, i) => i);
-    setSessionOrder(studyOnceMode ? shuffleArray(order) : order);
-    setSessionIndex(0);
+    const visibilityOrder = visibilityOrderRef.current;
+    if (visibilityOrder) {
+      setSessionOrder(visibilityOrder.ids.map(id => filteredCards.findIndex(card => card.id === id)).filter(index => index >= 0));
+      setSessionIndex(visibilityOrder.index);
+      visibilityOrderRef.current = null;
+    } else {
+      setSessionOrder(studyOnceMode ? shuffleArray(order) : order);
+      setSessionIndex(0);
+    }
     setStepIndex(0);
     setTypedInput("");
     setTypedFeedback(null);
@@ -1200,6 +1236,7 @@ function BookFlashcardsPageContent() {
     setReadyForNextCard(false);
     setLastTypedResult(null);
     setFirstTouch(true);
+    resetMcState();
   }, [filteredCards, studyOnceMode]);
 
   useEffect(() => {
@@ -1489,25 +1526,25 @@ function BookFlashcardsPageContent() {
       studySet !== "FROM_READING_MEANING_MC"
     ) return;
     if (!mcAnswered) return;
-    if (autoAdvancePaused) return;
+    if (autoAdvancePaused || visibility.busy) return;
 
     const timer = window.setTimeout(() => {
       goToNextWord(mcWasCorrect ? "correct" : "wrong");
     }, FLASHCARD_AUTO_ADVANCE_MS);
 
     return () => window.clearTimeout(timer);
-  }, [isMultipleChoiceMode, studySet, mcAnswered, mcWasCorrect, autoAdvancePaused]);
+  }, [isMultipleChoiceMode, studySet, mcAnswered, mcWasCorrect, autoAdvancePaused, visibility.busy, card?.id]);
 
   useEffect(() => {
     if (!readyForNextCard) return;
-    if (autoAdvancePaused) return;
+    if (autoAdvancePaused || visibility.busy) return;
 
     const timer = window.setTimeout(() => {
       goToNextWord(lastTypedResult ?? "revealed");
     }, FLASHCARD_AUTO_ADVANCE_MS);
 
     return () => window.clearTimeout(timer);
-  }, [readyForNextCard, lastTypedResult, autoAdvancePaused]);
+  }, [readyForNextCard, lastTypedResult, autoAdvancePaused, visibility.busy, card?.id]);
 
   async function logStudyEvent(result: "revealed" | "correct" | "wrong") {
     if (!canAccessBook || !canUseStudyFlashcards) {
@@ -1564,7 +1601,7 @@ function BookFlashcardsPageContent() {
   }
 
   async function goToNextWord(result: "revealed" | "correct" | "wrong" = "revealed") {
-    if (filteredCards.length === 0 || !card) return;
+    if (visibility.isSaving() || filteredCards.length === 0 || !card) return;
 
     await logStudyEvent(result);
 
@@ -1696,26 +1733,6 @@ function BookFlashcardsPageContent() {
     setMcSelected(null);
     setMcAnswered(false);
     setMcWasCorrect(null);
-  }
-
-  async function hideCardPermanently(cardId: string) {
-    if (!canAccessBook || !canUseStudyFlashcards) {
-      console.warn("Cannot hide card without access to this flashcard set.");
-      return;
-    }
-
-    const { error } = (studentContext ? await saveStudentWord(studentContext, { hidden: true }, cardId) : await supabase
-      .from("user_book_words")
-      .update({ hidden: true })
-      .eq("id", cardId).eq("user_book_id", userBookId));
-
-    if (error) {
-      console.error("Error hiding card:", error);
-      return;
-    }
-
-    setCards((prev) => prev.filter((c) => c.id !== cardId));
-    setFilteredCards((prev) => prev.filter((c) => c.id !== cardId));
   }
 
   function nextCardReveal() {
@@ -1962,6 +1979,8 @@ function BookFlashcardsPageContent() {
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
+      if (visibility.isSaving()) return;
+      if ((e.target as HTMLElement | null)?.closest("button, a")) return;
       const target = e.target as HTMLElement | null;
       const isTypingTarget =
         target?.tagName === "INPUT" ||
@@ -2176,6 +2195,7 @@ function BookFlashcardsPageContent() {
   if (filteredCards.length === 0) {
     return (
       <main className="min-h-screen flex flex-col items-center gap-3 px-4 py-4 bg-slate-100 sm:px-6">
+      {visibility.notice}
         <StudyBookHeader
           bookTitle={bookTitle}
           bookCover={bookCover}
@@ -2207,6 +2227,8 @@ function BookFlashcardsPageContent() {
 
   if (studyOnceMode && sessionIndex >= sessionOrder.length) {
     return (
+      <>
+      {visibility.notice}
       <StudyCompleteState
         nextStudyModeLabel={isEnglishBook ? undefined : studySetLabel(nextStudySet)}
         onGoToVocabList={() => router.push(`/books/${userBookId}/words`)}
@@ -2220,6 +2242,7 @@ function BookFlashcardsPageContent() {
             }
         }
       />
+      </>
     );
   }
 
@@ -2253,7 +2276,8 @@ function BookFlashcardsPageContent() {
     sessionTotal > 0 ? Math.min(sessionIndex + 1, sessionTotal) : 0;
 
   return (
-    <main className="min-h-screen flex flex-col items-center px-4 py-4 bg-slate-100 sm:px-6">
+    <main inert={visibility.busy} className="min-h-screen flex flex-col items-center px-4 py-4 bg-slate-100 sm:px-6">
+      {visibility.notice}
       <StudyBookHeader
         bookTitle={bookTitle}
         bookCover={bookCover}
@@ -2514,6 +2538,12 @@ function BookFlashcardsPageContent() {
         onShuffle={shuffleBookFlashcardDeck}
         onFlag={() => void handleFlagCurrentBookFlashcard()}
       />
+      {ownsBook && card ? <button type="button" disabled={visibility.busy}
+        className="mt-3 rounded-lg px-3 py-2 text-sm text-stone-500 underline hover:text-stone-800 disabled:opacity-50"
+        onKeyDown={(event) => event.stopPropagation()}
+        onClick={(event) => { event.preventDefault(); event.stopPropagation(); setAutoAdvancePaused(true); void visibility.save({ wordId: card.id, bookId: userBookId, feature: "flashcard", hidden: true }); }}>
+        Hide this card
+      </button> : null}
     </main>
   );
 }

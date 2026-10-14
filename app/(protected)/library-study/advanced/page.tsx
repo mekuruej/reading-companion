@@ -38,7 +38,7 @@ const READINESS_SAMPLE_SIZE = 1000;
 
 async function loadAdvancedStudySummaryRows(userId: string) {
     const { data, error } = await supabase
-        .from("user_library_word_summaries")
+        .from("study_available_library_word_summaries")
         .select("study_identity_key, surface, reading, meaning, total_encounter_count, hidden_encounter_count")
         .eq("user_id", userId)
         .order("last_seen_at", { ascending: false })
@@ -268,7 +268,7 @@ export default function AdvancedStudyPage() {
                 }
 
                 const { data: savedWordRows, error: savedWordError } = await supabase
-                    .from("finalized_user_book_words")
+                    .from("study_visible_user_book_words")
                     .select("id")
                     .limit(1);
 

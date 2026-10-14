@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { ProgressTrackingMethod } from "@/lib/books/readingProgress";
 import BookVocabActionsCell from "./BookVocabActionsCell";
 import BookVocabKatakanaBadge from "./BookVocabKatakanaBadge";
@@ -5,6 +6,7 @@ import BookVocabPageCell from "./BookVocabPageCell";
 
 type BookVocabRowProps = {
   hidden: boolean;
+  visibilityControls?: ReactNode;
   surface: string | null | undefined;
   reading: string | null | undefined;
   meaning: string | null | undefined;
@@ -27,6 +29,7 @@ type BookVocabRowProps = {
 // and database-changing actions. This component only renders the prepared row.
 export default function BookVocabRow({
   hidden,
+  visibilityControls,
   surface,
   reading,
   meaning,
@@ -97,6 +100,7 @@ export default function BookVocabRow({
 
       <td className="break-words p-2">
         <div>{meaning ?? "—"}</div>
+        {visibilityControls}
       </td>
 
       <BookVocabActionsCell onDelete={readOnly ? undefined : onDelete} />

@@ -42,7 +42,7 @@ export default function BookVocabFilterPanel({
             onChange={(e) => onShowHiddenChange(e.target.checked)}
             className="h-5 w-5 rounded border-stone-300 text-stone-900 focus:ring-stone-300"
           />
-          <span className="font-medium">Hidden Words Only</span>
+          <span className="font-medium">Hidden words</span>
         </label>
 
         <select

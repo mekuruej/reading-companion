@@ -2,6 +2,9 @@
 // 
 
 "use client";
+import { loadPersonallyHiddenStudyKeys } from "@/lib/vocabulary/personalVisibilityData";
+import { usePersonalVisibility } from "@/components/vocabulary/usePersonalVisibility";
+import { changeGroupedCardVisibility, visibleStudyEncounters } from "@/lib/vocabulary/personalVisibility";
 import AlsoWritten from "@/components/vocabulary/AlsoWritten";
 
 import { savedSenseNumber, senseDefinitionKey, senseStudyKey, cardSenseKey, groupSavedSenseEncounters } from "@/lib/studySenseIdentity";
@@ -61,6 +64,7 @@ type UserBookWordRow = {
   meaning_choice_index: number | null;
   jlpt: string | null;
   hidden: boolean | null;
+  flashcard_hidden?: boolean;
   created_at: string;
 };
 
@@ -111,6 +115,7 @@ type LibraryWordClaimRow = {
 type LibraryCheckGate = "reading" | "meaning";
 
 type StudyCard = {
+  visibilityEntries?: StudyCard[];
   alternative_surface?: string | null;
   id: string;
   userBookId: string;
@@ -395,8 +400,8 @@ async function loadAllLibraryCheckWords(userBookIds: string[]) {
   while (true) {
     const to = from + LIBRARY_CHECK_WORD_PAGE_SIZE - 1;
     const { data, error } = await supabase
-      .from("finalized_user_book_words")
-      .select("id, user_book_id, surface, alternative_surface, study_identity_key, reading, meaning, meaning_choice_index, jlpt, hidden, created_at")
+      .from("personal_user_book_words")
+      .select("id, user_book_id, surface, alternative_surface, study_identity_key, reading, meaning, meaning_choice_index, jlpt, hidden, flashcard_hidden, created_at")
       .in("user_book_id", userBookIds)
       .not("hidden", "is", true)
       .or("target_language_code.is.null,target_language_code.eq.ja")
@@ -676,6 +681,7 @@ function isCardAvailableForLibraryPractice(
 }
 
 function LibraryPracticePanel({
+  visibilitySaving = false,
   card,
   cards,
   total,
@@ -692,6 +698,7 @@ function LibraryPracticePanel({
   onReviewMeanings,
   onOpenWordSky,
 }: {
+  visibilitySaving?: boolean;
   card: StudyCard | undefined;
   cards: StudyCard[];
   total: number;
@@ -781,7 +788,7 @@ function LibraryPracticePanel({
 
   useEffect(() => {
     if (!pendingTypingAdvance) return;
-    if (autoAdvancePaused) return;
+    if (autoAdvancePaused || visibilitySaving) return;
 
     const timer = window.setTimeout(() => {
       if (pendingTypingAdvance === "meaning") {
@@ -803,19 +810,19 @@ function LibraryPracticePanel({
     }, LIBRARY_REVIEW_AUTO_ADVANCE_MS);
 
     return () => window.clearTimeout(timer);
-  }, [pendingTypingAdvance, autoAdvancePaused, onNext]);
+  }, [pendingTypingAdvance, autoAdvancePaused, onNext, visibilitySaving]);
 
   useEffect(() => {
     if (!isMultipleChoiceMode) return;
     if (!mcAnswered) return;
-    if (autoAdvancePaused) return;
+    if (autoAdvancePaused || visibilitySaving) return;
 
     const timer = window.setTimeout(() => {
       onNext();
     }, LIBRARY_REVIEW_AUTO_ADVANCE_MS);
 
     return () => window.clearTimeout(timer);
-  }, [isMultipleChoiceMode, mcAnswered, autoAdvancePaused, onNext]);
+  }, [isMultipleChoiceMode, mcAnswered, autoAdvancePaused, onNext, visibilitySaving]);
 
   const correctAnswer = card ? practiceCorrectAnswer(card, practiceMode) : "";
   const mcOptions = useMemo(() => {
@@ -1431,6 +1438,26 @@ export default function LibraryStudyPage() {
   const [meaningReviewItems, setMeaningReviewItems] = useState<MeaningReviewItem[]>([]);
   const [showPracticeMeaningReview, setShowPracticeMeaningReview] = useState(false);
   const practiceCardAnchorRef = useRef<HTMLDivElement | null>(null);
+  const hiddenCardsRef = useRef(new Map<string, StudyCard>());
+  const visibilityDeckRef = useRef<{ cards: StudyCard[]; index: number } | null>(null);
+  const visibility = usePersonalVisibility(({ wordId, hidden }) => {
+    const source = hidden ? libraryReviewCards.find(card => card.id === wordId) : hiddenCardsRef.current.get(wordId);
+    if (!source) return;
+    const entry = { ...source, visibilityEntries: undefined };
+    if (hidden) hiddenCardsRef.current.set(wordId, entry);
+    const sameGroup = (a: StudyCard, b: StudyCard) => cardSenseKey(a) === cardSenseKey(b);
+    const update = (cards: StudyCard[]) => changeGroupedCardVisibility(cards, entry, hidden, sameGroup)
+      .map(card => {
+        const latest = libraryReviewCards.find(current => sameGroup(current, card));
+        return { ...card, progress: latest?.progress ?? card.progress, colorStatus: latest?.colorStatus ?? card.colorStatus,
+          encounterIds: card.visibilityEntries?.map(item => item.id) ?? card.encounterIds };
+      });
+    visibilityDeckRef.current = { cards: update(practiceDeck), index: practiceIndex };
+    setLibraryReviewCards(update(libraryReviewCards));
+    setMeaningReviewItems(items => items.filter(item => item.card.id !== wordId));
+    if (!hidden) hiddenCardsRef.current.delete(wordId);
+  });
+
 
   const libraryReviewStudyingNowLabelText = libraryReviewStudyingNowLabel({
     colorFilters: effectivePracticeColorFilters,
@@ -1622,7 +1649,9 @@ export default function LibraryStudyPage() {
           .map<StudyCard | null>(([senseKey, group]) => {
             const key = (group[0].study_identity_key || studyIdentityKey(group[0].surface, group[0].reading));
             const primarySense = savedSenseNumber(group[0].meaning_choice_index) === 1;
-            const representative = group[0];
+            const activeGroup = visibleStudyEncounters(group);
+            if (!activeGroup.length) return null;
+            const representative = activeGroup[0];
             const meta = metaById.get(representative.user_book_id);
             const surface = representative.surface!.trim();
             const reading = representative.reading!.trim();
@@ -1646,7 +1675,7 @@ export default function LibraryStudyPage() {
               mastered: progress?.mastered ?? false,
             });
 
-            return {
+            const card: StudyCard = {
               id: representative.id,
               userBookId: representative.user_book_id,
               bookTitle: meta?.title ?? "Untitled",
@@ -1658,19 +1687,26 @@ export default function LibraryStudyPage() {
               jlpt: representative.jlpt ?? null,
               encounterCount: group.length,
               bookCount: new Set(group.map((word) => word.user_book_id).filter(Boolean)).size,
-              encounterIds: group.map((word) => word.id),
+              encounterIds: activeGroup.map((word) => word.id),
               colorStatus,
               activeGate: pickLibraryCheckGate(colorStatus, key, surface),
               studyIdentityKey: key,
               progress,
               definitionNumber: definitionNumberFromIndex(representative.meaning_choice_index),
             };
+            return { ...card, visibilityEntries: activeGroup.map(word => ({ ...card,
+              id: word.id, userBookId: word.user_book_id,
+              bookTitle: metaById.get(word.user_book_id)?.title ?? "Untitled",
+              bookCoverUrl: metaById.get(word.user_book_id)?.cover_url ?? null,
+              surface: word.surface!.trim(), reading: word.reading!.trim(), meaning: word.meaning!.trim(),
+              alternative_surface: word.alternative_surface,
+            })) };
           })
           .filter((card): card is StudyCard => Boolean(card));
 
-        const groupedCardKeys = new Set(cards.map(cardSenseKey));
+        const personallyHidden = await loadPersonallyHiddenStudyKeys();
         const claimCards = claimRows
-          .filter((claim) => !groupedCardKeys.has(senseStudyKey(claim.study_identity_key)))
+          .filter((claim) => !personallyHidden.has(claim.study_identity_key) && !groupedWords.has(senseStudyKey(claim.study_identity_key)))
           .map((claim) => makeClaimStudyCard(user.id, claim, colorSettings, progressByKey))
           .filter((card): card is StudyCard => Boolean(card));
         const allStudyCards = [...cards, ...claimCards];
@@ -1715,7 +1751,16 @@ export default function LibraryStudyPage() {
       return;
     }
 
-    resetPracticeDeck(practiceFilteredCards);
+    const savedDeck = visibilityDeckRef.current;
+    if (savedDeck) {
+      const eligible = new Set(practiceFilteredCards.map(card => card.id));
+      const deck = savedDeck.cards.filter(card => eligible.has(card.id));
+      setPracticeDeck(deck);
+      setPracticeIndex(savedDeck.index);
+      setPracticeFinished(savedDeck.index >= deck.length);
+      setPracticeRevealStep("word");
+      visibilityDeckRef.current = null;
+    } else resetPracticeDeck(practiceFilteredCards);
   }, [practiceFilteredCards, practiceStarted]);
 
   function startPractice() {
@@ -2068,6 +2113,8 @@ export default function LibraryStudyPage() {
 
   if (!reviewCountsLoading && libraryReviewCards.length === 0) {
     return (
+      <>
+      {visibility.notice}
       <LibraryReviewEmptyState
         title={
           lockedMasteredWordsMode
@@ -2083,6 +2130,7 @@ export default function LibraryStudyPage() {
         onOpenWordSky={() => router.push("/library-study/word-sky")}
         onBackToStudyHub={() => router.push("/library-study")}
       />
+      </>
     );
   }
 
@@ -2101,6 +2149,7 @@ export default function LibraryStudyPage() {
 
   return (
     <main className="min-h-screen flex flex-col items-center bg-slate-100 px-4 py-4 sm:px-6">
+      {visibility.notice}
       <LibraryReviewPageHeader
         title={reviewTitle}
         subtitle={reviewSubtitle}
@@ -2208,14 +2257,16 @@ export default function LibraryStudyPage() {
           ) : (
             <>
               <div ref={practiceCardAnchorRef} className="scroll-mt-4" />
+              <div className="w-full max-w-3xl" inert={visibility.busy}>
               <LibraryPracticePanel
+                visibilitySaving={visibility.busy}
                 card={practiceCard}
                 cards={practiceDeck}
                 total={practiceDeck.length}
                 revealStep={practiceRevealStep}
                 practiceMode={practiceStudyMode}
                 onAdvance={advancePracticeCard}
-                onNext={goToNextPracticeCard}
+                onNext={() => { if (!visibility.isSaving()) goToNextPracticeCard(); }}
                 onPrevious={goToPreviousPracticeCard}
                 onShuffle={shufflePracticeDeck}
                 onFlagCard={() => {
@@ -2228,6 +2279,14 @@ export default function LibraryStudyPage() {
                 onReviewMeanings={() => setShowPracticeMeaningReview(true)}
                 onOpenWordSky={() => router.push("/library-study/word-sky")}
               />
+              </div>
+              {practiceCard && !isClaimCardId(practiceCard.id) ? <button type="button" disabled={visibility.busy}
+                title={`Hide from flashcards in ${practiceCard.bookTitle}`}
+                className="mt-3 rounded-lg px-3 py-2 text-sm text-stone-500 underline hover:text-stone-800 disabled:opacity-50"
+                onKeyDown={event => event.stopPropagation()}
+                onClick={event => { event.preventDefault(); event.stopPropagation(); void visibility.save({ wordId: practiceCard.id, bookId: practiceCard.userBookId, feature: "flashcard", hidden: true }); }}>
+                Hide this card
+              </button> : null}
             </>
           )}
         </>

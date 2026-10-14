@@ -144,7 +144,7 @@ export default function AbilityCheckTestHelperPage() {
         }
 
         const { count: loadedSavedWordCount, error: savedWordErr } = await supabase
-          .from("finalized_user_book_words")
+          .from("study_visible_user_book_words")
           .select("id", { count: "exact", head: true })
           .in("user_book_id", userBookIds);
 
@@ -154,7 +154,7 @@ export default function AbilityCheckTestHelperPage() {
 
         const { count: loadedVisibleSavedWordCount, error: visibleWordErr } =
           await supabase
-            .from("finalized_user_book_words")
+            .from("study_visible_user_book_words")
             .select("id", { count: "exact", head: true })
             .in("user_book_id", userBookIds)
             .or("hidden.is.null,hidden.eq.false");
@@ -164,7 +164,7 @@ export default function AbilityCheckTestHelperPage() {
         setVisibleSavedWordCount(loadedVisibleSavedWordCount ?? 0);
 
         const { count: loadedSummaryReadyCount, error: summaryErr } = await supabase
-          .from("user_library_word_summaries")
+          .from("study_available_library_word_summaries")
           .select("study_identity_key", { count: "exact", head: true })
           .eq("user_id", user.id)
           .gt("check_ready_encounter_count", 0);

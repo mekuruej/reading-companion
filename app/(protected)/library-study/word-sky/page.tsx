@@ -2,6 +2,7 @@
 //
 "use client";
 
+import { loadPersonallyHiddenStudyKeys } from "@/lib/vocabulary/personalVisibilityData";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
@@ -343,7 +344,7 @@ export default function WordSkyPage() {
           ),
           withTimeout(
             supabase
-              .from("user_library_word_summaries")
+              .from("study_available_library_word_summaries")
               .select("study_identity_key, surface, reading, meaning, jlpt, total_encounter_count")
               .eq("user_id", user.id)
               .in("jlpt", WORD_SKY_ALLOWED_JLPT_LEVELS)
@@ -475,7 +476,9 @@ export default function WordSkyPage() {
             ).slice(0, PERSONAL_LIBRARY_WORD_LIMIT);
 
         const seenKeys = new Set<string>();
+        const personallyHidden = await loadPersonallyHiddenStudyKeys();
         const loadedPool = [...starterPool, ...personalPool].filter((word) => {
+          if (personallyHidden.has(word.study_identity_key || studyIdentityKey(word.surface, word.reading))) return false;
           const key = (word.study_identity_key || studyIdentityKey(word.surface, word.reading));
           if (seenKeys.has(key)) return false;
           seenKeys.add(key);
@@ -548,6 +551,8 @@ export default function WordSkyPage() {
           setClaims(next);
         }
       } catch (error: any) {
+        setWordPool([]);
+        setVisibleWords([]);
         setMessage(
           error?.message?.includes("user_library_word_claims")
             ? "Word Sky needs its small claims table before it can save."

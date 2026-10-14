@@ -112,12 +112,15 @@ test('normal vocabulary/study queries use the shared gate; review and workspace 
   'app/api/books/[userBookId]/word-context/route.ts',
  ]) {
   const source=fs.readFileSync(file,'utf8');
-  assert.ok(source.includes('.from("finalized_user_book_words")'),file);
+  assert.match(source, /\.from\("(?:finalized_user_book_words|personal_user_book_words|study_visible_user_book_words)"\)/, file);
   assert.ok(!/\.from\("user_book_words"\)\s*\.select\(/.test(source),file);
  }
  for(const file of ['lib/teacher/teacherBookVocabulary.ts','app/(protected)/teacher/library/[teacherBookId]/follow/components/TeacherFollowAlongPanel.tsx']) {
   const source=fs.readFileSync(file,'utf8');assert.ok(source.includes('.from("finalized_teacher_book_vocabulary")'),file);
  }
+ const personal=fs.readFileSync('sql/20261014_personal_word_visibility.sql','utf8');
+ assert.match(personal, /from public\.finalized_user_book_words w/);
+ assert.match(personal, /select \* from public\.personal_user_book_words where not flashcard_hidden/);
  const review=fs.readFileSync('app/api/teacher/live-lesson-words/route.ts','utf8');
  assert.ok(review.includes('.from("user_book_words")'));assert.ok(!review.includes('.from("finalized_user_book_words")'));
  assert.ok(review.includes('.rpc("capture_live_lesson_word"'));

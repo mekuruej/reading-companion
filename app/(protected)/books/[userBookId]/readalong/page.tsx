@@ -2,6 +2,7 @@
 // 
 
 "use client";
+import { usePersonalVisibility } from "@/components/vocabulary/usePersonalVisibility";
 import VocabularyProgressPrompt from "@/components/books/VocabularyProgressPrompt";
 import type { CapturePosition } from "@/lib/books/vocabularyProgress";
 import WordPositionField from "@/components/vocabulary/WordPositionField";
@@ -55,6 +56,7 @@ import {
 const READ_ALONG_TIMED_SESSION_MODE = "readalong";
 
 type ReadAlongWord = {
+    follow_along_hidden?: boolean;
     id: string;
     surface: string;
     reading: string | null;
@@ -342,6 +344,10 @@ function ReadAlongContent() {
 
     const [capturePositions, setCapturePositions] = useState<CapturePosition[]>([]);
     const [words, setWords] = useState<ReadAlongWord[]>([]);
+    const [ownsBook, setOwnsBook] = useState(false);
+    const visibility = usePersonalVisibility(({ wordId, hidden }) => {
+        setWords((rows) => rows.map((row) => row.id === wordId ? { ...row, follow_along_hidden: hidden } : row));
+    });
     const [libraryColorByWordKey, setLibraryColorByWordKey] = useState<
         Record<string, LibraryStudyWordColorInfo>
     >({});
@@ -515,6 +521,7 @@ function ReadAlongContent() {
             }
 
             const ownerUserId = (userBook as any).user_id;
+            setOwnsBook(ownerUserId === user.id);
             const isSuperTeacher =
                 profile?.role === "super_teacher" || Boolean((profile as any)?.is_super_teacher);
             let canAccess =
@@ -607,9 +614,9 @@ function ReadAlongContent() {
             }
 
             const { data, error } = await supabase
-                .from("finalized_user_book_words")
+                .from("personal_user_book_words")
                 .select(`
-                    id,
+                    id, follow_along_hidden,
                     surface,
                     reading,
                     meaning,
@@ -722,7 +729,7 @@ function ReadAlongContent() {
                     sortNumber: word.chapter_number ?? 999999,
                 };
 
-            existing.wordCount += 1;
+            if (!word.follow_along_hidden) existing.wordCount += 1;
 
             if (wordPositionText(word)) {
                 existing.pages.add(wordPositionText(word));
@@ -840,7 +847,7 @@ function ReadAlongContent() {
         ? chapterLabelForWord(currentPage.words[0])
         : selectedChapterLabel;
     const emptyPageAddWordKey =
-        currentPage && currentPage.words.length === 0
+        currentPage && currentPage.words.every(word => word.follow_along_hidden)
             ? `empty-page-${currentPage.pageNumber ?? pageIndex}`
             : null;
 
@@ -2195,13 +2202,14 @@ function ReadAlongContent() {
 
                     <ReadAlongCurrentPageSummary
                         currentPageLabel={currentPage?.label ?? "Fluid Reading"}
-                        wordCount={currentPage?.words.length ?? 0}
+                        wordCount={currentPage?.words.filter(word => !word.follow_along_hidden).length ?? 0}
                         hasCurrentPage={Boolean(currentPage)}
                     />
                 </>
             }
         >
-            {!currentPage || currentPage.words.length === 0 ? (
+            {visibility.notice}
+            {!currentPage || currentPage.words.every(word => word.follow_along_hidden) ? (
                 <ReadAlongEmptyState
                     canAddWord={Boolean(currentPage && canUseSavedWordReading)}
                     isAddWordOpen={Boolean(emptyPageAddWordKey && activeAddAfterWordId === emptyPageAddWordKey)}
@@ -2230,6 +2238,8 @@ function ReadAlongContent() {
             ) : (
                 <ReadAlongWordList
                     words={currentPage.words}
+                    hideBusy={visibility.busy}
+                    onHide={ownsBook ? (word) => void visibility.save({ wordId: word.id, bookId: userBookId, feature: "follow_along", hidden: true }) : undefined}
                     supportMode={supportMode}
                     fadedThroughIndex={fadedThroughIndex}
                     getColorInfo={(word) =>

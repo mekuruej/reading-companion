@@ -14,6 +14,7 @@ type WordColorInfo = {
 
 type ReadAlongWord = WordContext & {
   id: string;
+  follow_along_hidden?: boolean;
   surface: string | null;
   reading: string | null;
   meaning: string | null;
@@ -33,6 +34,8 @@ type ReadAlongWordCardProps = {
   colorInfo: WordColorInfo | null;
   setWordRef: (wordId: string, element: HTMLDivElement | null) => void;
   onProgressTap: () => void;
+  onHide?: () => void;
+  hideBusy?: boolean;
   canAddAfter?: boolean;
   canAddBefore?: boolean;
   isAddAfterOpen?: boolean;
@@ -105,6 +108,8 @@ export default function ReadAlongWordCard({
   colorInfo,
   setWordRef,
   onProgressTap,
+  onHide,
+  hideBusy,
   canAddAfter = false,
   canAddBefore = false,
   isAddAfterOpen = false,
@@ -124,11 +129,16 @@ export default function ReadAlongWordCard({
         setWordRef(word.id, element);
       }}
       onClick={onProgressTap}
-      className={`relative cursor-pointer rounded-2xl border border-l-8 px-4 py-3 pr-36 transition sm:pr-40 ${savedWordBorderClass(
+      className={`relative min-h-20 cursor-pointer rounded-2xl border border-l-8 px-4 py-3 pr-36 transition sm:pr-40 ${savedWordBorderClass(
         colorInfo,
         isFaded
       )}`}
     >
+      {onHide ? <button type="button" disabled={hideBusy}
+        aria-label={`Hide ${displaySurface} from Follow-Along`}
+        className="absolute bottom-2 right-4 rounded px-2 py-1 text-xs text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:opacity-50"
+        onKeyDown={(event) => event.stopPropagation()}
+        onClick={(event) => { event.preventDefault(); event.stopPropagation(); onHide(); }}>Hide</button> : null}
       {colorInfo ? (
         <div className="absolute right-4 top-3">
           <LibraryColorBadge
