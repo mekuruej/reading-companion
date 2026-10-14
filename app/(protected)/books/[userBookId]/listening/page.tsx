@@ -154,9 +154,7 @@ export default function ListeningPage() {
           isTrialActive: appAccessStatus.reason === "trial",
         });
 
-        setCanSaveWordsWhileListening(
-          !trackerMode.isEnglishNativeTrackerBook && featureAccess.canUseListeningWordCapture
-        );
+        setCanSaveWordsWhileListening(featureAccess.canUseListeningWordCapture);
         setCanUseReadingJournal(
           Boolean(canAccessBook && ownerUserId && (trackerMode.isEnglishNativeTrackerBook || featureAccess.canUseStoryNotes))
         );
@@ -211,7 +209,14 @@ export default function ListeningPage() {
   }
 
   const showReadingWorkspace = viewMode === "workspace" && canUseReadingJournal && journalOwnerUserId;
-  const listeningExperience = isNativeListeningWorkspace ? (
+  const listeningExperience = canSaveWordsWhileListening ? (
+    <CuriosityReadingExperience
+      experienceMode="listening"
+      nativeListeningPosition={isNativeListeningWorkspace}
+      embedded
+      workspaceCompact={Boolean(showReadingWorkspace)}
+    />
+  ) : isNativeListeningWorkspace ? (
     <SimpleTimedSessionPage
       sessionMode="listening"
       nativeListeningPosition
@@ -225,12 +230,6 @@ export default function ListeningPage() {
       endLocationLabel="End page optional"
       sessionLocationNote="Page numbers are optional. If you leave them blank, only the time will be saved. Pace stats can only be generated with page numbers."
       listeningLocationNote="Optional. Add an audiobook position like Chapter 8, 37%, or 3:12:45. Listening time stays separate from reading pace."
-      embedded
-      workspaceCompact={Boolean(showReadingWorkspace)}
-    />
-  ) : canSaveWordsWhileListening ? (
-    <CuriosityReadingExperience
-      experienceMode="listening"
       embedded
       workspaceCompact={Boolean(showReadingWorkspace)}
     />
@@ -269,7 +268,7 @@ export default function ListeningPage() {
               : "max-w-4xl",
         ].join(" ")}
       >
-        {!showReadingWorkspace ? (
+        {!showReadingWorkspace && !canSaveWordsWhileListening ? (
         <Link
           href={`/books/${encodeURIComponent(userBookId)}`}
           className="inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900"

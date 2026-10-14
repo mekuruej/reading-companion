@@ -323,6 +323,7 @@ function CuriosityReadingContent({
   targetUserBookId,
   wordCaptureOnly = false,
   experienceMode = "curiosity",
+  nativeListeningPosition = false,
   embedded = false,
   workspaceCompact = false,
   workspaceAside,
@@ -336,6 +337,7 @@ function CuriosityReadingContent({
   targetUserBookId?: string;
   wordCaptureOnly?: boolean;
   experienceMode?: WordTimerExperienceMode;
+  nativeListeningPosition?: boolean;
   embedded?: boolean;
   workspaceCompact?: boolean;
   workspaceAside?: ReactNode;
@@ -449,6 +451,9 @@ function CuriosityReadingContent({
   const [accumulatedElapsedMs, setAccumulatedElapsedMs] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [showTimedSessionForm, setShowTimedSessionForm] = useState(false);
+  const canCaptureListeningWord = Boolean(
+    capture.identity && !capture.completed && (isRunning || isPaused || showTimedSessionForm)
+  );
   const [timerSaveMessage, setTimerSaveMessage] = useState("");
   const [hasFinishedTimer, setHasFinishedTimer] = useState(false);
   const [sessionStartPage, setSessionStartPage] = useState("");
@@ -1780,6 +1785,38 @@ function CuriosityReadingContent({
       if (error) { setMessage(`❌ Could not save reading session: ${error.message}`); return; }
     }
 
+    if (isListeningMode && nativeListeningPosition && tracking.method !== "audiobook_time") {
+      const { data: currentBookStatus, error: currentBookStatusError } = await supabase
+        .from("user_books")
+        .select("started_at")
+        .eq("id", userBookId)
+        .maybeSingle();
+
+      if (currentBookStatusError) {
+        console.error("Error loading user_books status after listening session:", currentBookStatusError);
+      }
+
+      const bookStatusUpdate: {
+        status: "reading";
+        personal_tracking_status: "reading";
+        started_at?: string;
+        current_location: string | null;
+      } = {
+        status: "reading",
+        personal_tracking_status: "reading",
+        current_location: sessionEndPage.trim() || null,
+      };
+      if (!currentBookStatus?.started_at) bookStatusUpdate.started_at = readOn;
+
+      const { error: updateError } = await supabase
+        .from("user_books")
+        .update(bookStatusUpdate)
+        .eq("id", userBookId);
+      if (updateError) {
+        console.error("Error updating user_books after listening session:", updateError);
+      }
+    }
+
     if (!isListeningMode) {
       const { data: currentBookStatus, error: currentBookStatusError } = await supabase
         .from("user_books")
@@ -2279,7 +2316,8 @@ function CuriosityReadingContent({
 
       }
       {isListeningMode && capture.error && <p role="alert" className="my-3 text-sm text-red-700">{capture.error}<button type="button" className="ml-2 underline" disabled={capture.busy} onClick={() => void capture.recover()}>Retry recovery</button></p>}
-      {(!isListeningMode || (capture.identity && !capture.completed && (isRunning || isPaused || showTimedSessionForm))) && <fieldset disabled={isListeningMode && (capture.busy || capture.isFinalizing)} className="min-w-0">
+      {isListeningMode && !capture.completed && !canCaptureListeningWord && <p className="my-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">Start the listening timer to enable word capture. Your words will be saved with that listening session.</p>}
+      {(!isListeningMode || !capture.completed) && <fieldset disabled={isListeningMode && (capture.busy || capture.isFinalizing || !canCaptureListeningWord)} className="min-w-0">
       <div
         className={
           isListeningMode ? "block" : workspaceCompact && workspaceAside

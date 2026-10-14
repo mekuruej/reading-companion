@@ -59,10 +59,24 @@ test('Listening keeps the current book cover in its shared page context card',()
  assert.match(html,/alt="Go to The Book Book Hub"/);
 });
 
-test('listening capture view requires a started unfinished identity and retains the saved list after completion',()=>{
+test('listening form is visible before Start, but capture stays timer-gated and the saved list remains visible',()=>{
  const source=fs.readFileSync('app/(protected)/books/[userBookId]/curiosity-reading/WordTimerExperience.tsx','utf8');
+ assert.match(source,/\(!isListeningMode \|\| !capture\.completed\)/);
  assert.match(source,/capture\.identity && !capture\.completed && \(isRunning \|\| isPaused \|\| showTimedSessionForm\)/);
+ assert.match(source,/capture\.isFinalizing \|\| !canCaptureListeningWord/);
+ assert.match(source,/Start the listening timer to enable word capture/);
  assert.match(source,/isListeningMode && capture\.identity && <ListeningSessionWords words=\{capture\.words\}/);
  assert.match(source,/startDisabled=\{isListeningMode && \(!capture\.ready \|\| !capture\.owner\)\}/);
  assert.match(source,/listening-capture migration may be missing/);
+});
+
+test('native-language books with capture access use the capture experience and keep one Book Hub link',()=>{
+ const page=fs.readFileSync('app/(protected)/books/[userBookId]/listening/page.tsx','utf8');
+ const experience=fs.readFileSync('app/(protected)/books/[userBookId]/curiosity-reading/WordTimerExperience.tsx','utf8');
+ assert.match(page,/setCanSaveWordsWhileListening\(featureAccess\.canUseListeningWordCapture\)/);
+ assert.match(page,/const listeningExperience = canSaveWordsWhileListening \?/);
+ assert.match(page,/nativeListeningPosition=\{isNativeListeningWorkspace\}/);
+ assert.match(page,/!showReadingWorkspace && !canSaveWordsWhileListening/);
+ assert.match(experience,/if \(isListeningMode && nativeListeningPosition && tracking\.method !== "audiobook_time"\)/);
+ assert.match(experience,/current_location: sessionEndPage\.trim\(\) \|\| null/);
 });
