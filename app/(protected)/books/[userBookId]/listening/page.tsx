@@ -250,22 +250,11 @@ export default function ListeningPage() {
   );
 
   return (
-    <main
-      className={[
-        "min-h-screen",
-        canSaveWordsWhileListening
-          ? "bg-slate-100 px-3 py-4 sm:px-6 sm:py-8"
-          : "bg-stone-50 p-6",
-      ].join(" ")}
-    >
+    <main className="min-h-screen bg-stone-50 px-4 py-5 sm:px-6 sm:py-8">
       <div
         className={[
           "mx-auto space-y-4",
-          showReadingWorkspace
-            ? "max-w-[96rem]"
-            : canSaveWordsWhileListening
-              ? "max-w-5xl"
-              : "max-w-4xl",
+          showReadingWorkspace ? "max-w-[96rem]" : "max-w-5xl",
         ].join(" ")}
       >
         {!showReadingWorkspace && !canSaveWordsWhileListening ? (
@@ -277,13 +266,22 @@ export default function ListeningPage() {
         </Link>
         ) : null}
 
-        {canUseReadingJournal ? (
-          <div className="hidden justify-end lg:flex">
-            <div className="inline-flex rounded-2xl border border-stone-200 bg-white p-1 shadow-sm">
+        <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5">
+          <h1 className="text-2xl font-black text-stone-950">Listen</h1>
+          <p className="mt-1 text-sm text-stone-600">
+            Log listening time and keep heard words with their listening session.
+          </p>
+
+          {canUseReadingJournal ? (
+            <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3">
+              <span className="mr-1 text-xs font-black uppercase tracking-[0.14em] text-stone-500">
+                Workspace
+              </span>
               <button
                 type="button"
                 onClick={() => setViewMode("listening")}
-                className={`rounded-xl px-4 py-2 text-sm font-black transition ${
+                aria-pressed={!showReadingWorkspace}
+                className={`rounded-full px-3 py-1.5 text-sm font-bold transition ${
                   viewMode === "listening"
                     ? nativeSessionMode === "listening"
                       ? "bg-violet-700 text-white"
@@ -300,7 +298,8 @@ export default function ListeningPage() {
               <button
                 type="button"
                 onClick={() => setViewMode("workspace")}
-                className={`rounded-xl px-4 py-2 text-sm font-black transition ${
+                aria-pressed={Boolean(showReadingWorkspace)}
+                className={`rounded-full px-3 py-1.5 text-sm font-bold transition ${
                   viewMode === "workspace"
                     ? isNativeListeningWorkspace && nativeSessionMode !== "listening"
                       ? "bg-emerald-700 text-white"
@@ -313,8 +312,8 @@ export default function ListeningPage() {
                 Reading Journal
               </button>
             </div>
-          </div>
-        ) : null}
+          ) : null}
+        </section>
 
         <div
           className={
