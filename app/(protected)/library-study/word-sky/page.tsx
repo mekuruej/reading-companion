@@ -14,7 +14,6 @@ import {
   type LibraryStudyGateStatus,
 } from "@/lib/libraryStudyColor";
 import { supabase } from "@/lib/supabaseClient";
-import { WORD_SKY_ALLOWED_JLPT_LEVELS } from "@/lib/wordSkyLevels";
 import WordSkyLoadingState from "./components/WordSkyLoadingState";
 import WordSkyHeader from "./components/WordSkyHeader";
 import WordSkyMessageBanner from "./components/WordSkyMessageBanner";
@@ -52,12 +51,8 @@ type WordSkyPoolRow = {
   book_count: number | null;
 };
 
-type LibrarySummarySkyRow = {
+type LibraryColorSkyRow = {
   study_identity_key: string | null;
-  surface: string | null;
-  reading: string | null;
-  meaning: string | null;
-  jlpt: string | null;
   total_encounter_count: number | null;
 };
 
@@ -80,25 +75,8 @@ type VisibleSkyWord = SkyWord & {
   bobDelay: number;
 };
 
-const FALLBACK_SKY_WORDS: SkyWord[] = [
-  { surface: "理由", reading: "りゆう", meaning: "reason", level: "soft", jlpt: "N4" },
-  { surface: "必要", reading: "ひつよう", meaning: "necessary", level: "middle", jlpt: "N4" },
-  { surface: "場所", reading: "ばしょ", meaning: "place", level: "soft", jlpt: "N5" },
-  { surface: "世界", reading: "せかい", meaning: "world", level: "bright", jlpt: "N4" },
-  { surface: "気持ち", reading: "きもち", meaning: "feeling", level: "middle", jlpt: "N4" },
-  { surface: "意味", reading: "いみ", meaning: "meaning", level: "soft", jlpt: "N4" },
-  { surface: "関係", reading: "かんけい", meaning: "relationship", level: "bright", jlpt: "N3" },
-  { surface: "問題", reading: "もんだい", meaning: "problem", level: "middle", jlpt: "N4" },
-  { surface: "経験", reading: "けいけん", meaning: "experience", level: "bright", jlpt: "N3" },
-  { surface: "普通", reading: "ふつう", meaning: "ordinary", level: "soft", jlpt: "N4" },
-  { surface: "説明", reading: "せつめい", meaning: "explanation", level: "middle", jlpt: "N3" },
-  { surface: "表情", reading: "ひょうじょう", meaning: "expression", level: "bright", jlpt: "N3" },
-];
-
 const LANES = [3, 8, 13, 18, 24, 30, 36, 43, 50, 57, 64, 71, 78, 85, 92];
 const VISIBLE_WORD_COUNT = 36;
-const PERSONAL_LIBRARY_WORD_LIMIT = 45;
-const PERSONAL_LIBRARY_SKY_LEVELS = new Set<string>(WORD_SKY_ALLOWED_JLPT_LEVELS);
 
 function clampPercent(value: number) {
   return Math.max(3, Math.min(92, value));
@@ -154,32 +132,8 @@ function levelForWord(row: WordSkyPoolRow, index: number): SkyWord["level"] {
   return index % 3 === 0 ? "bright" : index % 2 === 0 ? "middle" : "soft";
 }
 
-function shouldIncludePersonalLibraryWord(
-  row: LibrarySummarySkyRow,
-  progress: LibraryProgressSkyRow | null | undefined,
-  settings: LibraryStudyColorSettings
-) {
-  const jlpt = normalizeJlpt(row.jlpt);
-  if (!PERSONAL_LIBRARY_SKY_LEVELS.has(jlpt)) return false;
-
-  const status = computeLibraryStudyColorStatus({
-    encounterCount: row.total_encounter_count ?? 0,
-    settings,
-    readingGate: progress?.reading_gate_status ?? "not_started",
-    meaningGate: progress?.meaning_gate_status ?? "not_started",
-    heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
-    heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
-    preReadingSupportCycle: progress?.held_before_reading_gate
-      ? Math.max(2, (progress.reading_gate_attempts ?? 0) + 1)
-      : null,
-    mastered: progress?.mastered ?? false,
-  });
-
-  return status.color === "red" || status.color === "orange" || status.color === "yellow";
-}
-
 function libraryColorForWord(
-  row: Pick<LibrarySummarySkyRow, "total_encounter_count">,
+  row: Pick<LibraryColorSkyRow, "total_encounter_count">,
   progress: LibraryProgressSkyRow | null | undefined,
   settings: LibraryStudyColorSettings
 ) {
@@ -199,14 +153,6 @@ function libraryColorForWord(
 
 function shouldHideFromWordSkyByLibraryColor(color: LibraryStudyColor | undefined) {
   return color === "green" || color === "blue" || color === "purple";
-}
-
-function normalizeJlpt(value: string | null | undefined) {
-  const normalized = (value ?? "NON-JLPT").trim().toUpperCase();
-  if (normalized === "N5" || normalized === "N4" || normalized === "N3" || normalized === "N2" || normalized === "N1") {
-    return normalized;
-  }
-  return "NON-JLPT";
 }
 
 function makeVisibleWords(words: SkyWord[]) {
@@ -248,10 +194,8 @@ function withTimeout<T>(promise: PromiseLike<T>, ms: number, label: string): Pro
 export default function WordSkyPage() {
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
-  const [wordPool, setWordPool] = useState<SkyWord[]>(FALLBACK_SKY_WORDS);
-  const [visibleWords, setVisibleWords] = useState<VisibleSkyWord[]>(
-    makeVisibleWords(shuffleArray(FALLBACK_SKY_WORDS))
-  );
+  const [wordPool, setWordPool] = useState<SkyWord[]>([]);
+  const [visibleWords, setVisibleWords] = useState<VisibleSkyWord[]>([]);
   const [claims, setClaims] = useState<Record<string, ClaimRow>>({});
   const [libraryColors, setLibraryColors] = useState<Record<string, LibraryStudyColor>>({});
   const [selectedWord, setSelectedWord] = useState<SkyWord | null>(null);
@@ -325,7 +269,6 @@ export default function WordSkyPage() {
         const [
           { data: poolData, error: poolError },
           { data: settingsData, error: settingsError },
-          { data: libraryRows, error: libraryError },
           { data: progressRows, error: progressError },
         ] = await Promise.all([
           withTimeout(
@@ -341,21 +284,6 @@ export default function WordSkyPage() {
               .maybeSingle<LibraryStudyColorSettings>(),
             4500,
             "Reading color settings"
-          ),
-          withTimeout(
-            supabase
-              .from("study_available_library_word_summaries")
-              .select("study_identity_key, surface, reading, meaning, jlpt, total_encounter_count")
-              .eq("user_id", user.id)
-              .in("jlpt", WORD_SKY_ALLOWED_JLPT_LEVELS)
-              .not("surface", "is", null)
-              .not("reading", "is", null)
-              .not("meaning", "is", null)
-              .order("last_seen_at", { ascending: false })
-              .limit(500)
-              .returns<LibrarySummarySkyRow[]>(),
-            4500,
-            "Personal Word Sky words"
           ),
           withTimeout(
             supabase
@@ -375,40 +303,39 @@ export default function WordSkyPage() {
         const poolRows = Array.isArray(poolData) ? (poolData as WordSkyPoolRow[]) : [];
 
         if (poolError) {
-          console.warn("Word Sky pool is using fallback words:", poolError);
+          console.error("Word Sky reference pool did not load:", poolError);
+          if (!cancelled) {
+            setMessage("The shared Word Sky word list could not be loaded. Please try again shortly.");
+          }
         }
         if (settingsError) {
           console.warn("Word Sky is using default reading color settings:", settingsError);
-        }
-        if (libraryError) {
-          console.warn("Personal Word Sky words did not load:", libraryError);
         }
         if (progressError) {
           console.warn("Personal Word Sky progress did not load:", progressError);
         }
 
-        const starterPool =
-          !poolError && poolRows.length > 0
-            ? poolRows
-              .map((row, index): SkyWord | null => {
-                const surface = (row.surface ?? "").trim();
-                const reading = (row.reading ?? "").trim();
-                const meaning = (row.meaning ?? "").trim();
+        const starterPool = poolError
+          ? []
+          : poolRows
+            .map((row, index): SkyWord | null => {
+              const surface = (row.surface ?? "").trim();
+              const reading = (row.reading ?? "").trim();
+              const meaning = (row.meaning ?? "").trim();
 
-                if (!surface || !reading || !meaning) return null;
+              if (!surface || !reading || !meaning) return null;
 
-                return {
-                  surface,
-                  study_identity_key: row.study_identity_key,
-                  reading,
-                  meaning,
-                  level: levelForWord(row, index),
-                  jlpt: row.jlpt ?? null,
-                  encounterCount: row.total_encounter_count ?? null,
-                };
-              })
-              .filter((word): word is SkyWord => Boolean(word))
-            : FALLBACK_SKY_WORDS;
+              return {
+                surface,
+                study_identity_key: row.study_identity_key,
+                reading,
+                meaning,
+                level: levelForWord(row, index),
+                jlpt: row.jlpt ?? null,
+                encounterCount: row.total_encounter_count ?? null,
+              };
+            })
+            .filter((word): word is SkyWord => Boolean(word));
 
         const colorSettings = settingsError
           ? { red_stages: 1, orange_stages: 1, yellow_stages: 1 }
@@ -419,92 +346,25 @@ export default function WordSkyPage() {
           if (row.study_identity_key) progressByKey.set(row.study_identity_key, row);
         }
 
+        const starterKeys = starterPool
+          .map((word) => word.study_identity_key || studyIdentityKey(word.surface, word.reading));
         const libraryColorByKey: Record<string, LibraryStudyColor> = {};
-        for (const row of libraryError ? [] : libraryRows ?? []) {
-          const key = row.study_identity_key;
-          if (!key) continue;
-
-          libraryColorByKey[key] = libraryColorForWord(
-            row,
-            progressByKey.get(key),
-            colorSettings
-          );
-        }
-
-        const personalPool =
-          libraryError
-            ? []
-            : shuffleArray(
-              (libraryRows ?? [])
-                .map((row, index): SkyWord | null => {
-                  const surface = (row.surface ?? "").trim();
-                  const reading = (row.reading ?? "").trim();
-                  const meaning = (row.meaning ?? "").trim();
-                  if (!surface || !reading || !meaning) return null;
-                  if (
-                    !shouldIncludePersonalLibraryWord(
-                      row,
-                      row.study_identity_key ? progressByKey.get(row.study_identity_key) : null,
-                      colorSettings
-                    )
-                  ) {
-                    return null;
-                  }
-
-                  return {
-                    surface,
-                    study_identity_key: row.study_identity_key,
-                    reading,
-                    meaning,
-                    level: levelForWord(
-                      {
-                        study_identity_key: row.study_identity_key,
-                        surface,
-                        reading,
-                        meaning,
-                        jlpt: row.jlpt,
-                        total_encounter_count: row.total_encounter_count,
-                        book_count: null,
-                      },
-                      index
-                    ),
-                    jlpt: row.jlpt ?? null,
-                    encounterCount: row.total_encounter_count ?? null,
-                  };
-                })
-                .filter((word): word is SkyWord => Boolean(word))
-            ).slice(0, PERSONAL_LIBRARY_WORD_LIMIT);
-
-        const seenKeys = new Set<string>();
-        const personallyHidden = await loadPersonallyHiddenStudyKeys();
-        const loadedPool = [...starterPool, ...personalPool].filter((word) => {
-          if (personallyHidden.has(word.study_identity_key || studyIdentityKey(word.surface, word.reading))) return false;
-          const key = (word.study_identity_key || studyIdentityKey(word.surface, word.reading));
-          if (seenKeys.has(key)) return false;
-          seenKeys.add(key);
-          return true;
-        });
-
-        const starterKeysWithoutColor = starterPool
-          .map((word) => (word.study_identity_key || studyIdentityKey(word.surface, word.reading)))
-          .filter((key) => !libraryColorByKey[key]);
-
-        if (starterKeysWithoutColor.length > 0) {
-          const { data: starterSummaryRows, error: starterSummaryError } = await withTimeout(
+        if (starterKeys.length > 0) {
+          const { data: summaryRows, error: summaryError } = await withTimeout(
             supabase
               .from("user_library_word_summaries")
               .select("study_identity_key, total_encounter_count")
               .eq("user_id", user.id)
-              .in("study_identity_key", starterKeysWithoutColor)
-              .returns<LibrarySummarySkyRow[]>(),
+              .in("study_identity_key", starterKeys)
+              .returns<LibraryColorSkyRow[]>(),
             4500,
-            "Starter Word Sky library colors"
+            "Word Sky reading colors"
           );
 
-          if (starterSummaryError) {
-            console.warn("Starter Word Sky library colors did not load:", starterSummaryError);
+          if (summaryError) {
+            console.warn("Word Sky reading colors did not load:", summaryError);
           } else {
-            for (const row of starterSummaryRows ?? []) {
+            for (const row of summaryRows ?? []) {
               const key = row.study_identity_key;
               if (!key) continue;
 
@@ -517,17 +377,31 @@ export default function WordSkyPage() {
           }
         }
 
+        const personallyHidden = await loadPersonallyHiddenStudyKeys();
+        const loadedPool = starterPool.filter((word) => {
+          const key = word.study_identity_key || studyIdentityKey(word.surface, word.reading);
+          return !personallyHidden.has(key);
+        });
+
         const finalPool = loadedPool.filter((word) => {
           const key = (word.study_identity_key || studyIdentityKey(word.surface, word.reading));
           return !shouldHideFromWordSkyByLibraryColor(libraryColorByKey[key]);
         });
 
-        const shuffledPool = shuffleArray(finalPool.length > 0 ? finalPool : loadedPool);
+        const shuffledPool = shuffleArray(finalPool);
+        if (shuffledPool.length === 0 && !poolError) {
+          setMessage("There are no active shared Word Sky reference words available right now.");
+        }
         setWordPool(shuffledPool);
         setVisibleWords(makeVisibleWords(shuffledPool));
         setLibraryColors(libraryColorByKey);
 
         const keys = shuffledPool.map((word) => (word.study_identity_key || studyIdentityKey(word.surface, word.reading)));
+        if (keys.length === 0) {
+          if (!cancelled) setClaims({});
+          return;
+        }
+
         const { data, error } = await withTimeout(
           supabase
             .from("user_library_word_claims")
@@ -677,8 +551,8 @@ export default function WordSkyPage() {
             </p>
             <h1 className="mt-2 text-2xl font-semibold text-slate-950">Word Sky</h1>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Word Sky is available with full learning access. It uses your saved vocabulary,
-              reading-color progress, and Word Sky claims, so it is part of the advanced study tools.
+              Word Sky is available with full learning access. It uses the shared reference word list,
+              along with your reading-color progress and Word Sky claims.
             </p>
 
             {message ? (

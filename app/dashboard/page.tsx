@@ -37,15 +37,6 @@ type WordSkyPoolRow = {
   meaning: string | null;
 };
 
-const FALLBACK_WARMUP_WORDS: WarmupWord[] = [
-  { surface: "本", reading: "ほん", meaning: "book" },
-  { surface: "場所", reading: "ばしょ", meaning: "place" },
-  { surface: "気持ち", reading: "きもち", meaning: "feeling" },
-  { surface: "時間", reading: "じかん", meaning: "time" },
-  { surface: "読む", reading: "よむ", meaning: "to read" },
-  { surface: "物語", reading: "ものがたり", meaning: "story" },
-];
-
 function normalizeText(value: string | null | undefined) {
   return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 }
@@ -286,7 +277,7 @@ export default function DashboardPage() {
       }
 
       setWarmupLoading(true);
-      let words = dailyWarmupWords(FALLBACK_WARMUP_WORDS, userId);
+      let words: WarmupWord[] = [];
 
       const { data: poolData, error: poolError } = await supabase.rpc("get_word_sky_pool", {
         p_limit: 120,
@@ -308,6 +299,15 @@ export default function DashboardPage() {
         }
       } else if (poolError) {
         console.warn("Dashboard warm-up pool did not load:", poolError);
+      }
+
+      if (words.length === 0) {
+        if (!cancelled) {
+          setWarmupWords([]);
+          setWarmupClaimKeys(new Set());
+          setWarmupLoading(false);
+        }
+        return;
       }
 
       const keys = words.map((word) => (word.study_identity_key || studyIdentityKey(word.surface, word.reading)));
