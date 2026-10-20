@@ -11,6 +11,27 @@ const root = path.resolve(import.meta.dirname, '..');
 let state, cursor, writes, alerts;
 const cache = new Map();
 const tracking = { method: 'page', totals: { page_count: 100 }, requireMethod() { throw Error('Unexpected missing method'); } };
+const pageStateSlots = [
+  ['ownsBook', value => value === false],
+  ['loading', value => value === true],
+  ['accessMessage', value => value === ''],
+  ['row', value => value === null],
+  ['sessions', Array.isArray],
+  ['startedAt', value => value === ''],
+  ['finishedAt', value => value === ''],
+  ['dnfAt', value => value === ''],
+  ['dnfReason', value => value === ''],
+  ['dnfNote', value => value === ''],
+  ['wouldRetry', value => value === ''],
+  ['sessionDate', value => typeof value === 'string'],
+  ['sessionMode', value => value === 'fluid'],
+  ['sessionStartPage', value => value === ''],
+  ['sessionEndPage', value => value === ''],
+  ['sessionMinutesRead', value => value === ''],
+  ['editingSessionId', value => value === null],
+  ['isNativeBook', value => value === false],
+  ['canUseCuriosityReading', value => value === false],
+];
 function load(relative) {
   const filename = path.resolve(root, relative);
   if (cache.has(filename)) return cache.get(filename).exports;
@@ -20,7 +41,13 @@ function load(relative) {
   }).outputText;
   new Function('require','module','exports',code)(name => {
     if (name === 'react') return { ...React,
-      useState(initial) { const index = cursor++; if (!(index in state)) state[index] = initial; return [state[index], value => { state[index] = typeof value === 'function' ? value(state[index]) : value; }]; },
+      useState(initial) {
+        const index = cursor++;
+        const [key, matchesInitial] = pageStateSlots[index] ?? [];
+        assert.ok(key, `Unexpected Reading History useState hook at position ${index}`);
+        assert.ok(matchesInitial(initial), `Reading History useState hook "${key}" changed position or default`);
+        return [state[key], value => { state[key] = typeof value === 'function' ? value(state[key]) : value; }];
+      },
       useEffect() {}, useMemo: fn => fn(),
     };
     if (name === 'next/navigation') return { useParams: () => ({userBookId:'book'}) };
@@ -39,11 +66,36 @@ const { getFeatureAccess } = load('lib/access/featureAccess.ts');
 const { getAppAccessStatus } = load('lib/access/appAccess.ts');
 const historical = {id:'old',user_book_id:'book',read_on:'2026-09-01',session_mode:'curiosity',start_page:1,end_page:10,minutes_read:20,tracking_unit:'page',progress_total:100,is_filler:false};
 function setup(canUseCuriosityReading, sessions = [historical]) {
-  // State slots correspond to the live page's hooks; effects are disabled for isolated UI testing.
-  state = [false,'',{id:'book',started_at:'2026-09-01',books:{title:'Test',page_count:100}},sessions,'2026-09-01','','','','','','2026-09-27','fluid','','','',null,false,canUseCuriosityReading];
+  // Named values mirror the page's useState declarations; effect callbacks are disabled for isolated UI testing.
+  state = {
+    ownsBook: false,
+    loading: false,
+    accessMessage: '',
+    row: {id:'book',started_at:'2026-09-01',books:{title:'Test',page_count:100}},
+    sessions,
+    startedAt: '',
+    finishedAt: '',
+    dnfAt: '',
+    dnfReason: '',
+    dnfNote: '',
+    wouldRetry: '',
+    sessionDate: '2026-09-27',
+    sessionMode: 'fluid',
+    sessionStartPage: '',
+    sessionEndPage: '',
+    sessionMinutesRead: '',
+    editingSessionId: null,
+    isNativeBook: false,
+    canUseCuriosityReading,
+  };
   writes=[];alerts=[];
 }
-function render() { cursor=0; return Page(); }
+function render() {
+  cursor=0;
+  const tree=Page();
+  assert.equal(cursor, pageStateSlots.length, 'Reading History useState hook count changed');
+  return tree;
+}
 function nodes(tree) {
   if (!tree || typeof tree !== 'object') return [];
   if (Array.isArray(tree)) return tree.flatMap(nodes);
@@ -95,7 +147,7 @@ test('editing and saving historical curiosity preserves mode; cancel/save cannot
     button(render(),'Cancel Edit').props.onClick();
     assert.deepEqual(options(render()).map(x=>x[0]),['fluid','listening']);
     // A stale draft cannot submit curiosity without editing its saved historical record.
-    state[11]='curiosity';
+    state.sessionMode='curiosity';
     await button(render(),'Save Session').props.onClick();
     assert.equal(writes.length,1);assert.equal(alerts.length,1);
     // Editing a different historical mode does not grant the curiosity option.
