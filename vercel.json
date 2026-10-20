@@ -1,8 +1,3 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "git": {
-    "deploymentEnabled": {
-      "release/2026-10-security": false
-    }
-  }
+  "$schema": "https://openapi.vercel.sh/vercel.json"
 }
