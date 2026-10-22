@@ -2332,12 +2332,6 @@ function ReadAlongContent() {
                     </div>
                 ) : null}
 
-                {canUseReadingJournal && learnerUserId ? (
-                    <button type="button" onClick={() => { setHasOpenedMobileJournal(true); setMobileJournalOpen(true); }} className="rounded-xl bg-violet-700 px-4 py-2 text-sm font-bold text-white xl:hidden">
-                        Open Reading Journal
-                    </button>
-                ) : null}
-
                 {bookTitle ? (
                     <ReadAlongBookContextCard
                         bookTitle={bookTitle}
