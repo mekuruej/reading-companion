@@ -4,6 +4,7 @@
 import { usePersonalVisibility } from "@/components/vocabulary/usePersonalVisibility";
 import WordContextFields from "@/components/vocabulary/WordContextFields";
 import { wordContextPayload, type WordContext } from "@/lib/vocabulary/wordContext";
+import { loadAllPagedRows } from "@/lib/vocabulary/loadAllPagedRows";
 
 import { isReadyForFlashcards } from "@/lib/wordSupportEligibility";
 import { saveStudentWord } from "@/lib/teacher/saveStudentWord";
@@ -64,6 +65,8 @@ const DEFAULT_LEARNING_SETTINGS = {
   yellow_stages: 1,
   show_badge_numbers: true,
 };
+
+const BOOK_VOCABULARY_PAGE_SIZE = 500;
 
 const GLOBAL_ENCOUNTER_PAGE_SIZE = 1000;
 
@@ -914,10 +917,11 @@ function BookWordsPageContent() {
           setLibraryProgressByKey({});
         }
 
-        let wordsQuery = supabase
-          .from("personal_user_book_words")
-          .select(
-            `
+        const rows = await loadAllPagedRows<WordRow>((from, to) => {
+          let wordsQuery = supabase
+            .from("personal_user_book_words")
+            .select(
+              `
               id,
               user_book_id,
               surface,
@@ -941,24 +945,24 @@ function BookWordsPageContent() {
               vocabulary_cache: vocabulary_cache_id (
                 surface
               )
-            `
-          )
-          .eq("user_book_id", userBookId)
-          .order("chapter_number", { ascending: true, nullsFirst: false })
-          .order("page_number", { ascending: true, nullsFirst: false })
-          .order("page_order", { ascending: true, nullsFirst: false })
-          .order("created_at", { ascending: true })
-          .order("id", { ascending: true });
+              `,
+              { count: "exact" }
+            )
+            .eq("user_book_id", userBookId)
+            .order("chapter_number", { ascending: true, nullsFirst: false })
+            .order("page_number", { ascending: true, nullsFirst: false })
+            .order("page_order", { ascending: true, nullsFirst: false })
+            .order("created_at", { ascending: true })
+            .order("id", { ascending: true });
 
-        if (showHidden) {
-          wordsQuery = wordsQuery.or("hidden.eq.true,follow_along_hidden.eq.true,flashcard_hidden.eq.true");
-        } else {
-          wordsQuery = wordsQuery.eq("hidden", false);
-        }
+          if (showHidden) {
+            wordsQuery = wordsQuery.or("hidden.eq.true,follow_along_hidden.eq.true,flashcard_hidden.eq.true");
+          } else {
+            wordsQuery = wordsQuery.eq("hidden", false);
+          }
 
-        const { data: rows, error: wErr } = await wordsQuery.returns<WordRow[]>();
-
-        if (wErr) throw wErr;
+          return wordsQuery.range(from, to).returns<WordRow[]>();
+        }, BOOK_VOCABULARY_PAGE_SIZE);
 
         const list = (rows ?? []).map((w: any) => ({
           ...w,
