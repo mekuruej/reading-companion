@@ -8,6 +8,8 @@ import { getFeatureAccess } from "@/lib/access/featureAccess";
 import { withReturnTo } from "@/lib/navigation/returnTo";
 import {
     calculateAdvancedStudyReadiness,
+    hasAbilityCheckActivity,
+    shouldShowAbilityCheckReadinessIntro,
     type AdvancedStudyReadinessProgressRow,
     type AdvancedStudyReadinessResult,
     type AdvancedStudyReadinessSummaryRow,
@@ -21,6 +23,8 @@ type ProfileAccessRow = {
     app_access_expires_at: string | null;
     trial_started_at: string | null;
 };
+
+type ProfileAccessFallbackRow = Pick<ProfileAccessRow, "role" | "is_super_teacher">;
 
 type LearningSettingsRow = {
     red_stages: number | null;
@@ -87,6 +91,22 @@ async function loadAdvancedStudyProgressRows(
     return rows;
 }
 
+async function loadHasPriorAbilityCheckActivity(userId: string) {
+    // This lookup deliberately does not depend on the currently eligible
+    // vocabulary summaries, which can be empty when words are personally
+    // hidden or otherwise unavailable for study.
+    const { data, error } = await supabase
+        .from("user_library_word_progress")
+        .select("reading_gate_status, meaning_gate_status, reading_gate_attempts, meaning_gate_attempts, mastered")
+        .eq("user_id", userId)
+        .or("reading_gate_attempts.gt.0,meaning_gate_attempts.gt.0,reading_gate_status.neq.not_started,meaning_gate_status.neq.not_started,mastered.eq.true")
+        .limit(1)
+        .maybeSingle();
+
+    if (error) throw error;
+    return hasAbilityCheckActivity(data ? [data as AdvancedStudyReadinessProgressRow] : []);
+}
+
 const advancedTools = [
     {
         title: "Library Review",
@@ -123,7 +143,7 @@ export default function AdvancedStudyPage() {
     const [isStaffAccess, setIsStaffAccess] = useState(false);
     const [canUseAbilityCheck, setCanUseAbilityCheck] = useState(false);
     const [canUseLibraryReview, setCanUseLibraryReview] = useState(false);
-    const [hasAbilityCheckHistory, setHasAbilityCheckHistory] = useState(false);
+    const [hasAbilityCheckHistory, setHasAbilityCheckHistory] = useState<boolean | null>(null);
     const accessTitle = accessReason === "expired" ? "Japanese Learning ended" : "Free reading tracker";
     const abilityCheckAvailable = canUseAbilityCheck && !isTrialAccess && (isStaffAccess || (readiness?.abilityCheckReady ?? false));
     const libraryReviewAvailable = canUseLibraryReview && !isTrialAccess && (isStaffAccess || (readiness?.libraryReviewReady ?? false));
@@ -137,8 +157,11 @@ export default function AdvancedStudyPage() {
         : 0;
     const showAbilityCheckReadinessCard = Boolean(
         readiness &&
-        !hasAbilityCheckHistory &&
-        readiness.eligibleWordCount < readiness.abilityCheckTarget + 10
+        shouldShowAbilityCheckReadinessIntro({
+            hasPriorAbilityCheckActivity: hasAbilityCheckHistory,
+            eligibleWordCount: readiness.eligibleWordCount,
+            abilityCheckTarget: readiness.abilityCheckTarget,
+        })
     );
 
     useEffect(() => {
@@ -161,7 +184,7 @@ export default function AdvancedStudyPage() {
                         setIsStaffAccess(false);
                         setCanUseAbilityCheck(false);
                         setCanUseLibraryReview(false);
-                        setHasAbilityCheckHistory(false);
+                        setHasAbilityCheckHistory(null);
                         setLoadingAccess(false);
                     }
                     return;
@@ -172,7 +195,7 @@ export default function AdvancedStudyPage() {
                     .select("role, is_super_teacher, app_access_type, app_access_expires_at, trial_started_at")
                     .eq("id", user.id)
                     .maybeSingle<ProfileAccessRow>();
-                let profile: any = profileResult.data;
+                let profile: ProfileAccessRow | ProfileAccessFallbackRow | null = profileResult.data;
                 let profileError = profileResult.error;
 
                 if (isMissingAppAccessColumnError(profileError)) {
@@ -180,7 +203,7 @@ export default function AdvancedStudyPage() {
                         .from("profiles")
                         .select("role, is_super_teacher")
                         .eq("id", user.id)
-                        .maybeSingle();
+                        .maybeSingle<ProfileAccessFallbackRow>();
 
                     profile = fallbackResult.data;
                     profileError = fallbackResult.error;
@@ -229,19 +252,19 @@ export default function AdvancedStudyPage() {
 
                         const { rows: summaryRows } = await loadAdvancedStudySummaryRows(user.id);
                         let progressRows: AdvancedStudyReadinessProgressRow[] = [];
+                        let hasPriorAbilityCheckActivity: boolean | null = null;
+
+                        try {
+                            hasPriorAbilityCheckActivity = await loadHasPriorAbilityCheckActivity(user.id);
+                        } catch (historyError) {
+                            console.warn("Could not verify prior Ability Check activity:", historyError);
+                        }
 
                         try {
                             progressRows = await loadAdvancedStudyProgressRows(user.id, summaryRows);
                         } catch (progressError) {
                             console.warn("Advanced Study readiness is using summary colors without progress:", progressError);
                         }
-                        const hasStartedAbilityCheck = progressRows.some((progress) =>
-                            (progress.reading_gate_attempts ?? 0) > 0 ||
-                            progress.reading_gate_status !== "not_started" ||
-                            progress.meaning_gate_status !== "not_started" ||
-                            progress.mastered === true
-                        );
-
                         const nextReadiness = calculateAdvancedStudyReadiness({
                             summaries: summaryRows,
                             progressRows,
@@ -253,13 +276,13 @@ export default function AdvancedStudyPage() {
 
                         if (mounted) {
                             setReadiness(nextReadiness);
-                            setHasAbilityCheckHistory(hasStartedAbilityCheck);
+                            setHasAbilityCheckHistory(hasPriorAbilityCheckActivity);
                         }
                     } catch (readinessLoadError) {
                         console.error("Could not load Advanced Study readiness:", readinessLoadError);
                         if (mounted) {
                             setReadiness(null);
-                            setHasAbilityCheckHistory(false);
+                            setHasAbilityCheckHistory(null);
                             setReadinessError("Could not load Advanced Study readiness.");
                         }
                     } finally {
@@ -291,7 +314,7 @@ export default function AdvancedStudyPage() {
                     setIsStaffAccess(false);
                     setCanUseAbilityCheck(false);
                     setCanUseLibraryReview(false);
-                    setHasAbilityCheckHistory(false);
+                    setHasAbilityCheckHistory(null);
                     setLoadingAccess(false);
                 }
             }
@@ -395,7 +418,7 @@ export default function AdvancedStudyPage() {
                                         <h2 className="text-2xl font-black text-slate-950">
                                             {readiness.abilityCheckReady
                                                 ? "Ability Check alerts will start appearing on your Library page."
-                                                : `${readiness.eligibleWordCount} / ${readiness.abilityCheckTarget} words saved until Ability Check starts`}
+                                                : `${readiness.eligibleWordCount} / ${readiness.abilityCheckTarget} eligible study words until Ability Check starts`}
                                         </h2>
                                         <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-600">
                                             {readiness.abilityCheckReady
@@ -405,7 +428,7 @@ export default function AdvancedStudyPage() {
                                     </div>
 
                                     <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700">
-                                        {readiness.eligibleWordCount} saved words
+                                        {readiness.eligibleWordCount} eligible study words
                                     </div>
                                 </div>
 
@@ -421,7 +444,7 @@ export default function AdvancedStudyPage() {
                                 <p className="mt-4 text-sm font-semibold leading-6 text-slate-600">
                                     {readiness.abilityCheckReady
                                         ? `You have saved ${readiness.abilityCheckTarget} or more words, so Ability Check can begin surfacing Library alerts.`
-                                        : `${readiness.eligibleWordCount}/${readiness.abilityCheckTarget} words saved (${abilityCheckProgressPercent}%) until your Ability Check starts.`}
+                                        : `${readiness.eligibleWordCount}/${readiness.abilityCheckTarget} eligible study words (${abilityCheckProgressPercent}%) until your Ability Check starts.`}
                                 </p>
 
                                 {!showAdvancedTools ? (

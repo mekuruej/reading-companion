@@ -24,6 +24,7 @@ export type AdvancedStudyReadinessProgressRow = {
   held_before_reading_gate?: boolean | null;
   held_before_meaning_gate?: boolean | null;
   reading_gate_attempts?: number | null;
+  meaning_gate_attempts?: number | null;
   mastered?: boolean | null;
 };
 
@@ -38,6 +39,31 @@ export type AdvancedStudyReadinessResult = {
   libraryReviewReady: boolean;
   eligibleWordCount: number;
 };
+
+/**
+ * Only show the introductory Ability Check card when a successful history
+ * lookup confirms that this user has never interacted with an Ability Check.
+ * `null` represents a failed or inconclusive lookup and must not look like a
+ * first-time user.
+ */
+export function shouldShowAbilityCheckReadinessIntro(input: {
+  hasPriorAbilityCheckActivity: boolean | null;
+  eligibleWordCount: number;
+  abilityCheckTarget: number;
+}) {
+  return input.hasPriorAbilityCheckActivity === false &&
+    input.eligibleWordCount < input.abilityCheckTarget + 10;
+}
+
+export function hasAbilityCheckActivity(rows: AdvancedStudyReadinessProgressRow[]) {
+  return rows.some((progress) =>
+    (progress.reading_gate_attempts ?? 0) > 0 ||
+    (progress.meaning_gate_attempts ?? 0) > 0 ||
+    (progress.reading_gate_status != null && progress.reading_gate_status !== "not_started") ||
+    (progress.meaning_gate_status != null && progress.meaning_gate_status !== "not_started") ||
+    progress.mastered === true
+  );
+}
 
 const COLOR_SCORE_WEIGHTS: Record<LibraryStudyColor, number> = {
   none: 0,
