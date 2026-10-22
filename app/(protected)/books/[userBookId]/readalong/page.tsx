@@ -2,6 +2,7 @@
 // 
 
 "use client";
+import { loadAllPagedRows } from "@/lib/vocabulary/loadAllPagedRows";
 import { usePersonalVisibility } from "@/components/vocabulary/usePersonalVisibility";
 import VocabularyProgressPrompt from "@/components/books/VocabularyProgressPrompt";
 import type { CapturePosition } from "@/lib/books/vocabularyProgress";
@@ -352,6 +353,7 @@ function ReadAlongContent() {
         Record<string, LibraryStudyWordColorInfo>
     >({});
     const [loading, setLoading] = useState(true);
+    const [wordsLoadError, setWordsLoadError] = useState("");
     const [supportMode, setSupportMode] = useState<SupportMode>("full");
     const [viewMode, setViewMode] = useState<FollowAlongViewMode>("follow-along");
     const [hasWorkspaceWidth, setHasWorkspaceWidth] = useState(false);
@@ -465,6 +467,7 @@ function ReadAlongContent() {
             if (!userBookId) return;
 
             setLoading(true);
+            setWordsLoadError("");
             setAccessChecked(false);
             setCanAccessBook(false);
             setLearnerUserId(null);
@@ -613,36 +616,40 @@ function ReadAlongContent() {
                 return;
             }
 
-            const { data, error } = await supabase
-                .from("personal_user_book_words")
-                .select(`
-                    id, follow_along_hidden,
-                    surface,
-                    reading,
-                    meaning,
-                    jlpt,
-                    meaning_choice_index,
-                    page_number, position_unit, position_value, percent_location,
-                    page_order,
-                    chapter_number,
-                    chapter_name,
-                    hide_kanji_in_reading_support, alternative_surface, book_form, book_form_description, follow_along_support_note
-                    `)
-                .eq("user_book_id", userBookId)
-                .eq("hidden", false)
-                .order("page_number", { ascending: true, nullsFirst: false })
-                .order("page_order", { ascending: true, nullsFirst: false })
-                .order("created_at", { ascending: true });
-
-            if (error) {
+            try {
+                const rows = await loadAllPagedRows<ReadAlongWord>((from, to) =>
+                    supabase
+                        .from("personal_user_book_words")
+                        .select(`
+                            id, follow_along_hidden,
+                            surface,
+                            reading,
+                            meaning,
+                            jlpt,
+                            meaning_choice_index,
+                            page_number, position_unit, position_value, percent_location,
+                            page_order,
+                            chapter_number,
+                            chapter_name,
+                            hide_kanji_in_reading_support, alternative_surface, book_form, book_form_description, follow_along_support_note
+                            `, { count: "exact" })
+                        .eq("user_book_id", userBookId)
+                        .eq("hidden", false)
+                        .order("page_number", { ascending: true, nullsFirst: false })
+                        .order("page_order", { ascending: true, nullsFirst: false })
+                        .order("created_at", { ascending: true })
+                        .order("id", { ascending: true })
+                        .range(from, to)
+                        .returns<ReadAlongWord[]>(),
+                );
+                setWords(rows.filter(hasUsefulSupport));
+            } catch (error) {
                 console.error("Error loading read along words:", error);
                 setWords([]);
+                setWordsLoadError("Could not load the complete Follow-Along vocabulary. Please reload and try again.");
+            } finally {
                 setLoading(false);
-                return;
             }
-
-            setWords(((data as ReadAlongWord[]) ?? []).filter(hasUsefulSupport));
-            setLoading(false);
         }
 
         loadWords();
@@ -1287,6 +1294,20 @@ function ReadAlongContent() {
 
     if (!canAccessBook) {
         return <ReadAlongAccessDeniedState message={accessMessage} />;
+    }
+
+    if (wordsLoadError) {
+        return (
+            <main className="min-h-screen bg-slate-100 p-6">
+                <div role="alert" className="mx-auto max-w-xl rounded-2xl bg-white p-6">
+                    <p>{wordsLoadError}</p>
+                    <button type="button" onClick={() => window.location.reload()}
+                        className="mt-4 rounded-xl border px-4 py-2 font-semibold">
+                        Reload Follow-Along
+                    </button>
+                </div>
+            </main>
+        );
     }
 
     if (fullAccessLocked) {
