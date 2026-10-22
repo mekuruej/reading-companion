@@ -342,6 +342,9 @@ function BookWordsPageContent() {
   const [teacherVocabContext, setTeacherVocabContext] = useState<TeacherBookContext | null>(null);
   const [sharedTeachingWords, setSharedTeachingWords] = useState<SharedTeacherVocabularyWord[]>([]);
   const [query, setQuery] = useState("");
+  const [exportExpanded, setExportExpanded] = useState(false);
+  const [exportChapter, setExportChapter] = useState("all");
+  const [exportJlpt, setExportJlpt] = useState("all");
   const [chapterFilter, setChapterFilter] = useState("all");
   const [chapterOptions, setChapterOptions] = useState<{ value: string; label: string }[]>([]);
   const [showHidden, setShowHidden] = useState(false);
@@ -1145,18 +1148,15 @@ function BookWordsPageContent() {
     });
   }, [filtered]);
 
-  function handleExportVocabCsv(exportChapter: string, exportJlpt: string) {
-    const exportWords = words.filter((word) => {
+  const exportWords = useMemo(() => words.filter((word) => {
       const chapterMatches = exportChapter === "all" || chapterKey(word) === exportChapter;
       const jlptMatches = exportJlpt === "all" || normalizeJlpt(word.jlpt) === exportJlpt;
 
       return chapterMatches && jlptMatches;
-    });
+    }), [words, exportChapter, exportJlpt]);
 
-    if (exportWords.length === 0) {
-      window.alert("There are no words to export for those filters yet.");
-      return;
-    }
+  function handleExportVocabCsv() {
+    if (exportWords.length === 0) return;
 
     const selectedChapterLabel =
       exportChapter === "all"
@@ -1401,7 +1401,13 @@ function BookWordsPageContent() {
 
           <BookVocabCsvExportPanel
             chapterOptions={chapterOptions}
-            wordCount={words.length}
+            wordCount={exportWords.length}
+            exportChapter={exportChapter}
+            exportJlpt={exportJlpt}
+            expanded={exportExpanded}
+            onExpandedChange={setExportExpanded}
+            onExportChapterChange={setExportChapter}
+            onExportJlptChange={setExportJlpt}
             onExportCsv={handleExportVocabCsv}
           />
         </div>

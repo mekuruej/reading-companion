@@ -117,8 +117,10 @@ test('chapter/search filtering and CSV export still consume the complete words c
   const exportStart = pageSource.indexOf('function handleExportVocabCsv');
   const exportEnd = pageSource.indexOf('\n  }', exportStart);
   const exportHandler = pageSource.slice(exportStart, exportEnd);
-  assert.match(exportHandler, /const exportWords = words\.filter/);
-  assert.match(exportHandler, /chapterMatches/);
-  assert.match(exportHandler, /jlptMatches/);
+  const exportSelection = pageSource.slice(pageSource.indexOf('const exportWords = useMemo'), exportStart);
+  assert.match(exportSelection, /words\.filter/);
+  assert.match(exportSelection, /chapterMatches/);
+  assert.match(exportSelection, /jlptMatches/);
+  assert.match(exportHandler, /exportWords\.map/);
   assert.match(exportHandler, /\["Surface", "Reading", "Meaning", "Def #", "Chapter", "Position", "JLPT", "Common"\]/);
 });
