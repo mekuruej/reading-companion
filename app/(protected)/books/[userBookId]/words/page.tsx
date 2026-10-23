@@ -1413,6 +1413,7 @@ function BookWordsPageContent() {
         </div>
       </div>
 
+      <div hidden={exportExpanded}>
       {sharedTeachingWords.length > 0 ? (
         <section className="my-4 rounded-3xl border border-blue-100 bg-blue-50 p-4">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
@@ -1549,6 +1550,7 @@ function BookWordsPageContent() {
         </BookVocabTableShell>
       </div>
       <BookVocabBackToTopButton />
+      </div>
     </main >
   );
 }
