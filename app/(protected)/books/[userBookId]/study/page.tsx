@@ -8,6 +8,13 @@ import AlsoWritten from "@/components/vocabulary/AlsoWritten";
 import { savedSenseNumber, senseStudyKey, senseDefinitionKey } from "@/lib/studySenseIdentity";
 import { wordPositionText, type WordPositionRecord } from "@/lib/vocabulary/wordPosition";
 import { useStudyModeRotation } from "@/lib/study/useStudyModeRotation";
+import {
+  JAPANESE_FLASHCARD_COMPLETE_MODES,
+  JAPANESE_FLASHCARD_MULTIPLE_CHOICE_MODES,
+  JAPANESE_FLASHCARD_MODE_ORDER,
+  JAPANESE_FLASHCARD_TYPING_MODES,
+  normalizeJapaneseFlashcardMode,
+} from "@/lib/study/japaneseFlashcardModes";
 import { canLoadJapaneseFlashcard, canStudyWord } from "@/lib/wordSupportEligibility";
 import { saveStudentWord } from "@/lib/teacher/saveStudentWord";
 import StudentToolBoundary from "@/components/teacher/StudentToolBoundary";
@@ -69,17 +76,17 @@ type StepField = "word" | "reading" | "meaning";
 function studySetLabel(s: StudySet) {
   switch (s) {
     case "READING":
-      return "Reading Typing";
+      return "Kanji/Meaning → Kana";
     case "MEANING":
       return "Meaning Typing";
     case "FROM_READING_MEANING":
-      return "Kana to Meaning Typing";
+      return "Kana → Meaning";
     case "READING_MC":
       return "Reading MC";
     case "MEANING_MC":
-      return "Meaning MC";
+      return "Kanji/Kana → Meaning";
     case "FROM_READING_MC":
-      return "Kana to Kanji MC";
+      return "Meaning → Kanji";
     case "FROM_READING_MEANING_MC":
       return "Kana to Meaning MC";
     case "COMPLETE":
@@ -89,28 +96,25 @@ function studySetLabel(s: StudySet) {
     case "ENGLISH_READER":
       return "English → Japanese";
     default:
-      return "Reading Typing";
+      return "Kanji/Meaning → Kana";
   }
 }
 
 const BOOK_FLASHCARD_MODE_OPTIONS = [
-  { value: "READING", label: studySetLabel("READING") },
-  { value: "MEANING", label: studySetLabel("MEANING") },
-  {
-    value: "FROM_READING_MEANING",
-    label: studySetLabel("FROM_READING_MEANING"),
-  },
+  ...JAPANESE_FLASHCARD_TYPING_MODES.map((value) => ({
+    value,
+    label: studySetLabel(value),
+  })),
   { value: "divider-1", label: "──────────", disabled: true },
-  { value: "READING_MC", label: studySetLabel("READING_MC") },
-  { value: "MEANING_MC", label: studySetLabel("MEANING_MC") },
-  { value: "FROM_READING_MC", label: studySetLabel("FROM_READING_MC") },
-  {
-    value: "FROM_READING_MEANING_MC",
-    label: studySetLabel("FROM_READING_MEANING_MC"),
-  },
+  ...JAPANESE_FLASHCARD_MULTIPLE_CHOICE_MODES.map((value) => ({
+    value,
+    label: studySetLabel(value),
+  })),
   { value: "divider-2", label: "──────────", disabled: true },
-  { value: "COMPLETE", label: studySetLabel("COMPLETE") },
-  { value: "COMPLETE_TYPING", label: studySetLabel("COMPLETE_TYPING") },
+  ...JAPANESE_FLASHCARD_COMPLETE_MODES.map((value) => ({
+    value,
+    label: studySetLabel(value),
+  })),
 ];
 
 type KanjiMetaItem = {
@@ -278,17 +282,7 @@ const LIBRARY_COLOR_FILTERS: LibraryStudyColor[] = [
   "red",
   "grey",
 ];
-const STUDY_MODE_ORDER: StudySet[] = [
-  "READING",
-  "MEANING",
-  "FROM_READING_MEANING",
-  "READING_MC",
-  "MEANING_MC",
-  "FROM_READING_MC",
-  "FROM_READING_MEANING_MC",
-  "COMPLETE",
-  "COMPLETE_TYPING",
-];
+const STUDY_MODE_ORDER: StudySet[] = [...JAPANESE_FLASHCARD_MODE_ORDER];
 
 function bookFlashcardColorName(color: LibraryStudyColor) {
   if (color === "grey") return "Limbo";
@@ -577,8 +571,11 @@ function BookFlashcardsPageContent() {
       if (parsed?.chapterFilter) setChapterFilter(parsed.chapterFilter);
       if (parsed?.pageFilter) setPageFilter(String(parsed.pageFilter));
       if (typeof parsed?.repeatsOnly === "boolean") setRepeatsOnly(parsed.repeatsOnly);
+      if (parsed?.studySet && parsed.studySet !== "ENGLISH_READER") {
+        setStudySet(normalizeJapaneseFlashcardMode(parsed.studySet));
+      }
     } catch { }
-  }, [settingsKey, userBookId]);
+  }, [settingsKey, setStudySet, userBookId]);
 
   useEffect(() => {
     if (!userBookId) return;
@@ -2365,7 +2362,6 @@ function BookFlashcardsPageContent() {
                 </>
               ) : studySet === "FROM_READING_MC" ? (
                 <>
-                  <Row label="Reading" value={card.reading || "—"} visible big placeholder="---" />
                   <Row label="Meaning" value={card.meaning || "—"} visible placeholder="---" />
                 </>
               ) : (

@@ -1,6 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import {
+  JAPANESE_FLASHCARD_COMPLETE_MODES,
+  JAPANESE_FLASHCARD_MULTIPLE_CHOICE_MODES,
+  JAPANESE_FLASHCARD_TYPING_MODES,
+} from "@/lib/study/japaneseFlashcardModes";
 
 type PracticeStudyMode =
   | "READING"
@@ -31,17 +36,17 @@ type LibraryPracticeModeSelectorProps = {
 function modeLabel(mode: PracticeStudyMode) {
   switch (mode) {
     case "READING":
-      return "Reading Typing";
+      return "Kanji/Meaning → Kana";
     case "MEANING":
       return "Meaning Typing";
     case "FROM_READING_MEANING":
-      return "Kana to Meaning Typing";
+      return "Kana → Meaning";
     case "READING_MC":
       return "Reading MC";
     case "MEANING_MC":
-      return "Meaning MC";
+      return "Kanji/Kana → Meaning";
     case "FROM_READING_MC":
-      return "Kana to Kanji MC";
+      return "Meaning → Kanji";
     case "FROM_READING_MEANING_MC":
       return "Kana to Meaning MC";
     case "COMPLETE":
@@ -60,13 +65,13 @@ function descriptionForMode(mode: PracticeStudyMode) {
     case "MEANING":
       return "Show the word and reading, then type the meaning.";
     case "FROM_READING_MEANING":
-      return "Show the reading, then type the meaning.";
+      return "Show the kana, then type the meaning.";
     case "READING_MC":
       return "Show the word and meaning, then choose the reading.";
     case "MEANING_MC":
       return "Show the word and reading, then choose the meaning.";
     case "FROM_READING_MC":
-      return "Show the reading and meaning, then choose the word.";
+      return "Show the meaning, then choose the written word.";
     case "FROM_READING_MEANING_MC":
       return "Show the reading, then choose the meaning.";
     case "COMPLETE":
@@ -81,27 +86,24 @@ function descriptionForMode(mode: PracticeStudyMode) {
 const MODE_GROUPS: ModeGroup[] = [
   {
     label: "Typing",
-    options: [
-      { value: "READING", label: modeLabel("READING") },
-      { value: "MEANING", label: modeLabel("MEANING") },
-      { value: "FROM_READING_MEANING", label: modeLabel("FROM_READING_MEANING") },
-    ],
+    options: JAPANESE_FLASHCARD_TYPING_MODES.map((value) => ({
+      value,
+      label: modeLabel(value),
+    })),
   },
   {
     label: "Multiple Choice",
-    options: [
-      { value: "READING_MC", label: modeLabel("READING_MC") },
-      { value: "MEANING_MC", label: modeLabel("MEANING_MC") },
-      { value: "FROM_READING_MC", label: modeLabel("FROM_READING_MC") },
-      { value: "FROM_READING_MEANING_MC", label: modeLabel("FROM_READING_MEANING_MC") },
-    ],
+    options: JAPANESE_FLASHCARD_MULTIPLE_CHOICE_MODES.map((value) => ({
+      value,
+      label: modeLabel(value),
+    })),
   },
   {
     label: "Complete",
-    options: [
-      { value: "COMPLETE", label: modeLabel("COMPLETE") },
-      { value: "COMPLETE_TYPING", label: modeLabel("COMPLETE_TYPING") },
-    ],
+    options: JAPANESE_FLASHCARD_COMPLETE_MODES.map((value) => ({
+      value,
+      label: modeLabel(value),
+    })),
   },
 ];
 

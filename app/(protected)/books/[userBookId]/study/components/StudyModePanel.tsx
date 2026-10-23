@@ -17,11 +17,11 @@ type StudyModePanelProps = {
 const MODE_GROUPS = [
   {
     label: "Typing",
-    values: ["READING", "MEANING", "FROM_READING_MEANING"],
+    values: ["READING", "FROM_READING_MEANING"],
   },
   {
     label: "Multiple Choice",
-    values: ["READING_MC", "MEANING_MC", "FROM_READING_MC", "FROM_READING_MEANING_MC"],
+    values: ["MEANING_MC", "FROM_READING_MC"],
   },
   {
     label: "Complete",
@@ -39,7 +39,7 @@ function descriptionForMode(value: string, fallback: string) {
   }
 
   if (value === "FROM_READING_MEANING") {
-    return "Show the reading, then type the meaning.";
+    return "Show the kana, then type the meaning.";
   }
 
   if (value === "READING_MC") {
@@ -51,7 +51,7 @@ function descriptionForMode(value: string, fallback: string) {
   }
 
   if (value === "FROM_READING_MC") {
-    return "Show the reading and meaning, then choose the word.";
+    return "Show the meaning, then choose the written word.";
   }
 
   if (value === "FROM_READING_MEANING_MC") {

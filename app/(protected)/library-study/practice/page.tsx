@@ -9,6 +9,7 @@ import AlsoWritten from "@/components/vocabulary/AlsoWritten";
 
 import { savedSenseNumber, senseDefinitionKey, senseStudyKey, cardSenseKey, groupSavedSenseEncounters } from "@/lib/studySenseIdentity";
 import { useStudyModeRotation } from "@/lib/study/useStudyModeRotation";
+import { JAPANESE_FLASHCARD_MODE_ORDER } from "@/lib/study/japaneseFlashcardModes";
 import { studyCardPromptClass, studyCardSenseClass, resolveSenseNumber, STUDY_CARD_INPUT_CLASS, STUDY_CARD_CHECK_BUTTON_CLASS, STUDY_CARD_CHECK_LABEL } from "@/lib/studyCardPresentation";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -225,17 +226,17 @@ const LIBRARY_CHECK_WORD_PAGE_SIZE = 1000;
 function practiceStudyModeLabel(mode: PracticeStudyMode) {
   switch (mode) {
     case "READING":
-      return "Reading Typing";
+      return "Kanji/Meaning → Kana";
     case "MEANING":
       return "Meaning Typing";
     case "FROM_READING_MEANING":
-      return "Kana to Meaning Typing";
+      return "Kana → Meaning";
     case "READING_MC":
       return "Reading MC";
     case "MEANING_MC":
-      return "Meaning MC";
+      return "Kanji/Kana → Meaning";
     case "FROM_READING_MC":
-      return "Kana to Kanji MC";
+      return "Meaning → Kanji";
     case "FROM_READING_MEANING_MC":
       return "Kana to Meaning MC";
     case "COMPLETE":
@@ -243,20 +244,12 @@ function practiceStudyModeLabel(mode: PracticeStudyMode) {
     case "COMPLETE_TYPING":
       return "Typing Reveal";
     default:
-      return "Reading Typing";
+      return "Kanji/Meaning → Kana";
   }
 }
 
 const LIBRARY_REVIEW_MODE_ORDER: PracticeStudyMode[] = [
-  "READING",
-  "MEANING",
-  "FROM_READING_MEANING",
-  "READING_MC",
-  "MEANING_MC",
-  "FROM_READING_MC",
-  "FROM_READING_MEANING_MC",
-  "COMPLETE",
-  "COMPLETE_TYPING",
+  ...JAPANESE_FLASHCARD_MODE_ORDER,
 ];
 
 const DEFAULT_LEARNING_SETTINGS: LearningSettingsRow = {
@@ -1136,7 +1129,6 @@ function LibraryPracticePanel({
               </>
             ) : practiceMode === "FROM_READING_MC" ? (
               <>
-                <div className="text-3xl font-bold text-slate-950">{card.reading}</div>
                 <div className="text-base font-semibold text-slate-500">{card.meaning}</div>
               </>
             ) : (
