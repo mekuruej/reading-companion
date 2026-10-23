@@ -64,6 +64,7 @@ function ActionButton({
     <button
       type="button"
       onClick={onClick}
+      data-hub-activity={appearance || undefined}
       className={[
         "relative rounded-xl border text-center transition-all hover:-translate-y-[1px] hover:shadow-md",
         appearance ? coolCardStyles[appearance] : "border-stone-900",
@@ -153,6 +154,7 @@ function UtilityActionButton({
     <button
       type="button"
       onClick={onClick}
+      data-hub-button="secondary"
       className="inline-flex min-h-11 items-center justify-center rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-black text-stone-800 shadow-[0_2px_8px_rgba(41,37,36,0.10)] transition hover:-translate-y-[1px] hover:border-stone-400 hover:bg-stone-50 hover:shadow-md"
       title={description}
     >
@@ -300,6 +302,7 @@ export default function BookHubActionGrid({
                   />
                 ) : null}
                 <Link
+                  data-hub-button="secondary"
                   href={japaneseLearningCta.href}
                   onClick={onJapaneseLearningCtaClick}
                   className="inline-flex min-h-11 items-center justify-center rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-black text-stone-800 shadow-[0_2px_8px_rgba(41,37,36,0.10)] transition hover:-translate-y-[1px] hover:border-stone-400 hover:bg-stone-50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 focus-visible:ring-offset-2"

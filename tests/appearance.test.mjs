@@ -131,7 +131,7 @@ test("shared surfaces use appearance variables without profile or database depen
   assert.doesNotMatch(helper, /localStorage|supabase|fetch\(|useAppearance|AppearanceProvider/);
   for (const file of ["app/(protected)/library/page.tsx", "app/(protected)/users/[username]/books/page.tsx", "app/(protected)/books/[userBookId]/page.tsx"]) {
     const page = fs.readFileSync(path.join(root, file), "utf8");
-    assert.match(page, /<main className="min-h-screen [^"]*" style=\{DEFAULT_PAGE_STYLE\}/);
+    assert.match(page, /<main className=(?:"min-h-screen [^"]*"|\{`\$\{hubStyles.hub\} min-h-screen p-6`\}) style=\{DEFAULT_PAGE_STYLE\}/);
   }
   const header = fs.readFileSync(path.join(root, "components/Header.tsx"), "utf8");
   assert.match(header, /style=\{DEFAULT_NAVIGATION_STYLE\}/);

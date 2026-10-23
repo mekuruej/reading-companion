@@ -144,6 +144,7 @@ export default function BookHubProgressSummary({
                     key={view}
                     type="button"
                     aria-pressed={snapshotView === view}
+                    data-hub-button={snapshotView === view ? "primary" : "secondary"}
                     onClick={() => setSnapshotView(view)}
                     className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 ${snapshotView === view ? "border-violet-700 bg-violet-700 text-white" : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"}`}
                   >

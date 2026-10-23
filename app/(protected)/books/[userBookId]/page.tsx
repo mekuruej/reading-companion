@@ -2,6 +2,7 @@
 //
 "use client";
 
+import hubStyles from "./bookHubAppearance.module.css";
 import { DEFAULT_PAGE_STYLE } from "@/lib/appearance/defaultAppearance";
 import { initialReflectionReaderLevel, reflectionReaderLevelForSave } from "@/lib/books/readingReflectionLevel";
 import { loadReviewedBookWordCount, readingPaceLabel, readingTimeLabel } from "@/lib/books/bookHubLearningSnapshot";
@@ -5744,7 +5745,7 @@ export default function BookHubPage() {
 
   const showBookHubStartButton = !started && realReadingSessions.length === 0;
   return (
-    <main className="min-h-screen p-6" style={DEFAULT_PAGE_STYLE}>
+    <main className={`${hubStyles.hub} min-h-screen p-6`} style={DEFAULT_PAGE_STYLE}>
       {showBookFlagModal ? (
         <BookFlagModal
           bookTitle={book.title ?? "Untitled book"}
@@ -5816,7 +5817,7 @@ export default function BookHubPage() {
           </p>
         ) : null}
 
-        <section className="overflow-hidden rounded-3xl border border-stone-200/60 bg-[#f7f7f7] shadow-sm [&_[data-hub-surface-text=heading]]:text-stone-950 [&_[data-hub-surface-text=body]]:text-stone-700">
+        <section className="overflow-hidden rounded-3xl border border-stone-200/60 bg-[var(--appearance-surface-muted)] shadow-sm">
           <div className="p-5 md:p-8">
             <section aria-label="Book Overview" className="rounded-3xl border border-stone-200/70 bg-white p-4 shadow-sm md:p-6">
             <div className="grid gap-6 md:grid-cols-[150px_minmax(0,1fr)_380px] md:items-start md:gap-8">

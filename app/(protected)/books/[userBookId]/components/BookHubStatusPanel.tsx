@@ -132,7 +132,7 @@ export default function BookHubStatusPanel({
     progressPercent >= 100;
 
   return (
-    <div className="rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-100 via-purple-50 to-amber-50 p-4 shadow-[0_3px_14px_rgba(41,37,36,0.12)]">
+    <div data-hub-info className="rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-100 via-purple-50 to-amber-50 p-4 shadow-[0_3px_14px_rgba(41,37,36,0.12)]">
       <div className="mb-3 text-sm font-semibold text-stone-900">
         Book Status
       </div>
@@ -185,6 +185,7 @@ export default function BookHubStatusPanel({
             {dnfError ? <p role="alert" className="mt-2 text-xs text-red-700">{dnfError}</p> : null}
             <div className="mt-3 flex flex-wrap gap-2">
               <button type="button" onClick={() => void saveDnf()} disabled={busy}
+                data-hub-button="primary"
                 className="rounded-lg bg-violet-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? "Saving..." : "Save DNF"}</button>
               <button type="button" onClick={() => setDnfPromptOpen(false)} disabled={busy}
                 className="rounded-lg border border-stone-300 px-3 py-2 text-sm font-medium disabled:opacity-50">Cancel</button>
@@ -261,6 +262,7 @@ export default function BookHubStatusPanel({
           <button
             type="button"
             onClick={onOpenReview}
+            data-hub-button="primary"
             className="rounded-2xl border border-purple-700 bg-purple-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:border-purple-800 hover:bg-purple-800"
           >
             {reviewLinkLabel}
@@ -280,7 +282,7 @@ export default function BookHubStatusPanel({
           <button
             type="button"
             onClick={onOpenReflection}
-            className="mt-3 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-amber-600"
+            className="mt-3 rounded-2xl bg-amber-500 px-4 py-2 text-sm font-black text-[#1c1917] shadow-sm transition hover:bg-amber-600"
           >
             Go to Reading Reflection ↓
           </button>

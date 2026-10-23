@@ -12,7 +12,7 @@ export default function BookHubStatCard({
   details,
 }: BookHubStatCardProps) {
   return (
-    <div className="min-h-[116px] rounded-3xl bg-gradient-to-br from-violet-50/85 to-amber-50/60 px-4 py-5 text-center shadow-[0_3px_14px_rgba(65,48,80,0.09)]">
+    <div data-hub-info className="min-h-[116px] rounded-3xl bg-gradient-to-br from-violet-50/85 to-amber-50/60 px-4 py-5 text-center shadow-[0_3px_14px_rgba(65,48,80,0.09)]">
       <div className="text-xs font-semibold text-stone-600">{label}</div>
       {details ? (
         <div className="mx-auto mt-2 max-w-xs space-y-1 text-left text-xs text-stone-700">

@@ -19,6 +19,7 @@ export default function BookHubModeToggle({
               key={option}
               type="button"
               onClick={() => onModeChange(option)}
+              data-hub-button={selected ? "primary" : "secondary"}
               className={[
                 "rounded-xl px-4 py-2 text-sm font-black transition",
                 selected

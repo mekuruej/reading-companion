@@ -1,0 +1,111 @@
+/* Scoped to Book Hub. Activity cards and semantic status colors keep their identity. */
+.hub {
+  color: var(--appearance-text);
+}
+
+.hub :global(.bg-white):not(:global([data-hub-activity] *)) {
+  background-color: var(--appearance-surface);
+}
+
+.hub :is(:global(.bg-stone-50), :global(.bg-stone-100)) {
+  background-color: var(--appearance-surface-muted);
+}
+
+.hub :is(:global(.border-stone-100), :global(.border-stone-200), :global(.border-stone-300), :global(.border-stone-400)) {
+  border-color: var(--appearance-border);
+}
+
+.hub :is(:global(.text-stone-700), :global(.text-stone-800), :global(.text-stone-900), :global(.text-stone-950)):not(:global([data-hub-activity] *)) {
+  color: var(--appearance-text);
+}
+
+.hub :is(:global(.text-stone-500), :global(.text-stone-600), :global(.text-slate-500), :global(.text-gray-600)):not(:global([data-hub-activity] *)) {
+  color: var(--appearance-muted-text);
+}
+
+.hub :global([data-hub-info]) {
+  background-color: var(--appearance-surface-muted);
+  background-image: none;
+  border-color: var(--appearance-border);
+}
+
+.hub :global(a.text-slate-500:hover),
+.hub :global(a.text-stone-500:hover) {
+  color: var(--appearance-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Text, rather than accent, is deliberately used for a high-contrast solid control. */
+.hub :global([data-hub-button="primary"]) {
+  color: var(--appearance-surface);
+  background-color: var(--appearance-text);
+  border-color: var(--appearance-text);
+}
+
+.hub :global([data-hub-button="primary"]:enabled:hover) {
+  background-color: var(--appearance-brand-text);
+  border-color: var(--appearance-brand-text);
+}
+
+.hub :global([data-hub-button="secondary"]) {
+  color: var(--appearance-text);
+  background-color: var(--appearance-surface);
+  border-color: var(--appearance-border);
+}
+
+.hub :global([data-hub-button="secondary"]:enabled:hover),
+.hub :global(a[data-hub-button="secondary"]:hover) {
+  background-color: var(--appearance-surface-muted);
+  border-color: var(--appearance-muted-text);
+}
+
+.hub :is(button, a, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--appearance-text);
+  outline-offset: 3px;
+  /* Keep one predictable focus indicator rather than unrelated violet/sky rings. */
+  --tw-ring-color: transparent;
+  --tw-ring-offset-color: transparent;
+}
+
+.hub :is(button, input, select, textarea):disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  animation: none;
+  transform: none;
+}
+
+.hub :global([data-hub-button="primary"]:disabled:hover) {
+  background-color: var(--appearance-text);
+  border-color: var(--appearance-text);
+}
+
+.hub :global([data-hub-button="secondary"]:disabled:hover) {
+  background-color: var(--appearance-surface);
+  border-color: var(--appearance-border);
+}
+
+.hub :is(:global([class~="bg-white/70"]), :global([class~="bg-stone-50/80"])) {
+  background-color: var(--appearance-surface-muted);
+}
+
+.hub :is(:global([class~="border-stone-200/60"]), :global([class~="border-stone-200/70"]), :global([class~="border-stone-200/80"])) {
+  border-color: var(--appearance-border);
+}
+
+.hub :is(button:enabled, a):is(:global([class~="hover:bg-stone-100"]), :global([class~="hover:bg-stone-200"]), :global([class~="hover:bg-stone-50"])):hover:not(:global([data-hub-button="primary"])) {
+  background-color: var(--appearance-surface-muted);
+}
+
+.hub :global(.bg-stone-700) {
+  background-color: var(--appearance-text);
+}
+
+.hub :global([data-hub-info] .border-violet-200),
+.hub :global([data-hub-info] .border-violet-100) {
+  border-color: var(--appearance-border);
+}
+
+.hub :global(button[class~="hover:bg-white"]:enabled:hover) {
+  background-color: var(--appearance-surface);
+}

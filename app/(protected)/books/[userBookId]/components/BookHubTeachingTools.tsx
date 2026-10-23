@@ -56,6 +56,7 @@ function TeachingUtilityButton({
     <button
       type="button"
       onClick={onClick}
+      data-hub-button="secondary"
       className="inline-flex min-h-11 items-center justify-center rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-black text-stone-800 shadow-sm transition hover:-translate-y-[1px] hover:border-stone-400 hover:bg-stone-50 hover:shadow-md"
       title={description}
     >
@@ -91,6 +92,7 @@ function StudentCardButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
+      data-hub-button={variant === "primary" ? "primary" : "secondary"}
       className={[
         "inline-flex min-h-9 items-center justify-center rounded-lg border px-3 py-1.5 text-sm font-semibold shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60",
         variantClass,
@@ -473,6 +475,7 @@ export default function BookHubTeachingTools({
 
               return (
                 <article
+                  data-hub-info
                   key={draftKey}
                   className={[
                     "rounded-xl border p-3 shadow-sm",
