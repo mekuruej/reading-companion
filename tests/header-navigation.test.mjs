@@ -75,7 +75,8 @@ for (const [label, profile, expected] of [
   assert.equal(h.hrefs().includes('/discovery/dictionary'), expected.dictionary);
   assert.equal(Boolean(h.button('Teaching')), expected.teaching);
   h.button('More Library destinations').props.onClick(); h.render();
-  for (const route of ['/library', '/books/add', '/library/book-hubs', '/community/profile', '/reading-access']) assert.ok(h.hrefs().includes(route));
+  for (const route of ['/library', '/books/add', '/community/profile', '/reading-access']) assert.ok(h.hrefs().includes(route));
+  assert.ok(!h.hrefs().includes('/library/book-hubs'));
   if (expected.teaching) {
     h.button('Teaching').props.onClick(); h.render();
     assert.ok(h.hrefs().includes('/teacher'));

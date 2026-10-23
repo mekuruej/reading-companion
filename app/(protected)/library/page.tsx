@@ -31,13 +31,6 @@ const libraryCards = [
     className: "border-rose-200 bg-rose-50 text-rose-950",
   },
   {
-    title: "Book Hubs",
-    href: "/library/book-hubs",
-    eyebrow: "Book spaces",
-    description: "Jump into a book’s reading tools, vocab list, notes, and stats.",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-950",
-  },
-  {
     title: "Vocab Lists",
     href: "/vocab",
     eyebrow: "Words by book",
