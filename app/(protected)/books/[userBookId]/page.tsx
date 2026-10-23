@@ -3,7 +3,7 @@
 "use client";
 
 import { initialReflectionReaderLevel, reflectionReaderLevelForSave } from "@/lib/books/readingReflectionLevel";
-import { loadReviewedBookWordCount, readingTimeLabel } from "@/lib/books/bookHubLearningSnapshot";
+import { loadReviewedBookWordCount, readingPaceLabel, readingTimeLabel } from "@/lib/books/bookHubLearningSnapshot";
 import type { DnfDetails } from "@/lib/books/dnf";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
 import AudiobookProgressControl from "@/components/books/AudiobookProgressControl";
@@ -1260,16 +1260,6 @@ export default function BookHubPage() {
     savedWordsPerPage != null ? savedWordsPerPage.toFixed(1) : "—";
   const bookHubAverageMinutesPerPageLabel =
     averageMinutesPerPage != null ? averageMinutesPerPage.toFixed(1) : "—";
-  const bookHubSummaryStats = [
-    { label: "Days Engaged", value: bookHubDaysEngagedLabel, caption: "Reading or listening" },
-    { label: "Avg Min / Page", value: bookHubAverageMinutesPerPageLabel, caption: "Timed page-tracked reading" },
-    { label: "Total Reading Time", value: readingTimeLabel(totalTimedMinutes), caption: "Completed reading sessions" },
-  ];
-  const bookHubLearningStats = [
-    { label: "Saved Words", value: uniqueLookupCount != null ? String(uniqueLookupCount) : "—", caption: "Distinct saved vocabulary" },
-    { label: "Saved Words / Page", value: bookHubSavedWordsPerPageLabel, caption: "Saved-word load" },
-    { label: "Words Reviewed", value: reviewedWordCount != null ? String(reviewedWordCount) : "—", caption: "Distinct saved words studied" },
-  ];
 
   useEffect(() => {
     let cancelled = false;
@@ -5602,6 +5592,24 @@ export default function BookHubPage() {
     if (!fluidPages) return null;
     return timedFluidSessions.filter(s => s.start_page != null && s.end_page != null).reduce((n,s) => n + (s.minutes_read ?? 0), 0) / fluidPages;
   }, [timedFluidSessions, fluidPages]);
+
+  const bookHubSummaryStats = [
+    { label: "Days Engaged", value: bookHubDaysEngagedLabel, caption: "Reading or listening" },
+    {
+      label: "Reading Pace",
+      details: [
+        { label: "Fluid:", value: readingPaceLabel(fluidMinPerPage) },
+        { label: "Curiosity:", value: readingPaceLabel(curiosityMinPerPage) },
+      ],
+      caption: "Timed page-tracked reading",
+    },
+    { label: "Total Reading Time", value: readingTimeLabel(totalTimedMinutes), caption: "Completed reading sessions" },
+  ];
+  const bookHubLearningStats = [
+    { label: "Saved Words", value: uniqueLookupCount != null ? String(uniqueLookupCount) : "—", caption: "Distinct saved vocabulary" },
+    { label: "Saved Words / Page", value: bookHubSavedWordsPerPageLabel, caption: "Saved-word load" },
+    { label: "Words Reviewed", value: reviewedWordCount != null ? String(reviewedWordCount) : "—", caption: "Distinct saved words studied" },
+  ];
 
   if (loading) {
     return <BookHubLoadingState />;

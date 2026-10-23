@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import BookHubStatCard from "./BookHubStatCard";
 
 type BookHubProgressSummaryProps = {
@@ -18,12 +18,20 @@ type BookHubProgressSummaryProps = {
   showVocabularyStats?: boolean;
   showSummaryCard?: boolean;
   showProgressSection?: boolean;
-  learningStats?: { label: string; value: string; caption: string }[];
+  learningStats?: BookHubStat[];
   summaryStats?: {
     label: string;
-    value: string;
+    value?: string;
     caption?: string;
+    details?: { label: string; value: string }[];
   }[];
+};
+
+type BookHubStat = {
+  label: string;
+  value?: string;
+  caption?: string;
+  details?: { label: string; value: string }[];
 };
 
 export default function BookHubProgressSummary({
@@ -46,27 +54,7 @@ export default function BookHubProgressSummary({
   learningStats,
 }: BookHubProgressSummaryProps) {
   const [snapshotView, setSnapshotView] = useState<"reading" | "learning">("reading");
-  const [snapshotHovered, setSnapshotHovered] = useState(false);
-  const [snapshotFocused, setSnapshotFocused] = useState(false);
-  const [snapshotVisible, setSnapshotVisible] = useState(true);
   const hasLearningStats = Boolean(learningStats && summaryStats);
-  useEffect(() => {
-    if (!hasLearningStats || !showProgressSection || snapshotHovered || snapshotFocused) return;
-    let contentChange: number | undefined;
-    let fadeIn: number | undefined;
-    const rotation = window.setInterval(() => {
-      setSnapshotVisible(false);
-      contentChange = window.setTimeout(() => {
-        setSnapshotView(view => view === "reading" ? "learning" : "reading");
-        fadeIn = window.setTimeout(() => setSnapshotVisible(true), 150);
-      }, 450);
-    }, 15000);
-    return () => {
-      window.clearInterval(rotation);
-      window.clearTimeout(contentChange);
-      window.clearTimeout(fadeIn);
-    };
-  }, [hasLearningStats, showProgressSection, snapshotHovered, snapshotFocused]);
   const showLastDetailLine = lastSavedWordLabel || lastChapterLabel || lastPageLabel;
   const statGridClass = summaryStats
     ? summaryStats.length >= 3
@@ -147,32 +135,32 @@ export default function BookHubProgressSummary({
           {hasLearningStats ? (
             <div
               role="region"
-              aria-label="Reading and learning progress snapshot"
-              tabIndex={0}
-              onMouseEnter={() => { setSnapshotHovered(true); setSnapshotVisible(true); }}
-              onMouseLeave={() => setSnapshotHovered(false)}
-              onFocusCapture={() => { setSnapshotFocused(true); setSnapshotVisible(true); }}
-              onBlurCapture={(event) => {
-                if (!event.currentTarget.contains(event.relatedTarget)) setSnapshotFocused(false);
-              }}
-              className="grid rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300 focus-visible:ring-offset-2"
+              aria-label={`${snapshotView === "reading" ? "Reading" : "Learning"} progress snapshot`}
+              className="rounded-3xl"
             >
-              {(["reading", "learning"] as const).map(view => (
-                <div
-                  key={view}
-                  aria-hidden={snapshotView !== view}
-                  className={`col-start-1 row-start-1 space-y-2 transition-opacity duration-[450ms] motion-reduce:transition-none ${snapshotView === view && snapshotVisible ? "opacity-100" : "pointer-events-none opacity-0"}`}
-                >
-                  <h3 className="text-xs font-semibold tracking-wide text-stone-500">
-                    {view === "reading" ? "Reading Snapshot" : "Learning Snapshot"}
-                  </h3>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    {(view === "reading" ? summaryStats : learningStats)?.map(stat => (
-                      <BookHubStatCard key={stat.label} label={stat.label} value={stat.value} caption={stat.caption} />
-                    ))}
-                  </div>
+              <div role="group" aria-label="Choose progress snapshot" className="mb-2 flex flex-wrap gap-2">
+                {(["reading", "learning"] as const).map((view) => (
+                  <button
+                    key={view}
+                    type="button"
+                    aria-pressed={snapshotView === view}
+                    onClick={() => setSnapshotView(view)}
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 ${snapshotView === view ? "border-violet-700 bg-violet-700 text-white" : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"}`}
+                  >
+                    {view === "reading" ? "Reading" : "Learning"}
+                  </button>
+                ))}
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xs font-semibold tracking-wide text-stone-500">
+                  {snapshotView === "reading" ? "Reading Snapshot" : "Learning Snapshot"}
+                </h3>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {(snapshotView === "reading" ? summaryStats : learningStats)?.map(stat => (
+                    <BookHubStatCard key={stat.label} label={stat.label} value={stat.value} caption={stat.caption} details={stat.details} />
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           ) : summaryStats && summaryStats.length === 0 ? null : (
             <div className={`grid grid-cols-1 gap-3 ${learningStats ? "sm:grid-cols-3" : statGridClass}`}>
@@ -183,6 +171,7 @@ export default function BookHubProgressSummary({
                     label={stat.label}
                     value={stat.value}
                     caption={stat.caption}
+                    details={stat.details}
                   />
                 ))
               ) : (

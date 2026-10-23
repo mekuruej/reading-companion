@@ -2,12 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
+import { createRequire } from 'node:module';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 const source = fs.readFileSync('lib/books/bookHubLearningSnapshot.ts', 'utf8');
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
 const exports = {};
 new Function('exports', code)(exports);
-const { countReviewedBookWords, readingTimeLabel, loadReviewedBookWordCount } = exports;
+const { countReviewedBookWords, readingPaceLabel, readingTimeLabel, loadReviewedBookWordCount } = exports;
 
 const words = [
   { id: 'a', surface: '読む', reading: 'ヨム', meaning: 'read' },
@@ -37,6 +40,15 @@ test('reading time is human-readable and missing timed evidence stays unavailabl
   assert.equal(readingTimeLabel(84), '1 hr 24 min');
   assert.equal(readingTimeLabel(120), '2 hr');
   assert.equal(readingTimeLabel(0), '—');
+});
+
+test('mode-specific reading pace stays labeled and missing or invalid values do not become zero', () => {
+  assert.equal(readingPaceLabel(4.26), '4.3 min/page');
+  assert.equal(readingPaceLabel(null), '— min/page');
+  assert.equal(readingPaceLabel(0), '— min/page');
+  assert.equal(readingPaceLabel(-2), '— min/page');
+  assert.equal(readingPaceLabel(Number.NaN), '— min/page');
+  assert.equal(readingPaceLabel(Number.POSITIVE_INFINITY), '— min/page');
 });
 
 test('review loader scopes evidence to owner/book, pages results, and propagates failures', async () => {
@@ -69,80 +81,135 @@ test('review loader scopes evidence to owner/book, pages results, and propagates
   }
 });
 
-test('snapshot switch is local presentation and Book Hub supplies exactly three reading and learning metrics', () => {
+test('reading pace replaces only the combined pace card and keeps the three-card snapshots', () => {
   const page = fs.readFileSync('app/(protected)/books/[userBookId]/page.tsx', 'utf8');
   const component = fs.readFileSync('app/(protected)/books/[userBookId]/components/BookHubProgressSummary.tsx', 'utf8');
+  const statCard = fs.readFileSync('app/(protected)/books/[userBookId]/components/BookHubStatCard.tsx', 'utf8');
+  const embedded = fs.readFileSync('components/books/BookProgressSummaryBar.tsx', 'utf8');
   const reading = page.slice(page.indexOf('const bookHubSummaryStats ='), page.indexOf('const bookHubLearningStats ='));
   const learning = page.slice(page.indexOf('const bookHubLearningStats ='), page.indexOf('useEffect(() => {', page.indexOf('const bookHubLearningStats =')));
-  assert.equal((reading.match(/label:/g) || []).length, 3);
-  assert.equal((learning.match(/label:/g) || []).length, 3);
+  assert.match(reading, /label: "Days Engaged"/);
+  assert.match(reading, /label: "Reading Pace"/);
+  assert.match(reading, /label: "Total Reading Time"/);
+  assert.doesNotMatch(reading, /Avg Min \/ Page/);
+  assert.match(reading, /\{ label: "Fluid:", value: readingPaceLabel\(fluidMinPerPage\) \}/);
+  assert.match(reading, /\{ label: "Curiosity:", value: readingPaceLabel\(curiosityMinPerPage\) \}/);
+  assert.equal((learning.match(/label: "(?:Saved Words|Saved Words \/ Page|Words Reviewed)"/g) || []).length, 3);
+  assert.match(page, /const curiosityMinPerPage = useMemo/);
+  assert.match(page, /const fluidMinPerPage = useMemo/);
+  assert.match(statCard, /details\.map\(\(detail\)/);
   assert.match(component, /useState<"reading" \| "learning">\("reading"\)/);
-  assert.match(component, /}, 15000\)/);
-  assert.match(component, /snapshotHovered \|\| snapshotFocused/);
-  assert.match(component, /window.clearInterval\(rotation\)/);
-  assert.match(component, /onMouseEnter=[^\n]*setSnapshotHovered\(true\)/);
-  assert.match(component, /onFocusCapture=[^\n]*setSnapshotFocused\(true\)/);
-  assert.match(component, /col-start-1 row-start-1/);
-  assert.match(component, /aria-hidden=\{snapshotView !== view\}/);
-  assert.match(component, /view === "reading" \? "Reading Snapshot" : "Learning Snapshot"/);
-  assert.doesNotMatch(component, /aria-pressed|setSnapshotView\(view\)/);
+  assert.doesNotMatch(component, /setInterval|setTimeout|snapshotHovered|snapshotFocused|snapshotVisible/);
+  assert.doesNotMatch(component, /onMouseEnter|onMouseLeave|onFocusCapture|onBlurCapture/);
+  assert.match(component, /role="group" aria-label="Choose progress snapshot"/);
+  assert.match(component, /aria-pressed=\{snapshotView === view\}/);
+  assert.match(component, /snapshotView === "reading" \? "Reading Snapshot" : "Learning Snapshot"/);
+  assert.match(component, /onClick=\{\(\) => setSnapshotView\(view\)\}/);
   assert.match(page, /learningStats=\{canSeeVocabularySummary && isJapaneseLearningBook/);
+  assert.doesNotMatch(embedded, /learningStats=/);
 });
 
-test('calm fifteen-second rotation fades out before changing content and pauses for hover/focus', () => {
+test('snapshot controls are manual, default to Reading, and retain the selected view', () => {
   const filename = 'app/(protected)/books/[userBookId]/components/BookHubProgressSummary.tsx';
   const compiled = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
-  function mount({ learning = true, hovered = false, focused = false } = {}) {
+  function mount({ learning = true } = {}) {
     let stateIndex = 0;
     let currentView = 'reading';
-    let callback;
-    const pendingTimeouts = [];
-    let cleared = false;
-    const effects = [];
+    const state = [];
+    let tree;
     const fakeReact = {
       useState(initial) {
         const index = stateIndex++;
-        return [index === 1 ? hovered : index === 2 ? focused : initial, update => {
-          if (index === 0) currentView = typeof update === 'function' ? update(currentView) : update;
+        if (!(index in state)) state[index] = initial;
+        return [state[index], update => {
+          state[index] = typeof update === 'function' ? update(state[index]) : update;
+          if (index === 0) currentView = state[index];
         }];
       },
-      useEffect(effect) { effects.push(effect); },
     };
     const moduleExports = {};
-    const jsx = { jsx: () => null, jsxs: () => null };
-    const fakeWindow = {
-      setInterval(fn, delay) { assert.equal(delay, 15000); callback = fn; return 1; },
-      setTimeout(fn, delay) { pendingTimeouts.push({ fn, delay }); return pendingTimeouts.length; },
-      clearTimeout() {},
-      clearInterval(id) { assert.equal(id, 1); cleared = true; },
+    const jsx = {
+      jsx: (type, props) => ({ type, props }),
+      jsxs: (type, props) => ({ type, props }),
     };
     new Function('exports', 'require', 'window', compiled)(
-      moduleExports, name => name === 'react' ? fakeReact : name === 'react/jsx-runtime' ? jsx : { default: () => null }, fakeWindow,
+      moduleExports, name => name === 'react' ? fakeReact : name === 'react/jsx-runtime' ? jsx : { default: () => null }, {},
     );
-    moduleExports.default({
+    const props = {
       summaryStats: [{ label: 'Days Engaged', value: '2', caption: '' }],
       learningStats: learning ? [{ label: 'Saved Words', value: '3', caption: '' }] : undefined,
-    });
-    const cleanup = effects[0]();
-    return { tick: () => callback?.(), advanceFade: () => { const next = pendingTimeouts.shift(); next?.fn(); return next?.delay; }, hasTimer: () => Boolean(callback), cleanup, view: () => currentView, cleared: () => cleared };
+    };
+    const findNodes = (node, predicate, found = []) => {
+      if (Array.isArray(node)) node.forEach(child => findNodes(child, predicate, found));
+      else if (node && typeof node === 'object') {
+        if (predicate(node)) found.push(node);
+        findNodes(node.props?.children, predicate, found);
+      }
+      return found;
+    };
+    const render = () => {
+      stateIndex = 0;
+      tree = moduleExports.default(props);
+      return tree;
+    };
+    render();
+    return {
+      render,
+      view: () => currentView,
+      buttons: () => findNodes(tree, node => node.type === 'button'),
+      group: () => findNodes(tree, node => node.props?.role === 'group')[0],
+      heading: () => findNodes(tree, node => node.type === 'h3')[0]?.props.children,
+    };
   }
   const active = mount();
   assert.equal(active.view(), 'reading');
-  active.tick();
-  assert.equal(active.view(), 'reading');
-  assert.equal(active.advanceFade(), 450);
+  assert.equal(active.heading(), 'Reading Snapshot');
+  assert.equal(active.group().props['aria-label'], 'Choose progress snapshot');
+  assert.deepEqual(active.buttons().map(button => button.props.children), ['Reading', 'Learning']);
+  assert.equal(active.buttons()[0].props['aria-pressed'], true);
+  assert.equal(active.buttons()[1].props['aria-pressed'], false);
+  active.buttons()[1].props.onClick();
   assert.equal(active.view(), 'learning');
-  assert.equal(active.advanceFade(), 150);
-  active.tick();
-  active.advanceFade();
-  active.advanceFade();
+  active.render();
+  assert.equal(active.heading(), 'Learning Snapshot');
+  assert.equal(active.buttons()[0].props['aria-pressed'], false);
+  assert.equal(active.buttons()[1].props['aria-pressed'], true);
+  active.buttons()[0].props.onClick();
   assert.equal(active.view(), 'reading');
-  active.cleanup();
-  assert.equal(active.cleared(), true);
-  assert.equal(mount({ hovered: true }).hasTimer(), false);
-  assert.equal(mount({ focused: true }).hasTimer(), false);
-  assert.equal(mount({ learning: false }).hasTimer(), false);
-  assert.equal(mount().hasTimer(), true);
+  active.render();
+  assert.equal(active.heading(), 'Reading Snapshot');
+  assert.equal(mount({ learning: false }).buttons().length, 0);
+});
+
+function loadSummaryComponent(file) {
+  const require = createRequire(import.meta.url);
+  const exports = {};
+  const compiled = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText;
+  new Function('exports', 'require', compiled)(exports, name =>
+    name === './BookHubStatCard'
+      ? loadSummaryComponent('app/(protected)/books/[userBookId]/components/BookHubStatCard.tsx')
+      : require(name));
+  return exports;
+}
+
+test('reading-only summaries retain both pace rows, including explicit empty-data units', () => {
+  const Summary = loadSummaryComponent('app/(protected)/books/[userBookId]/components/BookHubProgressSummary.tsx').default;
+  for (const values of [[4.26, 2], [null, null]]) {
+    const html = renderToStaticMarkup(createElement(Summary, {
+      summaryStats: [{ label: 'Reading Pace', details: [
+        { label: 'Fluid:', value: readingPaceLabel(values[0]) },
+        { label: 'Curiosity:', value: readingPaceLabel(values[1]) },
+      ] }],
+    }));
+    assert.ok(html.includes('Fluid:') && html.includes('Curiosity:'));
+    for (const value of values) assert.ok(html.includes(readingPaceLabel(value)));
+    assert.ok(!html.includes('Choose progress snapshot'));
+    assert.doesNotMatch(html, /NaN|undefined/);
+  }
+  const empty = renderToStaticMarkup(createElement(Summary, { summaryStats: [] }));
+  assert.ok(!empty.includes('Days Engaged') && !empty.includes('Reading Pace'));
 });

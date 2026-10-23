@@ -63,3 +63,9 @@ export function readingTimeLabel(minutes: number) {
   const remainder = rounded % 60;
   return hours ? `${hours} hr${remainder ? ` ${remainder} min` : ""}` : `${rounded} min`;
 }
+
+export function readingPaceLabel(minutesPerPage: number | null) {
+  return minutesPerPage != null && Number.isFinite(minutesPerPage) && minutesPerPage > 0
+    ? `${minutesPerPage.toFixed(1)} min/page`
+    : "— min/page";
+}
