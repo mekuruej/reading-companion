@@ -35,37 +35,15 @@ export default function LibraryViewControls({
   onSortModeChange,
 }: LibraryViewControlsProps) {
   return (
-    <div className="mb-4 space-y-3">
-      <div className="inline-flex overflow-hidden rounded-lg border bg-white text-sm">
-        <button
-          type="button"
-          onClick={() => onViewModeChange("cover")}
-          className={`px-3 py-1 ${
-            viewMode === "cover" ? "bg-stone-800 text-white" : "text-stone-600"
-          }`}
-        >
-          Cover
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onViewModeChange("list")}
-          className={`px-3 py-1 ${
-            viewMode === "list" ? "bg-stone-800 text-white" : "text-stone-600"
-          }`}
-        >
-          List
-        </button>
-      </div>
-
-      <div className="flex flex-wrap gap-3">
+    <div className="mb-4">
+      <div className="flex flex-wrap items-center gap-3">
         <input
           type="search"
           aria-label="Search title or author"
           placeholder="Search title or author"
           value={searchQuery}
           onChange={(event) => onSearchQueryChange(event.target.value)}
-          className="min-w-[220px] rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
+          className="w-full min-w-[220px] max-w-[450px] flex-1 rounded-lg border bg-white px-3 py-2 text-sm text-stone-700"
         />
         <select
           value={bookTypeFilter}
@@ -105,6 +83,28 @@ export default function LibraryViewControls({
           <option value="difficulty_low">Easiest First</option>
           <option value="rating_high">Highest Rated</option>
         </select>
+
+        <div className="ml-auto inline-flex shrink-0 overflow-hidden rounded-lg border bg-white text-sm">
+          <button
+            type="button"
+            onClick={() => onViewModeChange("cover")}
+            className={`px-3 py-1 ${
+              viewMode === "cover" ? "bg-stone-800 text-white" : "text-stone-600"
+            }`}
+          >
+            Cover
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onViewModeChange("list")}
+            className={`px-3 py-1 ${
+              viewMode === "list" ? "bg-stone-800 text-white" : "text-stone-600"
+            }`}
+          >
+            List
+          </button>
+        </div>
       </div>
     </div>
   );
