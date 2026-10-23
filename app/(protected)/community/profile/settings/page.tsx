@@ -4,6 +4,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AppearanceSettings from "@/components/appearance/AppearanceSettings";
 import { useRouter } from "next/navigation";
 import ProfileShell from "@/components/profile/ProfileShell";
 import { PROFILE_LEVEL_OPTIONS } from "@/lib/profileLevels";
@@ -324,6 +325,7 @@ export default function ProfileSettingsPage() {
       description="Update your Mekuru profile, reading level, and public reader details."
     >
       <div className="mx-auto max-w-4xl space-y-4">
+        <AppearanceSettings />
         <ProfileSettingsCoreCard
           displayName={displayName}
           username={username}

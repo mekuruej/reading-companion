@@ -238,7 +238,7 @@ export default function Header() {
     <header data-mekuru-header className="relative z-30 text-stone-900">
       <div className="w-full border-b border-stone-100 bg-white">
         <div className="mx-auto flex min-h-[68px] max-w-6xl items-center px-4 py-2">
-          <Link href={myLibraryHref} aria-label="My MEKURU Library" onClick={closeMenus} style={{ color: DEFAULT_APPEARANCE_PALETTE.brandText }}
+          <Link href={myLibraryHref} aria-label="My MEKURU Library" onClick={closeMenus} style={{ color: `var(--appearance-brand-text, ${DEFAULT_APPEARANCE_PALETTE.brandText})` }}
             className="block whitespace-nowrap text-[1.75rem] font-extrabold tracking-tight text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-500 sm:text-[2.125rem]">
             MEKURU <span className="align-middle text-[10px] font-semibold text-red-600 sm:text-xs">(Beta)</span>
           </Link>

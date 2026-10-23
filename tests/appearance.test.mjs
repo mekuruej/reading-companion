@@ -124,7 +124,7 @@ test("appearance palettes provide five coordinated schemes and independent treat
 });
 
 
-test("fixed default surfaces do not introduce preferences, providers or profile dependencies", () => {
+test("shared surfaces use appearance variables without profile or database dependencies", () => {
   const helper = fs.readFileSync(path.join(root, "lib/appearance/defaultAppearance.ts"), "utf8");
   assert.match(helper, /APPEARANCE_PALETTES\[DEFAULT_APPEARANCE.palette\]/);
   assert.match(helper, /getAppearanceBackgroundImage\(DEFAULT_APPEARANCE.palette, DEFAULT_APPEARANCE.treatment\)/);
@@ -135,7 +135,7 @@ test("fixed default surfaces do not introduce preferences, providers or profile 
   }
   const header = fs.readFileSync(path.join(root, "components/Header.tsx"), "utf8");
   assert.match(header, /style=\{DEFAULT_NAVIGATION_STYLE\}/);
-  assert.match(header, /style=\{\{ color: DEFAULT_APPEARANCE_PALETTE.brandText \}\}/);
+  assert.match(header, /--appearance-brand-text/);
   assert.doesNotMatch(header, /useAppearance|AppearanceProvider|localStorage/);
 });
 
@@ -150,4 +150,15 @@ test("Classic background stops retain readable primary/body text and coordinated
   assert.ok(contrastRatio(p.navigation, p.text) >= 4.5);
   assert.ok(contrastRatio(p.navigation, p.mutedText) >= 4.5);
   assert.ok(contrastRatio(p.navigation, p.accent) >= 3);
+});
+
+test("all selectable backgrounds retain readable existing body text", () => {
+  const { APPEARANCE_PALETTES } = loadTsModule("lib/appearance/palettes.ts");
+  for (const p of Object.values(APPEARANCE_PALETTES)) {
+    for (const bg of [p.page, p.neutralTouchStart, p.neutralTouchCenter, p.neutralTouchEnd]) {
+      for (const text of [p.text, p.mutedText, "#475569", "#4b5563"]) {
+        assert.ok(contrastRatio(bg, text) >= 4.5, `${p.label}: ${text} on ${bg}`);
+      }
+    }
+  }
 });

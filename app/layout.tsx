@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import MobileOptimizationNotice from "@/components/MobileOptimizationNotice";
 import AppHeaderGate from "@/components/AppHeaderGate";
 import SupportProjectFooterGate from "@/components/SupportProjectFooterGate";
+import { AppearanceProvider } from "@/components/appearance/AppearanceProvider";
 import "./globals.css";
 
 export const metadata = {
@@ -38,10 +39,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="flex min-h-screen flex-col bg-white text-black">
-        <AppHeaderGate />
-        <MobileOptimizationNotice />
-        <main className="flex-1">{children}</main>
-        <SupportProjectFooterGate />
+        <AppearanceProvider>
+          <AppHeaderGate />
+          <MobileOptimizationNotice />
+          <main className="flex-1">{children}</main>
+          <SupportProjectFooterGate />
+        </AppearanceProvider>
       </body>
     </html>
   );

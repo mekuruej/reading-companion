@@ -1,21 +1,18 @@
 import type { CSSProperties } from "react";
 import { APPEARANCE_PALETTES, DEFAULT_APPEARANCE, getAppearanceBackgroundImage } from "./palettes";
 
-// Fixed default design; no browser preferences or appearance provider in this release.
+// CSS variables follow browser preferences; fallbacks preserve the server-rendered Classic default.
 export const DEFAULT_APPEARANCE_PALETTE = APPEARANCE_PALETTES[DEFAULT_APPEARANCE.palette];
 
 export const DEFAULT_PAGE_STYLE: CSSProperties = {
-  backgroundColor: DEFAULT_APPEARANCE_PALETTE.page,
-  backgroundImage: getAppearanceBackgroundImage(DEFAULT_APPEARANCE.palette, DEFAULT_APPEARANCE.treatment),
+  backgroundColor: `var(--appearance-page-background, ${DEFAULT_APPEARANCE_PALETTE.page})`,
+  backgroundImage: `var(--appearance-page-image, ${getAppearanceBackgroundImage(DEFAULT_APPEARANCE.palette, DEFAULT_APPEARANCE.treatment)})`,
   backgroundPosition: "center",
   backgroundRepeat: "no-repeat",
   backgroundAttachment: "fixed",
 };
 
 export const DEFAULT_NAVIGATION_STYLE: CSSProperties = {
-  backgroundColor: DEFAULT_APPEARANCE_PALETTE.navigation,
-  borderBottomColor: DEFAULT_APPEARANCE_PALETTE.border,
-  "--appearance-text": DEFAULT_APPEARANCE_PALETTE.text,
-  "--appearance-muted-text": DEFAULT_APPEARANCE_PALETTE.mutedText,
-  "--appearance-accent": DEFAULT_APPEARANCE_PALETTE.accent,
+  backgroundColor: `var(--appearance-navigation, ${DEFAULT_APPEARANCE_PALETTE.navigation})`,
+  borderBottomColor: `var(--appearance-border, ${DEFAULT_APPEARANCE_PALETTE.border})`,
 } as CSSProperties;

@@ -1,5 +1,19 @@
 @import "tailwindcss";
 
+:root {
+  --appearance-page: #eeecea;
+  --appearance-navigation: #c9c5c4;
+  --appearance-brand-text: #38343b;
+  --appearance-text: #38343b;
+  --appearance-muted-text: #514b52;
+  --appearance-accent: #665b67;
+  --appearance-border: #d7d3d0;
+  --appearance-surface: #fbfaf8;
+  --appearance-surface-muted: #f4f2ef;
+  --appearance-page-background: #eeecea;
+  --appearance-page-image: linear-gradient(118deg, #e7e5e3 0%, #e7e5e3 17%, #f7f6f3 48%, #f7f6f3 68%, #e5e3e4 100%);
+}
+
 html {
   scroll-behavior: smooth;
 }
