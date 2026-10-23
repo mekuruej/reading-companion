@@ -3,6 +3,7 @@
 
 "use client";
 
+import { DEFAULT_APPEARANCE_PALETTE, DEFAULT_NAVIGATION_STYLE } from "@/lib/appearance/defaultAppearance";
 import TeacherAttentionBadge from "@/components/TeacherAttentionBadge";
 import { useTeacherAttention } from "@/lib/teacher/useTeacherAttention";
 import Link from "next/link";
@@ -15,7 +16,7 @@ import { shouldShowJapaneseStudyNavigation } from "@/lib/access/japaneseLearning
 import { supabase } from "@/lib/supabaseClient";
 
 function navClass(active: boolean) {
-  return `inline-flex min-h-10 items-center justify-center gap-1 border-b-2 bg-transparent px-2 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-600 focus-visible:ring-offset-2 ${active ? "border-stone-800 text-stone-950" : "border-transparent text-stone-600 hover:text-stone-950"}`;
+  return `inline-flex min-h-10 items-center justify-center gap-1 border-b-2 bg-transparent px-2 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-600 focus-visible:ring-offset-2 ${active ? "border-[var(--appearance-accent)] text-[var(--appearance-text)]" : "border-transparent text-[var(--appearance-muted-text)] hover:text-[var(--appearance-text)]"}`;
 }
 
 export default function Header() {
@@ -237,13 +238,13 @@ export default function Header() {
     <header data-mekuru-header className="relative z-30 text-stone-900">
       <div className="w-full border-b border-stone-100 bg-white">
         <div className="mx-auto flex min-h-[68px] max-w-6xl items-center px-4 py-2">
-          <Link href={myLibraryHref} aria-label="My MEKURU Library" onClick={closeMenus}
+          <Link href={myLibraryHref} aria-label="My MEKURU Library" onClick={closeMenus} style={{ color: DEFAULT_APPEARANCE_PALETTE.brandText }}
             className="block whitespace-nowrap text-[1.75rem] font-extrabold tracking-tight text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-500 sm:text-[2.125rem]">
             MEKURU <span className="align-middle text-[10px] font-semibold text-red-600 sm:text-xs">(Beta)</span>
           </Link>
         </div>
       </div>
-      <div className="w-full border-b border-stone-200 bg-stone-50">
+      <div className="w-full border-b" style={DEFAULT_NAVIGATION_STYLE}>
         <nav aria-label="Main navigation" className="relative mx-auto flex w-full max-w-6xl flex-wrap items-center justify-center gap-x-6 gap-y-1 px-4 py-2.5">
           <div className="static inline-flex items-center sm:relative" ref={libraryMenuRef} onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setShowLibraryMenu(false); }}>
             <Link href={myLibraryHref} aria-current={librarySectionActive ? "page" : undefined} onClick={closeMenus} className={navClass(librarySectionActive)}>

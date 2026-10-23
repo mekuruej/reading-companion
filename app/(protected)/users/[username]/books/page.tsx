@@ -2,6 +2,7 @@
 //
 "use client";
 
+import { DEFAULT_PAGE_STYLE } from "@/lib/appearance/defaultAppearance";
 import { effectiveProgressMethod, progressSummary, type ProgressTrackingMethod, type ProgressTotals } from "@/lib/books/readingProgress";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
@@ -1180,7 +1181,7 @@ export default function BooksPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 px-6 py-8">
+    <main className="min-h-screen px-6 py-8" style={DEFAULT_PAGE_STYLE}>
       <div className="mx-auto max-w-screen-xl">
         <LibraryHeader
           libraryOwnerLabel={libraryOwnerLabel}

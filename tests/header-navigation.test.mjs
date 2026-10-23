@@ -52,6 +52,7 @@ async function mount(profile, pathname = '/books') {
     '@/lib/access/japaneseLearningIntent': { shouldShowJapaneseStudyNavigation },
     '@/lib/access/japaneseLearningFreeFeatures': { loadJapaneseLearningFreeFeatureFlags: async () => ({}) },
     '@/lib/supabaseClient': { supabase },
+    '@/lib/appearance/defaultAppearance': load('lib/appearance/defaultAppearance.ts'),
   })[name] ?? require(name), fakeDocument, fakeWindow);
   const render = () => { si = ri = ei = 0; tree = exports.default(); pending.splice(0).forEach(fn => fn()); return tree; };
   render(); await new Promise(setImmediate); render();
@@ -115,7 +116,7 @@ test('student workspace still links My Library to the signed-in account', async 
   assert.ok(!h.hrefs().some(href => href.includes('/users/another')));
 });
 test('presentation has no sticky header, appearance provider, account dropdown, or auth refactor', () => {
-  assert.doesNotMatch(headerSource, /sticky top-0|useAppearance|appearance-|onAuthStateChange|My Account|signOut/);
+  assert.doesNotMatch(headerSource, /sticky top-0|useAppearance|AppearanceProvider|localStorage|onAuthStateChange|My Account|signOut/);
   assert.match(headerSource, /aria-label="Main navigation"/);
   assert.match(headerSource, /trial_started_at/);
   const library = fs.readFileSync('app/(protected)/users/[username]/books/page.tsx', 'utf8');

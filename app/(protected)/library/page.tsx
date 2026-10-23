@@ -3,6 +3,7 @@
 
 "use client";
 
+import { DEFAULT_PAGE_STYLE } from "@/lib/appearance/defaultAppearance";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -128,7 +129,7 @@ function TrialCountdownBanner() {
 
 export default function LibraryHubPage() {
   return (
-    <main className="min-h-screen bg-slate-100 px-5 py-8">
+    <main className="min-h-screen px-5 py-8" style={DEFAULT_PAGE_STYLE}>
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">

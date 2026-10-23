@@ -2,6 +2,7 @@
 //
 "use client";
 
+import { DEFAULT_PAGE_STYLE } from "@/lib/appearance/defaultAppearance";
 import { initialReflectionReaderLevel, reflectionReaderLevelForSave } from "@/lib/books/readingReflectionLevel";
 import { loadReviewedBookWordCount, readingPaceLabel, readingTimeLabel } from "@/lib/books/bookHubLearningSnapshot";
 import type { DnfDetails } from "@/lib/books/dnf";
@@ -5743,7 +5744,7 @@ export default function BookHubPage() {
 
   const showBookHubStartButton = !started && realReadingSessions.length === 0;
   return (
-    <main className="min-h-screen bg-gradient-to-br from-[#cdc0df] via-[#e5dfdf] to-[#e7d7b7] p-6">
+    <main className="min-h-screen p-6" style={DEFAULT_PAGE_STYLE}>
       {showBookFlagModal ? (
         <BookFlagModal
           bookTitle={book.title ?? "Untitled book"}
