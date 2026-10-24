@@ -8,7 +8,7 @@ import TeacherAttentionBadge from "@/components/TeacherAttentionBadge";
 import { useTeacherAttention } from "@/lib/teacher/useTeacherAttention";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
 import { loadJapaneseLearningFreeFeatureFlags } from "@/lib/access/japaneseLearningFreeFeatures";
@@ -20,6 +20,15 @@ function navClass(active: boolean) {
 }
 
 export default function Header() {
+  const router = useRouter();
+  const [authLoaded, setAuthLoaded] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const authUserIdRef = useRef<string | null>(null);
+  const authProfileLoadedRef = useRef(false);
+  const headerLoadRequestIdRef = useRef(0);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement | null>(null);
+  const accountButtonRef = useRef<HTMLButtonElement | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const [profileRole, setProfileRole] = useState<string | null>(null);
   const [profileIsSuperTeacher, setProfileIsSuperTeacher] = useState(false);
@@ -44,16 +53,23 @@ export default function Header() {
 
   useEffect(() => {
     let cancelled = false;
+    const requestId = ++headerLoadRequestIdRef.current;
+    const isCurrentRequest = () => !cancelled && requestId === headerLoadRequestIdRef.current;
 
     async function loadHeaderData() {
       try {
         const {
           data: { user },
+          error: authError,
         } = await supabase.auth.getUser();
 
-        if (cancelled) return;
+        if (!isCurrentRequest()) return;
+        if (authError) throw authError;
 
         if (!user) {
+          authUserIdRef.current = null;
+          authProfileLoadedRef.current = false;
+          setIsAuthenticated(false);
           setUsername(null);
           setProfileRole(null);
           setProfileIsSuperTeacher(false);
@@ -64,6 +80,9 @@ export default function Header() {
           setPendingJapaneseLearningRequestCount(0);
           return;
         }
+
+        authUserIdRef.current = user.id;
+        setIsAuthenticated(true);
 
         const profileResult = await supabase
           .from("profiles")
@@ -84,9 +103,10 @@ export default function Header() {
           profileError = fallbackResult.error;
         }
 
-        if (cancelled) return;
+        if (!isCurrentRequest()) return;
 
         if (profileError) {
+          authProfileLoadedRef.current = false;
           setUsername(null);
           setProfileRole(null);
           setProfileIsSuperTeacher(false);
@@ -98,6 +118,7 @@ export default function Header() {
           return;
         }
 
+        authProfileLoadedRef.current = true;
         setUsername(profile?.username ?? null);
         setProfileRole(profile?.role ?? null);
         setProfileIsSuperTeacher(profile?.is_super_teacher === true || profile?.is_super_teacher === "true");
@@ -106,7 +127,7 @@ export default function Header() {
         setHasFullAccess(accessStatus?.hasFullAccess ?? false);
         setIsTrialAccess(accessStatus?.reason === "trial");
         const freeFeatureFlags = await loadJapaneseLearningFreeFeatureFlags(supabase);
-        if (cancelled) return;
+        if (!isCurrentRequest()) return;
         const featureAccess = getFeatureAccess({
           role:
             profile?.is_super_teacher === true || profile?.is_super_teacher === "true"
@@ -130,7 +151,7 @@ export default function Header() {
             .select("id", { count: "exact", head: true })
             .eq("status", "pending");
 
-          if (cancelled) return;
+          if (!isCurrentRequest()) return;
 
           setPendingJapaneseLearningRequestCount(
             !pendingRequestsResult.error ? pendingRequestsResult.count ?? 0 : 0
@@ -140,7 +161,8 @@ export default function Header() {
         }
 
       } catch (error) {
-        if (!cancelled) {
+        if (isCurrentRequest()) {
+          authProfileLoadedRef.current = false;
           setUsername(null);
           setProfileRole(null);
           setProfileIsSuperTeacher(false);
@@ -150,6 +172,8 @@ export default function Header() {
           setCanUseFindNextBook(false);
           setPendingJapaneseLearningRequestCount(0);
         }
+      } finally {
+        if (isCurrentRequest()) setAuthLoaded(true);
       }
     }
 
@@ -157,8 +181,53 @@ export default function Header() {
 
     return () => {
       cancelled = true;
+      if (headerLoadRequestIdRef.current === requestId) headerLoadRequestIdRef.current += 1;
     };
   }, [headerRefreshToken]);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") {
+        authUserIdRef.current = null;
+        authProfileLoadedRef.current = false;
+        // Invalidate any profile request already in flight so it cannot restore stale auth state.
+        headerLoadRequestIdRef.current += 1;
+        setIsAuthenticated(false);
+        setUsername(null);
+        setProfileRole(null);
+        setProfileIsSuperTeacher(false);
+        setShowJapaneseStudyNavigation(false);
+        setHasFullAccess(false);
+        setIsTrialAccess(false);
+        setCanUseFindNextBook(false);
+        setPendingJapaneseLearningRequestCount(0);
+        setAuthLoaded(true);
+        setShowAccountMenu(false);
+        setShowLibraryMenu(false);
+        setShowStudyMenu(false);
+        setShowTeacherMenu(false);
+      } else if (event === "SIGNED_IN" && session?.user) {
+        setIsAuthenticated(true);
+        if (authUserIdRef.current === session.user.id && authProfileLoadedRef.current) return;
+
+        // Invalidate pending data before loading a new identity or retrying its profile.
+        headerLoadRequestIdRef.current += 1;
+        authUserIdRef.current = session.user.id;
+        authProfileLoadedRef.current = false;
+        setUsername(null);
+        setProfileRole(null);
+        setProfileIsSuperTeacher(false);
+        setShowJapaneseStudyNavigation(false);
+        setHasFullAccess(false);
+        setIsTrialAccess(false);
+        setCanUseFindNextBook(false);
+        setPendingJapaneseLearningRequestCount(0);
+        setHeaderRefreshToken((current) => current + 1);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     function handleProfilePreferencesUpdated() {
@@ -181,12 +250,14 @@ export default function Header() {
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
       const target = event.target as Node;
+      if (accountMenuRef.current && !accountMenuRef.current.contains(target)) setShowAccountMenu(false);
       if (libraryMenuRef.current && !libraryMenuRef.current.contains(target)) setShowLibraryMenu(false);
       if (studyMenuRef.current && !studyMenuRef.current.contains(target)) setShowStudyMenu(false);
       if (teacherMenuRef.current && !teacherMenuRef.current.contains(target)) setShowTeacherMenu(false);
     }
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
+      if (showAccountMenu) { setShowAccountMenu(false); accountButtonRef.current?.focus(); }
       if (showLibraryMenu) { setShowLibraryMenu(false); libraryButtonRef.current?.focus(); }
       if (showStudyMenu) { setShowStudyMenu(false); studyButtonRef.current?.focus(); }
       if (showTeacherMenu) { setShowTeacherMenu(false); teacherButtonRef.current?.focus(); }
@@ -197,7 +268,7 @@ export default function Header() {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [showLibraryMenu, showStudyMenu, showTeacherMenu]);
+  }, [showAccountMenu, showLibraryMenu, showStudyMenu, showTeacherMenu]);
 
   const libraryHref = username ? `/users/${username}/books` : "/books";
   const librarySectionActive =
@@ -228,7 +299,18 @@ export default function Header() {
     ? `/users/${encodeURIComponent(username)}/books`
     : "/books";
 
+  const accountButtonClass = `inline-flex min-h-10 items-center gap-1 bg-transparent px-1 py-2 text-xs font-semibold text-stone-700 transition hover:text-stone-950 hover:underline hover:underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-500 focus-visible:ring-offset-2 sm:gap-2 sm:px-2 sm:text-sm ${showAccountMenu ? "text-stone-950 underline underline-offset-4" : ""}`;
+
+  async function handleLogout() {
+    const { error } = await supabase.auth.signOut();
+    if (error) { console.error("Logout error:", error); return; }
+    setShowAccountMenu(false);
+    router.replace("/login");
+    router.refresh();
+  }
+
   function closeMenus() {
+    setShowAccountMenu(false);
     setShowLibraryMenu(false);
     setShowStudyMenu(false);
     setShowTeacherMenu(false);
@@ -237,11 +319,61 @@ export default function Header() {
   return (
     <header data-mekuru-header className="relative z-30 text-stone-900">
       <div className="w-full border-b border-stone-100 bg-white">
-        <div className="mx-auto flex min-h-[68px] max-w-6xl items-center px-4 py-2">
+        <div className="mx-auto flex min-h-[68px] max-w-6xl items-center justify-between gap-2 px-4 py-2 sm:gap-4">
           <Link href={myLibraryHref} aria-label="My MEKURU Library" onClick={closeMenus} style={{ color: `var(--appearance-brand-text, ${DEFAULT_APPEARANCE_PALETTE.brandText})` }}
             className="block whitespace-nowrap text-[1.75rem] font-extrabold tracking-tight text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-500 sm:text-[2.125rem]">
             MEKURU <span className="align-middle text-[10px] font-semibold text-red-600 sm:text-xs">(Beta)</span>
           </Link>
+          <div className="relative shrink-0" ref={accountMenuRef} onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setShowAccountMenu(false); }}>
+            {authLoaded ? isAuthenticated ? (
+              <>
+                <button
+                  ref={accountButtonRef}
+                  type="button"
+                  aria-expanded={showAccountMenu}
+                  aria-haspopup="true"
+                  aria-controls="mekuru-account-menu"
+                  onClick={() => {
+                    setShowAccountMenu((open) => !open);
+                    setShowLibraryMenu(false);
+                    setShowStudyMenu(false);
+                    setShowTeacherMenu(false);
+                  }}
+                  className={accountButtonClass}
+                >
+                  <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor">
+                    <path d="M10 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-4.05 0-7 2.04-7 4.25V18h14v-1.75C17 14.04 14.05 12 10 12Z" />
+                  </svg>
+                  <span>My Account</span>
+                  <svg aria-hidden="true" viewBox="0 0 20 20" className={`h-3 w-3 transition-transform ${showAccountMenu ? "rotate-180" : ""}`} fill="currentColor">
+                    <path d="m5.5 7.5 4.5 4 4.5-4" stroke="currentColor" strokeWidth="1.7" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                {showAccountMenu ? (
+                  <div id="mekuru-account-menu" className="absolute right-0 top-full z-50 mt-2 w-60 max-w-[calc(100vw-2rem)] rounded-2xl border border-stone-200 bg-white p-2 shadow-xl">
+                    <Link href="/community/profile" onClick={closeMenus} className="block rounded-xl px-3 py-2.5 text-sm text-stone-700 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-500">
+                      My Profile &amp; Settings
+                    </Link>
+                    <a href="mailto:mekuru.ej@gmail.com" onClick={closeMenus} className="block rounded-xl px-3 py-2.5 text-sm text-stone-700 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-500">
+                      Help &amp; Contact
+                    </a>
+                    <Link href="/reading-access" onClick={closeMenus} className="block rounded-xl px-3 py-2.5 text-sm text-stone-700 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-500">
+                      Membership &amp; Billing
+                    </Link>
+                    <div className="my-1 border-t border-stone-100" />
+                    <button type="button" onClick={() => void handleLogout()} className="block w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-stone-700 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-500">
+                      Log out
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <div className="flex items-center gap-1 text-xs sm:gap-2 sm:text-sm">
+                <Link href="/login" className="rounded-full px-2 py-2 sm:px-3 font-semibold text-stone-700 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-500">Log in</Link>
+                <Link href="/login/beta-signup" className="rounded-full bg-stone-900 px-2 py-2 sm:px-3 font-semibold text-white hover:bg-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-500 focus-visible:ring-offset-2">Sign up</Link>
+              </div>
+            ) : <span aria-hidden="true" className="inline-block h-10 w-24" />}
+          </div>
         </div>
       </div>
       <div className="w-full border-b" style={DEFAULT_NAVIGATION_STYLE}>
@@ -258,6 +390,7 @@ export default function Header() {
               aria-haspopup="true"
               aria-controls="mekuru-library-menu"
               onClick={() => {
+                setShowAccountMenu(false);
                 setShowLibraryMenu((open) => !open);
                 setShowStudyMenu(false);
                 setShowTeacherMenu(false);
@@ -292,6 +425,7 @@ export default function Header() {
                 aria-haspopup="true"
                 aria-controls="mekuru-study-menu"
                 onClick={() => {
+                  setShowAccountMenu(false);
                   setShowStudyMenu((open) => !open);
                   setShowLibraryMenu(false);
                   setShowTeacherMenu(false);
@@ -356,6 +490,7 @@ export default function Header() {
                 aria-haspopup="true"
                 aria-controls="mekuru-teaching-menu"
                 onClick={() => {
+                  setShowAccountMenu(false);
                   const opening = !showTeacherMenu;
                   setShowTeacherMenu(opening);
                   setShowLibraryMenu(false);
