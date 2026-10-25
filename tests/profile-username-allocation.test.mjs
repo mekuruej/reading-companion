@@ -181,7 +181,7 @@ test('setup navigation retains username completeness checks and uses existing Li
   const books = fs.readFileSync('app/(protected)/books/page.tsx', 'utf8');
   assert.match(books, /!!profile\?\.username/);
   assert.match(books, /router.replace\(`\/users\/\$\{profile.username\}\/books`\)/);
-  const settings = fs.readFileSync('app/(protected)/community/profile/settings/page.tsx', 'utf8');
+  const settings = fs.readFileSync('app/(protected)/community/profile/ProfileEditor.tsx', 'utf8');
   assert.match(settings, /username === originalUsername \? originalUsername : username.trim\(\).toLowerCase\(\)/);
   const settingsCard = fs.readFileSync('app/(protected)/community/profile/settings/components/ProfileSettingsCoreCard.tsx', 'utf8');
   assert.match(settingsCard, /Changing your username changes your Library link/);

@@ -8,11 +8,11 @@ import { findMekuruReadingLevel } from "@/components/profile/MekuruReadingLevelG
 import ProfileShell from "@/components/profile/ProfileShell";
 import { wantsJapaneseLearning } from "@/lib/access/japaneseLearningIntent";
 import {
-  emptyLibraryStudyColorTotals,
   fetchLibraryStudyColorTotals,
   type LibraryStudyColorTotals,
 } from "@/lib/libraryStudyTotals";
 import { supabase } from "@/lib/supabaseClient";
+import { useProfileOwner } from "@/lib/profile/useProfileOwner";
 import ProfilePreviewErrorState from "./components/ProfilePreviewErrorState";
 import ProfilePreviewHeader from "./components/ProfilePreviewHeader";
 import ProfilePreviewStatsGrid from "./components/ProfilePreviewStatsGrid";
@@ -79,6 +79,8 @@ const publicAbilityColors = [
 ] as const;
 
 export default function PublicProfilePreviewPage() {
+  const { ownerId, error: authError, isCurrentOwner } = useProfileOwner();
+  const [loadedOwner, setLoadedOwner] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [profile, setProfile] = useState<ProfileRow | null>(null);
@@ -86,28 +88,21 @@ export default function PublicProfilePreviewPage() {
   const [bookCount, setBookCount] = useState<number | null>(null);
   const [libraryWordCount, setLibraryWordCount] = useState<number | null>(null);
   const [currentBooks, setCurrentBooks] = useState<CurrentBookPreview[]>([]);
-  const [colorTotals, setColorTotals] = useState<LibraryStudyColorTotals>(
-    emptyLibraryStudyColorTotals()
-  );
+  const [colorTotals, setColorTotals] = useState<LibraryStudyColorTotals | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    if (!ownerId) return;
+    setProfile(null); setPublicProfile(null); setBookCount(null); setLibraryWordCount(null);
+    setCurrentBooks([]); setColorTotals(null);
+    setLoadedOwner(ownerId);
 
     async function loadPreview() {
       setLoading(true);
       setErrorMsg("");
 
       try {
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
-
-        if (userError) throw userError;
-        if (!user) {
-          setErrorMsg("Please sign in again.");
-          return;
-        }
+        const user = { id: ownerId };
 
         const [
           profileResult,
@@ -158,7 +153,7 @@ export default function PublicProfilePreviewPage() {
             .limit(3),
           fetchLibraryStudyColorTotals(user.id).catch((error) => {
             console.error("Error loading public profile color totals:", error);
-            return emptyLibraryStudyColorTotals();
+            return null;
           }),
         ]);
 
@@ -167,8 +162,11 @@ export default function PublicProfilePreviewPage() {
         if (bookCountResult.error) throw bookCountResult.error;
         if (libraryWordCountResult.error) throw libraryWordCountResult.error;
         if (currentBooksResult.error) throw currentBooksResult.error;
+        for (const result of [bookCountResult, libraryWordCountResult]) {
+          if (!Number.isSafeInteger(result.count) || result.count! < 0) throw new Error("Profile preview counts unavailable.");
+        }
 
-        if (!cancelled) {
+        if (!cancelled && isCurrentOwner(ownerId)) {
           const normalizedCurrentBooks = ((currentBooksResult.data ?? []) as any[])
             .map((row) => ({
               id: String(row.id),
@@ -186,11 +184,11 @@ export default function PublicProfilePreviewPage() {
           setColorTotals(colorTotalsResult);
         }
       } catch (error: any) {
-        if (!cancelled) {
+        if (!cancelled && isCurrentOwner(ownerId)) {
           setErrorMsg(error?.message ?? "Could not load public profile preview.");
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && isCurrentOwner(ownerId)) setLoading(false);
       }
     }
 
@@ -199,7 +197,7 @@ export default function PublicProfilePreviewPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [ownerId, isCurrentOwner]);
 
   const displayName = profile?.display_name?.trim() || "";
   const username = profile?.username?.trim() || "";
@@ -223,10 +221,14 @@ export default function PublicProfilePreviewPage() {
       value: wantsJapaneseLearning(profile) ? "Japanese Study Tools" : "Reading Companion",
     },
   ];
-  const readingLevel = findMekuruReadingLevel(profile?.level);
+  const readingLevel = findMekuruReadingLevel(publicProfile?.jlpt_level_public);
   const readingModeLabel = wantsJapaneseLearning(profile)
     ? "Japanese Study Tools"
     : "Reading Companion";
+
+  if (authError) return <main className="p-6" role="alert">Could not confirm your session. Please reload.</main>;
+  if (ownerId === null) return <main className="p-6">Please sign in to view your reader-profile preview.</main>;
+  if (!ownerId || loadedOwner !== ownerId) return <main className="p-6">Loading reader-profile preview…</main>;
 
   return (
     <ProfileShell
@@ -251,7 +253,7 @@ export default function PublicProfilePreviewPage() {
               loading={loading}
               publicStats={publicStats}
               readingLevel={readingLevel}
-              fallbackLevelLabel={displayValue(profile?.level, "Not set")}
+              fallbackLevelLabel={displayValue(publicProfile?.jlpt_level_public, "Hidden")}
             />
 
             <ProfilePreviewAbilityColors
@@ -261,7 +263,7 @@ export default function PublicProfilePreviewPage() {
                 label: color.label,
                 description: color.description,
                 dotClass: color.dotClass,
-                value: formatCount(colorTotals[color.key]),
+                value: formatCount(colorTotals?.[color.key]),
               }))}
             />
 

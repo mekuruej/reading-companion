@@ -57,14 +57,14 @@ test('completeness checks and profile forms no longer require a level', () => {
   for (const file of ['app/(protected)/books/page.tsx', 'app/dashboard/page.tsx']) {
     assert.doesNotMatch(read(file), /needsJapaneseReadingLevel|!!profile\?\.level/);
   }
-  for (const file of ['app/(protected)/community/profile/setup/page.tsx', 'app/(protected)/community/profile/settings/page.tsx']) {
+  for (const file of ['app/(protected)/community/profile/setup/page.tsx', 'app/(protected)/community/profile/ProfileEditor.tsx']) {
     const source = read(file);
     assert.doesNotMatch(source, /Please choose the reading level/);
-    if (file.includes("/settings/")) assert.match(source, /profileReadingLevelFields\(japaneseLearningEnabled, level\)/);
+    if (file.endsWith("/ProfileEditor.tsx")) assert.match(source, /profileReadingLevelFields\(japaneseLearningEnabled, level\)/);
     else assert.match(read("app/api/profile/setup/route.ts"), /profileReadingLevelFields\(enabled, level\)/);
     assert.match(source, /MekuruReadingLevelGuide optional/);
     assert.match(source, /Please (?:enter|add) a display name/);
-    if (file.includes("/settings/")) assert.match(source, /Please (?:enter|choose) a username/);
+    if (file.endsWith("/ProfileEditor.tsx")) assert.match(source, /Please (?:enter|choose) a username/);
     assert.match(source, /Please choose your native language/);
   }
 });

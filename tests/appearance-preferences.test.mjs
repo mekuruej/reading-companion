@@ -57,9 +57,9 @@ test('preferences are added to the existing profile settings without introducing
   const provider = fs.readFileSync('components/appearance/AppearanceProvider.tsx', 'utf8');
   const settings = fs.readFileSync('components/appearance/AppearanceSettings.tsx', 'utf8');
   assert.doesNotMatch(provider + settings, /supabase|fetch\(|signOut|onAuthStateChange/);
-  assert.match(fs.readFileSync('app/(protected)/community/profile/settings/page.tsx', 'utf8'), /<AppearanceSettings \/>/);
+  assert.match(fs.readFileSync('app/(protected)/community/profile/page.tsx', 'utf8'), /<AppearanceSettings \/>/);
   assert.match(settings, /saved in this browser only/);
   assert.match(settings, /htmlFor="appearance-palette"/);
   assert.match(settings, /htmlFor="appearance-treatment"/);
-  assert.equal(fs.existsSync('app/(protected)/community/profile/ProfileEditor.tsx'), false);
+  assert.doesNotMatch(fs.readFileSync('app/(protected)/community/profile/ProfileEditor.tsx', 'utf8'), /AppearanceSettings/);
 });
