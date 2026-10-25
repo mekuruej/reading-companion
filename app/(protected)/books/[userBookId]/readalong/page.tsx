@@ -407,6 +407,7 @@ function ReadAlongContent() {
     const [dismissedPersonalEntries, setDismissedPersonalEntries] = useState<string[]>([]);
     useEffect(() => { setDismissedPersonalEntries([]); }, [activeAddAfterWordId, userBookId]);
     const personalLookupVersion = useRef(0);
+    const captureSaveInFlight = useRef(false);
     const canSearchPersonalVocabulary = ownsBook && !searchParams.has("studentId") && !searchParams.has("sourceUserBookId");
     useEffect(() => () => { personalLookupVersion.current += 1; }, [userBookId, canSearchPersonalVocabulary]);
 
@@ -1641,8 +1642,8 @@ function ReadAlongContent() {
 
     function applyPersonalAddAfterEntry(entry: PersonalVocabularyMatch) {
         personalLookupVersion.current += 1;
-        setAddAfterDraft((current) => ({
-            ...current,
+        const draft: AddAfterDraft = {
+            ...addAfterDraft,
             lookupLoading: false,
             personalLookupLoading: false,
             personalLookupError: null,
@@ -1655,8 +1656,10 @@ function ReadAlongContent() {
             meaningChoiceIndex: null,
             candidates: [],
             selectedPersonalEntry: true,
-            message: "Selected your saved entry. Review it before saving.",
-        }));
+            message: "",
+        };
+        setAddAfterDraft(draft);
+        return draft;
     }
 
     async function renumberGroupWithInsertedWord(
@@ -1714,7 +1717,25 @@ function ReadAlongContent() {
         return new Map(reorderedRows.map((row, index) => [String(row.id), index + 1]));
     }
 
-    async function saveAddAfterWord(anchor: ReadAlongWord) {
+    async function saveAddAfterWord(anchor: ReadAlongWord, draft = addAfterDraft) {
+        await runCaptureSave(() => persistAddAfterWord(anchor, draft));
+    }
+
+    async function saveWordToCurrentEmptyPage(draft = addAfterDraft) {
+        await runCaptureSave(() => persistWordToCurrentEmptyPage(draft));
+    }
+
+    async function runCaptureSave(save: () => Promise<void>) {
+        if (captureSaveInFlight.current) return;
+        captureSaveInFlight.current = true;
+        try {
+            await save();
+        } finally {
+            captureSaveInFlight.current = false;
+        }
+    }
+
+    async function persistAddAfterWord(anchor: ReadAlongWord, addAfterDraft: AddAfterDraft) {
         if (!userBookId || !canAccessBook || !canUseSavedWordReading) return;
 
         const parsedPosition = parseWordPosition(newWordPosition, newWordUnit);
@@ -1917,7 +1938,7 @@ function ReadAlongContent() {
         }
     }
 
-    async function saveWordToCurrentEmptyPage() {
+    async function persistWordToCurrentEmptyPage(addAfterDraft: AddAfterDraft) {
         if (!userBookId || !canAccessBook || !canUseSavedWordReading || !currentPage) return;
 
         const parsedPosition = parseWordPosition(newWordPosition, newWordUnit);
@@ -2130,7 +2151,7 @@ function ReadAlongContent() {
 
     function renderAddAfterPanel(
         anchor: ReadAlongWord,
-        options: { heading?: string; onSave?: () => void } = {}
+        options: { heading?: string; onSave?: (draft?: AddAfterDraft) => Promise<void> } = {}
     ) {
         const placementLabel = activeAddPlacement === "before" ? "before" : "after";
         const selectedCandidateId =
@@ -2220,7 +2241,12 @@ function ReadAlongContent() {
                         searched={addAfterDraft.personalLookupSearched}
                         loading={addAfterDraft.personalLookupLoading}
                         error={addAfterDraft.personalLookupError}
-                        onSelect={applyPersonalAddAfterEntry}
+                        saving={addAfterDraft.saving}
+                        onSelect={(entry) => {
+                            if (captureSaveInFlight.current) return;
+                            const draft = applyPersonalAddAfterEntry(entry);
+                            void (options.onSave ? options.onSave(draft) : saveAddAfterWord(anchor, draft));
+                        }}
                     />
                 ) : null}
 

@@ -393,6 +393,8 @@ function CuriosityReadingContent({
   const [accessMessage, setAccessMessage] = useState("");
 
   const [quickLoading, setQuickLoading] = useState(false);
+  const quickSaveInFlight = useRef(false);
+  const [quickSaving, setQuickSaving] = useState(false);
   const [quickError, setQuickError] = useState<string | null>(null);
   const [englishItemType, setEnglishItemType] = useState<EnglishItemType>("word");
   const [hideKanjiInReadingSupport, setHideKanjiInReadingSupport] = useState(false);
@@ -1325,7 +1327,43 @@ function CuriosityReadingContent({
     }
   }
 
-  async function saveQuickWord(options: { requireSelectedLookup?: boolean } = {}) {
+  async function savePersonalQuickWord(entry: PersonalVocabularyMatch) {
+    if (quickSaveInFlight.current) return;
+    invalidateQuickLookup();
+    const draft: QuickPreview = {
+      ...quickPreview,
+      id: null,
+      surface: entry.surface,
+      cacheSurface: "",
+      reading: entry.reading,
+      meanings: [],
+      selectedMeaningIndex: 0,
+      meaning: entry.meaning,
+      isCustomMeaning: true,
+      alternateSurface: entry.alternativeSurface,
+    };
+    setQuickPreview(draft);
+    setSelectedQuickLookupCandidateId(null);
+    setSelectedPersonalEntryKey(JSON.stringify([entry.surface, entry.reading, entry.meaning]));
+    setQuickError(null);
+    await saveQuickWord({}, draft);
+  }
+
+  async function saveQuickWord(options: { requireSelectedLookup?: boolean } = {}, draft = quickPreview) {
+    if (quickSaveInFlight.current) return;
+    quickSaveInFlight.current = true;
+    setQuickSaving(true);
+    try {
+      await persistQuickWord(draft, options);
+    } catch (error) {
+      setQuickError(error instanceof Error ? error.message : "Could not save this word.");
+    } finally {
+      quickSaveInFlight.current = false;
+      setQuickSaving(false);
+    }
+  }
+
+  async function persistQuickWord(quickPreview: QuickPreview, options: { requireSelectedLookup?: boolean }) {
     if (isListeningMode) {
       if (!capture.identity || capture.completed || !(isRunning || isPaused || showTimedSessionForm)) return;
       if (!quickPreview.surface.trim()) return;
@@ -2223,7 +2261,7 @@ function CuriosityReadingContent({
                 chapterNumber={quickPreview.chapterNumber}
                 chapterName={quickPreview.chapterName}
                 chapterNameOptions={sortedChapterNameOptions}
-                saving={quickLoading}
+                saving={quickLoading || quickSaving}
                 isEditing={quickPreview.id != null}
                 savedNotice={savedQuickNotice}
                 onItemTypeChange={setEnglishItemType}
@@ -2290,7 +2328,7 @@ function CuriosityReadingContent({
             selectedMeaningIndex={quickPreview.selectedMeaningIndex}
             positionLabel={positionLabel(positionUnit)}
             position={quickPreview.page}
-            quickLoading={quickLoading}
+            quickLoading={quickLoading || quickSaving}
             quickError={quickError}
             savedNotice={savedQuickNotice}
             canSaveWord={Boolean(
@@ -2376,24 +2414,8 @@ function CuriosityReadingContent({
               searched={personalVocabularySearched}
               loading={personalVocabularyLoading}
               error={personalVocabularyError}
-              onSelect={(entry) => {
-                invalidateQuickLookup();
-                setQuickPreview((prev) => ({
-                  ...prev,
-                  id: null,
-                  surface: entry.surface,
-                  cacheSurface: "",
-                  reading: entry.reading,
-                  meanings: [],
-                  selectedMeaningIndex: 0,
-                  meaning: entry.meaning,
-                  isCustomMeaning: true,
-                  alternateSurface: entry.alternativeSurface,
-                }));
-                setSelectedQuickLookupCandidateId(null);
-                setSelectedPersonalEntryKey(JSON.stringify([entry.surface, entry.reading, entry.meaning]));
-                setQuickError(null);
-              }}
+              saving={quickSaving}
+              onSelect={(entry) => void savePersonalQuickWord(entry)}
             />
           ) : null}
           </>
@@ -2403,7 +2425,7 @@ function CuriosityReadingContent({
       }
       {isListeningMode && capture.error && <p role="alert" className="my-3 text-sm text-red-700">{capture.error}<button type="button" className="ml-2 underline" disabled={capture.busy} onClick={() => void capture.recover()}>Retry recovery</button></p>}
       {isListeningMode && !capture.completed && !canCaptureListeningWord && <p className="my-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">Start the listening timer to enable word capture. Your words will be saved per listening session in Reading History, separate from your reading vocabulary.</p>}
-      {(!isListeningMode || !capture.completed) && <fieldset disabled={isListeningMode && (capture.busy || capture.isFinalizing || !canCaptureListeningWord)} className="min-w-0">
+      {(!isListeningMode || !capture.completed) && <fieldset disabled={quickSaving || (isListeningMode && (capture.busy || capture.isFinalizing || !canCaptureListeningWord))} className="min-w-0">
       <div
         className={
           isListeningMode ? "block" : workspaceCompact && workspaceAside
@@ -2436,7 +2458,7 @@ function CuriosityReadingContent({
                   chapterNumber={quickPreview.chapterNumber}
                   chapterName={quickPreview.chapterName}
                   chapterNameOptions={sortedChapterNameOptions}
-                  saving={quickLoading}
+                  saving={quickLoading || quickSaving}
                   isEditing={quickPreview.id != null}
                   savedNotice={savedQuickNotice}
                   onItemTypeChange={setEnglishItemType}
@@ -2490,7 +2512,7 @@ function CuriosityReadingContent({
                     listening={isListeningMode}
                     surface={quickPreview.surface}
                     reading={quickPreview.reading}
-                    quickLoading={quickLoading}
+                    quickLoading={quickLoading || quickSaving}
                     quickPreviewLibraryColorInfo={quickPreviewLibraryColorInfo}
                     quickWordInputRef={quickWordInputRef}
                     onSurfaceChange={(value) => {
@@ -2568,25 +2590,8 @@ function CuriosityReadingContent({
                       searched={personalVocabularySearched}
                       loading={personalVocabularyLoading}
                       error={personalVocabularyError}
-                      onSelect={(entry) => {
-                        invalidateQuickLookup();
-                        setQuickPreview((prev) => ({
-                          ...prev,
-                          id: null,
-                          surface: entry.surface,
-                          cacheSurface: "",
-                          reading: entry.reading,
-                          meanings: [],
-                          selectedMeaningIndex: 0,
-                          meaning: entry.meaning,
-                          isCustomMeaning: true,
-                          alternateSurface: entry.alternativeSurface,
-                        }));
-                        setSelectedQuickLookupCandidateId(null);
-                        setSelectedPersonalEntryKey(JSON.stringify([entry.surface, entry.reading, entry.meaning]));
-                        setQuickError(null);
-                        jumpToQuickWordFields();
-                      }}
+                      saving={quickSaving}
+                      onSelect={(entry) => void savePersonalQuickWord(entry)}
                     />
                   ) : null}
 

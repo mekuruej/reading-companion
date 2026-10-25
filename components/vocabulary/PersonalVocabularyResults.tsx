@@ -4,6 +4,7 @@ type PersonalVocabularyResultsProps = {
   entries: PersonalVocabularyMatch[];
   searched: boolean;
   loading?: boolean;
+  saving?: boolean;
   error?: string | null;
   dismissedKeys: string[];
   showPreviousLocation?: boolean;
@@ -13,7 +14,7 @@ type PersonalVocabularyResultsProps = {
 
 /** Recognition only: each distinct saved meaning remains an explicit choice. */
 export default function PersonalVocabularyResults({
-  entries, searched, loading = false, error = null, dismissedKeys,
+  entries, searched, loading = false, saving = false, error = null, dismissedKeys,
   showPreviousLocation = true, onSelect, onDismiss,
 }: PersonalVocabularyResultsProps) {
   const suggestions = entries.filter(entry => !dismissedKeys.includes(personalVocabularyEntryKey(entry)));
@@ -21,6 +22,7 @@ export default function PersonalVocabularyResults({
   return (
     <section className="mt-3 rounded-xl border border-violet-200 bg-violet-50/60 p-3" aria-label="Previously saved vocabulary">
       {suggestions.length ? <h3 className="text-sm font-semibold text-violet-950">You&apos;ve saved this word before!</h3> : null}
+      {suggestions.length ? <p className="mt-1 text-xs italic text-violet-800">Every encounter counts.</p> : null}
       {loading ? <p className="mt-2 text-xs text-violet-800">Checking saved words in this book…</p> : null}
       {error ? <p role="status" className="mt-2 text-sm text-amber-900">{error}</p> : null}
       <ul className="space-y-2">
@@ -30,8 +32,8 @@ export default function PersonalVocabularyResults({
             <p className="mt-1 text-sm text-stone-700">{entry.meaning || "No meaning saved"}</p>
             {showPreviousLocation && entry.previousLocation ? <p className="mt-1 text-xs text-stone-500">{entry.previousLocation}</p> : null}
             <div className="mt-2 flex flex-wrap gap-2">
-              <button type="button" onClick={() => onSelect(entry)} className="rounded-lg bg-violet-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-800 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:ring-offset-2">Use this entry</button>
-              <button type="button" onClick={() => onDismiss(entry)} className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs text-stone-600 hover:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:ring-offset-2">Not this one</button>
+              <button type="button" disabled={saving} onClick={() => onSelect(entry)} className="rounded-lg bg-violet-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-800 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">Save again</button>
+              <button type="button" disabled={saving} onClick={() => onDismiss(entry)} className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs text-stone-600 hover:bg-stone-100 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">Different word</button>
             </div>
           </li>
         ))}
