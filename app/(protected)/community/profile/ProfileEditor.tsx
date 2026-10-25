@@ -33,7 +33,7 @@ export default function ProfileEditor({ ownerId, isCurrentOwner, onCancel, onSav
   const activeRef = useRef(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const [publicNameChoice, setPublicNameChoice] = useState<"display_name" | "username">("display_name");
-  const [publicLevel, setPublicLevel] = useState("None");
+  const [publicLevel, setPublicLevel] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -118,7 +118,7 @@ export default function ProfileEditor({ ownerId, isCurrentOwner, onCancel, onSav
       setFavoriteGenres(aboutResult.data?.favorite_genres ?? []);
       setBio(aboutResult.data?.bio ?? "");
       setPublicNameChoice(aboutResult.data?.public_name_choice ?? "display_name");
-      setPublicLevel(aboutResult.data?.jlpt_level_public ?? "None");
+      setPublicLevel(aboutResult.data?.jlpt_level_public ?? null);
       setLoading(false);
     }
 
@@ -194,7 +194,7 @@ export default function ProfileEditor({ ownerId, isCurrentOwner, onCancel, onSav
         ...profileReadingLevelFields(japaneseLearningEnabled, level),
       }, {
         public_name_choice: publicNameChoice,
-        ...(japaneseLearningEnabled ? { jlpt_level_public: publicLevel === "None" ? null : publicLevel } : {}),
+        ...(japaneseLearningEnabled ? { jlpt_level_public: publicLevel } : {}),
         favorite_genres: cleanedGenres,
         bio: bio.trim(),
       }, id => activeRef.current && isCurrentOwner(id), () => {
@@ -261,7 +261,7 @@ export default function ProfileEditor({ ownerId, isCurrentOwner, onCancel, onSav
         showJapaneseReadingLevel={japaneseLearningEnabled}
         profileLevelOptions={PROFILE_LEVEL_OPTIONS}
         onPublicNameChoiceChange={setPublicNameChoice}
-        onPublicLevelChange={setPublicLevel}
+        onPublicLevelChange={(value) => setPublicLevel(value === "None" ? null : value)}
         favoriteGenres={favoriteGenres}
         favoriteGenreInput={favoriteGenreInput}
         bio={bio}

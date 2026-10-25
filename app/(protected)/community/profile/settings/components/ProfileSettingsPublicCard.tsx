@@ -1,3 +1,4 @@
+import { interpretPublicJapaneseLevel } from "@/lib/profile/publicJapaneseLevel";
 import { PROFILE_LEVEL_OPTIONS } from "@/lib/profileLevels";
 import FavoriteGenreEditor from "./FavoriteGenreEditor";
 import ProfileSettingsSectionLabel from "./ProfileSettingsSectionLabel";
@@ -11,7 +12,7 @@ type ProfileSettingsPublicCardProps = {
   displayName: string;
   username: string;
   chosenPublicName: string;
-  publicLevel: string;
+  publicLevel: string | null;
   favoriteGenres: string[];
   favoriteGenreInput: string;
   bio: string;
@@ -43,6 +44,7 @@ export default function ProfileSettingsPublicCard({
   onRemoveFavoriteGenre,
   onBioChange,
 }: ProfileSettingsPublicCardProps) {
+  const interpretedLevel = interpretPublicJapaneseLevel(publicLevel);
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
       <ProfileSettingsSectionLabel
@@ -82,16 +84,20 @@ export default function ProfileSettingsPublicCard({
 
         {showJapaneseReadingLevel ? (
           <div>
-            <label className="block text-sm font-medium text-stone-800">
+            <label htmlFor="public-japanese-level" className="block text-sm font-medium text-stone-800">
               Japanese reading level shown publicly
             </label>
 
             <select
               className="mt-1 w-full rounded-xl border px-3 py-2"
-              value={publicLevel}
+              id="public-japanese-level"
+              value={interpretedLevel.selectValue}
               onChange={(e) => onPublicLevelChange(e.target.value)}
             >
               <option value="None">Prefer not to share</option>
+              {interpretedLevel.kind === "legacy" ? (
+                <option value={interpretedLevel.selectValue}>{interpretedLevel.label}</option>
+              ) : null}
               {profileLevelOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.title} · {option.plain} ({option.cefr} · {option.jlpt})

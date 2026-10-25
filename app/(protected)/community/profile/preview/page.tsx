@@ -3,6 +3,7 @@
 
 "use client";
 
+import { interpretPublicJapaneseLevel } from "@/lib/profile/publicJapaneseLevel";
 import { useEffect, useMemo, useState } from "react";
 import { findMekuruReadingLevel } from "@/components/profile/MekuruReadingLevelGuide";
 import ProfileShell from "@/components/profile/ProfileShell";
@@ -221,7 +222,10 @@ export default function PublicProfilePreviewPage() {
       value: wantsJapaneseLearning(profile) ? "Japanese Study Tools" : "Reading Companion",
     },
   ];
-  const readingLevel = findMekuruReadingLevel(publicProfile?.jlpt_level_public);
+  const publicJapaneseLevel = interpretPublicJapaneseLevel(publicProfile?.jlpt_level_public);
+  const readingLevel = publicJapaneseLevel.kind === "current"
+    ? findMekuruReadingLevel(publicJapaneseLevel.selectValue)
+    : null;
   const readingModeLabel = wantsJapaneseLearning(profile)
     ? "Japanese Study Tools"
     : "Reading Companion";
@@ -253,7 +257,7 @@ export default function PublicProfilePreviewPage() {
               loading={loading}
               publicStats={publicStats}
               readingLevel={readingLevel}
-              fallbackLevelLabel={displayValue(publicProfile?.jlpt_level_public, "Hidden")}
+              fallbackLevelLabel={publicJapaneseLevel.label}
             />
 
             <ProfilePreviewAbilityColors
@@ -277,7 +281,7 @@ export default function PublicProfilePreviewPage() {
             <ProfilePreviewCurrentBooks books={currentBooks} />
 
             <ProfilePreviewDetailsGrid
-              publicLevelLabel={displayValue(publicProfile?.jlpt_level_public, "Hidden")}
+              publicLevelLabel={publicJapaneseLevel.label}
               favoriteGenres={favoriteGenres}
             />
           </div>

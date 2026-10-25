@@ -147,7 +147,7 @@ test('feature preservation, accurate wording, route compatibility and appearance
  assert.doesNotMatch(page+editor,/ProfileFavoriteBooks|is_favorite|not a public profile page/);
  assert.match(page,/href="\/books"/);assert.match(page,/router\.replace\("\/community\/profile", \{ scroll: false \}\)/);
  assert.match(read(profilePath+'settings/page.tsx'),/redirect\("\/community\/profile\?edit=1"\)/);
- assert.match(preview,/findMekuruReadingLevel\(publicProfile\?\.jlpt_level_public\)/);assert.doesNotMatch(preview,/findMekuruReadingLevel\(profile\?\.level\)|fallbackLevelLabel=\{displayValue\(profile\?\.level/);
+ assert.match(preview,/interpretPublicJapaneseLevel\(publicProfile\?\.jlpt_level_public\)/);assert.doesNotMatch(preview,/findMekuruReadingLevel\(profile\?\.level\)|fallbackLevelLabel=\{displayValue\(profile\?\.level/);
 });
 
 test('Production page/time/pace calculations remain unchanged with a complete >1000-session history',async()=>{
@@ -187,7 +187,7 @@ test('same-user refresh does not erase editor drafts; public-level hiding and ge
 });
 test('Cancel before Save performs no writes and public preview has no private-level fallback',async()=>{
  const db=fakeDatabase({profile:{...account},reader:{...reader}});let cancelled=0;const h=mount(profilePath+'ProfileEditor.tsx',db,{ownerId:'reader-a',isCurrentOwner:()=>true,onSaved(){},onCancel:()=>cancelled++});await h.flush();h.find('ProfileSettingsCoreCard').props.onDisplayNameChange('Unsaved');await h.flush();h.find('ProfileSettingsSaveBar').props.onCancel();assert.equal(cancelled,1);assert.equal(db.writes.length,0);h.unmount();
- const source=read(profilePath+'preview/page.tsx');assert.match(source,/fallbackLevelLabel=\{displayValue\(publicProfile\?\.jlpt_level_public, "Hidden"\)\}/);
+ const source=read(profilePath+'preview/page.tsx');assert.match(source,/fallbackLevelLabel=\{publicJapaneseLevel\.label\}/);
 });
 
 test('an account switch during an in-flight account write cannot publish success or start the reader write',async()=>{
@@ -217,4 +217,43 @@ test('preview failed color lookup is unavailable rather than a false zero',async
 test('late preview requests cannot publish after the owner changes',async()=>{
  const db=fakeDatabase({profile:{...account},reader:{...reader}});let current=true;
  const h=mount(profilePath+'preview/page.tsx',db,{}, {'@/lib/profile/useProfileOwner':{useProfileOwner:()=>({ownerId:'reader-a',isCurrentOwner:()=>current})},'@/lib/libraryStudyTotals':{fetchLibraryStudyColorTotals:async()=>({green:1,blue:2,purple:3})}});current=false;await h.flush();assert.equal(h.find('ProfilePreviewStatsGrid').props.loading,true);assert.equal(h.find('ProfilePreviewStatsGrid').props.readingLevel,null);h.unmount();
+});
+
+const {interpretPublicJapaneseLevel}=load('lib/profile/publicJapaneseLevel.ts');
+const publicLevelCases=[undefined,null,'','   ','None',' None ',...Array.from({length:10},(_,i)=>`Level ${i+1}`),' Level 8 ','advanced',' advanced '];
+for(const raw of publicLevelCases)test(`public level interpretation, selection, preservation and preview: ${JSON.stringify(raw)}`,async()=>{
+ const interpreted=interpretPublicJapaneseLevel(raw);
+ const trimmed=raw?.trim()??'';
+ const hidden=!trimmed||trimmed==='None';
+ const current=/^Level ([1-9]|10)$/.test(trimmed);
+ assert.equal(interpreted.kind,hidden?'hidden':current?'current':'legacy');
+ const db=fakeDatabase({profile:{...account},reader:{...reader,jlpt_level_public:raw}});
+ const h=mount(profilePath+'ProfileEditor.tsx',db,{ownerId:'reader-a',isCurrentOwner:()=>true,onSaved(){},onCancel(){}});await h.flush();
+ const card=h.find('ProfileSettingsPublicCard');
+ const rendered=card.type(card.props);
+ const select=walk(rendered).find(n=>n.type==='select'&&n.props.id==='public-japanese-level');
+ const options=walk(select).filter(n=>n.type==='option');
+ assert.equal(options.filter(n=>n.props.value===select.props.value).length,1);
+ assert.equal(select.props.value,interpreted.selectValue);
+ if(interpreted.kind==='legacy')assert.equal(options.find(n=>n.props.value===select.props.value).props.children,interpreted.label);
+ card.props.onBioChange('Unrelated edit');await h.flush();await h.find('ProfileSettingsSaveBar').props.onSave();await h.flush();
+ assert.equal(db.reader.jlpt_level_public,raw??null);
+ card.props.onPublicLevelChange('None');await h.flush();await h.find('ProfileSettingsSaveBar').props.onSave();await h.flush();assert.equal(db.reader.jlpt_level_public,null);h.unmount();
+ const previewDb=fakeDatabase({profile:{...account,level:'Level 10'},reader:{...reader,jlpt_level_public:raw}});
+ const preview=mount(profilePath+'preview/page.tsx',previewDb,{}, {'@/lib/profile/useProfileOwner':{useProfileOwner:()=>({ownerId:'reader-a',isCurrentOwner:()=>true})},'@/lib/libraryStudyTotals':{fetchLibraryStudyColorTotals:async()=>({green:0,blue:0,purple:0})}});await preview.flush();
+ assert.equal(preview.find('ProfilePreviewStatsGrid').props.readingLevel?.value??null,current?trimmed:null);
+ assert.equal(preview.find('ProfilePreviewStatsGrid').props.fallbackLevelLabel,interpreted.label);
+ assert.equal(preview.find('ProfilePreviewDetailsGrid').props.publicLevelLabel,interpreted.label);preview.unmount();
+});
+test('tools disabled hides public control and preserves legacy value without writing it',async()=>{
+ const db=fakeDatabase({profile:{...account},reader:{...reader,jlpt_level_public:' advanced '}});
+ const h=mount(profilePath+'ProfileEditor.tsx',db,{ownerId:'reader-a',isCurrentOwner:()=>true,onSaved(){},onCancel(){}});await h.flush();h.find('ProfileSettingsCoreCard').props.onJapaneseLearningEnabledChange(false);await h.flush();const card=h.find('ProfileSettingsPublicCard');
+ assert.equal(walk(card.type(card.props)).some(n=>n.props?.id==='public-japanese-level'),false);
+ await h.find('ProfileSettingsSaveBar').props.onSave();await h.flush();assert.equal('jlpt_level_public' in db.writes[1][1],false);assert.equal(db.reader.jlpt_level_public,' advanced ');h.unmount();
+});
+
+test('missing reader-profile record defaults to hidden without private-level fallback',async()=>{
+ const db=fakeDatabase({profile:{...account},reader:null});
+ const h=mount(profilePath+'ProfileEditor.tsx',db,{ownerId:'reader-a',isCurrentOwner:()=>true,onSaved(){},onCancel(){}});await h.flush();assert.equal(h.find('ProfileSettingsPublicCard').props.publicLevel,null);h.unmount();
+ const preview=mount(profilePath+'preview/page.tsx',db,{}, {'@/lib/profile/useProfileOwner':{useProfileOwner:()=>({ownerId:'reader-a',isCurrentOwner:()=>true})},'@/lib/libraryStudyTotals':{fetchLibraryStudyColorTotals:async()=>({green:0,blue:0,purple:0})}});await preview.flush();assert.equal(preview.find('ProfilePreviewStatsGrid').props.readingLevel,null);assert.equal(preview.find('ProfilePreviewDetailsGrid').props.publicLevelLabel,'Hidden');preview.unmount();
 });
