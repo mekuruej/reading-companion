@@ -4,6 +4,12 @@
 import { usePersonalVisibility } from "@/components/vocabulary/usePersonalVisibility";
 import WordContextFields from "@/components/vocabulary/WordContextFields";
 import { wordContextPayload, type WordContext } from "@/lib/vocabulary/wordContext";
+import {
+  compareVocabularyReadingOrder,
+  getAutomaticWordSectionOptions,
+  selectAutomaticWordSection,
+  shouldUseAutomaticWordSections,
+} from "@/lib/vocabulary/wordSections";
 import { loadAllPagedRows } from "@/lib/vocabulary/loadAllPagedRows";
 
 import { isReadyForFlashcards } from "@/lib/wordSupportEligibility";
@@ -347,6 +353,8 @@ function BookWordsPageContent() {
   const [exportJlpt, setExportJlpt] = useState("all");
   const [chapterFilter, setChapterFilter] = useState("all");
   const [chapterOptions, setChapterOptions] = useState<{ value: string; label: string }[]>([]);
+  const [wordSection, setWordSection] = useState("0");
+  useEffect(() => { setWordSection("0"); }, [userBookId]);
   const [showHidden, setShowHidden] = useState(false);
 
   const [editing, setEditing] = useState<WordRow | null>(null);
@@ -1125,28 +1133,28 @@ function BookWordsPageContent() {
     });
   }, [words, query, chapterFilter, showHidden]);
 
-  const filteredSorted = useMemo(() => {
-    return [...filtered].sort((a, b) => {
-      const aChapter = a.chapter_number ?? Number.MAX_SAFE_INTEGER;
-      const bChapter = b.chapter_number ?? Number.MAX_SAFE_INTEGER;
-      if (aChapter !== bChapter) return aChapter - bChapter;
-
-      const unitOrder = wordPosition(a).unit.localeCompare(wordPosition(b).unit);
-      if (unitOrder) return unitOrder;
-      const aPage = wordPosition(a).value ?? Number.MAX_SAFE_INTEGER;
-      const bPage = wordPosition(b).value ?? Number.MAX_SAFE_INTEGER;
-      if (aPage !== bPage) return aPage - bPage;
-
-      const aOrder = a.page_order ?? Number.MAX_SAFE_INTEGER;
-      const bOrder = b.page_order ?? Number.MAX_SAFE_INTEGER;
-      if (aOrder !== bOrder) return aOrder - bOrder;
-
-      const created = a.created_at.localeCompare(b.created_at);
-      if (created !== 0) return created;
-
-      return a.id.localeCompare(b.id);
-    });
-  }, [filtered]);
+  const filteredSorted = useMemo(
+    () => [...filtered].sort(compareVocabularyReadingOrder),
+    [filtered]
+  );
+  const hasChapterMetadata = words.some(
+    (word) => word.chapter_number != null || Boolean(word.chapter_name?.trim())
+  );
+  const automaticSectionsEnabled = shouldUseAutomaticWordSections(hasChapterMetadata, words.length);
+  const automaticSectionOptions = useMemo(
+    () => automaticSectionsEnabled ? getAutomaticWordSectionOptions(words.length) : undefined,
+    [automaticSectionsEnabled, words.length]
+  );
+  // Keep the native selector in sync when vocabulary shrinks below the chosen range.
+  const effectiveWordSection = automaticSectionOptions?.some((option) => option.value === wordSection)
+    ? wordSection
+    : automaticSectionOptions?.at(-1)?.value ?? "0";
+  const displayedWords = useMemo(
+    () => automaticSectionsEnabled
+      ? selectAutomaticWordSection(filteredSorted, effectiveWordSection, query.trim().length > 0)
+      : filteredSorted,
+    [automaticSectionsEnabled, filteredSorted, effectiveWordSection, query]
+  );
 
   const exportWords = useMemo(() => words.filter((word) => {
       const chapterMatches = exportChapter === "all" || chapterKey(word) === exportChapter;
@@ -1385,7 +1393,7 @@ function BookWordsPageContent() {
             bookTitle={bookTitle}
             bookCover={bookCover}
             totalCount={words.length}
-            visibleCount={filteredSorted.length}
+            visibleCount={displayedWords.length}
             bookHubHref={bookHubHref}
           />
 
@@ -1394,6 +1402,10 @@ function BookWordsPageContent() {
             showHidden={showHidden}
             chapterFilter={chapterFilter}
             chapterOptions={chapterOptions}
+            sectionOptions={automaticSectionOptions}
+            sectionFilter={effectiveWordSection}
+            searchCoversWholeBook={query.trim().length > 0}
+            onSectionFilterChange={setWordSection}
             onQueryChange={setQuery}
             onShowHiddenChange={setShowHidden}
             onChapterFilterChange={setChapterFilter}
@@ -1459,7 +1471,7 @@ function BookWordsPageContent() {
       <BookVocabReorderHint reordering={reordering} readOnly={!canUseVocabularyTools} />
 
       <div className="space-y-3 md:hidden">
-        {filteredSorted.map((w) => {
+        {displayedWords.map((w) => {
           const orderPosition = wordOrderPosition(w);
 
           return (
@@ -1498,7 +1510,7 @@ function BookWordsPageContent() {
           );
         })}
 
-        {filteredSorted.length === 0 ? (
+        {displayedWords.length === 0 ? (
           <div className="rounded-2xl border border-stone-200 bg-white p-4 text-sm text-stone-500">
             No words match your filters.
           </div>
@@ -1507,7 +1519,7 @@ function BookWordsPageContent() {
 
       <div className="hidden md:block">
         <BookVocabTableShell headerStickyStyle={headerStickyStyle} readOnly={!canUseVocabularyTools}>
-          {filteredSorted.map((w) => {
+          {displayedWords.map((w) => {
             const orderPosition = wordOrderPosition(w);
 
             return (
@@ -1546,7 +1558,7 @@ function BookWordsPageContent() {
             );
           })}
 
-          {filteredSorted.length === 0 ? <BookVocabEmptyRow /> : null}
+          {displayedWords.length === 0 ? <BookVocabEmptyRow /> : null}
         </BookVocabTableShell>
       </div>
       <BookVocabBackToTopButton />
