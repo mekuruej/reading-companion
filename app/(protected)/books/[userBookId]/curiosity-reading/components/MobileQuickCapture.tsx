@@ -1,4 +1,4 @@
-import type { KeyboardEvent, RefObject } from "react";
+import type { KeyboardEvent, RefObject, ReactNode } from "react";
 
 type MobileQuickCaptureCandidate = {
   id: string;
@@ -35,6 +35,8 @@ type MobileQuickCaptureProps = {
   savedNotice: string;
   canSaveWord: boolean;
   selectedCandidateId: string | null;
+  recognition?: ReactNode;
+  captureLocationFields?: ReactNode;
   candidates: MobileQuickCaptureCandidate[];
   lastAddedWord: MobileQuickCaptureWord | null;
   inputRef: RefObject<HTMLInputElement | null>;
@@ -66,6 +68,8 @@ export default function MobileQuickCapture({
   canSaveWord,
   selectedCandidateId,
   candidates,
+  recognition,
+  captureLocationFields,
   lastAddedWord,
   inputRef,
   onSurfaceChange,
@@ -121,6 +125,8 @@ export default function MobileQuickCapture({
             {quickError}
           </p>
         ) : null}
+
+        {recognition}
 
         {candidates.length > 0 ? (
           <div className="mt-3 max-h-44 space-y-2 overflow-y-auto pr-1">
@@ -209,7 +215,7 @@ export default function MobileQuickCapture({
           </div>
         ) : null}
 
-        {hasSelectedResult ? (
+        {captureLocationFields ?? (hasSelectedResult ? (
           <label className="mt-3 block rounded-2xl border border-stone-200 bg-white px-3 py-2 text-sm">
             <span className="mb-1 block text-xs font-black uppercase tracking-[0.12em] text-stone-400">
               {positionLabel}
@@ -223,7 +229,7 @@ export default function MobileQuickCapture({
               className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900"
             />
           </label>
-        ) : null}
+        ) : null)}
 
         {hasSelectedResult && canSaveWord ? (
           <button

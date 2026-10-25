@@ -44,6 +44,9 @@ import CuriosityPageHeader from "./components/CuriosityPageHeader";
 import CuriosityStatusMessage from "./components/CuriosityStatusMessage";
 import CuriosityBookContextCard from "./components/CuriosityBookContextCard";
 import CuriosityDictionaryChoices from "./components/CuriosityDictionaryChoices";
+import { rememberedCaptureContext, vocabularyCaptureContext, restoreCaptureContext } from "@/lib/vocabulary/curiosityCaptureContext";
+import WordPositionField from "@/components/vocabulary/WordPositionField";
+import ChapterNameCombobox from "@/components/ChapterNameCombobox";
 import PersonalVocabularyResults from "@/components/vocabulary/PersonalVocabularyResults";
 import {
   searchPersonalVocabulary,
@@ -405,11 +408,22 @@ function CuriosityReadingContent({
   const quickLookupVersion = useRef(0);
   useEffect(() => () => { quickLookupVersion.current += 1; }, [userBookId, studentContext?.studentId, isListeningMode]);
   const [quickPreview, setQuickPreview] = useState<QuickPreview>(() => makeBlankQuickPreview());
+  const captureContextEdited = useRef(false);
+  const [captureContextReady, setCaptureContextReady] = useState(false);
+  function editQuickContext(update: Parameters<typeof setQuickPreview>[0]) {
+    captureContextEdited.current = true;
+    setQuickPreview(update);
+  }
   const positionUnit = quickPreview.id ? quickPreview.positionUnit ?? "page" : tracking.method ?? "page";
   useEffect(() => {
     if (!tracking.loaded) return;
-    setQuickPreview(prev => prev.id || prev.positionUnit === (tracking.method ?? "page") ? prev : { ...prev, page: "", positionUnit: tracking.method ?? "page" });
-  }, [tracking.loaded, tracking.method, tracking.timersEnabled]);
+    setQuickPreview(prev => {
+      const unit = tracking.method ?? "page";
+      if (prev.id || prev.positionUnit === unit) return prev;
+      if (!isListeningMode && !prev.positionUnit && captureContextEdited.current) return { ...prev, positionUnit: unit };
+      return { ...prev, page: "", positionUnit: unit, ...(!isListeningMode ? { chapterNumber: "", chapterName: "" } : {}) };
+    });
+  }, [tracking.loaded, tracking.method, tracking.timersEnabled, isListeningMode]);
   const [quickSessionWords, setQuickSessionWords] = useState<QuickSessionWord[]>([]);
   const [chapterNameOptions, setChapterNameOptions] = useState<string[]>([]);
   const [chapterNumberByName, setChapterNumberByName] = useState<Record<string, string>>({});
@@ -496,6 +510,7 @@ function CuriosityReadingContent({
       }
 
       const parsed = JSON.parse(raw);
+      if (!isListeningMode) return rememberedCaptureContext(parsed, tracking.method ?? "page") ?? { page: "", positionUnit: tracking.method ?? "page", chapterNumber: "", chapterName: "" };
       return {
         page: stickyWordPosition(parsed.page, parsed.positionUnit, tracking.method ?? "page"),
         positionUnit: tracking.method ?? "page",
@@ -505,7 +520,7 @@ function CuriosityReadingContent({
     } catch {
       return { page: "", positionUnit: tracking.method ?? "page", chapterNumber: "", chapterName: "" };
     }
-  }, [quickMetaStorageKey, tracking.method]);
+  }, [quickMetaStorageKey, tracking.method, isListeningMode]);
 
   const saveQuickMeta = useCallback((meta: { positionUnit?: ProgressTrackingMethod; page: string; chapterNumber: string; chapterName: string }) => {
     if (typeof window === "undefined") return;
@@ -684,7 +699,7 @@ function CuriosityReadingContent({
   }, [fullAccessFeature, userBookId]);
 
   useEffect(() => {
-    if (!tracking.loaded || quickPreview.positionUnit !== positionUnit) return;
+    if (!tracking.loaded || quickPreview.positionUnit !== positionUnit || (!isListeningMode && !captureContextReady)) return;
 
     const meta = {
       page: positionUnit === (tracking.method ?? "page") ? quickPreview.page : "",
@@ -696,10 +711,10 @@ function CuriosityReadingContent({
     const hasAnyLocation =
       meta.page.trim() || meta.chapterNumber.trim() || meta.chapterName.trim();
 
-    if (!hasAnyLocation) return;
+    if (!hasAnyLocation && isListeningMode) return;
 
     saveQuickMeta(meta);
-  }, [quickPreview, positionUnit, tracking.loaded, tracking.method, saveQuickMeta]);
+  }, [quickPreview, positionUnit, tracking.loaded, tracking.method, saveQuickMeta, isListeningMode, captureContextReady]);
 
   useEffect(() => {
     onReadingJournalContextChange?.({
@@ -716,7 +731,7 @@ function CuriosityReadingContent({
   ]);
 
   useEffect(() => {
-    if (!tracking.loaded || quickPreview.id) return;
+    if (!isListeningMode || !tracking.loaded || quickPreview.id) return;
 
     const savedMeta = getSavedQuickMeta();
     if (savedMeta.chapterName) {
@@ -750,7 +765,39 @@ function CuriosityReadingContent({
         chapterName: shouldFillChapterName ? savedMeta.chapterName : prev.chapterName,
       };
     });
-  }, [quickPreview, getSavedQuickMeta, tracking.loaded, tracking.method]);
+  }, [quickPreview, getSavedQuickMeta, tracking.loaded, tracking.method, isListeningMode]);
+
+  useEffect(() => {
+    if (isListeningMode || !tracking.loaded || !userBookId || !canAccessBook) return;
+    let cancelled = false;
+    setCaptureContextReady(false);
+    async function restoreRememberedCapture() {
+      const unit = tracking.method ?? "page";
+      let remembered = rememberedCaptureContext(getSavedQuickMeta(), unit);
+      try {
+        // Explicit browser-local capture state wins over unrelated progress/history.
+        if (!remembered && !studentContext && !captureContextEdited.current) {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (cancelled || captureContextEdited.current) return;
+          if (user) {
+            const { data, error } = await supabase.from("finalized_user_book_words")
+              .select("position_unit, position_value, page_number, percent_location, chapter_number, chapter_name, user_books!inner(user_id)")
+              .eq("user_book_id", userBookId).eq("user_books.user_id", user.id)
+              .order("created_at", { ascending: false, nullsFirst: false })
+              .order("id", { ascending: true }).limit(1);
+            if (!error) remembered = vocabularyCaptureContext(data?.[0] ?? null, unit);
+          }
+        }
+        if (!cancelled) setQuickPreview(current => restoreCaptureContext(current, remembered, captureContextEdited.current));
+      } catch {
+        // Restoration is optional. Never guess a location after a failed lookup.
+      } finally {
+        if (!cancelled) setCaptureContextReady(true);
+      }
+    }
+    void restoreRememberedCapture();
+    return () => { cancelled = true; };
+  }, [isListeningMode, tracking.loaded, tracking.method, userBookId, canAccessBook, getSavedQuickMeta, studentContext]);
 
   useEffect(() => {
     if (!userBookId || !canAccessBook) {
@@ -1125,7 +1172,10 @@ function CuriosityReadingContent({
       chapterNumber: quickPreview.chapterNumber,
       chapterName: quickPreview.chapterName,
     };
-    setQuickPreview(makeBlankQuickPreview(meta));
+    setQuickPreview(current => makeBlankQuickPreview(isListeningMode || current.id ? meta : {
+      page: current.page, positionUnit: current.positionUnit,
+      chapterNumber: current.chapterNumber, chapterName: current.chapterName,
+    }));
     setEnglishItemType("word");
     setHideKanjiInReadingSupport(false);
     setQuickError(null);
@@ -1279,7 +1329,8 @@ function CuriosityReadingContent({
 
       const savedMeta = getSavedQuickMeta();
 
-      setQuickPreview({
+      setQuickPreview((current) => ({
+        ...current,
         id: null,
         surface: first.surface,
         cacheSurface: first.cacheSurface,
@@ -1290,12 +1341,12 @@ function CuriosityReadingContent({
         isCustomMeaning: first.isCustomMeaning,
 
         alternateSurface: "",
-        page: savedMeta.page,
-        positionUnit: savedMeta.positionUnit,
-        chapterNumber: savedMeta.chapterNumber,
-        chapterName: savedMeta.chapterName,
+        page: isListeningMode ? savedMeta.page : current.page,
+        positionUnit: isListeningMode ? savedMeta.positionUnit : current.positionUnit,
+        chapterNumber: isListeningMode ? savedMeta.chapterNumber : current.chapterNumber,
+        chapterName: isListeningMode ? savedMeta.chapterName : current.chapterName,
         pageOrder: null,
-      });
+      }));
       setQuickLookupCandidates(candidates);
       setSelectedQuickLookupCandidateId(null);
       setMessage(
@@ -2256,7 +2307,7 @@ function CuriosityReadingContent({
                 source={quickPreview.surface}
                 support={quickPreview.meaning}
                 positionUnit={positionUnit}
-                onPositionUnitChange={(unit) => setQuickPreview(prev => ({ ...prev, positionUnit: unit }))}
+                onPositionUnitChange={(unit) => editQuickContext(prev => ({ ...prev, positionUnit: unit }))}
                 pageNumber={quickPreview.page}
                 chapterNumber={quickPreview.chapterNumber}
                 chapterName={quickPreview.chapterName}
@@ -2291,13 +2342,13 @@ function CuriosityReadingContent({
                   setSavedQuickNotice("");
                 }}
                 onPageNumberChange={(value) =>
-                  setQuickPreview((prev) => ({ ...prev, page: value }))
+                  editQuickContext((prev) => ({ ...prev, page: value }))
                 }
                 onChapterNumberChange={(value) =>
-                  setQuickPreview((prev) => ({ ...prev, chapterNumber: value }))
+                  editQuickContext((prev) => ({ ...prev, chapterNumber: value }))
                 }
                 onChapterNameChange={(value) =>
-                  setQuickPreview((prev) => {
+                  editQuickContext((prev) => {
                     const knownChapterNumber = chapterNumberByName[value.trim()];
                     return {
                       ...prev,
@@ -2336,6 +2387,30 @@ function CuriosityReadingContent({
               (quickPreview.cacheSurface.trim() && quickPreview.meaning.trim() && !quickPreview.isCustomMeaning)
             )}
             selectedCandidateId={selectedQuickLookupCandidateId ?? selectedPersonalEntryKey}
+            recognition={!isListeningMode && !studentContext && personalVocabularyMatches.some(entry => !dismissedPersonalEntries.includes(personalVocabularyEntryKey(entry))) ? (
+              <PersonalVocabularyResults
+                dismissedKeys={dismissedPersonalEntries}
+                onDismiss={(entry) => setDismissedPersonalEntries(current => [...new Set([...current, personalVocabularyEntryKey(entry)])])}
+                entries={personalVocabularyMatches}
+                searched={personalVocabularySearched}
+                loading={personalVocabularyLoading}
+                error={personalVocabularyError}
+                saving={quickSaving}
+                onSelect={(entry) => void savePersonalQuickWord(entry)}
+              />
+            ) : null}
+            captureLocationFields={!isListeningMode ? (
+              <div className="mt-3 grid gap-3 rounded-2xl border border-stone-200 bg-white p-3">
+                <WordPositionField value={quickPreview.page} unit={positionUnit} onChange={value => editQuickContext(current => ({ ...current, page: value }))} />
+                <ChapterNameCombobox value={quickPreview.chapterName} chapterOptions={sortedChapterNameOptions} onChange={value => editQuickContext(current => ({
+                  ...current, chapterName: value, chapterNumber: chapterNumberByName[value.trim()] || current.chapterNumber,
+                }))} />
+                <label className="block text-sm font-medium text-stone-700">
+                  Chapter number
+                  <input value={quickPreview.chapterNumber} onChange={event => editQuickContext(current => ({ ...current, chapterNumber: event.target.value }))} placeholder="Chapter #" className="mt-1 w-full rounded border bg-white px-3 py-2 text-sm" />
+                </label>
+              </div>
+            ) : undefined}
             candidates={quickLookupCandidates}
             lastAddedWord={quickSessionWords[0] ?? null}
             inputRef={quickWordInputRef}
@@ -2398,7 +2473,7 @@ function CuriosityReadingContent({
               }))
             }
             onPositionChange={(value) =>
-              setQuickPreview((prev) => ({
+              editQuickContext((prev) => ({
                 ...prev,
                 page: value,
               }))
@@ -2406,18 +2481,7 @@ function CuriosityReadingContent({
             onSaveWord={() => void saveQuickWord({ requireSelectedLookup: true })}
             onDeleteLastWord={(id) => void deleteQuickWordById(id)}
           />
-          {!isListeningMode && !studentContext ? (
-            <PersonalVocabularyResults
-              dismissedKeys={dismissedPersonalEntries}
-              onDismiss={(entry) => setDismissedPersonalEntries(current => [...new Set([...current, personalVocabularyEntryKey(entry)])])}
-              entries={personalVocabularyMatches}
-              searched={personalVocabularySearched}
-              loading={personalVocabularyLoading}
-              error={personalVocabularyError}
-              saving={quickSaving}
-              onSelect={(entry) => void savePersonalQuickWord(entry)}
-            />
-          ) : null}
+
           </>
         )}
       </div>
@@ -2453,7 +2517,7 @@ function CuriosityReadingContent({
                   source={quickPreview.surface}
                   support={quickPreview.meaning}
                   positionUnit={positionUnit}
-                  onPositionUnitChange={(unit) => setQuickPreview(prev => ({ ...prev, positionUnit: unit }))}
+                  onPositionUnitChange={(unit) => editQuickContext(prev => ({ ...prev, positionUnit: unit }))}
                   pageNumber={quickPreview.page}
                   chapterNumber={quickPreview.chapterNumber}
                   chapterName={quickPreview.chapterName}
@@ -2488,13 +2552,13 @@ function CuriosityReadingContent({
                     setSavedQuickNotice("");
                   }}
                   onPageNumberChange={(value) =>
-                    setQuickPreview((prev) => ({ ...prev, page: value }))
+                    editQuickContext((prev) => ({ ...prev, page: value }))
                   }
                   onChapterNumberChange={(value) =>
-                    setQuickPreview((prev) => ({ ...prev, chapterNumber: value }))
+                    editQuickContext((prev) => ({ ...prev, chapterNumber: value }))
                   }
                   onChapterNameChange={(value) =>
-                    setQuickPreview((prev) => {
+                    editQuickContext((prev) => {
                       const knownChapterNumber = chapterNumberByName[value.trim()];
                       return {
                         ...prev,
@@ -2559,6 +2623,18 @@ function CuriosityReadingContent({
                   />
 
                   <CuriosityQuickErrorMessage message={quickError} />
+                  {!isListeningMode && !studentContext && personalVocabularyMatches.some(entry => !dismissedPersonalEntries.includes(personalVocabularyEntryKey(entry))) ? (
+                    <PersonalVocabularyResults
+                      dismissedKeys={dismissedPersonalEntries}
+                      onDismiss={(entry) => setDismissedPersonalEntries(current => [...new Set([...current, personalVocabularyEntryKey(entry)])])}
+                      entries={personalVocabularyMatches}
+                      searched={personalVocabularySearched}
+                      loading={personalVocabularyLoading}
+                      error={personalVocabularyError}
+                      saving={quickSaving}
+                      onSelect={(entry) => void savePersonalQuickWord(entry)}
+                    />
+                  ) : null}
                   <CuriosityDictionaryChoices
                     surface={quickPreview.surface}
                     candidates={quickLookupCandidates}
@@ -2582,18 +2658,7 @@ function CuriosityReadingContent({
                       jumpToQuickWordFields();
                     }}
                   />
-                  {!isListeningMode && !studentContext ? (
-                    <PersonalVocabularyResults
-                      dismissedKeys={dismissedPersonalEntries}
-                      onDismiss={(entry) => setDismissedPersonalEntries(current => [...new Set([...current, personalVocabularyEntryKey(entry)])])}
-                      entries={personalVocabularyMatches}
-                      searched={personalVocabularySearched}
-                      loading={personalVocabularyLoading}
-                      error={personalVocabularyError}
-                      saving={quickSaving}
-                      onSelect={(entry) => void savePersonalQuickWord(entry)}
-                    />
-                  ) : null}
+
 
                   <CuriosityWordDetailFields
                     listening={isListeningMode}
@@ -2634,13 +2699,13 @@ function CuriosityReadingContent({
                       }))
                     }
                     onPageChange={(value) =>
-                      setQuickPreview((prev) => ({ ...prev, page: value }))
+                      editQuickContext((prev) => ({ ...prev, page: value }))
                     }
                     onChapterNumberChange={(value) =>
-                      setQuickPreview((prev) => ({ ...prev, chapterNumber: value }))
+                      editQuickContext((prev) => ({ ...prev, chapterNumber: value }))
                     }
                     onChapterNameChange={(value) =>
-                      setQuickPreview((prev) => {
+                      editQuickContext((prev) => {
                         const knownChapterNumber = chapterNumberByName[value.trim()];
                         return {
                           ...prev,
@@ -2652,7 +2717,7 @@ function CuriosityReadingContent({
                     onSaveWord={() => void saveQuickWord()}
                     onClearWordFields={() => clearQuickWordFields()}
                     positionUnit={positionUnit}
-                    onPositionUnitChange={(unit) => setQuickPreview(prev => ({ ...prev, positionUnit: unit }))}
+                    onPositionUnitChange={(unit) => editQuickContext(prev => ({ ...prev, positionUnit: unit }))}
                     saveAreaWarning={
                       isRunning || isPaused
                         ? "Timer is active. If you leave or refresh the page, you may lose your session."
