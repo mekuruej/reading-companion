@@ -24,6 +24,7 @@ type MobileQuickCaptureProps = {
   surface: string;
   reading: string;
   meaning: string;
+  isPersonalEntry?: boolean;
   meanings: string[];
   selectedMeaningIndex: number;
   positionLabel: string;
@@ -38,6 +39,8 @@ type MobileQuickCaptureProps = {
   lastAddedWord: MobileQuickCaptureWord | null;
   inputRef: RefObject<HTMLInputElement | null>;
   onSurfaceChange: (value: string) => void;
+  onReadingChange?: (value: string) => void;
+  onMeaningChange?: (value: string) => void;
   onSearch: () => void;
   onSearchKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
   onSelectCandidate: (candidate: MobileQuickCaptureCandidate) => void;
@@ -50,6 +53,9 @@ export default function MobileQuickCapture({
   title,
   description,
   surface,
+  reading,
+  meaning,
+  isPersonalEntry = false,
   meanings,
   selectedMeaningIndex,
   positionLabel,
@@ -63,6 +69,8 @@ export default function MobileQuickCapture({
   lastAddedWord,
   inputRef,
   onSurfaceChange,
+  onReadingChange,
+  onMeaningChange,
   onSearch,
   onSearchKeyDown,
   onSelectCandidate,
@@ -177,6 +185,28 @@ export default function MobileQuickCapture({
               ))}
             </select>
           </label>
+        ) : null}
+
+        {isPersonalEntry ? (
+          <div className="mt-3 grid gap-2 rounded-2xl border border-violet-200 bg-violet-50 p-3">
+            <label className="block text-sm font-semibold text-stone-700">
+              Reading
+              <input
+                value={reading}
+                onChange={(event) => onReadingChange?.(event.target.value)}
+                className="mt-1 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="block text-sm font-semibold text-stone-700">
+              Meaning
+              <textarea
+                value={meaning}
+                onChange={(event) => onMeaningChange?.(event.target.value)}
+                rows={2}
+                className="mt-1 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm"
+              />
+            </label>
+          </div>
         ) : null}
 
         {hasSelectedResult ? (

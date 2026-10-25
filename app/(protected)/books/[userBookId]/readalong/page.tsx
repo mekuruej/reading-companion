@@ -2,6 +2,8 @@
 // 
 
 "use client";
+import PersonalVocabularyResults from "@/components/vocabulary/PersonalVocabularyResults";
+import { searchPersonalVocabulary, personalVocabularyEntryKey, type PersonalVocabularyMatch } from "@/lib/personalVocabularySearch";
 import { loadAllPagedRows } from "@/lib/vocabulary/loadAllPagedRows";
 import { usePersonalVisibility } from "@/components/vocabulary/usePersonalVisibility";
 import VocabularyProgressPrompt from "@/components/books/VocabularyProgressPrompt";
@@ -96,6 +98,11 @@ type AddAfterDraft = {
     lookupLoading: boolean;
     saving: boolean;
     message: string;
+    personalEntries: PersonalVocabularyMatch[];
+    personalLookupLoading: boolean;
+    personalLookupSearched: boolean;
+    personalLookupError: string | null;
+    selectedPersonalEntry: boolean;
 };
 
 type SupportMode = "full" | "reading" | "meaning";
@@ -286,6 +293,11 @@ function makeBlankAddAfterDraft(word = ""): AddAfterDraft {
         lookupLoading: false,
         saving: false,
         message: "",
+        personalEntries: [],
+        personalLookupLoading: false,
+        personalLookupSearched: false,
+        personalLookupError: null,
+        selectedPersonalEntry: false,
     };
 }
 
@@ -392,6 +404,11 @@ function ReadAlongContent() {
     const [addAfterDraft, setAddAfterDraft] = useState<AddAfterDraft>(() =>
         makeBlankAddAfterDraft()
     );
+    const [dismissedPersonalEntries, setDismissedPersonalEntries] = useState<string[]>([]);
+    useEffect(() => { setDismissedPersonalEntries([]); }, [activeAddAfterWordId, userBookId]);
+    const personalLookupVersion = useRef(0);
+    const canSearchPersonalVocabulary = ownsBook && !searchParams.has("studentId") && !searchParams.has("sourceUserBookId");
+    useEffect(() => () => { personalLookupVersion.current += 1; }, [userBookId, canSearchPersonalVocabulary]);
 
     const [pageIndex, setPageIndex] = useState(0);
     const [jumpPageInput, setJumpPageInput] = useState("");
@@ -1435,6 +1452,8 @@ function ReadAlongContent() {
     }
 
     function openAddAfter(word: ReadAlongWord, placement: AddWordPlacement) {
+        personalLookupVersion.current += 1;
+        setDismissedPersonalEntries([]);
         setAddPosition({ unit: newWordUnit, value: wordPosition(word).unit === newWordUnit ? wordPositionInput(word) : "" });
         setActiveAddAfterWordId((current) => {
             if (current === word.id && activeAddPlacement === placement) {
@@ -1449,6 +1468,8 @@ function ReadAlongContent() {
     }
 
     function openEmptyPageAddWord() {
+        personalLookupVersion.current += 1;
+        setDismissedPersonalEntries([]);
         if (!emptyPageAddWordKey) return;
         setAddPosition({ unit: newWordUnit, value: currentPage?.positionUnit === newWordUnit ? String(currentPage.pageNumber ?? "") : "" });
 
@@ -1465,8 +1486,11 @@ function ReadAlongContent() {
     }
 
     function applyAddAfterCandidate(candidate: JishoCandidate) {
+        personalLookupVersion.current += 1;
         setAddAfterDraft((current) => ({
             ...current,
+            lookupLoading: false,
+            personalLookupLoading: false,
             word: candidate.surface,
             reading: candidate.reading,
             meaning: candidate.defaultMeaning,
@@ -1474,6 +1498,7 @@ function ReadAlongContent() {
             isCommon: candidate.isCommon,
             meaningChoices: candidate.meaningChoices,
             meaningChoiceIndex: candidate.meaningChoices.length > 0 ? 0 : null,
+            selectedPersonalEntry: false,
             message: "",
         }));
     }
@@ -1487,6 +1512,7 @@ function ReadAlongContent() {
     }
 
     async function lookupAddAfterWord() {
+        const lookupVersion = ++personalLookupVersion.current;
         const parsedPosition = parseWordPosition(newWordPosition, newWordUnit);
         if (parsedPosition.error) { setAddAfterDraft(current => ({ ...current, message: parsedPosition.error ?? "Invalid position" })); return; }
 
@@ -1495,6 +1521,8 @@ function ReadAlongContent() {
         if (!cleanWord) {
             setAddAfterDraft((current) => ({
                 ...current,
+                lookupLoading: false,
+                personalLookupLoading: false,
                 message: "Enter a word first.",
             }));
             return;
@@ -1503,6 +1531,11 @@ function ReadAlongContent() {
         setAddAfterDraft((current) => ({
             ...current,
             lookupLoading: true,
+            personalEntries: [],
+            personalLookupLoading: false,
+            personalLookupSearched: false,
+            personalLookupError: null,
+            selectedPersonalEntry: false,
             message: "",
         }));
 
@@ -1511,12 +1544,41 @@ function ReadAlongContent() {
                 data: { session },
             } = await supabase.auth.getSession();
 
+            if (lookupVersion !== personalLookupVersion.current) return;
+            if (canSearchPersonalVocabulary) {
+                setAddAfterDraft((current) => ({
+                    ...current,
+                    personalLookupLoading: true,
+                    personalLookupSearched: true,
+                }));
+                void searchPersonalVocabulary(cleanWord, session?.access_token, userBookId)
+                    .then((entries) => {
+                        if (lookupVersion !== personalLookupVersion.current) return;
+                        setAddAfterDraft((current) => ({ ...current, personalEntries: entries }));
+                    })
+                    .catch((searchError) => {
+                        if (lookupVersion !== personalLookupVersion.current) return;
+                        setAddAfterDraft((current) => ({
+                            ...current,
+                            personalLookupError: searchError instanceof Error
+                                ? searchError.message
+                                : "Could not search your saved entries.",
+                        }));
+                    })
+                    .finally(() => {
+                        if (lookupVersion === personalLookupVersion.current) {
+                            setAddAfterDraft((current) => ({ ...current, personalLookupLoading: false }));
+                        }
+                    });
+            }
+
             const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(cleanWord)}`, {
                 headers: session?.access_token
                     ? { Authorization: `Bearer ${session.access_token}` }
                     : undefined,
             });
 
+            if (lookupVersion !== personalLookupVersion.current) return;
             if (!res.ok) {
                 setAddAfterDraft((current) => ({
                     ...current,
@@ -1527,6 +1589,7 @@ function ReadAlongContent() {
             }
 
             const data = await res.json();
+            if (lookupVersion !== personalLookupVersion.current) return;
             const candidates = buildJishoCandidates(data?.data ?? [], cleanWord);
             const first = candidates[0];
 
@@ -1561,6 +1624,7 @@ function ReadAlongContent() {
                         : "Dictionary loaded.",
             }));
         } catch (error) {
+            if (lookupVersion !== personalLookupVersion.current) return;
             console.error("Follow-Along add-after lookup error:", error);
             setAddAfterDraft((current) => ({
                 ...current,
@@ -1568,11 +1632,31 @@ function ReadAlongContent() {
                 message: "Could not load dictionary data. You can enter it manually.",
             }));
         } finally {
-            setAddAfterDraft((current) => ({
+            if (lookupVersion === personalLookupVersion.current) setAddAfterDraft((current) => ({
                 ...current,
                 lookupLoading: false,
             }));
         }
+    }
+
+    function applyPersonalAddAfterEntry(entry: PersonalVocabularyMatch) {
+        personalLookupVersion.current += 1;
+        setAddAfterDraft((current) => ({
+            ...current,
+            lookupLoading: false,
+            personalLookupLoading: false,
+            personalLookupError: null,
+            word: entry.surface,
+            reading: entry.reading,
+            meaning: entry.meaning,
+            jlpt: "NON-JLPT",
+            isCommon: false,
+            meaningChoices: [],
+            meaningChoiceIndex: null,
+            candidates: [],
+            selectedPersonalEntry: true,
+            message: "Selected your saved entry. Review it before saving.",
+        }));
     }
 
     async function renumberGroupWithInsertedWord(
@@ -1675,7 +1759,7 @@ function ReadAlongContent() {
                     candidate.meaningChoices.length > 0
             );
 
-            if (hasKanji(cleanWord) && cleanReading) {
+            if (!addAfterDraft.selectedPersonalEntry && hasKanji(cleanWord) && cleanReading) {
                 const { data: existingCache, error: cacheLookupError } = await supabase
                     .from("vocabulary_cache")
                     .select("id, jlpt, is_common")
@@ -1815,6 +1899,7 @@ function ReadAlongContent() {
                 await generateVocabularyKanjiMap(vocabularyCacheId);
             }
 
+            personalLookupVersion.current += 1;
             setActiveAddAfterWordId(null);
             setActiveAddPlacement("after");
             setAddAfterDraft(makeBlankAddAfterDraft());
@@ -1877,7 +1962,7 @@ function ReadAlongContent() {
                     candidate.meaningChoices.length > 0
             );
 
-            if (hasKanji(cleanWord) && cleanReading) {
+            if (!addAfterDraft.selectedPersonalEntry && hasKanji(cleanWord) && cleanReading) {
                 const { data: existingCache, error: cacheLookupError } = await supabase
                     .from("vocabulary_cache")
                     .select("id, jlpt, is_common")
@@ -2021,6 +2106,7 @@ function ReadAlongContent() {
                 await generateVocabularyKanjiMap(vocabularyCacheId);
             }
 
+            personalLookupVersion.current += 1;
             setActiveAddAfterWordId(null);
             setActiveAddPlacement("after");
             setAddAfterDraft(makeBlankAddAfterDraft());
@@ -2065,16 +2151,24 @@ function ReadAlongContent() {
                 <div className="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                     <input
                         value={addAfterDraft.word}
-                        onChange={(event) =>
+                        onChange={(event) => {
+                            personalLookupVersion.current += 1;
+                            setDismissedPersonalEntries([]);
                             setAddAfterDraft((current) => ({
                                 ...current,
                                 word: event.target.value,
+                                lookupLoading: false,
                                 candidates: [],
                                 meaningChoices: [],
                                 meaningChoiceIndex: null,
+                                personalEntries: [],
+                                personalLookupLoading: false,
+                                personalLookupSearched: false,
+                                personalLookupError: null,
+                                selectedPersonalEntry: false,
                                 message: "",
-                            }))
-                        }
+                            }));
+                        }}
                         onKeyDown={(event) => {
                             if (event.key === "Enter") {
                                 event.preventDefault();
@@ -2115,6 +2209,19 @@ function ReadAlongContent() {
                             ))}
                         </select>
                     </label>
+                ) : null}
+
+                {canSearchPersonalVocabulary ? (
+                    <PersonalVocabularyResults
+                        dismissedKeys={dismissedPersonalEntries}
+                        showPreviousLocation={false}
+                        onDismiss={(entry) => setDismissedPersonalEntries(current => [...new Set([...current, personalVocabularyEntryKey(entry)])])}
+                        entries={addAfterDraft.personalEntries}
+                        searched={addAfterDraft.personalLookupSearched}
+                        loading={addAfterDraft.personalLookupLoading}
+                        error={addAfterDraft.personalLookupError}
+                        onSelect={applyPersonalAddAfterEntry}
+                    />
                 ) : null}
 
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -2191,6 +2298,7 @@ function ReadAlongContent() {
                     <button
                         type="button"
                         onClick={() => {
+                            personalLookupVersion.current += 1;
                             setActiveAddAfterWordId(null);
                             setActiveAddPlacement("after");
                             setAddAfterDraft(makeBlankAddAfterDraft());

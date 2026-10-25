@@ -44,6 +44,12 @@ import CuriosityPageHeader from "./components/CuriosityPageHeader";
 import CuriosityStatusMessage from "./components/CuriosityStatusMessage";
 import CuriosityBookContextCard from "./components/CuriosityBookContextCard";
 import CuriosityDictionaryChoices from "./components/CuriosityDictionaryChoices";
+import PersonalVocabularyResults from "@/components/vocabulary/PersonalVocabularyResults";
+import {
+  searchPersonalVocabulary,
+  personalVocabularyEntryKey,
+  type PersonalVocabularyMatch,
+} from "@/lib/personalVocabularySearch";
 import CuriosityRecentSessionWordCard from "./components/CuriosityRecentSessionWordCard";
 import CuriosityRecentSessionWords from "./components/CuriosityRecentSessionWords";
 import CuriosityFullAccessRequired from "./components/CuriosityFullAccessRequired";
@@ -395,6 +401,7 @@ function CuriosityReadingContent({
   const [kanjiLookupResetKey, setKanjiLookupResetKey] = useState(0);
 
   const quickLookupVersion = useRef(0);
+  useEffect(() => () => { quickLookupVersion.current += 1; }, [userBookId, studentContext?.studentId, isListeningMode]);
   const [quickPreview, setQuickPreview] = useState<QuickPreview>(() => makeBlankQuickPreview());
   const positionUnit = quickPreview.id ? quickPreview.positionUnit ?? "page" : tracking.method ?? "page";
   useEffect(() => {
@@ -410,6 +417,12 @@ function CuriosityReadingContent({
   const [quickLookupCandidates, setQuickLookupCandidates] = useState<QuickLookupCandidate[]>([]);
   const [selectedQuickLookupCandidateId, setSelectedQuickLookupCandidateId] =
     useState<string | null>(null);
+  const [personalVocabularyMatches, setPersonalVocabularyMatches] = useState<PersonalVocabularyMatch[]>([]);
+  const [personalVocabularyLoading, setPersonalVocabularyLoading] = useState(false);
+  const [personalVocabularySearched, setPersonalVocabularySearched] = useState(false);
+  const [personalVocabularyError, setPersonalVocabularyError] = useState<string | null>(null);
+  const [dismissedPersonalEntries, setDismissedPersonalEntries] = useState<string[]>([]);
+  const [selectedPersonalEntryKey, setSelectedPersonalEntryKey] = useState<string | null>(null);
   const [savedQuickNotice, setSavedQuickNotice] = useState("");
   const [lastSavedWordContext, setLastSavedWordContext] =
     useState<LastSavedWordContext | null>(null);
@@ -1098,10 +1111,12 @@ function CuriosityReadingContent({
   function invalidateQuickLookup() {
     quickLookupVersion.current += 1;
     setQuickLoading(false);
+    setPersonalVocabularyLoading(false);
   }
 
   function clearQuickWordFields(options: { preserveSavedNotice?: boolean } = {}) {
     invalidateQuickLookup();
+    setDismissedPersonalEntries([]);
     const meta = {
       page: positionUnit === (tracking.method ?? "page") ? quickPreview.page : "",
       positionUnit: tracking.method ?? "page",
@@ -1114,6 +1129,11 @@ function CuriosityReadingContent({
     setQuickError(null);
     setQuickLookupCandidates([]);
     setSelectedQuickLookupCandidateId(null);
+    setPersonalVocabularyMatches([]);
+    setPersonalVocabularyLoading(false);
+    setPersonalVocabularySearched(false);
+    setPersonalVocabularyError(null);
+    setSelectedPersonalEntryKey(null);
     setMessage("");
     if (!options.preserveSavedNotice) {
       setSavedQuickNotice("");
@@ -1192,6 +1212,11 @@ function CuriosityReadingContent({
     setQuickLoading(true);
     setQuickError(null);
     setSavedQuickNotice("");
+    setPersonalVocabularyMatches([]);
+    setPersonalVocabularyLoading(false);
+    setPersonalVocabularySearched(false);
+    setPersonalVocabularyError(null);
+    setSelectedPersonalEntryKey(null);
 
     try {
       const {
@@ -1199,6 +1224,28 @@ function CuriosityReadingContent({
       } = await supabase.auth.getSession();
 
       if (lookupVersion !== quickLookupVersion.current) return;
+      if (!isListeningMode && !studentContext) {
+        setPersonalVocabularyLoading(true);
+        setPersonalVocabularySearched(true);
+        void searchPersonalVocabulary(word, session?.access_token, userBookId, true)
+          .then((matches) => {
+            if (lookupVersion !== quickLookupVersion.current) return;
+            setPersonalVocabularyMatches(matches);
+          })
+          .catch((searchError) => {
+            if (lookupVersion !== quickLookupVersion.current) return;
+            setPersonalVocabularyError(
+              searchError instanceof Error
+                ? searchError.message
+                : "Could not search your saved entries."
+            );
+          })
+          .finally(() => {
+            if (lookupVersion === quickLookupVersion.current) setPersonalVocabularyLoading(false);
+          });
+      } else {
+        setPersonalVocabularyLoading(false);
+      }
       const res = await fetch(`/api/jisho?keyword=${encodeURIComponent(word)}`, {
         headers: session?.access_token
           ? { Authorization: `Bearer ${session.access_token}` }
@@ -1291,7 +1338,7 @@ function CuriosityReadingContent({
       return;
     }
 
-    if (options.requireSelectedLookup && !selectedQuickLookupCandidateId) {
+    if (options.requireSelectedLookup && !selectedQuickLookupCandidateId && !selectedPersonalEntryKey) {
       setQuickError("Search and choose a result before saving.");
       return;
     }
@@ -1927,6 +1974,7 @@ function CuriosityReadingContent({
       return;
     }
 
+    setDismissedPersonalEntries([]);
     setQuickPreview((prev) => ({
       ...prev,
       surface: nextWord,
@@ -2226,6 +2274,7 @@ function CuriosityReadingContent({
             </CuriosityAddEditWordFormShell>
           </CuriosityAddEditWordCard>
         ) : (
+          <>
           <MobileQuickCapture
             title={isListeningMode ? "Save a heard word" : "Save a word"}
             description={
@@ -2236,6 +2285,7 @@ function CuriosityReadingContent({
             surface={quickPreview.surface}
             reading={quickPreview.reading}
             meaning={quickPreview.meaning}
+            isPersonalEntry={Boolean(selectedPersonalEntryKey)}
             meanings={quickPreview.meanings}
             selectedMeaningIndex={quickPreview.selectedMeaningIndex}
             positionLabel={positionLabel(positionUnit)}
@@ -2244,16 +2294,16 @@ function CuriosityReadingContent({
             quickError={quickError}
             savedNotice={savedQuickNotice}
             canSaveWord={Boolean(
-              quickPreview.cacheSurface.trim() &&
-              quickPreview.meaning.trim() &&
-              !quickPreview.isCustomMeaning
+              (selectedPersonalEntryKey && quickPreview.surface.trim() && quickPreview.reading.trim() && quickPreview.meaning.trim()) ||
+              (quickPreview.cacheSurface.trim() && quickPreview.meaning.trim() && !quickPreview.isCustomMeaning)
             )}
-            selectedCandidateId={selectedQuickLookupCandidateId}
+            selectedCandidateId={selectedQuickLookupCandidateId ?? selectedPersonalEntryKey}
             candidates={quickLookupCandidates}
             lastAddedWord={quickSessionWords[0] ?? null}
             inputRef={quickWordInputRef}
             onSurfaceChange={(value) => {
               invalidateQuickLookup();
+              setDismissedPersonalEntries([]);
               setQuickPreview((prev) => ({
                 ...prev,
                 surface: value,
@@ -2269,8 +2319,15 @@ function CuriosityReadingContent({
               }));
               setSavedQuickNotice("");
               setSelectedQuickLookupCandidateId(null);
+              setSelectedPersonalEntryKey(null);
+              setPersonalVocabularyMatches([]);
+              setPersonalVocabularyLoading(false);
+              setPersonalVocabularySearched(false);
+              setPersonalVocabularyError(null);
               if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
             }}
+            onReadingChange={(value) => setQuickPreview((prev) => ({ ...prev, reading: value }))}
+            onMeaningChange={(value) => setQuickPreview((prev) => ({ ...prev, meaning: value }))}
             onSearch={() => void pullQuickWord()}
             onSearchKeyDown={(event) => {
               if (event.key === "Enter") {
@@ -2291,6 +2348,7 @@ function CuriosityReadingContent({
                 isCustomMeaning: candidate.isCustomMeaning,
               }));
               setSelectedQuickLookupCandidateId(candidate.id);
+              setSelectedPersonalEntryKey(null);
               setQuickError(null);
             }}
             onMeaningChoiceChange={(index, meaning) =>
@@ -2310,6 +2368,35 @@ function CuriosityReadingContent({
             onSaveWord={() => void saveQuickWord({ requireSelectedLookup: true })}
             onDeleteLastWord={(id) => void deleteQuickWordById(id)}
           />
+          {!isListeningMode && !studentContext ? (
+            <PersonalVocabularyResults
+              dismissedKeys={dismissedPersonalEntries}
+              onDismiss={(entry) => setDismissedPersonalEntries(current => [...new Set([...current, personalVocabularyEntryKey(entry)])])}
+              entries={personalVocabularyMatches}
+              searched={personalVocabularySearched}
+              loading={personalVocabularyLoading}
+              error={personalVocabularyError}
+              onSelect={(entry) => {
+                invalidateQuickLookup();
+                setQuickPreview((prev) => ({
+                  ...prev,
+                  id: null,
+                  surface: entry.surface,
+                  cacheSurface: "",
+                  reading: entry.reading,
+                  meanings: [],
+                  selectedMeaningIndex: 0,
+                  meaning: entry.meaning,
+                  isCustomMeaning: true,
+                  alternateSurface: entry.alternativeSurface,
+                }));
+                setSelectedQuickLookupCandidateId(null);
+                setSelectedPersonalEntryKey(JSON.stringify([entry.surface, entry.reading, entry.meaning]));
+                setQuickError(null);
+              }}
+            />
+          ) : null}
+          </>
         )}
       </div>
 
@@ -2408,6 +2495,12 @@ function CuriosityReadingContent({
                     quickWordInputRef={quickWordInputRef}
                     onSurfaceChange={(value) => {
                       invalidateQuickLookup();
+                      setDismissedPersonalEntries([]);
+                      setSelectedPersonalEntryKey(null);
+                      setPersonalVocabularyMatches([]);
+                      setPersonalVocabularyLoading(false);
+                      setPersonalVocabularySearched(false);
+                      setPersonalVocabularyError(null);
                       setQuickPreview((prev) => ({
                         ...prev,
                         surface: value,
@@ -2452,6 +2545,7 @@ function CuriosityReadingContent({
                     selectedMeaning={quickPreview.meaning}
                     onSelectCandidate={(candidate) => {
                       invalidateQuickLookup();
+                      setSelectedPersonalEntryKey(null);
                       setQuickPreview((prev) => ({
                         ...prev,
                         surface: candidate.surface,
@@ -2466,6 +2560,35 @@ function CuriosityReadingContent({
                       jumpToQuickWordFields();
                     }}
                   />
+                  {!isListeningMode && !studentContext ? (
+                    <PersonalVocabularyResults
+                      dismissedKeys={dismissedPersonalEntries}
+                      onDismiss={(entry) => setDismissedPersonalEntries(current => [...new Set([...current, personalVocabularyEntryKey(entry)])])}
+                      entries={personalVocabularyMatches}
+                      searched={personalVocabularySearched}
+                      loading={personalVocabularyLoading}
+                      error={personalVocabularyError}
+                      onSelect={(entry) => {
+                        invalidateQuickLookup();
+                        setQuickPreview((prev) => ({
+                          ...prev,
+                          id: null,
+                          surface: entry.surface,
+                          cacheSurface: "",
+                          reading: entry.reading,
+                          meanings: [],
+                          selectedMeaningIndex: 0,
+                          meaning: entry.meaning,
+                          isCustomMeaning: true,
+                          alternateSurface: entry.alternativeSurface,
+                        }));
+                        setSelectedQuickLookupCandidateId(null);
+                        setSelectedPersonalEntryKey(JSON.stringify([entry.surface, entry.reading, entry.meaning]));
+                        setQuickError(null);
+                        jumpToQuickWordFields();
+                      }}
+                    />
+                  ) : null}
 
                   <CuriosityWordDetailFields
                     listening={isListeningMode}
@@ -2480,6 +2603,7 @@ function CuriosityReadingContent({
                     contextFields={<WordContextFields value={quickPreview} onChange={value => setQuickPreview(current => ({ ...current, ...value }))} teacher={canTeachWordForms} />}
                     onPromoteAlternative={() => {
                       invalidateQuickLookup();
+                      setDismissedPersonalEntries([]);
                       setQuickPreview(current => ({ ...current, cacheSurface: current.cacheSurface || current.surface, surface: current.alternateSurface.trim(), alternateSurface: current.surface }));
                     }}
                     onAlternateSurfaceChange={(value) =>
