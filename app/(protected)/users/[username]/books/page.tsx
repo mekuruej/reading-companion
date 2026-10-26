@@ -1186,12 +1186,14 @@ export default function BooksPage() {
         <LibraryHeader
           libraryOwnerLabel={libraryOwnerLabel}
         >
+          {isViewingStudentLibrary ? (
           <div className="flex flex-col items-end gap-2">
             {isViewingStudentLibrary && meDisplayName ? (
               <span className="text-xs text-slate-500">Logged in as {meDisplayName}</span>
             ) : null}
             <UserBar isTeacher={isTeacher} displayName={meDisplayName} variant="logoutOnly" />
           </div>
+          ) : null}
         </LibraryHeader>
 
         {trialBanner ? (

@@ -299,6 +299,11 @@ export default function Header() {
     ? `/users/${encodeURIComponent(username)}/books`
     : "/books";
 
+  // Compact only the signed-in reader's own Library; student and other routes retain branding.
+  const compactLibraryHeader = isAuthenticated && (
+    pathname === "/books" || (username !== null && (pathname === myLibraryHref || pathname === libraryHref))
+  );
+
   const accountButtonClass = `inline-flex min-h-10 items-center gap-1 bg-transparent px-1 py-2 text-xs font-semibold text-stone-700 transition hover:text-stone-950 hover:underline hover:underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-500 focus-visible:ring-offset-2 sm:gap-2 sm:px-2 sm:text-sm ${showAccountMenu ? "text-stone-950 underline underline-offset-4" : ""}`;
 
   async function handleLogout() {
@@ -316,14 +321,7 @@ export default function Header() {
     setShowTeacherMenu(false);
   }
 
-  return (
-    <header data-mekuru-header className="relative z-30 text-stone-900">
-      <div className="w-full border-b border-stone-100 bg-white">
-        <div className="mx-auto flex min-h-[68px] max-w-6xl items-center justify-between gap-2 px-4 py-2 sm:gap-4">
-          <Link href={myLibraryHref} aria-label="My MEKURU Library" onClick={closeMenus} style={{ color: `var(--appearance-brand-text, ${DEFAULT_APPEARANCE_PALETTE.brandText})` }}
-            className="block whitespace-nowrap text-[1.75rem] font-extrabold tracking-tight text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-500 sm:text-[2.125rem]">
-            MEKURU <span className="align-middle text-[10px] font-semibold text-red-600 sm:text-xs">(Beta)</span>
-          </Link>
+  const accountControls = (
           <div className="relative shrink-0" ref={accountMenuRef} onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setShowAccountMenu(false); }}>
             {authLoaded ? isAuthenticated ? (
               <>
@@ -374,10 +372,25 @@ export default function Header() {
               </div>
             ) : <span aria-hidden="true" className="inline-block h-10 w-24" />}
           </div>
+  );
+
+  return (
+    <header data-mekuru-header className="relative z-30 text-stone-900">
+      {!compactLibraryHeader ? (
+      <div className="w-full border-b border-stone-100 bg-white">
+        <div className="mx-auto flex min-h-[68px] max-w-6xl items-center justify-between gap-2 px-4 py-2 sm:gap-4">
+          <Link href={myLibraryHref} aria-label="My MEKURU Library" onClick={closeMenus} style={{ color: `var(--appearance-brand-text, ${DEFAULT_APPEARANCE_PALETTE.brandText})` }}
+            className="block whitespace-nowrap text-[1.75rem] font-extrabold tracking-tight text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-500 sm:text-[2.125rem]">
+            MEKURU <span className="align-middle text-[10px] font-semibold text-red-600 sm:text-xs">(Beta)</span>
+          </Link>
+          {accountControls}
         </div>
       </div>
+      ) : null}
       <div className="w-full border-b" style={DEFAULT_NAVIGATION_STYLE}>
-        <nav aria-label="Main navigation" className="relative mx-auto flex w-full max-w-6xl flex-wrap items-center justify-center gap-x-6 gap-y-1 px-4 py-2.5">
+        <nav aria-label="Main navigation" className={compactLibraryHeader
+          ? "relative mx-auto flex w-full max-w-6xl flex-wrap items-center justify-start gap-x-3 gap-y-1 px-4 py-2.5 sm:gap-x-6"
+          : "relative mx-auto flex w-full max-w-6xl flex-wrap items-center justify-center gap-x-6 gap-y-1 px-4 py-2.5"}>
           <div className="static inline-flex items-center sm:relative" ref={libraryMenuRef} onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setShowLibraryMenu(false); }}>
             <Link href={myLibraryHref} aria-current={librarySectionActive ? "page" : undefined} onClick={closeMenus} className={navClass(librarySectionActive)}>
               My Library
@@ -523,6 +536,7 @@ export default function Header() {
               ) : null}
             </div>
           ) : null}
+          {compactLibraryHeader ? <div className="ml-auto shrink-0">{accountControls}</div> : null}
         </nav>
       </div>
     </header>

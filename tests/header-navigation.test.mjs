@@ -219,3 +219,37 @@ test('a transient request failure does not hide a previously confirmed My Accoun
   fail=true;h.windowListeners.get('mekuru-profile-preferences-updated')();await h.flush();
   assert.ok(h.button('My Account'));assert.ok(!h.hrefs().includes('/login'));
 });
+
+test('only the signed-in own Library moves the single existing account control into navigation', async () => {
+  for (const pathname of ['/books', '/users/synthetic/books']) {
+    const h = await mount({ ...member, role: 'teacher' }, pathname);
+    const nav = h.all(n => n.type === 'nav')[0];
+    assert.equal(nodes(nav, n => n.props?.['aria-controls'] === 'mekuru-account-menu').length, 1);
+    assert.equal(h.all(n => n.props?.['aria-controls'] === 'mekuru-account-menu').length, 1);
+    assert.equal(h.all(n => n.type === 'a' && n.props['aria-label'] === 'My MEKURU Library').length, 0);
+    assert.ok(h.button('Teaching'));
+    h.button('My Account').props.onClick(); h.render();
+    for (const href of ['/community/profile', '/reading-access', 'mailto:mekuru.ej@gmail.com']) assert.ok(h.hrefs().includes(href));
+    assert.ok(h.button('Log out'));
+  }
+});
+test('student Library, teaching, book, study and signed-out routes retain the branded top row', async () => {
+  for (const pathname of ['/users/student/books', '/teacher/students/student/workspace', '/books/book-id', '/library-study', '/community/profile']) {
+    const h = await mount({ ...member, role:'teacher' }, pathname);
+    const nav = h.all(n => n.type === 'nav')[0];
+    assert.equal(nodes(nav,n=>n.props?.['aria-controls']==='mekuru-account-menu').length,0);
+    assert.equal(h.all(n=>n.type==='a' && n.props['aria-label']==='My MEKURU Library').length,1);
+    assert.ok(h.button('My Account'));
+  }
+  const h = await mount(null,'/books');
+  assert.equal(h.all(n=>n.type==='a' && n.props['aria-label']==='My MEKURU Library').length,1);
+  assert.ok(h.hrefs().includes('/login'));assert.ok(h.hrefs().includes('/login/beta-signup'));
+});
+test('welcome logout is omitted only for own Library; student identity and logout remain', () => {
+ const page=fs.readFileSync('app/(protected)/users/[username]/books/page.tsx','utf8');
+ const slot=page.slice(page.indexOf('<LibraryHeader'),page.indexOf('</LibraryHeader>'));
+ assert.match(slot,/\{isViewingStudentLibrary \? \(/);
+ assert.match(slot,/<UserBar isTeacher=\{isTeacher\} displayName=\{meDisplayName\} variant="logoutOnly"/);
+ const gate=fs.readFileSync('components/AppHeaderGate.tsx','utf8');
+ assert.match(gate,/"\/login"/);assert.match(gate,/HIDDEN_HEADER_ROUTES\.has\(pathname\)/);
+});
