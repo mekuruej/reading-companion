@@ -2,6 +2,7 @@
 //
 "use client";
 
+import { isWordSkyExploration, getWordSkyExplorationReturnPath } from "@/lib/wordSkyExploration";
 import { loadPersonallyHiddenStudyKeys } from "@/lib/vocabulary/personalVisibilityData";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -193,6 +194,18 @@ function withTimeout<T>(promise: PromiseLike<T>, ms: number, label: string): Pro
 
 export default function WordSkyPage() {
   const router = useRouter();
+  const [exploration, setExploration] = useState<{ returnPath: string } | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!isWordSkyExploration(params.get("explore"))) return;
+    setExploration({ returnPath: getWordSkyExplorationReturnPath(params.get("returnTo")) ?? "/books" });
+  }, []);
+
+  function finishExploration() {
+    router.push(exploration?.returnPath ?? "/books");
+  }
+
   const [userId, setUserId] = useState<string | null>(null);
   const [wordPool, setWordPool] = useState<SkyWord[]>([]);
   const [visibleWords, setVisibleWords] = useState<VisibleSkyWord[]>([]);
@@ -574,6 +587,18 @@ export default function WordSkyPage() {
           wordPoolCount={wordPool.length}
           onBackToStudy={() => router.push("/library-study")}
         />
+
+        {exploration ? (
+          <section aria-label="Word Sky exploration" className="flex flex-col gap-3 rounded-2xl border border-sky-100 bg-white/80 px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Discover words you already know!</h2>
+              <p className="mt-1 text-sm text-slate-600">Explore the sky and see what feels familiar.</p>
+            </div>
+            <button type="button" onClick={finishExploration} className="w-fit shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+              Finish for now
+            </button>
+          </section>
+        ) : null}
 
         <WordSkyMessageBanner message={message} />
 

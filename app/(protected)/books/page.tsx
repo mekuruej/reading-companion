@@ -4,6 +4,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { getWordSkyLibraryReturnState } from "@/lib/wordSkyExploration";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function BooksRedirectPage() {
@@ -50,7 +51,9 @@ export default function BooksRedirectPage() {
         return;
       }
 
-      router.replace(`/users/${profile.username}/books`);
+      const restored = getWordSkyLibraryReturnState(window.location.search);
+      const returnQuery = restored ? `?${new URLSearchParams({ wordSkyReturn: "1", ...restored })}` : "";
+      router.replace(`/users/${profile.username}/books${returnQuery}`);
       router.refresh();
     };
 

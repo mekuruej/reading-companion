@@ -2,6 +2,7 @@
 //
 "use client";
 
+import { getWordSkyLibraryReturnState } from "@/lib/wordSkyExploration";
 import { DEFAULT_PAGE_STYLE } from "@/lib/appearance/defaultAppearance";
 import { effectiveProgressMethod, progressSummary, type ProgressTrackingMethod, type ProgressTotals } from "@/lib/books/readingProgress";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
@@ -250,6 +251,21 @@ export default function BooksPage() {
   const abilityCheckReminderLoadFunctionRef = useRef<((userId: string, canUseAbilityCheck: boolean) => Promise<void>) | null>(null);
   const abilityCheckReminderMountedRef = useRef(false);
   const abilityCheckReminderForegroundTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const restoredWordSkyPreferencesRef = useRef(false);
+  useEffect(() => {
+    if (restoredWordSkyPreferencesRef.current) return;
+    const restored = getWordSkyLibraryReturnState(window.location.search);
+    if (!restored) return;
+    restoredWordSkyPreferencesRef.current = true;
+    setSearchQuery(restored.search);
+    setBookTypeFilter(restored.bookType);
+    setStatusFilter(restored.status);
+    setSortMode(restored.sort as LibrarySortMode);
+    setViewMode(restored.view);
+    const cleanPath = routeUsername ? `/users/${encodeURIComponent(routeUsername)}/books` : "/books";
+    router.replace(cleanPath, { scroll: false });
+  }, [routeUsername, router]);
 
   const viewingLabel =
     viewingUserId && viewingUserId === meId ? "Me" : viewingUserLabel || "Member";
