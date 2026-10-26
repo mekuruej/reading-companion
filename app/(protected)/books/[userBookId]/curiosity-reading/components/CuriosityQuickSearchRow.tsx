@@ -11,6 +11,9 @@ type CuriosityQuickSearchRowProps = {
   quickWordInputRef: RefObject<HTMLInputElement | null>;
   onSurfaceChange: (value: string) => void;
   onSearch: () => void;
+  onClearWordFields?: () => void;
+  isEditing?: boolean;
+  clearDisabled?: boolean;
   onSearchKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
 };
 
@@ -23,6 +26,9 @@ export default function CuriosityQuickSearchRow({
   quickWordInputRef,
   onSurfaceChange,
   onSearch,
+  onClearWordFields,
+  isEditing = false,
+  clearDisabled = false,
   onSearchKeyDown,
 }: CuriosityQuickSearchRowProps) {
   const inputId = useId();
@@ -39,7 +45,7 @@ export default function CuriosityQuickSearchRow({
       </div>
 
       <div className="min-w-0 flex-[1_1_17rem]">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <input
             id={inputId}
             aria-describedby={`${inputId}-hint`}
@@ -49,7 +55,7 @@ export default function CuriosityQuickSearchRow({
             onChange={(event) => onSurfaceChange(event.target.value)}
             onKeyDown={onSearchKeyDown}
             placeholder="Search or edit a word..."
-            className="min-h-10 min-w-0 flex-1 rounded-xl border border-stone-300 bg-white px-3 py-2 text-base text-stone-900 outline-none focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
+            className="min-h-10 min-w-0 flex-[1_1_12rem] rounded-xl border border-stone-300 bg-white px-3 py-2 text-base text-stone-900 outline-none focus:border-stone-500 focus:ring-2 focus:ring-stone-200"
           />
 
           <button
@@ -60,6 +66,18 @@ export default function CuriosityQuickSearchRow({
           >
             {quickLoading ? "Searching..." : "Search"}
           </button>
+          {!listening && onClearWordFields ? (
+            <button
+              type="button"
+              onClick={onClearWordFields}
+              disabled={clearDisabled}
+              aria-label={isEditing ? "Cancel editing and discard unsaved changes" : "Clear Words"}
+              title={isEditing ? "Discard unsaved edits. The saved word is unchanged." : "Clear unsaved word fields. Saved vocabulary is unchanged."}
+              className="min-h-10 shrink-0 rounded-xl border border-stone-300 bg-stone-100 px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isEditing ? "Cancel edit" : "Clear Words"}
+            </button>
+          ) : null}
         </div>
 
         {!listening && <p className="mt-2 text-xs text-stone-500">

@@ -44,6 +44,9 @@ type MobileQuickCaptureProps = {
   onReadingChange?: (value: string) => void;
   onMeaningChange?: (value: string) => void;
   onSearch: () => void;
+  onClearWordFields?: () => void;
+  isEditing?: boolean;
+  clearDisabled?: boolean;
   onSearchKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
   onSelectCandidate: (candidate: MobileQuickCaptureCandidate) => void;
   onMeaningChoiceChange: (index: number, meaning: string) => void;
@@ -76,6 +79,9 @@ export default function MobileQuickCapture({
   onReadingChange,
   onMeaningChange,
   onSearch,
+  onClearWordFields,
+  isEditing = false,
+  clearDisabled = false,
   onSearchKeyDown,
   onSelectCandidate,
   onMeaningChoiceChange,
@@ -97,9 +103,23 @@ export default function MobileQuickCapture({
       </div>
 
       <div className="mt-4 rounded-2xl border border-stone-200 bg-stone-50 p-3">
-        <label className="block text-xs font-black uppercase tracking-[0.12em] text-stone-400">
-          Word
-        </label>
+        <div className="flex items-center justify-between gap-2">
+          <label className="block text-xs font-black uppercase tracking-[0.12em] text-stone-400">
+            Word
+          </label>
+          {onClearWordFields ? (
+            <button
+              type="button"
+              onClick={onClearWordFields}
+              disabled={clearDisabled}
+              aria-label={isEditing ? "Cancel editing and discard unsaved changes" : "Clear unsaved word fields"}
+              title={isEditing ? "Discard unsaved edits. The saved word is unchanged." : "Saved vocabulary is unchanged."}
+              className="min-h-11 shrink-0 rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isEditing ? "Cancel edit" : "Clear"}
+            </button>
+          ) : null}
+        </div>
         <div className="mt-2 flex gap-2">
           <input
             ref={inputRef}

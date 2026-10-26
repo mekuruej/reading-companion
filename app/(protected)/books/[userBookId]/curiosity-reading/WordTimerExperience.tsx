@@ -2483,6 +2483,9 @@ function CuriosityReadingContent({
             }}
             onReadingChange={(value) => setQuickPreview((prev) => ({ ...prev, reading: value }))}
             onMeaningChange={(value) => setQuickPreview((prev) => ({ ...prev, meaning: value }))}
+            onClearWordFields={() => clearQuickWordFields()}
+            isEditing={quickPreview.id != null}
+            clearDisabled={quickSaving}
             onSearch={() => void pullQuickWord()}
             onSearchKeyDown={(event) => {
               if (event.key === "Enter") {
@@ -2637,6 +2640,9 @@ function CuriosityReadingContent({
                       setSavedQuickNotice("");
                       if (quickLookupCandidates.length > 0) setQuickLookupCandidates([]);
                     }}
+                    onClearWordFields={isListeningMode ? undefined : () => clearQuickWordFields()}
+                    isEditing={quickPreview.id != null}
+                    clearDisabled={quickSaving}
                     onSearch={() => void pullQuickWord()}
                     onSearchKeyDown={(event) => {
                       if (event.key === "Enter") {

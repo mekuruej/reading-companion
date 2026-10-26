@@ -160,13 +160,13 @@ export default function CuriosityWordDetailFields({
           {isEditing ? "Update Word" : "Save Word"}
         </button>
 
-        <button
+        {listening && <button
           type="button"
           onClick={onClearWordFields}
           className="rounded-xl bg-stone-200 px-4 py-2 text-sm font-medium text-stone-900 hover:bg-stone-300"
         >
           Clear Word Fields
-        </button>
+        </button>}
 
         {savedQuickNotice ? (
           <span className="text-sm font-medium text-emerald-700">
