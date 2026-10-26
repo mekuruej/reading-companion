@@ -13,7 +13,7 @@ import { nextProgressStart, matchingTotal, progressLabels, parseProgressRange, s
 
 
 import { isReadyForFlashcards } from "@/lib/wordSupportEligibility";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -297,6 +297,21 @@ function readableSupabaseError(error: any) {
   return String(error) || "Unknown Supabase error.";
 }
 
+function focusResetCuriositySearch(input: HTMLInputElement | null, origin: Element | null) {
+  if (!input?.isConnected || !input.getClientRects().length || input.matches(":disabled") || input.value) return;
+  const active = document.activeElement;
+  if (active !== document.body && active !== origin && active !== input) return;
+  input.focus({ preventScroll: true });
+  const header = document.querySelector<HTMLElement>("[data-mekuru-header]");
+  const viewportTop = window.visualViewport?.offsetTop ?? 0;
+  const visibleTop = Math.max(viewportTop, header?.getBoundingClientRect().bottom ?? 0) + 16;
+  const visibleBottom = viewportTop + (window.visualViewport?.height ?? window.innerHeight) - 16;
+  const bounds = input.getBoundingClientRect();
+  if (bounds.top < visibleTop || bounds.bottom > visibleBottom) {
+    window.scrollTo({ top: Math.max(0, window.scrollY + bounds.top - visibleTop), behavior: "instant" });
+  }
+}
+
 async function generateVocabularyKanjiMap(vocabularyCacheId: number) {
   const {
     data: { session },
@@ -463,6 +478,23 @@ function CuriosityReadingContent({
   }, [wordCaptureOnly, quickPreview.page, lastSavedWordContext, positionUnit]);
 
   const quickWordInputRef = useRef<HTMLInputElement | null>(null);
+  const mobileQuickWordInputRef = useRef<HTMLInputElement | null>(null);
+  const quickSaveFocus = useRef<{ input: HTMLInputElement | null; origin: Element | null } | null>(null);
+  const [quickFocusRequest, setQuickFocusRequest] = useState(0);
+  const quickFocusPending = useRef(false);
+  useLayoutEffect(() => {
+    if (isListeningMode || quickSaving || !quickFocusRequest || !quickFocusPending.current) return;
+    const request = quickSaveFocus.current;
+    quickSaveFocus.current = null;
+    quickFocusPending.current = false;
+    if (request) focusResetCuriositySearch(request.input, request.origin);
+  }, [isListeningMode, quickSaving, quickFocusRequest]);
+
+  function currentQuickSearchFocus() {
+    const input = [mobileQuickWordInputRef.current, quickWordInputRef.current]
+      .find(candidate => candidate?.isConnected && candidate.getClientRects().length) ?? null;
+    return { input, origin: document.activeElement };
+  }
   const quickWordFieldsRef = useRef<HTMLDivElement | null>(null);
   const isEnglishBook = bookLanguageCode === "en";
 
@@ -1095,6 +1127,12 @@ function CuriosityReadingContent({
   }, [quickSessionWords, quickPreview.surface, quickPreview.reading, quickPreview.id, isEnglishBook, isListeningMode]);
 
   function prepareForNextQuickWord() {
+    if (!isListeningMode) {
+      if (!quickSaveInFlight.current) quickSaveFocus.current = currentQuickSearchFocus();
+      quickFocusPending.current = true;
+      setQuickFocusRequest(request => request + 1);
+      return;
+    }
     window.setTimeout(() => {
       const input = quickWordInputRef.current;
       if (!input) return;
@@ -1402,6 +1440,10 @@ function CuriosityReadingContent({
 
   async function saveQuickWord(options: { requireSelectedLookup?: boolean } = {}, draft = quickPreview) {
     if (quickSaveInFlight.current) return;
+    if (!isListeningMode) {
+      quickSaveFocus.current = currentQuickSearchFocus();
+      quickFocusPending.current = false;
+    }
     quickSaveInFlight.current = true;
     setQuickSaving(true);
     try {
@@ -2413,7 +2455,7 @@ function CuriosityReadingContent({
             ) : undefined}
             candidates={quickLookupCandidates}
             lastAddedWord={quickSessionWords[0] ?? null}
-            inputRef={quickWordInputRef}
+            inputRef={isListeningMode ? quickWordInputRef : mobileQuickWordInputRef}
             onSurfaceChange={(value) => {
               invalidateQuickLookup();
               setDismissedPersonalEntries([]);
