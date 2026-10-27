@@ -6,8 +6,8 @@ export default function WordSkyLoadingState({
   message = "Loading Word Sky...",
 }: WordSkyLoadingStateProps) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-sky-50 p-6">
-      <p className="text-lg text-sky-700">{message}</p>
+    <main style={{ backgroundImage: "var(--appearance-page-image)" }} className="flex min-h-screen items-center justify-center bg-[var(--appearance-page)] p-6">
+      <p className="text-lg text-[var(--appearance-muted-text)]">{message}</p>
     </main>
   );
 }

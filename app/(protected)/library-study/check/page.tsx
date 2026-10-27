@@ -3,6 +3,7 @@
 
 "use client";
 
+import { dismissCompletedAbilityCheckReminder } from '@/lib/study/abilityCheckReminderCompletion';
 import { hasAbilityCheckRestDays } from "@/lib/abilityCheckSpacing";
 import { loadPersonallyHiddenStudyKeys } from "@/lib/vocabulary/personalVisibilityData";
 import { visibleStudyEncounters } from "@/lib/vocabulary/personalVisibility";
@@ -1259,6 +1260,7 @@ export default function LibraryStudyPage() {
   const searchParams = useSearchParams();
   const typingInputRef = useRef<HTMLInputElement | null>(null);
   const autoStartedCheckRef = useRef(false);
+  const reminderSeenIdsRef = useRef(new Set<string>());
   const restartingCardRef = useRef(false);
   const directStartRequested = searchParams.get("start") === "1";
 
@@ -1305,6 +1307,10 @@ export default function LibraryStudyPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [seenTodayIds, setSeenTodayIds] = useState<Set<string>>(new Set());
   const [activeTodayKey, setActiveTodayKey] = useState(getTodayKey());
+  useEffect(() => {
+    reminderSeenIdsRef.current.clear();
+  }, [currentUserId, activeTodayKey, dailyCheckPlan?.startedAt]);
+
   const [meaningReviewItems, setMeaningReviewItems] = useState<MeaningReviewItem[]>([]);
   const [showPracticeMeaningReview, setShowPracticeMeaningReview] = useState(false);
 
@@ -1739,6 +1745,7 @@ export default function LibraryStudyPage() {
     if (index < deck.length) return;
 
     completeAbilityCheckForToday();
+    void dismissCompletedSessionReminder(true);
   }, [libraryMode, endedEarly, deck.length, index]);
 
   function resetCardState() {
@@ -1748,7 +1755,24 @@ export default function LibraryStudyPage() {
     setTypingCorrectionComplete(false);
   }
 
+  async function dismissCompletedSessionReminder(reachedEnd: boolean) {
+    if (!currentUserId || !dailyCheckPlan || libraryMode !== "check") return;
+    const ownerId = currentUserId;
+    const session = {
+      planDay: dailyCheckPlan.dateKey,
+      cardIds: [...(dailyCheckPlan.cardIds ?? [])],
+      seenIds: new Set([...seenTodayIds, ...reminderSeenIdsRef.current]),
+      reachedEnd, endedEarly,
+    };
+    // Read-only identity check before writing an owner-scoped browser marker.
+    const auth = await supabase.auth.getUser().catch(() => null);
+    if (!auth || auth.error || auth.data.user?.id !== ownerId) return;
+    try { dismissCompletedAbilityCheckReminder(window.localStorage, ownerId, session); }
+    catch { /* Storage failure does not affect study completion or progress. */ }
+  }
+
   function markStudyCardSeen(card: StudyCard) {
+    reminderSeenIdsRef.current.add(card.id);
     setSeenTodayIds((prev) => {
       const next = new Set(prev);
       next.add(card.id);
@@ -1785,6 +1809,7 @@ export default function LibraryStudyPage() {
     saveDailyCheckPlanForToday(plan);
 
     brokenCardIdsRef.current.clear();
+    reminderSeenIdsRef.current.clear();
     setDailyCheckPlan(plan);
     setNotice(null);
     setEndedEarly(false);
@@ -1868,6 +1893,7 @@ export default function LibraryStudyPage() {
     if (index + 1 >= deck.length) {
       if (libraryMode === "check" && !endedEarly) {
         completeAbilityCheckForToday();
+        void dismissCompletedSessionReminder(true);
       }
       setIndex(deck.length);
       resetCardState();
@@ -1894,6 +1920,7 @@ export default function LibraryStudyPage() {
 
   function finishMeaningReview() {
     completeAbilityCheckForToday();
+    void dismissCompletedSessionReminder(index >= deck.length);
     setMeaningReviewItems([]);
   }
 

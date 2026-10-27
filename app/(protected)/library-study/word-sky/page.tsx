@@ -548,28 +548,28 @@ export default function WordSkyPage() {
 
   if (!canUseWordSky) {
     return (
-      <main className="min-h-screen bg-[#eef5fb] px-4 py-5 text-slate-900 sm:px-6">
+      <main style={{ backgroundImage: "var(--appearance-page-image)" }} className="min-h-screen bg-[var(--appearance-page)] px-4 py-5 text-[var(--appearance-text)] sm:px-6">
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
           <button
             type="button"
             onClick={() => router.push("/library-study")}
-            className="w-fit text-sm font-semibold text-slate-500 transition hover:text-slate-900"
+            className="w-fit text-sm font-semibold text-[var(--appearance-muted-text)] transition hover:text-[var(--appearance-text)]"
           >
             ← Back to Study Hub
           </button>
 
-          <section className="rounded-3xl border border-white/80 bg-white/85 p-6 shadow-sm backdrop-blur">
+          <section className="rounded-3xl border border-[var(--appearance-border)] bg-[var(--appearance-surface)] p-6 shadow-sm backdrop-blur">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
               Advanced Study
             </p>
-            <h1 className="mt-2 text-2xl font-semibold text-slate-950">Word Sky</h1>
-            <p className="mt-3 text-sm leading-6 text-slate-600">
+            <h1 className="mt-2 text-2xl font-semibold text-[var(--appearance-text)]">Word Sky</h1>
+            <p className="mt-3 text-sm leading-6 text-[var(--appearance-muted-text)]">
               Word Sky is available with full learning access. It uses the shared reference word list,
               along with your reading-color progress and Word Sky claims.
             </p>
 
             {message ? (
-              <p className="mt-4 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+              <p className="mt-4 rounded-2xl border border-[var(--appearance-border)] bg-sky-50 px-4 py-3 text-sm text-sky-900">
                 {message}
               </p>
             ) : null}
@@ -580,7 +580,7 @@ export default function WordSkyPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#eef5fb] px-4 py-5 text-slate-900 sm:px-6">
+    <main style={{ backgroundImage: "var(--appearance-page-image)" }} className="min-h-screen bg-[var(--appearance-page)] px-4 py-5 text-[var(--appearance-text)] sm:px-6">
       <div className="mx-auto flex max-w-5xl flex-col gap-4">
         <WordSkyHeader
           claimedCount={claimedCount}
@@ -589,12 +589,12 @@ export default function WordSkyPage() {
         />
 
         {exploration ? (
-          <section aria-label="Word Sky exploration" className="flex flex-col gap-3 rounded-2xl border border-sky-100 bg-white/80 px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <section aria-label="Word Sky exploration" className="flex flex-col gap-3 rounded-2xl border border-[var(--appearance-border)] bg-[var(--appearance-surface)] px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Discover words you already know!</h2>
-              <p className="mt-1 text-sm text-slate-600">Explore the sky and see what feels familiar.</p>
+              <h2 className="text-lg font-semibold text-[var(--appearance-text)]">Discover words you already know!</h2>
+              <p className="mt-1 text-sm text-[var(--appearance-muted-text)]">Explore the sky and see what feels familiar.</p>
             </div>
-            <button type="button" onClick={finishExploration} className="w-fit shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
+            <button type="button" onClick={finishExploration} className="w-fit shrink-0 rounded-lg border border-[var(--appearance-border)] bg-[var(--appearance-surface)] px-3 py-2 text-sm font-semibold text-[var(--appearance-text)] transition hover:bg-[var(--appearance-surface-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
               Finish for now
             </button>
           </section>
@@ -623,7 +623,7 @@ export default function WordSkyPage() {
             })}
           </div>
 
-          <div className="absolute bottom-4 left-4 right-4 flex flex-col gap-3 rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur md:left-auto md:w-[360px]">
+          <div className="absolute bottom-4 left-4 right-4 flex flex-col gap-3 rounded-2xl border border-[var(--appearance-border)] bg-[var(--appearance-surface)] p-4 shadow-sm backdrop-blur md:left-auto md:w-[360px]">
             {selectedWord ? (
               <WordSkySelectedPanel
                 selectedWord={selectedWord}

@@ -1,3 +1,4 @@
+import { abilityCheckReminderCompleted } from './abilityCheckReminderCompletion';
 import { ymdInTimeZone } from '@/lib/timeZone';
 import { getWordSkyExplorationReturnPath } from '@/lib/wordSkyExploration';
 import { loadDailyReminderReadiness, type DailyReminderReadiness, type DailyStudyContext } from './dailyReminderReadiness';
@@ -15,7 +16,7 @@ const DISMISS_PREFIX = 'mekuru-library-reminder-hidden:';
 export function selectDailyLibraryReminder(input: {
   date: Date; ownLibrary: boolean; enabled: boolean; hidden: boolean;
   canUseWordSky: boolean; wordSkyAvailable: boolean;
-  canUseAbilityCheck: boolean; readiness: DailyReminderReadiness;
+  canUseAbilityCheck: boolean; readiness: DailyReminderReadiness; abilityCheckCompleted?: boolean;
 }): DailyLibraryActivity | null {
   if (!input.ownLibrary || !input.enabled || input.hidden) return null;
   // Unknown is not evidence of beginner status. Wait for reliable information.
@@ -24,7 +25,8 @@ export function selectDailyLibraryReminder(input: {
   const sky = input.canUseWordSky && input.wordSkyAvailable;
   const weekday = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tokyo', weekday: 'short' }).format(input.date);
   const skyDay = ['Mon', 'Wed', 'Fri'].includes(weekday);
-  if (check && (!skyDay || !sky)) return 'ability_check';
+  if (input.abilityCheckCompleted && !skyDay) return null;
+  if (check && (!skyDay || !sky)) return input.abilityCheckCompleted ? null : 'ability_check';
   return sky ? 'word_sky' : check ? 'ability_check' : null;
 }
 
@@ -64,7 +66,7 @@ export function wordSkyReminderHref(path: string, state: {
   return '/library-study/word-sky?' + new URLSearchParams({ explore: '1', returnTo });
 }
 
-export type LoadedDailyReminder = { ownerId: string; day: string; libraryPath: string; canUseWordSky: boolean; wordSkyAvailable: boolean; canUseAbilityCheck: boolean; readiness: DailyReminderReadiness };
+export type LoadedDailyReminder = { ownerId: string; day: string; libraryPath: string; canUseWordSky: boolean; wordSkyAvailable: boolean; canUseAbilityCheck: boolean; readiness: DailyReminderReadiness; abilityCheckCompleted?: boolean };
 
 /** Read-only invitation data. Fail closed on auth/preferences, and use the exact
  * activity access gates. The reference RPC supplies availability only, never cards.
@@ -95,7 +97,7 @@ export async function loadDailyLibraryReminder(client: SupabaseClient, ownerId: 
     ]);
     const finalAuth = await client.auth.getUser();
     if (finalAuth.error || finalAuth.data.user?.id !== ownerId || ymdInTimeZone() !== day) return null;
-    return { ownerId, day, libraryPath, canUseWordSky, wordSkyAvailable, canUseAbilityCheck, readiness };
+    return { ownerId, day, libraryPath, canUseWordSky, wordSkyAvailable, canUseAbilityCheck, readiness, abilityCheckCompleted: storage ? abilityCheckReminderCompleted(storage, ownerId) : false };
   } catch { return null; }
 }
 

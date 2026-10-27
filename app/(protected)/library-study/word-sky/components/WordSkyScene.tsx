@@ -6,7 +6,7 @@ type WordSkySceneProps = {
 
 export default function WordSkyScene({ children }: WordSkySceneProps) {
     return (
-        <section className="relative min-h-[68vh] overflow-hidden rounded-3xl border border-sky-100/80 bg-gradient-to-b from-[#f3fbff] via-[#e4f4ff] to-[#f4f7ff] shadow-sm">
+        <section className="relative min-h-[68vh] overflow-hidden rounded-3xl border border-[var(--appearance-border)] bg-gradient-to-b from-[#f3fbff] via-[#e4f4ff] to-[#f4f7ff] shadow-sm">
             <div className="pointer-events-none absolute inset-0 opacity-80">
                 <div className="absolute left-[8%] top-[12%] h-28 w-28 rounded-full bg-white/60 blur-3xl" />
                 <div className="absolute right-[10%] top-[18%] h-56 w-56 rounded-full bg-sky-200/60 blur-3xl" />

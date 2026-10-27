@@ -40,8 +40,23 @@ test('shared reading/claim construction expressions match actual former page con
   assert.equal(text(returnNode.expression),before,name);
  }
 });
-test('page delegates to shared builders/scheduler; all grading/progress-writing functions are unchanged',()=>{
- const current=fs.readFileSync(file,'utf8'),newFn=functions(current);
+
+// Ignore only the explicitly tested reminder side effects; grading, progress,
+// scheduler and every other retained declaration still compare with Production.
+function withoutReminderHooks(source) {
+ const root=parse(source);let helper;
+ function visit(node){if(ts.isFunctionDeclaration(node)&&node.name?.text==='dismissCompletedSessionReminder')helper=node;ts.forEachChild(node,visit);}visit(root);
+ assert.ok(helper, 'completion integration exists');
+ let result=source.slice(0,helper.getFullStart())+source.slice(helper.end);
+ result=result.replace(/  const reminderSeenIdsRef = useRef\(new Set<string>\(\)\);\n/,'');
+ result=result.replace(/  useEffect\(\(\) => \{\n    reminderSeenIdsRef.current.clear\(\);\n  \}, \[currentUserId, activeTodayKey, dailyCheckPlan\?\.startedAt\]\);\n/,'');
+ result=result.replace(/^\s*void dismissCompletedSessionReminder\((?:true|index >= deck.length)\);\n/gm,'');
+ result=result.replace(/^\s*reminderSeenIdsRef.current\.(?:add\(card.id\)|clear\(\))\;\n/gm,'');
+ return result;
+}
+
+test('page delegates to shared builders/scheduler; grading/progress unchanged apart from reminder hooks',()=>{
+ const current=withoutReminderHooks(fs.readFileSync(file,'utf8')),newFn=functions(current);
  assert.match(current,/buildReadingAbilityCheckCards\(\{/);assert.match(current,/buildClaimAbilityCheckCards\(\{/);
  assert.match(current,/from ['"]@\/lib\/study\/abilityCheckScheduler['"]/);
  // Compare every retained declaration, including nested handlers, recursively.
@@ -52,8 +67,8 @@ test('page delegates to shared builders/scheduler; all grading/progress-writing 
  const shared=new Map([...functions(fs.readFileSync('lib/study/abilityCheckCards.ts','utf8')),...functions(fs.readFileSync('lib/study/abilityCheckScheduler.ts','utf8'))]);
  for(const [name] of oldFn)assert.ok(newFn.has(name)||shared.has(name),name);
 });
-test('entire Ability Check component is unchanged except the two builder delegations',()=>{
- const current=functions(fs.readFileSync(file,'utf8')).get('LibraryStudyPage');
+test('entire Ability Check component is unchanged except builder delegations and isolated reminder hooks',()=>{
+ const current=functions(withoutReminderHooks(fs.readFileSync(file,'utf8'))).get('LibraryStudyPage');
  const replacements=new Map();
  function collect(n){if(ts.isVariableDeclaration(n)&&ts.isIdentifier(n.name)&&['cards','claimCards'].includes(n.name.text))replacements.set(n.name.text,n);ts.forEachChild(n,collect);}
  collect(current);assert.equal(replacements.size,2);

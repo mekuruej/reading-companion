@@ -32,7 +32,7 @@ export default function WordSkySelectedPanel({
     <>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--appearance-muted-text)]">
             Selected
           </div>
 
@@ -40,11 +40,11 @@ export default function WordSkySelectedPanel({
             {selectedWord.surface}
           </div>
 
-          <div className="text-sm text-slate-500">
+          <div className="text-sm text-[var(--appearance-muted-text)]">
             {selectedWord.reading} · {selectedWord.meaning}
           </div>
 
-          <div className="mt-1 text-xs text-slate-400">
+          <div className="mt-1 text-xs text-[var(--appearance-muted-text)]">
             {(selectedWord.jlpt ?? "Non-JLPT").toUpperCase()}
             {selectedWord.encounterCount
               ? ` · ${selectedWord.encounterCount} library encounters`
@@ -55,7 +55,7 @@ export default function WordSkySelectedPanel({
         <button
           type="button"
           onClick={onClose}
-          className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-50"
+          className="rounded-full border border-[var(--appearance-border)] bg-[var(--appearance-surface)] px-3 py-1.5 text-xs font-medium text-[var(--appearance-muted-text)] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--appearance-accent)] hover:bg-[var(--appearance-surface-muted)]"
           aria-label="Close selected word"
         >
           Close
@@ -67,7 +67,7 @@ export default function WordSkySelectedPanel({
           type="button"
           onClick={onSaveGreen}
           disabled={isSaving}
-          className={`rounded-xl border px-3 py-2 text-sm font-medium transition hover:brightness-95 disabled:opacity-60 ${greenButtonClassName}`}
+          className={`rounded-xl border px-3 py-2 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--appearance-accent)] hover:brightness-95 disabled:opacity-60 ${greenButtonClassName}`}
         >
           {greenLabel}
         </button>
@@ -76,7 +76,7 @@ export default function WordSkySelectedPanel({
           type="button"
           onClick={onClearOrClose}
           disabled={isSaving}
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-500 transition hover:bg-slate-50 disabled:opacity-40"
+          className="rounded-xl border border-[var(--appearance-border)] bg-[var(--appearance-surface)] px-3 py-2 text-sm font-medium text-[var(--appearance-muted-text)] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--appearance-accent)] hover:bg-[var(--appearance-surface-muted)] disabled:opacity-40"
         >
           {hasClaim ? "Leave it clear" : "Leave it clear"}
         </button>
