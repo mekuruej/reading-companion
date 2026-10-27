@@ -8,10 +8,10 @@ export default function MekuruPrivateLessonsPage() {
         <section className="space-y-6">
           <p className="text-sm uppercase tracking-[0.25em] text-[#8a7f71]">Private Lessons</p>
           <h1 className="max-w-4xl text-4xl font-semibold leading-tight md:text-6xl">
-            Private lessons for learners who want to read Japanese more deeply.
+            Private Japanese reading coaching for adults who want to become independent readers.
           </h1>
           <p className="max-w-3xl text-lg leading-8 text-[#4f473d]">
-            Focused reading support for learners who want to slow down, work through real texts, and build lasting understanding.
+            Read authentic Japanese literature with guided support for pronunciation, vocabulary, grammar, and comprehension, building understanding at your own pace.
           </p>
         </section>
 
@@ -67,7 +67,7 @@ export default function MekuruPrivateLessonsPage() {
                 That said, I have built a consistent reading habit over several years and can recommend suitable texts for different levels.
               </p>
               <p className="text-lg leading-8 text-[#4f473d]">
-                If there is something you are interested in reading, feel free to ask. I am happy to take a look and let you know if it would work well.
+                If there is a book you would like to read, please ask. We can consider whether it suits your learning goals and the guided-reading activities we can offer with that material.
               </p>
             </div>
           </div>
@@ -77,20 +77,20 @@ export default function MekuruPrivateLessonsPage() {
           <div className="max-w-4xl space-y-6">
             <h2 className="text-3xl font-semibold">How lessons work</h2>
             <p className="text-lg leading-8 text-[#4f473d]">
-              Lessons are adjusted based on what you are most comfortable with and what helps you learn best.
+              Guided support is at the heart of these lessons. We work directly with Japanese texts, exploring pronunciation, vocabulary, grammar, and meaning at a pace that suits you. Guided reading activities depend on the selected material and applicable permissions.
             </p>
             <div className="grid gap-5 md:grid-cols-3">
               <div className="rounded-[1.5rem] border border-[#d9d1c3] bg-[#f8f5ef] p-6">
                 <h3 className="text-xl font-medium">You read first</h3>
-                <p className="mt-3 leading-7 text-[#4f473d]">You read and I guide you with corrections and support as we go.</p>
+                <p className="mt-3 leading-7 text-[#4f473d]">You try a selected passage with support for pronunciation, vocabulary, grammar, and comprehension as you go.</p>
               </div>
               <div className="rounded-[1.5rem] border border-[#d9d1c3] bg-[#f8f5ef] p-6">
                 <h3 className="text-xl font-medium">We translate together</h3>
-                <p className="mt-3 leading-7 text-[#4f473d]">We translate together and talk through what is happening.</p>
+                <p className="mt-3 leading-7 text-[#4f473d]">We use translation to explore selected sentences and understand how Japanese expresses meaning.</p>
               </div>
               <div className="rounded-[1.5rem] border border-[#d9d1c3] bg-[#f8f5ef] p-6">
                 <h3 className="text-xl font-medium">I read first</h3>
-                <p className="mt-3 leading-7 text-[#4f473d]">I read first and you follow along.</p>
+                <p className="mt-3 leading-7 text-[#4f473d]">Teacher modelling helps you connect pronunciation, phrasing, and meaning while following the Japanese text.</p>
               </div>
             </div>
             <p className="text-lg leading-8 text-[#4f473d]">
@@ -138,10 +138,13 @@ export default function MekuruPrivateLessonsPage() {
                 rel="noopener noreferrer"
                 className="inline-block rounded-full border border-stone-900 bg-white px-5 py-3 text-base font-semibold text-stone-950 shadow-sm hover:bg-emerald-50 hover:shadow-md"
               >
-                Trial Lesson — ¥2,000 / 30 minutes
+                Private Lesson Trial — ¥2,000 / 30 minutes
               </a>
               <p className="mt-3 text-sm leading-6 text-[#4f473d]">
-                The trial is a 30-minute private lesson where we&apos;ll read Japanese together, talk about your reading goals, and get a sense of your current reading level. It&apos;s a chance to experience what lessons are like and decide whether they&apos;re a good fit for you.
+                The Private Lesson Trial is a paid, 30-minute introduction to private Japanese reading coaching. We&apos;ll work through material selected for the session, talk about your reading goals, and explore the language support that would help you become a more independent reader.
+              </p>
+              <p className="mt-2 text-xs text-stone-500">
+                Trial tuition: ¥2,000 for students residing in Japan. International trial rates are provided when booking.
               </p>
             </div>
           </div>

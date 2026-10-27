@@ -5,34 +5,34 @@ export default function MekuruReadingGroupsPage() {
 
         {/* Hero */}
         <section className="space-y-6">
-          <p className="text-sm uppercase tracking-[0.25em] text-[#8a7f71]">Reading Groups</p>
+          <p className="text-sm uppercase tracking-[0.25em] text-[#8a7f71]">Planned Guided Reading Cohorts</p>
           <h1 className="max-w-4xl text-4xl font-semibold leading-tight md:text-6xl">
-            Reading groups for learners who want to work through real Japanese texts together.
+            Guided reading cohorts for adults exploring authentic Japanese literature.
           </h1>
           <p className="max-w-3xl text-lg leading-8 text-[#4f473d]">
-            Challenge yourself with small sections of real text, come with questions, and build confidence by reading with learners around your level.
+            We are developing small, teacher-supported cohorts built around reading Japanese together. Enrollment is not open yet; each cohort depends on confirmation of the selected book and any necessary publisher permission.
           </p>
         </section>
 
         {/* What reading groups are */}
         <section className="mt-16 rounded-[2rem] border border-[#d9d1c3] bg-white p-8 shadow-sm md:p-10">
           <div className="space-y-5">
-            <h2 className="text-3xl font-semibold">What reading groups are</h2>
+            <h2 className="text-3xl font-semibold">What we are planning</h2>
             <p className="text-lg leading-8 text-[#4f473d]">
-              Reading groups are not passive lessons. They are a space where you try first, and then work through what was difficult together.
+              The planned cohorts would help adult learners become more independent readers through guided reading, pronunciation, vocabulary, grammar, and comprehension support.
             </p>
             <p className="text-lg leading-8 text-[#4f473d]">
-              Before each session, you prepare a small section on your own. For lower levels, this might be as little as one page.
+              Participants would prepare a manageable section before each session. Guided reading would then give us time to work directly through the Japanese together.
             </p>
             <p className="text-lg leading-8 text-[#4f473d]">
-              You do not need to understand everything. The goal is to notice what was difficult and bring that into the discussion.
+              You would not need to understand everything in advance. The teacher would help you work through difficult language in the text and build confidence for your own reading.
             </p>
           </div>
         </section>
 
         {/* How groups work */}
         <section className="mt-16 space-y-10">
-          <h2 className="text-3xl font-semibold">How reading groups work</h2>
+          <h2 className="text-3xl font-semibold">The proposed guided-reading format</h2>
 
           <div className="grid gap-6 md:grid-cols-2">
 
@@ -46,7 +46,7 @@ export default function MekuruReadingGroupsPage() {
             <div className="rounded-[1.5rem] border border-[#d9d1c3] bg-white p-6">
               <h3 className="text-xl font-medium">Read together</h3>
               <p className="mt-3 leading-7 text-[#4f473d]">
-                We read through the section together with minimal stopping to build a sense of flow.
+                Work through selected passages with teacher modelling and support for readings, pronunciation, vocabulary, grammar, and meaning.
               </p>
             </div>
 
@@ -67,7 +67,7 @@ export default function MekuruReadingGroupsPage() {
           </div>
 
           <p className="text-lg leading-8 text-[#4f473d]">
-            Groups are organized by level, and pacing is kept realistic so you can consistently prepare and engage with the text.
+            The book, level, schedule, duration, and fees would be announced for each cohort before enrollment opens.
           </p>
         </section>
 
@@ -92,24 +92,24 @@ export default function MekuruReadingGroupsPage() {
           <h2 className="text-3xl font-semibold">Groups and future plans</h2>
 
           <p className="text-lg leading-8 text-[#4f473d]">
-            The first group will be beginner friendly. More levels will be added over time as the community grows.
+            Private Japanese reading coaching is currently available. Paid guided-reading cohorts are planned separately and are not yet open for enrollment.
           </p>
 
           <p className="text-lg leading-8 text-[#4f473d]">
-            Study sessions are also available for learners around JLPT N4 and above.
+            The free Facebook community is a place for questions, connection, and updates. It is separate from paid private lessons and planned cohorts.
           </p>
 
           <p className="text-lg leading-8 text-[#4f473d]">
-            In the future, reading retreats will offer a deeper, shared reading experience.
+            Reading retreats remain a longer-term possibility.
           </p>
         </section>
 
         {/* CTA */}
         <section className="mt-16 rounded-[2rem] border border-[#d9d1c3] bg-white p-8 shadow-sm md:p-10">
           <div className="space-y-4">
-            <h2 className="text-3xl font-semibold">You do not have to continue struggling alone.</h2>
+            <h2 className="text-3xl font-semibold">Stay connected as the cohorts take shape.</h2>
             <p className="text-lg leading-8 text-[#4f473d]">
-              Working through texts with others can change the experience completely.
+              Follow MEKURU for updates about planned cohorts, or ask about private Japanese reading coaching that is currently available.
             </p>
             <div className="pt-2 flex gap-3">
               <button className="rounded-full border border-[#b6ab99] px-5 py-3 text-sm hover:bg-[#efe8dc]">

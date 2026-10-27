@@ -65,7 +65,7 @@ export default function MekuruHomepage() {
                     </h1>
                     <p className="mx-auto max-w-2xl text-base leading-7 text-[#4f473d]">
                         You&apos;re not alone in finding kanji, complex sentences, or large amounts of vocabulary overwhelming.
-                        <br />I help learners work through real Japanese texts using English explanations to help you understand what's happening, notice grammar you might easily miss on your own, and build your confidence page by page.
+                        <br />I help adult learners become independent readers of authentic Japanese literature. Through guided reading and English-language explanations, we work on pronunciation, vocabulary, grammar, and comprehension, building confidence page by page.
                     </p>
                     <p className="text-l text-[#6b6257]">ページをめくって、話しまくろう！</p>
                 </section>
@@ -105,14 +105,12 @@ export default function MekuruHomepage() {
                             rel="noopener noreferrer"
                             className="inline-block rounded-2xl border border-stone-900 bg-white px-6 py-3 text-base font-semibold text-stone-950 shadow-sm hover:bg-emerald-50 hover:shadow-md"
                         >
-                            Trial Lesson — 30 minutes
+                            Private Lesson Trial — 30 minutes
                         </a>
                         <p className="mt-3 text-sm text-stone-600">
-                            The trial is a 30-minute private lesson where we&apos;ll
-                            read Japanese together, talk about your reading goals,
-                            and get a sense of your current reading level.
-                            It&apos;s a chance to experience what lessons are like
-                            and decide whether they&apos;re a good fit for you.
+                            The Private Lesson Trial is a paid, 30-minute introduction to private Japanese reading coaching.
+                            We&apos;ll work through material selected for the session, talk about your reading goals,
+                            and explore the language support that would help you become a more independent reader.
                         </p>
 
                         <p className="mt-2 text-xs text-stone-500">
@@ -125,9 +123,10 @@ export default function MekuruHomepage() {
                 <section className="-mt-4 space-y-4">
                     <h2 className="text-2xl font-semibold">Private Lessons</h2>
                     <p className="text-base leading-7 text-[#4f473d]">
-                        We work through real Japanese texts together, focusing on understanding rather than rushing through material.
-                        Some students prefer to translate every sentence or paragraph together, some prefer that I read first, and
-                        some prefer to try first. Whatever works best for you.
+                        Private Japanese reading coaching is available for adult learners. Reading together is central to the approach:
+                        we work directly with authentic Japanese texts, taking time with pronunciation, vocabulary, grammar, and meaning.
+                        Your own reading, teacher modelling, and translation of selected sentences can all support that process.
+                        Guided reading activities depend on the selected material and applicable permissions.
                     </p>
                     <p className="text-base leading-7 text-[#4f473d]">
                         My lessons focus on reading and understanding Japanese. Many students choose to combine this with conversation
@@ -211,9 +210,8 @@ export default function MekuruHomepage() {
                                     <p className="mt-2 text-xs text-stone-500">Track your reading, build your vocabulary, and keep everything you need for your Japanese books in one place.</p>
                                 </div>
                                 <p className="mt-2 text-xs leading-5 text-stone-500">
-                                    Not currently taking lessons? MEKURU Japanese Learning is also being tested with independent
-                                    Japanese readers. Join the Interest List if you&apos;d like to be considered for a future
-                                    Guided Japanese Trial.
+                                    Not taking lessons? Independent readers can join the Interest List to be considered for an invitation-based
+                                    Guided App Trial of MEKURU&apos;s Japanese Learning Tools. This is separate from the paid Private Lesson Trial.
                                 </p>
 
                                 <Link
@@ -281,14 +279,12 @@ export default function MekuruHomepage() {
                         rel="noopener noreferrer"
                         className="inline-block rounded-2xl border border-stone-900 bg-white px-6 py-3 text-base font-semibold text-stone-950 shadow-sm hover:bg-emerald-50 hover:shadow-md"
                     >
-                        Trial Lesson — 30 minutes
+                        Private Lesson Trial — 30 minutes
                     </a>
                     <p className="mt-3 text-sm text-stone-600">
-                        The trial is a 30-minute private lesson where we&apos;ll
-                        read Japanese together, talk about your reading goals,
-                        and get a sense of your current reading level.
-                        It&apos;s a chance to experience what lessons are like
-                        and decide whether they&apos;re a good fit for you.
+                        The Private Lesson Trial is a paid, 30-minute introduction to private Japanese reading coaching.
+                        We&apos;ll work through material selected for the session, talk about your reading goals,
+                        and explore the language support that would help you become a more independent reader.
                     </p>
 
                     <p className="mt-2 text-xs text-stone-500">
