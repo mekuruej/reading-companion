@@ -298,21 +298,20 @@ test('Library loader groups sessions by book and preserves page, legacy, Kindle,
   assert.equal(staleStats, undefined);
 });
 
-test('Ability Check reminder waits for Library render and bounds refresh/query work', () => {
+test('daily invitation waits for Library render, coalesces refreshes and uses verified complete readiness', () => {
   const pageSource = fs.readFileSync(base + 'page.tsx', 'utf8');
-  assert.match(pageSource, /if \(libraryBooksLoading\) \{\s*cancelAbilityCheckReminderLoad\(\);\s*return;\s*\}\s*void loadAbilityCheckReminder/);
-  assert.match(pageSource, /window\.addEventListener\("focus", queueForegroundRefresh\)/);
-  assert.match(pageSource, /document\.addEventListener\("visibilitychange", handleVisibilityChange\)/);
-  assert.match(pageSource, /setTimeout\(flushForegroundRefresh, 150\)/);
-  assert.match(pageSource, /activeRequest\.controller\.abort\(\)/);
-  assert.match(pageSource, /Promise\.all\(\[\s*supabase\s*\.from\("user_library_word_summaries"\)[\s\S]*?\.from\("user_library_word_claims"\)/);
-  assert.match(pageSource, /\.order\("updated_at", \{ ascending: false \}\)\s*\.limit\(500\)/);
-  assert.match(pageSource, /keys\.slice\(i, i \+ 75\)/);
-  assert.match(pageSource, /progressChunks\.slice\(i, i \+ 3\)/);
-  assert.match(pageSource, /const ABILITY_CHECK_REMINDER_MIN_DUE_CARDS = 10/);
-  assert.doesNotMatch(pageSource, /select\("id, study_identity_key, surface, reading, meaning, claimed_color, created_at, updated_at"\)/);
-  assert.doesNotMatch(pageSource, /mastered_at, reading_gate_failed_at/);
-  assert.match(pageSource, /router\.push\("\/library-study\/check\?start=1"\)/);
+  assert.match(pageSource, /isViewingOwnLibrary && !libraryBooksLoading && !libraryBooksError/);
+  const reminder = fs.readFileSync(base + 'components/DailyLibraryReminder.tsx', 'utf8');
+  assert.match(reminder, /window.addEventListener\('focus', foreground\)/);
+  assert.match(reminder, /document.addEventListener\('visibilitychange', visible\)/);
+  assert.match(reminder, /setTimeout\(update, 150\)/);
+  assert.match(reminder, /inFlight.current.get\(key\)/);
+  assert.match(reminder, /stale = true/);
+  const readiness = fs.readFileSync('lib/study/dailyReminderReadiness.ts', 'utf8');
+  assert.match(readiness, /loadAllPagedRows/);
+  assert.match(readiness, /keys.slice\(i, i \+ 75\)/);
+  assert.match(readiness, /eligibleIdentityCount >= 100 && dueCardCount >= 10/);
+  assert.match(reminder, /\/library-study\/check\?start=1/);
 });
 
 

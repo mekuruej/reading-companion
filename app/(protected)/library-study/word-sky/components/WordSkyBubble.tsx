@@ -27,8 +27,8 @@ export default function WordSkyBubble({
       type="button"
       onClick={onClick}
       className={[
-        "absolute rounded-full border-0 bg-transparent p-0 text-left shadow-none transition",
-        isSelected ? "ring-2 ring-slate-700" : "",
+        "absolute rounded-full border-0 bg-transparent p-0 text-left shadow-none transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--appearance-accent)]",
+        isSelected ? "ring-2 ring-[var(--appearance-accent)]" : "",
       ].join(" ")}
       style={{
         left: "-18%",
@@ -37,7 +37,7 @@ export default function WordSkyBubble({
       }}
     >
       <span
-        className={`block rounded-full border px-4 py-3 shadow-sm backdrop-blur transition hover:shadow-md ${bubbleClassName}`}
+        className={`block rounded-full border px-4 py-3 shadow-sm backdrop-blur transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--appearance-accent)] hover:shadow-md ${bubbleClassName}`}
         style={{
           animation: `word-sky-bob ${word.bobDuration}s ease-in-out ${word.bobDelay}s infinite`,
         }}

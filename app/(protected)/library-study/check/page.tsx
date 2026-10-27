@@ -3,6 +3,8 @@
 
 "use client";
 
+import { dismissCompletedAbilityCheckReminder } from '@/lib/study/abilityCheckReminderCompletion';
+import { hasAbilityCheckRestDays } from "@/lib/abilityCheckSpacing";
 import { loadPersonallyHiddenStudyKeys } from "@/lib/vocabulary/personalVisibilityData";
 import { visibleStudyEncounters } from "@/lib/vocabulary/personalVisibility";
 import { savedSenseNumber, senseDefinitionKey, senseStudyKey, cardSenseKey, groupSavedSenseEncounters } from "@/lib/studySenseIdentity";
@@ -17,7 +19,25 @@ import {
   type LibraryStudyGateStatus,
   type LibraryStudyColorStatus,
 } from "@/lib/libraryStudyColor";
-import { hasAbilityCheckRestDays } from "@/lib/abilityCheckSpacing";
+import {
+  normalizeJlpt,
+  hashString,
+  isCardAvailableForLibraryCheck,
+} from '@/lib/study/abilityCheckScheduler';
+import {
+  studyIdentityKey,
+  progressWithWordSkyClaim,
+  isReadyForReadingGateProgress,
+  preReadingSupportCycle,
+  pickLibraryCheckGate,
+  buildReadingAbilityCheckCards,
+  buildClaimAbilityCheckCards,
+  type UserBookWordRow,
+  type LearningSettingsRow,
+  type LibraryWordProgressRow,
+  type LibraryWordClaimRow,
+  type StudyCard,
+} from '@/lib/study/abilityCheckCards';
 import { normalizeKanaReading } from "@/lib/kanaInput";
 import { getAppAccessStatus } from "@/lib/access/appAccess";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
@@ -60,86 +80,6 @@ type UserBookJoinRow = {
     cover_url: string | null;
   }[]
   | null;
-};
-
-type UserBookWordRow = {
-  study_identity_key?: string | null;
-  alternative_surface?: string | null;
-  id: string;
-  user_book_id: string;
-  surface: string | null;
-  reading: string | null;
-  meaning: string | null;
-  meaning_choice_index: number | null;
-  jlpt: string | null;
-  hidden: boolean | null;
-  flashcard_hidden?: boolean;
-  created_at: string;
-};
-
-type LearningSettingsRow = {
-  red_stages: number | null;
-  orange_stages: number | null;
-  yellow_stages: number | null;
-  show_badge_numbers: boolean | null;
-  skip_katakana_library_check?: boolean | null;
-};
-
-type LibraryWordProgressRow = {
-  id?: string;
-  user_id: string;
-  study_identity_key: string;
-  surface: string | null;
-  reading: string | null;
-  definition_key: string;
-  reading_gate_status: LibraryStudyGateStatus;
-  meaning_gate_status: LibraryStudyGateStatus;
-  held_before_reading_gate: boolean;
-  held_before_meaning_gate: boolean;
-  mastered: boolean;
-  reading_gate_attempts: number;
-  meaning_gate_attempts: number;
-  reading_gate_passed_at: string | null;
-  reading_gate_failed_at: string | null;
-  meaning_gate_passed_at: string | null;
-  meaning_gate_failed_at: string | null;
-  mastered_at: string | null;
-  last_studied_at: string | null;
-};
-
-
-
-type LibraryWordClaimRow = {
-  id: string;
-  study_identity_key: string;
-  surface: string | null;
-  reading: string | null;
-  meaning: string | null;
-  claimed_color: "green" | string | null;
-  created_at: string | null;
-  updated_at: string | null;
-};
-
-type LibraryCheckGate = "readiness" | "reading" | "meaning";
-
-type StudyCard = {
-  alternative_surface?: string | null;
-  id: string;
-  userBookId: string;
-  bookTitle: string;
-  bookCoverUrl: string | null;
-  surface: string;
-  reading: string;
-  meaning: string;
-  jlpt: string | null;
-  encounterCount: number;
-  encounterIds: string[];
-  colorStatus: LibraryStudyColorStatus;
-  activeGate: LibraryCheckGate;
-  studyIdentityKey: string;
-  progress: LibraryWordProgressRow | null;
-  definitionNumber: number | null;
-  lastEncounteredAt: string | null;
 };
 
 type MeaningReviewItem = {
@@ -308,29 +248,13 @@ function normalizeKana(value: string) {
   return normalizeKanaReading(value ?? "");
 }
 
-function normalizeJlpt(value: string | null | undefined) {
-  return (value ?? "NON-JLPT").toUpperCase() || "NON-JLPT";
-}
-
 function isKatakanaOnly(value: string | null | undefined) {
   const compact = (value ?? "").trim().replace(/\s+/g, "");
   return compact.length > 0 && /^[ァ-ヶー・･]+$/.test(compact);
 }
 
-function isKanaOnly(value: string | null | undefined) {
-  const compact = (value ?? "").trim().replace(/[\sー・･]/g, "");
-  return compact.length > 0 && /^[\u3041-\u3096\u30A1-\u30FA]+$/.test(compact);
-}
-
 function containsJapaneseText(value: string | null | undefined) {
   return /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(value ?? "");
-}
-
-function studyIdentityKey(surface: string | null | undefined, reading: string | null | undefined) {
-  const normalizedSurface = normalizeText(surface ?? "");
-  const normalizedReading = normalizeKana(reading ?? "");
-  if (!normalizedSurface) return "";
-  return `${normalizedSurface}||${normalizedReading}`;
 }
 
 function isClaimCardId(id: string | null | undefined) {
@@ -343,10 +267,6 @@ function getBookMeta(row: UserBookJoinRow) {
     title: book?.title ?? "Untitled",
     cover_url: book?.cover_url ?? null,
   };
-}
-
-function definitionNumberFromIndex(index: number | null | undefined) {
-  return savedSenseNumber(index);
 }
 
 function definitionLabel(card: StudyCard | null | undefined) {
@@ -362,23 +282,6 @@ function definitionLabel(card: StudyCard | null | undefined) {
       : `Definition ${card.definitionNumber}`;
   }
   return "";
-}
-
-
-
-function latestWordCreatedAt(words: UserBookWordRow[]) {
-  return words.reduce<string | null>((latest, word) => {
-    if (!word.created_at) return latest;
-    if (!latest) return word.created_at;
-
-    const latestTime = new Date(latest).getTime();
-    const wordTime = new Date(word.created_at).getTime();
-
-    if (Number.isNaN(wordTime)) return latest;
-    if (Number.isNaN(latestTime)) return word.created_at;
-
-    return wordTime > latestTime ? word.created_at : latest;
-  }, null);
 }
 
 async function loadAllLibraryCheckWords(userBookIds: string[]) {
@@ -491,122 +394,6 @@ async function loadLibraryProgressByKey(userId: string, studyKeys: string[]) {
   return progressByKey;
 }
 
-function progressWithWordSkyClaim(
-  userId: string,
-  key: string,
-  surface: string,
-  reading: string,
-  progress: LibraryWordProgressRow | null,
-  claim: LibraryWordClaimRow | null | undefined
-): LibraryWordProgressRow | null {
-  if (!claim || claim.claimed_color !== "green") return progress;
-
-  const hasExistingGateHistory =
-    progress &&
-    (
-      progress.reading_gate_status !== "not_started" ||
-      progress.meaning_gate_status !== "not_started" ||
-      progress.held_before_reading_gate ||
-      progress.held_before_meaning_gate ||
-      progress.mastered
-    );
-
-  if (hasExistingGateHistory) return progress;
-
-  return {
-    id: progress?.id,
-    user_id: userId,
-    study_identity_key: key,
-    surface,
-    reading,
-    definition_key: "",
-    reading_gate_status: "not_started",
-    meaning_gate_status: "not_started",
-    held_before_reading_gate: false,
-    held_before_meaning_gate: false,
-    mastered: false,
-    reading_gate_attempts: progress?.reading_gate_attempts ?? 0,
-    meaning_gate_attempts: progress?.meaning_gate_attempts ?? 0,
-    reading_gate_passed_at: progress?.reading_gate_passed_at ?? null,
-    reading_gate_failed_at: progress?.reading_gate_failed_at ?? null,
-    meaning_gate_passed_at: progress?.meaning_gate_passed_at ?? null,
-    meaning_gate_failed_at: progress?.meaning_gate_failed_at ?? null,
-    mastered_at: progress?.mastered_at ?? null,
-    last_studied_at: progress?.last_studied_at ?? null,
-  };
-}
-
-function isReadyForReadingGateProgress(progress: LibraryWordProgressRow | null | undefined) {
-  return Boolean(
-    progress?.id &&
-    progress.reading_gate_status === "not_started" &&
-    progress.meaning_gate_status === "not_started" &&
-    !progress.held_before_reading_gate &&
-    !progress.held_before_meaning_gate &&
-    !progress.mastered
-  );
-}
-
-function preReadingSupportCycle(progress: LibraryWordProgressRow | null | undefined) {
-  if (!progress?.held_before_reading_gate) return null;
-  return Math.max(2, (progress.reading_gate_attempts ?? 0) + 1);
-}
-
-function makeClaimStudyCard(
-  userId: string,
-  claim: LibraryWordClaimRow,
-  colorSettings: LearningSettingsRow,
-  progressByKey: Map<string, LibraryWordProgressRow>
-): StudyCard | null {
-  const key = claim.study_identity_key;
-  const surface = (claim.surface ?? "").trim();
-  const reading = (claim.reading ?? "").trim();
-  const meaning = (claim.meaning ?? "").trim();
-
-  if (!key || !surface || !reading || !meaning) return null;
-
-  const progress = progressWithWordSkyClaim(
-    userId,
-    key,
-    surface,
-    reading,
-    progressByKey.get(senseStudyKey(key)) ?? null,
-    claim
-  );
-
-  const colorStatus = computeLibraryStudyColorStatus({
-    encounterCount: 0,
-    claimedGreen: claim.claimed_color === "green",
-    settings: colorSettings,
-    readingGate: progress?.reading_gate_status ?? "not_started",
-    meaningGate: progress?.meaning_gate_status ?? "not_started",
-    heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
-    heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
-    readyForReadingGate: isReadyForReadingGateProgress(progress),
-    preReadingSupportCycle: preReadingSupportCycle(progress),
-    mastered: progress?.mastered ?? false,
-  });
-
-  return {
-    id: `claim:${key}`,
-    userBookId: "",
-    bookTitle: "Word Sky",
-    bookCoverUrl: null,
-    surface,
-    reading,
-    meaning,
-    jlpt: null,
-    encounterCount: 0,
-    encounterIds: [],
-    colorStatus,
-    activeGate: pickLibraryCheckGate(colorStatus, key, surface),
-    studyIdentityKey: key,
-    progress,
-    definitionNumber: 1,
-    lastEncounteredAt: claim.updated_at ?? claim.created_at ?? null,
-  };
-}
-
 function libraryStudyCardClass(status: LibraryStudyColorStatus | undefined) {
   const color = status?.color ?? "yellow";
   const base =
@@ -655,65 +442,9 @@ function libraryStudyColorName(status: LibraryStudyColorStatus | undefined) {
   return color.charAt(0).toUpperCase() + color.slice(1);
 }
 
-function hashString(value: string) {
-  let hash = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash * 31 + value.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-}
-
-function pickLibraryCheckGate(
-  status: LibraryStudyColorStatus,
-  _seed: string,
-  surface?: string | null
-): LibraryCheckGate {
-  if (status.color === "red" && status.eligibleForLibraryStudy) return "readiness";
-  if (status.color === "yellow" && status.eligibleForLibraryStudy) return "readiness";
-  if (isKanaOnly(surface)) return "meaning";
-  if (status.nextGate === "reading") return "reading";
-  if (status.nextGate === "meaning") return "meaning";
-  return "reading";
-}
-
-function includeLibraryCheckCard(status: LibraryStudyColorStatus) {
-  return status.eligibleForLibraryStudy || status.nextGate === "reading" || status.nextGate === "meaning";
-}
-
-function daysSinceIso(value: string | null | undefined, now = new Date()) {
-  if (!value) return Number.POSITIVE_INFINITY;
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return Number.POSITIVE_INFINITY;
-
-  return (now.getTime() - date.getTime()) / (24 * 60 * 60 * 1000);
-}
-
-function missedGateRecheckDays(card: StudyCard) {
-  return (
-    MISSED_GATE_RECHECK_MIN_DAYS +
-    (hashString(`${cardSenseKey(card)}::missed-gate`) % MISSED_GATE_RECHECK_WINDOW_DAYS)
-  );
-}
-
-function regularGateRecheckDays(card: StudyCard) {
-  return (
-    REGULAR_GATE_RECHECK_MIN_DAYS +
-    (hashString(`${cardSenseKey(card)}::regular-gate`) % REGULAR_GATE_RECHECK_WINDOW_DAYS)
-  );
-}
-
 function appDayNumber(now = new Date()) {
   const [year, month, day] = ymdInTimeZone(now).split("-").map(Number);
   return Math.floor(Date.UTC(year, month - 1, day) / (24 * 60 * 60 * 1000));
-}
-
-function isInitialGateSlotDue(card: StudyCard, now = new Date()) {
-  return true;
-}
-
-function isInitialYellowReadinessSlotDue(card: StudyCard, now = new Date()) {
-  return true;
 }
 
 function lastStudiedTime(card: StudyCard) {
@@ -784,96 +515,6 @@ function buildBalancedDailyCheckDeck(cards: StudyCard[]) {
   }
 
   return selected;
-}
-
-function isMissedGateLimboDue(card: StudyCard, now = new Date()) {
-  if (card.colorStatus.color !== "grey") return true;
-
-  if (card.colorStatus.greyReason === "pre_reading_support") {
-    const recheckDays = card.progress?.held_before_meaning_gate
-      ? PRE_READING_WAIT_RECHECK_DAYS
-      : PRE_READING_SOFT_WAIT_RECHECK_DAYS;
-
-    return daysSinceIso(card.progress?.last_studied_at, now) >= recheckDays;
-  }
-
-  const recheckDays = missedGateRecheckDays(card);
-
-  if (card.colorStatus.greyReason === "reading_gate_support") {
-    return daysSinceIso(card.progress?.reading_gate_failed_at, now) >= recheckDays;
-  }
-
-  if (card.colorStatus.greyReason === "meaning_gate_support") {
-    return daysSinceIso(card.progress?.meaning_gate_failed_at, now) >= recheckDays;
-  }
-
-  return true;
-}
-
-function isBackToRedSupportCard(card: StudyCard) {
-  return (
-    card.colorStatus.color === "red" &&
-    card.progress?.held_before_reading_gate === true &&
-    card.progress?.held_before_meaning_gate === true
-  );
-}
-
-function isYellowReadinessCard(card: StudyCard) {
-  return card.activeGate === "readiness" && card.colorStatus.color === "yellow";
-}
-
-function isYellowReadinessCooldownDue(card: StudyCard, now = new Date()) {
-  const anchorDate = card.lastEncounteredAt ?? card.progress?.last_studied_at;
-
-  if (!anchorDate) {
-    return isInitialYellowReadinessSlotDue(card, now);
-  }
-
-  return daysSinceIso(anchorDate, now) >= YELLOW_READINESS_COOLDOWN_DAYS;
-}
-
-function isRegularGateRecheckDue(card: StudyCard, now = new Date()) {
-  if (isYellowReadinessCard(card)) {
-    return isYellowReadinessCooldownDue(card, now);
-  }
-
-  if (isBackToRedSupportCard(card)) {
-    return daysSinceIso(card.progress?.last_studied_at, now) >= PRE_READING_WAIT_RECHECK_DAYS;
-  }
-
-  if (card.colorStatus.color === "purple" || card.colorStatus.color === "grey") return true;
-  if (!card.progress?.last_studied_at) return isInitialGateSlotDue(card, now);
-
-  return daysSinceIso(card.progress.last_studied_at, now) >= regularGateRecheckDays(card);
-}
-
-function isCardAvailableForLibraryCheck(
-  card: StudyCard,
-  selectedJlpt: string,
-  seenTodayIds: Set<string>,
-  options: { ignoreTiming?: boolean } = {}
-) {
-  const jlptMatch = selectedJlpt === "all" || normalizeJlpt(card.jlpt) === selectedJlpt;
-
-  if (!jlptMatch) return false;
-  if (!includeLibraryCheckCard(card.colorStatus)) return false;
-  if (isYellowReadinessCard(card) && !isYellowReadinessCooldownDue(card)) {
-    return false;
-  }
-
-  if (!hasAbilityCheckRestDays(card.progress?.last_studied_at)) return false;
-
-  // Used by "Check Again Today" so the button really means:
-  // "give me cards outside their usual schedule, after the minimum rest period."
-  if (options.ignoreTiming) return true;
-
-  const notSeenToday = !isCardSeenToday(card, seenTodayIds);
-
-  return (
-    notSeenToday &&
-    isMissedGateLimboDue(card) &&
-    isRegularGateRecheckDue(card)
-  );
 }
 
 function buildDailyCheckDeckSource(
@@ -1619,6 +1260,7 @@ export default function LibraryStudyPage() {
   const searchParams = useSearchParams();
   const typingInputRef = useRef<HTMLInputElement | null>(null);
   const autoStartedCheckRef = useRef(false);
+  const reminderSeenIdsRef = useRef(new Set<string>());
   const restartingCardRef = useRef(false);
   const directStartRequested = searchParams.get("start") === "1";
 
@@ -1665,6 +1307,10 @@ export default function LibraryStudyPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [seenTodayIds, setSeenTodayIds] = useState<Set<string>>(new Set());
   const [activeTodayKey, setActiveTodayKey] = useState(getTodayKey());
+  useEffect(() => {
+    reminderSeenIdsRef.current.clear();
+  }, [currentUserId, activeTodayKey, dailyCheckPlan?.startedAt]);
+
   const [meaningReviewItems, setMeaningReviewItems] = useState<MeaningReviewItem[]>([]);
   const [showPracticeMeaningReview, setShowPracticeMeaningReview] = useState(false);
 
@@ -1927,66 +1573,10 @@ export default function LibraryStudyPage() {
           }
         }
 
-        const cards: StudyCard[] = Array.from(groupedWords.entries())
-          .map<StudyCard | null>(([senseKey, group]) => {
-            const key = (group[0].study_identity_key || studyIdentityKey(group[0].surface, group[0].reading));
-            const primarySense = savedSenseNumber(group[0].meaning_choice_index) === 1;
-            const activeGroup = visibleStudyEncounters(group);
-            if (!activeGroup.length) return null;
-            const representative = activeGroup[0];
-            const meta = metaById.get(representative.user_book_id);
-            const surface = representative.surface!.trim();
-            const reading = representative.reading!.trim();
-            const lastEncounteredAt = latestWordCreatedAt(group);
-            const progress = progressWithWordSkyClaim(
-              user.id,
-              key,
-              surface,
-              reading,
-              progressByKey.get(senseKey) ?? null,
-              (primarySense ? claimByKey.get(key) : undefined)
-            );
-
-            const colorStatus = computeLibraryStudyColorStatus({
-              encounterCount: group.length,
-              claimedGreen: (primarySense ? claimByKey.get(key) : undefined)?.claimed_color === "green",
-              settings: colorSettings,
-              readingGate: progress?.reading_gate_status ?? "not_started",
-              meaningGate: progress?.meaning_gate_status ?? "not_started",
-              heldBeforeReadingGate: progress?.held_before_reading_gate ?? false,
-              heldBeforeMeaningGate: progress?.held_before_meaning_gate ?? false,
-              readyForReadingGate: isReadyForReadingGateProgress(progress),
-              preReadingSupportCycle: preReadingSupportCycle(progress),
-              mastered: progress?.mastered ?? false,
-            });
-
-            return {
-              id: representative.id,
-              userBookId: representative.user_book_id,
-              bookTitle: meta?.title ?? "Untitled",
-              bookCoverUrl: meta?.cover_url ?? null,
-              surface,
-              reading,
-              meaning: representative.meaning!.trim(),
-              alternative_surface: representative.alternative_surface,
-              jlpt: representative.jlpt ?? null,
-              encounterCount: group.length,
-              encounterIds: activeGroup.map((word) => word.id),
-              colorStatus,
-              activeGate: pickLibraryCheckGate(colorStatus, key, surface),
-              studyIdentityKey: key,
-              progress,
-              definitionNumber: definitionNumberFromIndex(representative.meaning_choice_index),
-              lastEncounteredAt,
-            };
-          })
-          .filter((card): card is StudyCard => Boolean(card));
+        const cards = buildReadingAbilityCheckCards({ userId:user.id, groupedWords, claimByKey, progressByKey, colorSettings, metaById });
 
         const personallyHidden = await loadPersonallyHiddenStudyKeys();
-        const claimCards = claimRows
-          .filter((claim) => !personallyHidden.has(claim.study_identity_key) && !groupedWords.has(senseStudyKey(claim.study_identity_key)))
-          .map((claim) => makeClaimStudyCard(user.id, claim, colorSettings, progressByKey))
-          .filter((card): card is StudyCard => Boolean(card));
+        const claimCards = buildClaimAbilityCheckCards({ userId:user.id, groupedWords, progressByKey, colorSettings, claimRows, personallyHidden });
         const allStudyCards = [...cards, ...claimCards];
 
         setAllCards(allStudyCards);
@@ -2155,6 +1745,7 @@ export default function LibraryStudyPage() {
     if (index < deck.length) return;
 
     completeAbilityCheckForToday();
+    void dismissCompletedSessionReminder(true);
   }, [libraryMode, endedEarly, deck.length, index]);
 
   function resetCardState() {
@@ -2164,7 +1755,24 @@ export default function LibraryStudyPage() {
     setTypingCorrectionComplete(false);
   }
 
+  async function dismissCompletedSessionReminder(reachedEnd: boolean) {
+    if (!currentUserId || !dailyCheckPlan || libraryMode !== "check") return;
+    const ownerId = currentUserId;
+    const session = {
+      planDay: dailyCheckPlan.dateKey,
+      cardIds: [...(dailyCheckPlan.cardIds ?? [])],
+      seenIds: new Set([...seenTodayIds, ...reminderSeenIdsRef.current]),
+      reachedEnd, endedEarly,
+    };
+    // Read-only identity check before writing an owner-scoped browser marker.
+    const auth = await supabase.auth.getUser().catch(() => null);
+    if (!auth || auth.error || auth.data.user?.id !== ownerId) return;
+    try { dismissCompletedAbilityCheckReminder(window.localStorage, ownerId, session); }
+    catch { /* Storage failure does not affect study completion or progress. */ }
+  }
+
   function markStudyCardSeen(card: StudyCard) {
+    reminderSeenIdsRef.current.add(card.id);
     setSeenTodayIds((prev) => {
       const next = new Set(prev);
       next.add(card.id);
@@ -2201,6 +1809,7 @@ export default function LibraryStudyPage() {
     saveDailyCheckPlanForToday(plan);
 
     brokenCardIdsRef.current.clear();
+    reminderSeenIdsRef.current.clear();
     setDailyCheckPlan(plan);
     setNotice(null);
     setEndedEarly(false);
@@ -2284,6 +1893,7 @@ export default function LibraryStudyPage() {
     if (index + 1 >= deck.length) {
       if (libraryMode === "check" && !endedEarly) {
         completeAbilityCheckForToday();
+        void dismissCompletedSessionReminder(true);
       }
       setIndex(deck.length);
       resetCardState();
@@ -2310,6 +1920,7 @@ export default function LibraryStudyPage() {
 
   function finishMeaningReview() {
     completeAbilityCheckForToday();
+    void dismissCompletedSessionReminder(index >= deck.length);
     setMeaningReviewItems([]);
   }
 

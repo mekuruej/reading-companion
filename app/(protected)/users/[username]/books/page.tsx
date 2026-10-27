@@ -2,17 +2,14 @@
 //
 "use client";
 
+import { getWordSkyLibraryReturnState } from "@/lib/wordSkyExploration";
 import { DEFAULT_PAGE_STYLE } from "@/lib/appearance/defaultAppearance";
 import { effectiveProgressMethod, progressSummary, type ProgressTrackingMethod, type ProgressTotals } from "@/lib/books/readingProgress";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import {
-  getLibraryStudyEncounterStageCounts,
-} from "@/lib/libraryStudyColor";
 import { getAppAccessStatus, isMissingAppAccessColumnError } from "@/lib/access/appAccess";
-import { getFeatureAccess } from "@/lib/access/featureAccess";
-import { canUseFullAccessFeature } from "@/lib/access/requireFullAccess";
+import DailyLibraryReminder from "./components/DailyLibraryReminder";
 import LibraryGuidePanel from "./components/LibraryGuidePanel";
 import LibraryHeader from "./components/LibraryHeader";
 import LibraryViewControls from "./components/LibraryViewControls";
@@ -25,31 +22,15 @@ import LearningTaskCard from "./components/LearningTaskCard";
 import LearningTasksPanel from "./components/LearningTasksPanel";
 import UserBar from "./components/UserBar";
 import {
-  AbilityCheckReminderBanner,
   LearningTasksErrorBanner,
 } from "./components/LibraryStatusBanners";
 import {
   formatRelativeDate,
-  abilityCheckReminderHiddenToday,
-  abilityCheckReminderUnlocked,
-  getTodayKey,
-  hideAbilityCheckReminderForToday,
-  lockAbilityCheckReminder,
-  loadAbilityCheckSeenForToday,
-  unlockAbilityCheckReminder,
   getLibraryItemStatusLabel,
   sortLibraryItems,
 } from "./helpers";
 import { resolvePersonalTrackingStatus } from "@/lib/personalTracking";
 import { getLibraryRelationshipBadge, type LibraryRelationshipBadge } from "./libraryRelationship";
-import {
-  isAbilityCheckClaimInDailyPool,
-  isAbilityCheckCardInDailyPool,
-  type AbilityCheckClaimRow,
-  type AbilityCheckProgressRow,
-  type AbilityCheckReminderSettings,
-  type AbilityCheckSummaryRow,
-} from "./abilityCheckHelpers";
 
 const DAY_MS = 1000 * 60 * 60 * 24;
 
@@ -100,12 +81,6 @@ type TrialBannerState = {
   formattedDate: string;
 } | null;
 
-type AbilityCheckReminderLoadRequest = {
-  controller: AbortController;
-  queued: { userId: string; canUseAbilityCheck: boolean } | null;
-  promise: Promise<void> | null;
-};
-
 type LearningTaskRow = {
   id: string;
   created_by: string;
@@ -133,8 +108,6 @@ type LibrarySortMode =
   | "last_engaged"
   | "rating_high"
   | "difficulty_low";
-
-const ABILITY_CHECK_REMINDER_MIN_DUE_CARDS = 10;
 
 function LibraryBooksLoadingState() {
   return (
@@ -239,17 +212,20 @@ export default function BooksPage() {
   const [viewMode, setViewMode] = useState<"cover" | "list">("cover");
   const [sortMode, setSortMode] = useState<LibrarySortMode>("status");
 
-  const [abilityCheckReminderEnabled, setAbilityCheckReminderEnabled] = useState(true);
-  const [abilityCheckReminderCount, setAbilityCheckReminderCount] = useState(0);
-  const [abilityCheckReminderLoading, setAbilityCheckReminderLoading] = useState(false);
-  const [abilityCheckReminderHidden, setAbilityCheckReminderHidden] = useState(false);
-  const [abilityCheckReminderHasUnlocked, setAbilityCheckReminderHasUnlocked] = useState(false);
-  const [canUseAbilityCheckReminder, setCanUseAbilityCheckReminder] = useState(false);
-  const [abilityCheckReminderDayKey, setAbilityCheckReminderDayKey] = useState(getTodayKey());
-  const abilityCheckReminderLoadRef = useRef<AbilityCheckReminderLoadRequest | null>(null);
-  const abilityCheckReminderLoadFunctionRef = useRef<((userId: string, canUseAbilityCheck: boolean) => Promise<void>) | null>(null);
-  const abilityCheckReminderMountedRef = useRef(false);
-  const abilityCheckReminderForegroundTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const restoredWordSkyPreferencesRef = useRef(false);
+  useEffect(() => {
+    if (restoredWordSkyPreferencesRef.current) return;
+    const restored = getWordSkyLibraryReturnState(window.location.search);
+    if (!restored) return;
+    restoredWordSkyPreferencesRef.current = true;
+    setSearchQuery(restored.search);
+    setBookTypeFilter(restored.bookType);
+    setStatusFilter(restored.status);
+    setSortMode(restored.sort as LibrarySortMode);
+    setViewMode(restored.view);
+    const cleanPath = routeUsername ? `/users/${encodeURIComponent(routeUsername)}/books` : "/books";
+    router.replace(cleanPath, { scroll: false });
+  }, [routeUsername, router]);
 
   const viewingLabel =
     viewingUserId && viewingUserId === meId ? "Me" : viewingUserLabel || "Member";
@@ -275,228 +251,6 @@ export default function BooksPage() {
 
     return () => subscription.unsubscribe();
   }, []);
-
-  const cancelAbilityCheckReminderLoad = useCallback(() => {
-    const activeRequest = abilityCheckReminderLoadRef.current;
-    if (activeRequest) {
-      activeRequest.queued = null;
-      activeRequest.controller.abort();
-    }
-    setAbilityCheckReminderLoading(false);
-  }, []);
-
-  const loadAbilityCheckReminder = useCallback((userId: string, canUseAbilityCheck: boolean): Promise<void> => {
-    if (!canUseAbilityCheck) {
-      cancelAbilityCheckReminderLoad();
-      setAbilityCheckReminderCount(0);
-      setAbilityCheckReminderHasUnlocked(false);
-      lockAbilityCheckReminder();
-      return Promise.resolve();
-    }
-
-    const activeRequest = abilityCheckReminderLoadRef.current;
-    if (activeRequest) {
-      activeRequest.queued = { userId, canUseAbilityCheck };
-      activeRequest.controller.abort();
-      setAbilityCheckReminderLoading(true);
-      return activeRequest.promise ?? Promise.resolve();
-    }
-
-    const request: AbilityCheckReminderLoadRequest = {
-      controller: new AbortController(),
-      queued: null,
-      promise: null,
-    };
-    abilityCheckReminderLoadRef.current = request;
-    const isCurrentRequest = () =>
-      abilityCheckReminderMountedRef.current &&
-      abilityCheckReminderLoadRef.current === request &&
-      !request.controller.signal.aborted;
-
-    setAbilityCheckReminderLoading(true);
-
-    const run = async () => {
-      try {
-        let settings: AbilityCheckReminderSettings | null = null;
-        const { data: settingsWithReminder, error: settingsError } = await supabase
-          .from("user_learning_settings")
-          .select(
-            "red_stages, orange_stages, yellow_stages, skip_katakana_library_check, show_ability_check_reminder"
-          )
-          .eq("user_id", userId)
-          .abortSignal(request.controller.signal)
-          .maybeSingle<AbilityCheckReminderSettings>();
-
-        if (!isCurrentRequest()) return;
-
-        if (settingsError) {
-          const { data: fallbackSettings, error: fallbackError } = await supabase
-            .from("user_learning_settings")
-            .select("red_stages, orange_stages, yellow_stages, skip_katakana_library_check")
-            .eq("user_id", userId)
-            .abortSignal(request.controller.signal)
-            .maybeSingle<AbilityCheckReminderSettings>();
-
-          if (!isCurrentRequest()) return;
-          if (fallbackError) throw fallbackError;
-          settings = fallbackSettings;
-        } else {
-          settings = settingsWithReminder;
-        }
-
-        const resolvedSettings = {
-          red_stages: settings?.red_stages ?? 1,
-          orange_stages: settings?.orange_stages ?? 1,
-          yellow_stages: settings?.yellow_stages ?? 1,
-          skip_katakana_library_check: settings?.skip_katakana_library_check ?? true,
-          show_ability_check_reminder: settings?.show_ability_check_reminder ?? true,
-        };
-
-        setAbilityCheckReminderEnabled(resolvedSettings.show_ability_check_reminder);
-
-        if (!resolvedSettings.show_ability_check_reminder) {
-          setAbilityCheckReminderCount(0);
-          return;
-        }
-
-        const encounterThreshold = getLibraryStudyEncounterStageCounts(resolvedSettings).total;
-
-        const [summaryResult, claimResult] = await Promise.all([
-          supabase
-            .from("user_library_word_summaries")
-            .select(
-              "study_identity_key, surface, reading, meaning, total_encounter_count, last_seen_at, sample_user_book_word_id"
-            )
-            .eq("user_id", userId)
-            .gt("check_ready_encounter_count", 0)
-            .gte("total_encounter_count", encounterThreshold)
-            .order("total_encounter_count", { ascending: false })
-            .limit(500)
-            .abortSignal(request.controller.signal)
-            .returns<AbilityCheckSummaryRow[]>(),
-          supabase
-            .from("user_library_word_claims")
-            .select("study_identity_key, surface, reading, meaning, claimed_color")
-            .eq("user_id", userId)
-            .eq("claimed_color", "green")
-            .order("updated_at", { ascending: false })
-            .limit(500)
-            .abortSignal(request.controller.signal)
-            .returns<AbilityCheckClaimRow[]>(),
-        ]);
-
-        if (!isCurrentRequest()) return;
-
-        const { data: summaryRows, error: summaryError } = summaryResult;
-        if (summaryError) throw summaryError;
-
-        const summaries = summaryRows ?? [];
-        const { data: claimRows, error: claimError } = claimResult;
-
-        if (claimError) {
-          console.warn("Word Sky claims did not load for Ability Check reminder:", claimError);
-        }
-
-        const claims = claimError ? [] : claimRows ?? [];
-        const claimByKey = new Map<string, AbilityCheckClaimRow>();
-        for (const claim of claims) {
-          if (claim.study_identity_key) claimByKey.set(claim.study_identity_key, claim);
-        }
-
-        if (summaries.length === 0 && claims.length === 0) {
-          setAbilityCheckReminderCount(0);
-          return;
-        }
-
-        const keys = Array.from(
-          new Set([
-            ...summaries.map((row) => row.study_identity_key).filter(Boolean),
-            ...claims.map((row) => row.study_identity_key).filter(Boolean),
-          ])
-        );
-        const progressByKey = new Map<string, AbilityCheckProgressRow>();
-        const progressChunks: string[][] = [];
-
-        for (let i = 0; i < keys.length; i += 75) {
-          progressChunks.push(keys.slice(i, i + 75));
-        }
-
-        for (let i = 0; i < progressChunks.length; i += 3) {
-          const batch = progressChunks.slice(i, i + 3);
-          const batchResults = await Promise.all(batch.map((chunk) =>
-            supabase
-              .from("user_library_word_progress")
-              .select(
-                "id, study_identity_key, reading_gate_status, meaning_gate_status, held_before_reading_gate, held_before_meaning_gate, mastered, reading_gate_failed_at, meaning_gate_failed_at, last_studied_at"
-              )
-              .eq("definition_key", "")
-              .eq("user_id", userId)
-              .in("study_identity_key", chunk)
-              .abortSignal(request.controller.signal)
-              .returns<AbilityCheckProgressRow[]>()
-          ));
-
-          if (!isCurrentRequest()) return;
-
-          for (const { data: progressRows, error: progressError } of batchResults) {
-            if (progressError) throw progressError;
-            for (const row of progressRows ?? []) {
-              progressByKey.set(row.study_identity_key, row);
-            }
-          }
-        }
-
-        const seenTodayIds = loadAbilityCheckSeenForToday();
-        const availableSummaryCount = summaries.filter((summary) =>
-          isAbilityCheckCardInDailyPool(
-            summary,
-            progressByKey.get(summary.study_identity_key) ?? null,
-            resolvedSettings,
-            seenTodayIds,
-            new Date(),
-            claimByKey.get(summary.study_identity_key) ?? null
-          )
-        ).length;
-        const summaryKeys = new Set(summaries.map((summary) => summary.study_identity_key));
-        const availableClaimCount = claims
-          .filter((claim) => !summaryKeys.has(claim.study_identity_key))
-          .filter((claim) =>
-            isAbilityCheckClaimInDailyPool(
-              claim,
-              progressByKey.get(claim.study_identity_key) ?? null,
-              resolvedSettings,
-              seenTodayIds
-            )
-          ).length;
-        const availableCount = availableSummaryCount + availableClaimCount;
-
-        if (availableCount >= ABILITY_CHECK_REMINDER_MIN_DUE_CARDS) {
-          unlockAbilityCheckReminder();
-          setAbilityCheckReminderHasUnlocked(true);
-        }
-
-        setAbilityCheckReminderCount(availableCount);
-      } catch (error) {
-        if (isCurrentRequest()) {
-          console.error("Error loading Ability Check reminder:", error);
-          setAbilityCheckReminderCount(0);
-        }
-      } finally {
-        if (isCurrentRequest()) setAbilityCheckReminderLoading(false);
-      }
-    };
-
-    request.promise = run().finally(() => {
-      if (abilityCheckReminderLoadRef.current !== request) return;
-      const queued = request.queued;
-      abilityCheckReminderLoadRef.current = null;
-      if (queued && abilityCheckReminderMountedRef.current) {
-        void abilityCheckReminderLoadFunctionRef.current?.(queued.userId, queued.canUseAbilityCheck);
-      }
-    });
-
-    return request.promise;
-  }, [cancelAbilityCheckReminderLoad]);
 
   async function loadLearningTasks(userId: string) {
     setLearningTasksLoading(true);
@@ -840,15 +594,6 @@ export default function BooksPage() {
       const appAccessStatus = meProfile
         ? getAppAccessStatus(meProfile)
         : { hasFullAccess: false, reason: "free" };
-      const featureAccess = getFeatureAccess({
-        role: superTeacherFlag ? "super_teacher" : role,
-        isSuperTeacher: superTeacherFlag,
-        hasFullAccess: appAccessStatus.hasFullAccess,
-        isTrialActive: appAccessStatus.reason === "trial",
-      });
-      setCanUseAbilityCheckReminder(
-        canUseFullAccessFeature(featureAccess, "ability_check")
-      );
       setHasFullLearningAccess(appAccessStatus.hasFullAccess);
       setTrialBanner(
         getActiveTrialBannerState(
@@ -922,121 +667,6 @@ export default function BooksPage() {
     void loadLearningTasks(viewingUserId);
   }, [viewingUserId, meId, isViewingOwnLibrary]);
 
-  useEffect(() => {
-    abilityCheckReminderLoadFunctionRef.current = loadAbilityCheckReminder;
-    abilityCheckReminderMountedRef.current = true;
-
-    return () => {
-      abilityCheckReminderMountedRef.current = false;
-      if (abilityCheckReminderForegroundTimerRef.current) {
-        clearTimeout(abilityCheckReminderForegroundTimerRef.current);
-        abilityCheckReminderForegroundTimerRef.current = null;
-      }
-
-      const activeRequest = abilityCheckReminderLoadRef.current;
-      if (activeRequest) {
-        activeRequest.queued = null;
-        activeRequest.controller.abort();
-      }
-    };
-  }, [loadAbilityCheckReminder]);
-
-  useEffect(() => {
-    const hiddenToday = abilityCheckReminderHiddenToday();
-
-    setAbilityCheckReminderHidden(hiddenToday);
-    if (canUseAbilityCheckReminder) {
-      setAbilityCheckReminderHasUnlocked(abilityCheckReminderUnlocked());
-    } else {
-      setAbilityCheckReminderHasUnlocked(false);
-      lockAbilityCheckReminder();
-    }
-
-    if (
-      !viewingUserId ||
-      !meId ||
-      viewingUserId !== meId ||
-      hiddenToday
-    ) {
-      cancelAbilityCheckReminderLoad();
-      setAbilityCheckReminderCount(0);
-      return;
-    }
-
-    if (libraryBooksLoading) {
-      cancelAbilityCheckReminderLoad();
-      return;
-    }
-
-    void loadAbilityCheckReminder(viewingUserId, canUseAbilityCheckReminder);
-  }, [viewingUserId, meId, abilityCheckReminderDayKey, canUseAbilityCheckReminder, libraryBooksLoading, loadAbilityCheckReminder, cancelAbilityCheckReminderLoad]);
-
-  useEffect(() => {
-    function refreshAbilityCheckReminderDay(refreshCount = false) {
-      const todayKey = getTodayKey();
-      const hiddenToday = abilityCheckReminderHiddenToday();
-
-      setAbilityCheckReminderDayKey((previous) =>
-        previous === todayKey ? previous : todayKey
-      );
-
-      setAbilityCheckReminderHidden(hiddenToday);
-      if (canUseAbilityCheckReminder) {
-        setAbilityCheckReminderHasUnlocked(abilityCheckReminderUnlocked());
-      } else {
-        setAbilityCheckReminderHasUnlocked(false);
-        lockAbilityCheckReminder();
-      }
-
-      if (hiddenToday) {
-        cancelAbilityCheckReminderLoad();
-        setAbilityCheckReminderCount(0);
-        return;
-      }
-
-      if (
-        refreshCount &&
-        todayKey === abilityCheckReminderDayKey &&
-        !libraryBooksLoading &&
-        viewingUserId &&
-        meId &&
-        viewingUserId === meId
-      ) {
-        void loadAbilityCheckReminder(viewingUserId, canUseAbilityCheckReminder);
-      }
-    }
-
-    refreshAbilityCheckReminderDay();
-
-    function flushForegroundRefresh() {
-      abilityCheckReminderForegroundTimerRef.current = null;
-      refreshAbilityCheckReminderDay(true);
-    }
-
-    function queueForegroundRefresh() {
-      if (abilityCheckReminderForegroundTimerRef.current) {
-        clearTimeout(abilityCheckReminderForegroundTimerRef.current);
-      }
-      abilityCheckReminderForegroundTimerRef.current = setTimeout(flushForegroundRefresh, 150);
-    }
-
-    function handleVisibilityChange() {
-      if (document.visibilityState === "visible") queueForegroundRefresh();
-    }
-
-    window.addEventListener("focus", queueForegroundRefresh);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      window.removeEventListener("focus", queueForegroundRefresh);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      if (abilityCheckReminderForegroundTimerRef.current) {
-        clearTimeout(abilityCheckReminderForegroundTimerRef.current);
-        abilityCheckReminderForegroundTimerRef.current = null;
-      }
-    };
-  }, [viewingUserId, meId, canUseAbilityCheckReminder, abilityCheckReminderDayKey, libraryBooksLoading, loadAbilityCheckReminder, cancelAbilityCheckReminderLoad]);
-
   const currentlyReading = validRows.filter(
     (r) => resolvePersonalTrackingStatus(r) === "reading"
   );
@@ -1091,14 +721,6 @@ export default function BooksPage() {
     );
   }
 
-  const showAbilityCheckReminder =
-    viewingUserId === meId &&
-    !trialBanner &&
-    abilityCheckReminderEnabled &&
-    canUseAbilityCheckReminder &&
-    abilityCheckReminderHasUnlocked &&
-    !abilityCheckReminderLoading &&
-    !abilityCheckReminderHidden;
   const showLearningTasks =
     isViewingOwnLibrary &&
     !learningTasksLoading &&
@@ -1221,15 +843,13 @@ export default function BooksPage() {
           </section>
         ) : null}
 
-        {showAbilityCheckReminder && (hasFullLearningAccess || isTeacher) ? (
-          <AbilityCheckReminderBanner
-            abilityCheckReminderCount={abilityCheckReminderCount}
-            minDueCards={ABILITY_CHECK_REMINDER_MIN_DUE_CARDS}
-            onStart={() => router.push("/library-study/check?start=1")}
-            onHide={() => {
-              hideAbilityCheckReminderForToday();
-              setAbilityCheckReminderHidden(true);
-            }}
+        {isViewingOwnLibrary && !libraryBooksLoading && !libraryBooksError ? (
+          <DailyLibraryReminder
+            key={meId}
+            ownerId={meId}
+            libraryPath={routeUsername ? `/users/${encodeURIComponent(routeUsername)}/books` : "/books"}
+            search={searchQuery} bookType={bookTypeFilter} status={statusFilter}
+            sort={sortMode} view={viewMode}
           />
         ) : null}
 

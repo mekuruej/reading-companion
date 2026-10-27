@@ -90,7 +90,7 @@ function emptyColorCounts(): AdvancedStudyReadinessColorCounts {
 }
 
 function hasUsableText(value: string | null | undefined) {
-  return typeof value !== "string" || value.trim().length > 0;
+  return typeof value === "string" && value.trim().length > 0;
 }
 
 function visibleEncounterCount(row: AdvancedStudyReadinessSummaryRow) {
@@ -145,6 +145,7 @@ export function calculateAdvancedStudyReadiness({
   }
 
   const colorCounts = emptyColorCounts();
+  const eligibleIdentities = new Set<string>();
   let eligibleWordCount = 0;
   let readyScore = 0;
 
@@ -152,6 +153,8 @@ export function calculateAdvancedStudyReadiness({
     if (!eligibleSummaryRow(summary)) continue;
 
     const key = summary.study_identity_key!.trim();
+    if (eligibleIdentities.has(key)) continue;
+    eligibleIdentities.add(key);
     const progress = progressByKey.get(key) ?? null;
     const colorStatus = computeLibraryStudyColorStatus({
       encounterCount: visibleEncounterCount(summary),

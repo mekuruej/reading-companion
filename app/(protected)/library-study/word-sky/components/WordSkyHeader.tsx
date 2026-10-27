@@ -14,15 +14,15 @@ export default function WordSkyHeader({
       <button
         type="button"
         onClick={onBackToStudy}
-        className="mb-4 inline-flex text-sm font-semibold text-slate-500 transition hover:text-slate-900"
+        className="mb-4 inline-flex text-sm font-semibold text-[var(--appearance-muted-text)] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--appearance-accent)] hover:text-[var(--appearance-text)]"
       >
         ← Back to Study Hub
       </button>
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-white/80 bg-white/75 p-4 shadow-sm backdrop-blur md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-3 rounded-2xl border border-[var(--appearance-border)] bg-[var(--appearance-surface)] p-4 shadow-sm backdrop-blur md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Word Sky</h1>
-          <p className="mt-1 max-w-xl text-sm leading-6 text-slate-500">
+          <p className="mt-1 max-w-xl text-sm leading-6 text-[var(--appearance-muted-text)]">
             Pick words you can already read and change them to green.
             <br />
             These words will start to appear in your Ability Check and Library Practice, where you can
@@ -36,11 +36,11 @@ export default function WordSkyHeader({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <div className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">
+          <div className="rounded-full border border-[var(--appearance-border)] bg-[var(--appearance-surface)] px-3 py-2 text-sm font-medium text-[var(--appearance-text)]">
             {claimedCount} claimed
           </div>
 
-          <div className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">
+          <div className="rounded-full border border-[var(--appearance-border)] bg-[var(--appearance-surface)] px-3 py-2 text-sm font-medium text-[var(--appearance-text)]">
             {wordPoolCount} in sky
           </div>
         </div>
