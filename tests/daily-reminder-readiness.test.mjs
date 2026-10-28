@@ -109,7 +109,10 @@ test('complete >1000-word pagination, owner and finalization/language filters, n
  const f=fixture({words:[...rows(1201),word(2000,{finalized:false}),word(2001,{user_book_id:'other'}),word(2002,{target_language_code:'en'})]});
  const result=await loadReadiness(f.client,context());assert.equal(result.status,'not_ready');assert.equal(result.eligibleIdentityCount,1201);assert.equal(result.dueCardCount,0);
  assert.equal(f.calls.filter(c=>c.table==='personal_user_book_words').length,4);
- assert.ok(f.calls.filter(c=>c.table==='personal_user_book_words').every(c=>c.orders.includes('id')&&c.filters.some(x=>x[0]==='user_book_id')));
+ const vocabularyCalls=f.calls.filter(c=>c.table==='personal_user_book_words');
+ assert.deepEqual(vocabularyCalls[0].orders,[],'discarded compatibility probe IDs need no sort');
+ assert.ok(vocabularyCalls.slice(1).every(c=>c.orders.includes('id')));
+ assert.ok(vocabularyCalls.every(c=>c.filters.some(x=>x[0]==='user_book_id')));
  assert.ok(f.calls.filter(c=>['user_library_word_claims','user_library_word_progress','user_books'].includes(c.table)).every(c=>c.filters.some(x=>x[0]==='user_id'&&x[2]==='u')));
 });
 test('pagination/query/count/profile/settings/session failures are unknown, never not_ready',async()=>{

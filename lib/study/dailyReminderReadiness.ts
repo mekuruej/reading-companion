@@ -143,10 +143,29 @@ const DEFAULT_SETTINGS: LearningSettingsRow = {
   red_stages: 1, orange_stages: 1, yellow_stages: 1,
   show_badge_numbers: true, skip_katakana_library_check: true,
 };
+/** Shared only inside one authenticated outer load, never across accounts or loads. */
+export type OwnerBoundHiddenIdentities = {
+  ownerId: string;
+  load: () => Promise<ReadonlySet<string>>;
+};
+export async function loadPersonallyHiddenIdentities(client: SupabaseClient): Promise<ReadonlySet<string>> {
+  const rows = await loadAllPagedRows<{ id: string; study_identity_key: string | null }>(async (from, to) => {
+    const result = await client.from('personally_hidden_study_identities')
+      .select('study_identity_key', { count: 'exact' }).order('study_identity_key').range(from, to);
+    return { ...result, data: result.data?.map(r => ({ ...r, id: JSON.stringify(r.study_identity_key) })) ?? null };
+  });
+  return new Set(rows.map(r => r.study_identity_key).filter((key): key is string => Boolean(key)));
+}
+export function ownerHiddenIdentities(client: SupabaseClient, ownerId: string, shared?: OwnerBoundHiddenIdentities): Promise<ReadonlySet<string>> {
+  if (shared && shared.ownerId !== ownerId) return Promise.reject(new IncompleteActivitySource('owner_mismatch'));
+  return shared ? shared.load() : loadPersonallyHiddenIdentities(client);
+}
+
 /** Inject the existing signed-in client. Never creates a privileged client or accepts an arbitrary owner. */
 export async function loadDailyReminderReadiness(
   client: SupabaseClient,
   studyContext: DailyStudyContext | null,
+  sharedHidden?: OwnerBoundHiddenIdentities,
 ): Promise<DailyReminderReadiness> {
   try {
     const auth = await client.auth.getUser();
@@ -183,8 +202,8 @@ export async function loadDailyReminderReadiness(
       const probe = await client.from('personal_user_book_words')
         .select('id', { count: 'exact' }).in('user_book_id', [...bookIds])
         .not('hidden', 'is', true).or('target_language_code.is.null,target_language_code.eq.ja')
-        .order('study_identity_key', { ascending: false, nullsFirst: false })
-        .order('created_at', { ascending: false }).order('id').range(0, 999);
+        // Only count/response-cap compatibility matters; sorting these discarded IDs is redundant.
+        .range(0, 999);
       if (probe.error) throw probe.error;
       if (!Number.isSafeInteger(probe.count) || probe.count === null || probe.count < 0 ||
           !Array.isArray(probe.data) || probe.data.length !== Math.min(1000, probe.count)) {
@@ -201,7 +220,7 @@ export async function loadDailyReminderReadiness(
           .in('user_book_id', batch).not('hidden', 'is', true)
           .or('target_language_code.is.null,target_language_code.eq.ja')
           .order('study_identity_key', { ascending: false, nullsFirst: false })
-          .order('created_at', { ascending: false }).order('id').range(from, to)));
+          .order('created_at', { ascending: false }).order('id').range(from, to), 500, 4));
     }
     if (words.length !== expectedWordCount) return unavailable('unknown', 'vocabulary_changed');
     if (words.some(w => !bookIds.has(w.user_book_id))) return unavailable('unknown', 'owner_mismatch');
@@ -211,11 +230,7 @@ export async function loadDailyReminderReadiness(
         .eq('user_id', ownerId).eq('claimed_color', 'green')
         .order('updated_at', { ascending: false }).order('id').limit(500), 'ability_check_claim_cap');
     if (claims.some(c => c.user_id !== ownerId)) return unavailable('unknown', 'owner_mismatch');
-    const hidden = await loadAllPagedRows<{ id: string; study_identity_key: string | null }>(async (from, to) => {
-      const result = await client.from('personally_hidden_study_identities')
-        .select('study_identity_key', { count: 'exact' }).order('study_identity_key').range(from, to);
-      return { ...result, data: result.data?.map(r => ({ ...r, id: JSON.stringify(r.study_identity_key) })) ?? null };
-    });
+    const hidden = await ownerHiddenIdentities(client, ownerId, sharedHidden);
     const keys = [...new Set([...words.map(w => w.study_identity_key || studyIdentityKey(w.surface, w.reading)),
       ...claims.map(c => c.study_identity_key)].filter(Boolean))];
     // Independent 75-key reads need not accumulate one round trip per batch.
@@ -247,7 +262,7 @@ export async function loadDailyReminderReadiness(
     return calculateDailyReminderReadiness({
       status: 'complete', ownerId, canUseAbilityCheck: true, activityHasBooks: books.length > 0, words, claims, progressRows,
       settings: { ...DEFAULT_SETTINGS, ...(settings.data ?? {}) },
-      personallyHidden: new Set(hidden.map(h => h.study_identity_key).filter((k): k is string => Boolean(k))),
+      personallyHidden: hidden,
       studyContext,
     });
   } catch (error) {

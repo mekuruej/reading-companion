@@ -73,7 +73,7 @@ for(const size of [100,1000,10000])test('synthetic loader timing at 25ms request
   const q=from(table);let proxy;proxy=new Proxy(q,{get(target,key){if(key==='then')return(resolve,reject)=>delayed(table,()=>Promise.resolve(target)).then(resolve,reject);const value=target[key];return typeof value==='function'?(...args)=>{const result=value.apply(target,args);return result===target?proxy:result}:value}});return proxy;
  };
  const start=performance.now();const result=await loadDailyLibraryReminder(client,'u',memory(),'/users/reader/books');const elapsed=Math.round(performance.now()-start);
- assert.ok(result);assert.equal(stages.profiles,2);assert.equal(stages.user_learning_settings,2);assert.equal(stages.personally_hidden_study_identities,2);
+ assert.ok(result);assert.equal(stages.profiles,2);assert.equal(stages.user_learning_settings,2);assert.equal(stages.personally_hidden_study_identities,1);
  const pool=requests.find(r=>r.stage==='reference_pool'),readinessProfile=requests.filter(r=>r.stage==='profiles')[1];assert.ok(pool.start<readinessProfile.end,'Word Sky and readiness execute concurrently');
  const stageCumulativeMs={};for(const r of requests)stageCumulativeMs[r.stage]=Math.round((stageCumulativeMs[r.stage]??0)+(r.end-r.start));
  t.diagnostic(JSON.stringify({syntheticOnly:true,words:size,simulatedLatencyMs:25,loaderElapsedMs:elapsed,requestCounts:stages,stageCumulativeMs}));

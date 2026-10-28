@@ -1,7 +1,7 @@
 import { abilityCheckReminderCompleted } from './abilityCheckReminderCompletion';
 import { ymdInTimeZone } from '@/lib/timeZone';
 import { getWordSkyExplorationReturnPath } from '@/lib/wordSkyExploration';
-import { loadDailyReminderReadiness, type DailyReminderReadiness, type DailyStudyContext } from './dailyReminderReadiness';
+import { loadDailyReminderReadiness, loadPersonallyHiddenIdentities, ownerHiddenIdentities, type OwnerBoundHiddenIdentities, type DailyReminderReadiness, type DailyStudyContext } from './dailyReminderReadiness';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getAppAccessStatus } from '@/lib/access/appAccess';
 import { getFeatureAccess } from '@/lib/access/featureAccess';
@@ -91,9 +91,14 @@ export async function loadDailyLibraryReminder(client: SupabaseClient, ownerId: 
     const canUseAbilityCheck = canUseFullAccessFeature(features, 'ability_check');
     const canUseWordSky = features.canUseAdvancedStudy;
     if (!canUseAbilityCheck && !canUseWordSky) return null;
+    let hiddenPromise: Promise<ReadonlySet<string>> | undefined;
+    const sharedHidden: OwnerBoundHiddenIdentities = {
+      ownerId,
+      load: () => hiddenPromise ??= loadPersonallyHiddenIdentities(client),
+    };
     const [readiness, wordSkyAvailable] = await Promise.all([
-      loadDailyReminderReadiness(client, storage ? reminderStudyContext(storage, ownerId) : null),
-      canUseWordSky ? loadWordSkyReminderAvailability(client, ownerId, settings.data ?? {}) : Promise.resolve(false),
+      loadDailyReminderReadiness(client, storage ? reminderStudyContext(storage, ownerId) : null, sharedHidden),
+      canUseWordSky ? loadWordSkyReminderAvailability(client, ownerId, settings.data ?? {}, sharedHidden) : Promise.resolve(false),
     ]);
     const finalAuth = await client.auth.getUser();
     if (finalAuth.error || finalAuth.data.user?.id !== ownerId || ymdInTimeZone() !== day) return null;
@@ -105,7 +110,7 @@ export async function loadDailyLibraryReminder(client: SupabaseClient, ownerId: 
  * Only the reference RPC supplies content. Personal data merely excludes entries.
  * Failed/incomplete visibility reads cannot establish available Word Sky words.
  */
-export async function loadWordSkyReminderAvailability(client: SupabaseClient, ownerId: string, settings: LibraryStudyColorSettings): Promise<boolean> {
+export async function loadWordSkyReminderAvailability(client: SupabaseClient, ownerId: string, settings: LibraryStudyColorSettings, sharedHidden?: OwnerBoundHiddenIdentities): Promise<boolean> {
   try {
     const pool = await client.rpc('get_word_sky_pool', { p_limit: 180 });
     if (pool.error || !Array.isArray(pool.data)) return false;
@@ -114,16 +119,13 @@ export async function loadWordSkyReminderAvailability(client: SupabaseClient, ow
     ).map((row: {study_identity_key: string}) => row.study_identity_key))];
     if (!keys.length) return false;
     const [hidden, summaries, progress] = await Promise.all([
-      loadAllPagedRows<{ id: string; study_identity_key: string }>(async (from, to) => {
-        const result = await client.from('personally_hidden_study_identities').select('study_identity_key', { count: 'exact' }).order('study_identity_key').range(from, to);
-        return { ...result, data: result.data?.map(row => ({ ...row, id: JSON.stringify(row.study_identity_key) })) ?? null };
-      }),
+      ownerHiddenIdentities(client, ownerId, sharedHidden),
       loadAllPagedRows<{ id: string; study_identity_key: string; total_encounter_count: number }>((from, to) =>
         client.from('user_library_word_summaries').select('id, study_identity_key, total_encounter_count', { count: 'exact' }).eq('user_id', ownerId).in('study_identity_key', keys).order('id').range(from, to)),
       loadAllPagedRows<{ id: string; study_identity_key: string; reading_gate_status: 'not_started' | 'passed'; meaning_gate_status: 'not_started' | 'passed'; held_before_reading_gate: boolean; held_before_meaning_gate: boolean; reading_gate_attempts: number; mastered: boolean }>((from, to) =>
         client.from('user_library_word_progress').select('id, study_identity_key, reading_gate_status, meaning_gate_status, held_before_reading_gate, held_before_meaning_gate, reading_gate_attempts, mastered', { count: 'exact' }).eq('user_id', ownerId).eq('definition_key', '').in('study_identity_key', keys).order('id').range(from, to)),
     ]);
-    const hiddenKeys = new Set(hidden.map(row => row.study_identity_key));
+    const hiddenKeys = hidden;
     const progressByKey = new Map(progress.map(row => [row.study_identity_key, row]));
     const excludedColors = new Set<string>();
     for (const row of summaries) {

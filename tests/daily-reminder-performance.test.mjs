@@ -73,12 +73,12 @@ for(const extra of [{failAt:0},{failAt:4},{wrongOwnerAt:1},{truncateAt:2}])test(
 test('readiness calculation, cards and scheduler remain unchanged',()=>{
  function calculation(text){const root=ts.createSourceFile('readiness.ts',text,ts.ScriptTarget.Latest,true);return root.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text==='calculateDailyReminderReadiness').getText(root)}
  assert.equal(calculation(fs.readFileSync('lib/study/dailyReminderReadiness.ts','utf8')),calculation(baseline));
- for(const file of ['lib/study/abilityCheckCards.ts','lib/study/abilityCheckScheduler.ts','lib/study/dailyLibraryReminder.ts','app/(protected)/users/[username]/books/components/DailyLibraryReminder.tsx'])assert.equal(fs.readFileSync(file,'utf8'),execFileSync('git',['show','3b953fe:'+file],{encoding:'utf8'}));
+ for(const file of ['lib/study/abilityCheckCards.ts','lib/study/abilityCheckScheduler.ts','app/(protected)/users/[username]/books/components/DailyLibraryReminder.tsx'])assert.equal(fs.readFileSync(file,'utf8'),execFileSync('git',['show','3b953fe:'+file],{encoding:'utf8'}));
 });
 test('all selected database columns remain identical to the staged loader',()=>{
  const selections=text=>{
   const source=ts.createSourceFile('loader.ts',text,ts.ScriptTarget.Latest,true),found=[];
   function visit(n){if(ts.isCallExpression(n)&&ts.isPropertyAccessExpression(n.expression)&&n.expression.name.text==='select')found.push(n.arguments[0].getText(source));ts.forEachChild(n,visit)}visit(source);return found;
  };
- assert.deepEqual(selections(fs.readFileSync('lib/study/dailyReminderReadiness.ts','utf8')),selections(baseline));
+ assert.deepEqual(selections(fs.readFileSync('lib/study/dailyReminderReadiness.ts','utf8')).sort(),selections(baseline).sort());
 });
