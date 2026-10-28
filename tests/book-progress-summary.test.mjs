@@ -4,13 +4,14 @@ import fs from 'node:fs';
 import ts from 'typescript';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
+const bookmark = await import('../lib/books/resumeBookmark.mjs');
 function load(file, deps = {}) {
   const exports = {};
   new Function('require', 'exports', ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText)(name => deps[name] ?? require(name), exports);
   return exports;
 }
 const progress = load('lib/books/readingProgress.ts');
-const { summarizeBookProgress: summary, loadBookProgressSummary: fetchSummary } = load('lib/books/bookProgressSummary.ts', { './readingProgress': progress });
+const { summarizeBookProgress: summary, loadBookProgressSummary: fetchSummary } = load('lib/books/bookProgressSummary.ts', { './readingProgress': progress, './resumeBookmark.mjs': bookmark });
 const data = {
   currentLocation: null,
   sessions: [
@@ -125,4 +126,10 @@ test('listening summary uses the Read-style resume bar and latest listening posi
   assert.match(JSON.stringify(status), /Resume from page 53/);
   assert.match(JSON.stringify(status), /次の章でまた聞こう/);
   assert.equal(tree.some(node => node.type === 'ExistingProgressCard'), false);
+});
+
+
+test('latest blank reading session does not borrow a stopping phrase from an older session', () => {
+  const newer = { read_on: '2026-10-28', created_at: '2026-10-28', tracking_unit: 'page', end_page: 60, session_mode: 'fluid', ending_phrase: null };
+  assert.equal(summary({ ...data, sessions: [...data.sessions, newer] }, 'page', { page_count: 200 }).lastReadPhrase, undefined);
 });

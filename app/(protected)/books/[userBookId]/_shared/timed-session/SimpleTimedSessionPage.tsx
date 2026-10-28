@@ -6,7 +6,10 @@ import BookProgressSummaryBar from "@/components/books/BookProgressSummaryBar";
 import { useSessionEndingPhrase, SessionEndingPhraseField, LatestEndingPhrase } from "@/components/books/SessionEndingPhrase";
 import AudioTimeInput from "@/components/books/AudioTimeInput";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
-import { nextProgressStart, matchingTotal, progressLabels, parseProgressRange, progressPayload, sessionEnd } from "@/lib/books/readingProgress";
+import ResumeBookmarkSection, { ResumeBookmarkFeedback } from "@/components/books/ResumeBookmarkSection";
+import ResumeBookmarkSummary from "@/components/books/ResumeBookmarkSummary";
+import { useResumeBookmark } from "@/lib/books/useResumeBookmark";
+import { nextProgressStart, matchingTotal, progressLabels, parseProgressRange, parseProgressPosition, progressPayload, sessionEnd } from "@/lib/books/readingProgress";
 
 
 import { useEffect, useRef, useState } from "react";
@@ -112,6 +115,10 @@ export default function SimpleTimedSessionPage({
     const [timerPersistenceReady, setTimerPersistenceReady] = useState(false);
     const [activeSessionMode, setActiveSessionMode] = useState<SessionMode>(sessionMode);
     const { sessionEndingPhrase, setSessionEndingPhrase, latestEndingPhrase, markPhraseSaved } = useSessionEndingPhrase(userBookId, activeSessionMode);
+    const resumeBookmark = useResumeBookmark(userBookId, tracking.method === "page" && tracking.canChoose);
+    const bookmarkEndingPage = tracking.method === "page"
+        ? parseProgressPosition(sessionEndPage, "page", progressTotal).value
+        : null;
     const [showProgressUpdateForm, setShowProgressUpdateForm] = useState(false);
     const [progressUpdateLocation, setProgressUpdateLocation] = useState("");
     const [progressUpdateMessage, setProgressUpdateMessage] = useState("");
@@ -509,6 +516,10 @@ export default function SimpleTimedSessionPage({
             return;
         }
 
+        const bookmarkSave = tracking.method === "page"
+            ? await resumeBookmark.save(trimmedEndPage)
+            : { saved: false, skipped: true as const };
+
         markPhraseSaved();
         setShowTimedSessionForm(false);
         setElapsed(0);
@@ -518,7 +529,9 @@ export default function SimpleTimedSessionPage({
         setIsPaused(false);
         setSessionMinutesRead("");
         clearPersistedTimedSession(activeSessionMode, userBookId);
-        setTimerSaveMessage(activeSaveSuccessMessage);
+        setTimerSaveMessage(bookmarkSave.error
+            ? `${activeSaveSuccessMessage} The session was saved, but the resume bookmark could not be updated.`
+            : activeSaveSuccessMessage);
         setShowFinishedNav(true);
 
         const bookPatch: {
@@ -560,8 +573,9 @@ export default function SimpleTimedSessionPage({
         }, 4000);
     }
     function startTimer() {
-    if (!tracking.timersEnabled) return;
+        if (!tracking.timersEnabled) return;
         if (!tracking.requireMethod()) return;
+        resumeBookmark.skip();
         const today = todayYmdAppTimeZone();
 
         setSessionDate(today);
@@ -848,7 +862,8 @@ export default function SimpleTimedSessionPage({
                 </p>
             ) : null}
 
-            {activeSessionMode === "listening" ? null : <LatestEndingPhrase phrase={latestEndingPhrase} />}
+            {activeSessionMode === "listening" || resumeBookmark.bookmark ? null : <LatestEndingPhrase phrase={latestEndingPhrase} />}
+            <ResumeBookmarkFeedback bookmark={resumeBookmark} />
             {timerSaveMessage ? (
                 <p className="mt-3 text-xs text-emerald-600">{timerSaveMessage}</p>
             ) : null}
@@ -908,7 +923,18 @@ export default function SimpleTimedSessionPage({
                 </div>
             )}
 
-            <SessionEndingPhraseField value={sessionEndingPhrase} onChange={setSessionEndingPhrase} listening={activeSessionMode === "listening"} />
+            {tracking.method === "page" && tracking.canChoose ? (
+                <ResumeBookmarkSection
+                    available={resumeBookmark.available && resumeBookmark.eligible}
+                    endingPage={bookmarkEndingPage}
+                    kind={resumeBookmark.choice}
+                    phrase={resumeBookmark.phrase}
+                    onKindChange={resumeBookmark.setChoice}
+                    onPhraseChange={resumeBookmark.setPhrase}
+                    onSkip={resumeBookmark.skip}
+                />
+            ) : null}
+            {!(resumeBookmark.available && resumeBookmark.eligible) ? <SessionEndingPhraseField value={sessionEndingPhrase} onChange={setSessionEndingPhrase} listening={activeSessionMode === "listening"} /> : null}
             <div className="mt-3 space-y-1 text-sm text-stone-500">
                 <div>Time: {formatTimer(elapsed)}</div>
                 <div className="text-xs">
@@ -932,6 +958,7 @@ export default function SimpleTimedSessionPage({
                     type="button"
                     onClick={() => {
                         setSessionEndingPhrase("");
+                        resumeBookmark.skip();
                         setShowTimedSessionForm(false);
                         setElapsed(0);
                         setAccumulatedElapsedMs(0);
@@ -1101,6 +1128,7 @@ export default function SimpleTimedSessionPage({
                         <p className="mt-3 text-sm leading-7 text-stone-600">
                             {activeDescription}
                         </p>
+                        {!embedded && tracking.method === "page" && tracking.canChoose ? <ResumeBookmarkSummary userBookId={userBookId} /> : null}
                         {fluidReadingExplanation}
                     </div>
 
@@ -1214,6 +1242,7 @@ export default function SimpleTimedSessionPage({
                                     {activeEyebrow}
                                 </p>
                             ) : null}
+                            {!embedded && tracking.method === "page" && tracking.canChoose ? <ResumeBookmarkSummary userBookId={userBookId} /> : null}
 
                             <h1 className="mt-2 text-3xl font-bold tracking-tight text-stone-900 md:text-4xl">
                                 <span className={activeModeColor === "violet" ? "text-violet-800" : "text-emerald-800"}>

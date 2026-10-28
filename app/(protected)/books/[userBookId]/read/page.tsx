@@ -24,6 +24,7 @@ import {
 import SimpleTimedSessionPage from "../_shared/timed-session/SimpleTimedSessionPage";
 import { CuriosityReadingExperience } from "../curiosity-reading/WordTimerExperience";
 import ReadingJournalPanel from "../components/ReadingJournalPanel";
+import ResumeBookmarkSummary from "@/components/books/ResumeBookmarkSummary";
 import { supabase } from "@/lib/supabaseClient";
 
 type ReadingMode = "fluid" | "curiosity";
@@ -377,10 +378,15 @@ export default function ReadPage() {
           ) : null}
         </section>
 
-        <div className="rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-700 shadow-sm" role="status">
-          <span className="font-semibold text-stone-900">Where did I leave off?</span>{" "}
-          {resumeLabel ?? "No saved reading position yet."}
-        </div>
+        {progress.method === "page" ? (
+          <ResumeBookmarkSummary
+            userBookId={userBookId}
+            enabled={progress.canChoose}
+            fallback={<div className="rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-700 shadow-sm" role="status"><span className="font-semibold text-stone-900">Where did I leave off?</span>{" "}{resumeLabel ?? "No saved reading position yet."}</div>}
+          />
+        ) : (
+          <div className="rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-700 shadow-sm" role="status"><span className="font-semibold text-stone-900">Where did I leave off?</span>{" "}{resumeLabel ?? "No saved reading position yet."}</div>
+        )}
 
         {mode === "curiosity" && curiosityAvailable ? (
           <CuriosityReadingExperience

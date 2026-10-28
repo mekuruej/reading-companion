@@ -12,13 +12,17 @@ export function useSessionEndingPhrase(userBookId: string, sessionMode: string) 
     setSessionEndingPhrase("");
     setLatestEndingPhrase("");
     if (userBookId) {
-      void supabase.from("user_book_reading_sessions")
+      const query = supabase.from("user_book_reading_sessions")
         .select("ending_phrase")
-        .eq("user_book_id", userBookId)
-        .eq("session_mode", sessionMode)
-        .not("ending_phrase", "is", null)
+        .eq("user_book_id", userBookId);
+      // A stopping cue follows the latest reading session, not the latest
+      // historical phrase from whichever reading mode is currently open.
+      void (sessionMode === "listening"
+        ? query.eq("session_mode", "listening")
+        : query.or("session_mode.neq.listening,session_mode.is.null"))
         .order("read_on", { ascending: false })
         .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
         .limit(1)
         .maybeSingle()
         .then(({ data, error }) => {
@@ -29,7 +33,7 @@ export function useSessionEndingPhrase(userBookId: string, sessionMode: string) 
   }, [userBookId, sessionMode]);
 
   function markPhraseSaved() {
-    if (sessionEndingPhrase.trim()) setLatestEndingPhrase(sessionEndingPhrase.trim());
+    setLatestEndingPhrase(sessionEndingPhrase.trim());
     setSessionEndingPhrase("");
   }
 

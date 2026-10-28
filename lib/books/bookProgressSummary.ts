@@ -1,3 +1,4 @@
+import { latestSessionPhrase } from "./resumeBookmark.mjs";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatAudioTime, formatProgressPosition, progressSummary, type ProgressRecord, type ProgressTotals, type ProgressTrackingMethod } from "./readingProgress";
 
@@ -58,6 +59,6 @@ export function summarizeBookProgress(data: BookProgressSummaryData, method: Pro
     lastSavedWordLabel: showVocabulary ? newest?.surface?.trim() || newest?.meaning?.trim() || "" : "",
     lastChapterLabel: showVocabulary ? chapter?.chapter_name?.trim() || (chapter?.chapter_number != null ? `Chapter ${chapter.chapter_number}` : "") : "",
     lastPageLabel: positionLabel,
-    lastReadPhrase: dated.find(session => session.session_mode !== "listening" && session.ending_phrase?.trim())?.ending_phrase ?? undefined,
+    lastReadPhrase: latestSessionPhrase(dated.filter(session => session.session_mode !== "listening")),
   };
 }

@@ -1,0 +1,955 @@
+{
+  "provenance": "SELECT-only Production metadata captured 2026-10-28. No user records or credentials. Minimal table shapes in tests; full live policy/grant expressions for the three relevant public relations.",
+  "user_books": {
+    "table": {
+      "rls": true,
+      "owner": "postgres",
+      "force_rls": false
+    },
+    "grants": [
+      {
+        "grantee": "postgres",
+        "is_grantable": "YES",
+        "privilege_type": "INSERT"
+      },
+      {
+        "grantee": "postgres",
+        "is_grantable": "YES",
+        "privilege_type": "SELECT"
+      },
+      {
+        "grantee": "postgres",
+        "is_grantable": "YES",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "grantee": "postgres",
+        "is_grantable": "YES",
+        "privilege_type": "DELETE"
+      },
+      {
+        "grantee": "postgres",
+        "is_grantable": "YES",
+        "privilege_type": "TRUNCATE"
+      },
+      {
+        "grantee": "postgres",
+        "is_grantable": "YES",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "grantee": "postgres",
+        "is_grantable": "YES",
+        "privilege_type": "TRIGGER"
+      },
+      {
+        "grantee": "anon",
+        "is_grantable": "NO",
+        "privilege_type": "INSERT"
+      },
+      {
+        "grantee": "anon",
+        "is_grantable": "NO",
+        "privilege_type": "SELECT"
+      },
+      {
+        "grantee": "anon",
+        "is_grantable": "NO",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "grantee": "anon",
+        "is_grantable": "NO",
+        "privilege_type": "DELETE"
+      },
+      {
+        "grantee": "anon",
+        "is_grantable": "NO",
+        "privilege_type": "TRUNCATE"
+      },
+      {
+        "grantee": "anon",
+        "is_grantable": "NO",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "grantee": "anon",
+        "is_grantable": "NO",
+        "privilege_type": "TRIGGER"
+      },
+      {
+        "grantee": "authenticated",
+        "is_grantable": "NO",
+        "privilege_type": "INSERT"
+      },
+      {
+        "grantee": "authenticated",
+        "is_grantable": "NO",
+        "privilege_type": "SELECT"
+      },
+      {
+        "grantee": "authenticated",
+        "is_grantable": "NO",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "grantee": "authenticated",
+        "is_grantable": "NO",
+        "privilege_type": "DELETE"
+      },
+      {
+        "grantee": "authenticated",
+        "is_grantable": "NO",
+        "privilege_type": "TRUNCATE"
+      },
+      {
+        "grantee": "authenticated",
+        "is_grantable": "NO",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "grantee": "authenticated",
+        "is_grantable": "NO",
+        "privilege_type": "TRIGGER"
+      },
+      {
+        "grantee": "service_role",
+        "is_grantable": "NO",
+        "privilege_type": "INSERT"
+      },
+      {
+        "grantee": "service_role",
+        "is_grantable": "NO",
+        "privilege_type": "SELECT"
+      },
+      {
+        "grantee": "service_role",
+        "is_grantable": "NO",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "grantee": "service_role",
+        "is_grantable": "NO",
+        "privilege_type": "DELETE"
+      },
+      {
+        "grantee": "service_role",
+        "is_grantable": "NO",
+        "privilege_type": "TRUNCATE"
+      },
+      {
+        "grantee": "service_role",
+        "is_grantable": "NO",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "grantee": "service_role",
+        "is_grantable": "NO",
+        "privilege_type": "TRIGGER"
+      }
+    ],
+    "policies": [
+      {
+        "cmd": "SELECT",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "permissive": "PERMISSIVE",
+        "policyname": "owner can read user_books",
+        "with_check": null
+      },
+      {
+        "cmd": "UPDATE",
+        "qual": "(auth.uid() = user_id)",
+        "roles": [
+          "public"
+        ],
+        "permissive": "PERMISSIVE",
+        "policyname": "owner can update user_books",
+        "with_check": "(auth.uid() = user_id)"
+      },
+      {
+        "cmd": "INSERT",
+        "qual": null,
+        "roles": [
+          "public"
+        ],
+        "permissive": "PERMISSIVE",
+        "policyname": "owner can write user_books",
+        "with_check": "(auth.uid() = user_id)"
+      },
+      {
+        "cmd": "UPDATE",
+        "qual": "(EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (p.is_super_teacher = true))))",
+        "roles": [
+          "public"
+        ],
+        "permissive": "PERMISSIVE",
+        "policyname": "super teacher can update user_books",
+        "with_check": "(EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (p.is_super_teacher = true))))"
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "(EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (p.is_super_teacher = true))))",
+        "roles": [
+          "public"
+        ],
+        "permissive": "PERMISSIVE",
+        "policyname": "super teacher can view all user_books",
+        "with_check": null
+      },
+      {
+        "cmd": "DELETE",
+        "qual": "(EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (p.is_super_teacher = true))))",
+        "roles": [
+          "public"
+        ],
+        "permissive": "PERMISSIVE",
+        "policyname": "super teachers can do anything on user_books_delete",
+        "with_check": null
+      },
+      {
+        "cmd": "INSERT",
+        "qual": null,
+        "roles": [
+          "public"
+        ],
+        "permissive": "PERMISSIVE",
+        "policyname": "super teachers can do anything on user_books_insert",
+        "with_check": "(EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (p.is_super_teacher = true))))"
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "(EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (p.is_super_teacher = true))))",
+        "roles": [
+          "public"
+        ],
+        "permissive": "PERMISSIVE",
+        "policyname": "super teachers can do anything on user_books_select",
+        "with_check": null
+      },
+      {
+        "cmd": "UPDATE",
+        "qual": "(EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (p.is_super_teacher = true))))",
+        "roles": [
+          "public"
+        ],
+        "permissive": "PERMISSIVE",
+        "policyname": "super teachers can do anything on user_books_update",
+        "with_check": "(EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (p.is_super_teacher = true))))"
+      },
+      {
+        "cmd": "DELETE",
+        "qual": "is_super_teacher(auth.uid())",
+        "roles": [
+          "public"
+        ],
+        "permissive": "PERMISSIVE",
+        "policyname": "super teachers delete user_books",
+        "with_check": null
+      },
+      {
+        "cmd": "INSERT",
+        "qual": null,
+        "roles": [
+          "public"
+        ],
+        "permissive": "PERMISSIVE",
+        "policyname": "super teachers insert user_books",
+        "with_check": "is_super_teacher(auth.uid())"
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "is_super_teacher(auth.uid())",
+        "roles": [
+          "public"
+        ],
+        "permissive": "PERMISSIVE",
+        "policyname": "super teachers select user_books",
+        "with_check": null
+      },
+      {
+        "cmd": "UPDATE",
+        "qual": "is_super_teacher(auth.uid())",
+        "roles": [
+          "public"
+        ],
+        "permissive": "PERMISSIVE",
+        "policyname": "super teachers update user_books",
+        "with_check": "is_super_teacher(auth.uid())"
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "(EXISTS ( SELECT 1\n   FROM teacher_students ts\n  WHERE ((ts.teacher_id = auth.uid()) AND (ts.student_id = user_books.user_id))))",
+        "roles": [
+          "public"
+        ],
+        "permissive": "PERMISSIVE",
+        "policyname": "teacher can access linked student user_books",
+        "with_check": null
+      },
+      {
+        "cmd": "INSERT",
+        "qual": null,
+        "roles": [
+          "public"
+        ],
+        "permissive": "PERMISSIVE",
+        "policyname": "teacher can insert linked student user_books",
+        "with_check": "(EXISTS ( SELECT 1\n   FROM teacher_students ts\n  WHERE ((ts.teacher_id = auth.uid()) AND (ts.student_id = user_books.user_id))))"
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "(EXISTS ( SELECT 1\n   FROM teacher_students ts\n  WHERE ((ts.teacher_id = auth.uid()) AND (ts.student_id = user_books.user_id))))",
+        "roles": [
+          "public"
+        ],
+        "permissive": "PERMISSIVE",
+        "policyname": "teacher can read linked student user_books",
+        "with_check": null
+      },
+      {
+        "cmd": "UPDATE",
+        "qual": "(EXISTS ( SELECT 1\n   FROM teacher_students ts\n  WHERE ((ts.teacher_id = auth.uid()) AND (ts.student_id = user_books.user_id))))",
+        "roles": [
+          "public"
+        ],
+        "permissive": "PERMISSIVE",
+        "policyname": "teacher can write linked student user_books",
+        "with_check": "(EXISTS ( SELECT 1\n   FROM teacher_students ts\n  WHERE ((ts.teacher_id = auth.uid()) AND (ts.student_id = user_books.user_id))))"
+      }
+    ],
+    "constraints": []
+  },
+  "related": {
+    "functions": [
+      {
+        "acl": [
+          "=X/postgres",
+          "postgres=X/postgres",
+          "anon=X/postgres",
+          "authenticated=X/postgres",
+          "service_role=X/postgres"
+        ],
+        "name": "is_super_teacher(uuid)",
+        "owner": "postgres",
+        "config": [
+          "search_path=public"
+        ],
+        "definition": "CREATE OR REPLACE FUNCTION public.is_super_teacher(_uid uuid)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\n  select exists (\n    select 1\n    from public.profiles p\n    where p.id = _uid\n      and coalesce(p.is_super_teacher, false) = true\n  );\n$function$\n",
+        "security_definer": true
+      },
+      {
+        "acl": [
+          "=X/postgres",
+          "postgres=X/postgres",
+          "anon=X/postgres",
+          "authenticated=X/postgres",
+          "service_role=X/postgres"
+        ],
+        "name": "require_reading_reflection_access_for_user_books()",
+        "owner": "postgres",
+        "config": [
+          "search_path=public"
+        ],
+        "definition": "CREATE OR REPLACE FUNCTION public.require_reading_reflection_access_for_user_books()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\ndeclare\n  book_language_code text;\n  changed_reflection_fields boolean;\nbegin\n  changed_reflection_fields :=\n    new.reader_advice is distinct from old.reader_advice\n    or new.rating_overall is distinct from old.rating_overall\n    or new.rating_difficulty is distinct from old.rating_difficulty\n    or new.reader_level is distinct from old.reader_level;\n\n  if not changed_reflection_fields then\n    return new;\n  end if;\n\n  select b.language_code\n    into book_language_code\n  from public.books b\n  where b.id = new.book_id;\n\n  if coalesce(book_language_code, '') <> 'ja' then\n    return new;\n  end if;\n\n  if not public.current_user_has_japanese_learning_feature('reading_reflections') then\n    raise exception 'Reading Reflections are locked for this account right now.'\n      using errcode = '42501';\n  end if;\n\n  return new;\nend;\n$function$\n",
+        "security_definer": true
+      },
+      {
+        "acl": [
+          "=X/supabase_auth_admin",
+          "supabase_auth_admin=X/supabase_auth_admin",
+          "dashboard_user=X/supabase_auth_admin"
+        ],
+        "name": "auth.uid()",
+        "owner": "supabase_auth_admin",
+        "config": null,
+        "definition": "CREATE OR REPLACE FUNCTION auth.uid()\n RETURNS uuid\n LANGUAGE sql\n STABLE\nAS $function$\n  select \n  coalesce(\n    nullif(current_setting('request.jwt.claim.sub', true), ''),\n    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')\n  )::uuid\n$function$\n",
+        "security_definer": false
+      }
+    ],
+    "related_tables": [
+      {
+        "rls": true,
+        "table": "profiles",
+        "force_rls": false
+      },
+      {
+        "rls": true,
+        "table": "teacher_students",
+        "force_rls": false
+      }
+    ],
+    "related_policies": [
+      {
+        "cmd": "INSERT",
+        "qual": null,
+        "roles": [
+          "public"
+        ],
+        "tablename": "profiles",
+        "permissive": "PERMISSIVE",
+        "policyname": "insert own profile",
+        "with_check": "(auth.uid() = id)"
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "(auth.uid() = id)",
+        "roles": [
+          "public"
+        ],
+        "tablename": "profiles",
+        "permissive": "PERMISSIVE",
+        "policyname": "profiles: read own",
+        "with_check": null
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "(is_public = true)",
+        "roles": [
+          "public"
+        ],
+        "tablename": "profiles",
+        "permissive": "PERMISSIVE",
+        "policyname": "profiles: read public",
+        "with_check": null
+      },
+      {
+        "cmd": "UPDATE",
+        "qual": "(auth.uid() = id)",
+        "roles": [
+          "public"
+        ],
+        "tablename": "profiles",
+        "permissive": "PERMISSIVE",
+        "policyname": "profiles: update own",
+        "with_check": "(auth.uid() = id)"
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "(auth.uid() = id)",
+        "roles": [
+          "public"
+        ],
+        "tablename": "profiles",
+        "permissive": "PERMISSIVE",
+        "policyname": "read own profile",
+        "with_check": null
+      },
+      {
+        "cmd": "DELETE",
+        "qual": "is_super_teacher(auth.uid())",
+        "roles": [
+          "public"
+        ],
+        "tablename": "profiles",
+        "permissive": "PERMISSIVE",
+        "policyname": "super teachers delete profiles",
+        "with_check": null
+      },
+      {
+        "cmd": "INSERT",
+        "qual": null,
+        "roles": [
+          "public"
+        ],
+        "tablename": "profiles",
+        "permissive": "PERMISSIVE",
+        "policyname": "super teachers insert profiles",
+        "with_check": "is_super_teacher(auth.uid())"
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "is_super_teacher(auth.uid())",
+        "roles": [
+          "public"
+        ],
+        "tablename": "profiles",
+        "permissive": "PERMISSIVE",
+        "policyname": "super teachers select profiles",
+        "with_check": null
+      },
+      {
+        "cmd": "UPDATE",
+        "qual": "is_super_teacher(auth.uid())",
+        "roles": [
+          "public"
+        ],
+        "tablename": "profiles",
+        "permissive": "PERMISSIVE",
+        "policyname": "super teachers update profiles",
+        "with_check": "is_super_teacher(auth.uid())"
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "(EXISTS ( SELECT 1\n   FROM teacher_students ts\n  WHERE ((ts.teacher_id = auth.uid()) AND (ts.student_id = profiles.id))))",
+        "roles": [
+          "public"
+        ],
+        "tablename": "profiles",
+        "permissive": "PERMISSIVE",
+        "policyname": "teacher can read linked student profiles",
+        "with_check": null
+      },
+      {
+        "cmd": "UPDATE",
+        "qual": "(auth.uid() = id)",
+        "roles": [
+          "public"
+        ],
+        "tablename": "profiles",
+        "permissive": "PERMISSIVE",
+        "policyname": "update own profile",
+        "with_check": "(auth.uid() = id)"
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "(auth.uid() = id)",
+        "roles": [
+          "public"
+        ],
+        "tablename": "profiles",
+        "permissive": "PERMISSIVE",
+        "policyname": "user can read own profile",
+        "with_check": null
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "(auth.uid() = student_id)",
+        "roles": [
+          "public"
+        ],
+        "tablename": "teacher_students",
+        "permissive": "PERMISSIVE",
+        "policyname": "student can view their teachers",
+        "with_check": null
+      },
+      {
+        "cmd": "DELETE",
+        "qual": "is_super_teacher(auth.uid())",
+        "roles": [
+          "public"
+        ],
+        "tablename": "teacher_students",
+        "permissive": "PERMISSIVE",
+        "policyname": "super teachers delete teacher_students",
+        "with_check": null
+      },
+      {
+        "cmd": "INSERT",
+        "qual": null,
+        "roles": [
+          "public"
+        ],
+        "tablename": "teacher_students",
+        "permissive": "PERMISSIVE",
+        "policyname": "super teachers insert teacher_students",
+        "with_check": "is_super_teacher(auth.uid())"
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "is_super_teacher(auth.uid())",
+        "roles": [
+          "public"
+        ],
+        "tablename": "teacher_students",
+        "permissive": "PERMISSIVE",
+        "policyname": "super teachers select teacher_students",
+        "with_check": null
+      },
+      {
+        "cmd": "UPDATE",
+        "qual": "is_super_teacher(auth.uid())",
+        "roles": [
+          "public"
+        ],
+        "tablename": "teacher_students",
+        "permissive": "PERMISSIVE",
+        "policyname": "super teachers update teacher_students",
+        "with_check": "is_super_teacher(auth.uid())"
+      },
+      {
+        "cmd": "SELECT",
+        "qual": "(auth.uid() = teacher_id)",
+        "roles": [
+          "public"
+        ],
+        "tablename": "teacher_students",
+        "permissive": "PERMISSIVE",
+        "policyname": "teacher can read teacher_students",
+        "with_check": null
+      }
+    ]
+  },
+  "supporting_grants": {
+    "roles": [
+      {
+        "role": "authenticated",
+        "inherits": true,
+        "superuser": false,
+        "bypass_rls": false
+      },
+      {
+        "role": "anon",
+        "inherits": true,
+        "superuser": false,
+        "bypass_rls": false
+      },
+      {
+        "role": "service_role",
+        "inherits": true,
+        "superuser": false,
+        "bypass_rls": true
+      }
+    ],
+    "table_grants": [
+      {
+        "grantee": "anon",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "DELETE"
+      },
+      {
+        "grantee": "anon",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "INSERT"
+      },
+      {
+        "grantee": "anon",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "grantee": "anon",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "SELECT"
+      },
+      {
+        "grantee": "anon",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "TRIGGER"
+      },
+      {
+        "grantee": "anon",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "TRUNCATE"
+      },
+      {
+        "grantee": "anon",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "grantee": "authenticated",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "DELETE"
+      },
+      {
+        "grantee": "authenticated",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "INSERT"
+      },
+      {
+        "grantee": "authenticated",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "grantee": "authenticated",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "SELECT"
+      },
+      {
+        "grantee": "authenticated",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "TRIGGER"
+      },
+      {
+        "grantee": "authenticated",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "TRUNCATE"
+      },
+      {
+        "grantee": "authenticated",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "grantee": "postgres",
+        "table_name": "profiles",
+        "is_grantable": "YES",
+        "privilege_type": "DELETE"
+      },
+      {
+        "grantee": "postgres",
+        "table_name": "profiles",
+        "is_grantable": "YES",
+        "privilege_type": "INSERT"
+      },
+      {
+        "grantee": "postgres",
+        "table_name": "profiles",
+        "is_grantable": "YES",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "grantee": "postgres",
+        "table_name": "profiles",
+        "is_grantable": "YES",
+        "privilege_type": "SELECT"
+      },
+      {
+        "grantee": "postgres",
+        "table_name": "profiles",
+        "is_grantable": "YES",
+        "privilege_type": "TRIGGER"
+      },
+      {
+        "grantee": "postgres",
+        "table_name": "profiles",
+        "is_grantable": "YES",
+        "privilege_type": "TRUNCATE"
+      },
+      {
+        "grantee": "postgres",
+        "table_name": "profiles",
+        "is_grantable": "YES",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "grantee": "service_role",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "DELETE"
+      },
+      {
+        "grantee": "service_role",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "INSERT"
+      },
+      {
+        "grantee": "service_role",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "grantee": "service_role",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "SELECT"
+      },
+      {
+        "grantee": "service_role",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "TRIGGER"
+      },
+      {
+        "grantee": "service_role",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "TRUNCATE"
+      },
+      {
+        "grantee": "service_role",
+        "table_name": "profiles",
+        "is_grantable": "NO",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "grantee": "anon",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "DELETE"
+      },
+      {
+        "grantee": "anon",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "INSERT"
+      },
+      {
+        "grantee": "anon",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "grantee": "anon",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "SELECT"
+      },
+      {
+        "grantee": "anon",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "TRIGGER"
+      },
+      {
+        "grantee": "anon",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "TRUNCATE"
+      },
+      {
+        "grantee": "anon",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "grantee": "authenticated",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "DELETE"
+      },
+      {
+        "grantee": "authenticated",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "INSERT"
+      },
+      {
+        "grantee": "authenticated",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "grantee": "authenticated",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "SELECT"
+      },
+      {
+        "grantee": "authenticated",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "TRIGGER"
+      },
+      {
+        "grantee": "authenticated",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "TRUNCATE"
+      },
+      {
+        "grantee": "authenticated",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "grantee": "postgres",
+        "table_name": "teacher_students",
+        "is_grantable": "YES",
+        "privilege_type": "DELETE"
+      },
+      {
+        "grantee": "postgres",
+        "table_name": "teacher_students",
+        "is_grantable": "YES",
+        "privilege_type": "INSERT"
+      },
+      {
+        "grantee": "postgres",
+        "table_name": "teacher_students",
+        "is_grantable": "YES",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "grantee": "postgres",
+        "table_name": "teacher_students",
+        "is_grantable": "YES",
+        "privilege_type": "SELECT"
+      },
+      {
+        "grantee": "postgres",
+        "table_name": "teacher_students",
+        "is_grantable": "YES",
+        "privilege_type": "TRIGGER"
+      },
+      {
+        "grantee": "postgres",
+        "table_name": "teacher_students",
+        "is_grantable": "YES",
+        "privilege_type": "TRUNCATE"
+      },
+      {
+        "grantee": "postgres",
+        "table_name": "teacher_students",
+        "is_grantable": "YES",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "grantee": "service_role",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "DELETE"
+      },
+      {
+        "grantee": "service_role",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "INSERT"
+      },
+      {
+        "grantee": "service_role",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "grantee": "service_role",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "SELECT"
+      },
+      {
+        "grantee": "service_role",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "TRIGGER"
+      },
+      {
+        "grantee": "service_role",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "TRUNCATE"
+      },
+      {
+        "grantee": "service_role",
+        "table_name": "teacher_students",
+        "is_grantable": "NO",
+        "privilege_type": "UPDATE"
+      }
+    ]
+  },
+  "triggers": {
+    "triggers": [
+      {
+        "name": "require_reading_reflection_access_for_user_books",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER require_reading_reflection_access_for_user_books BEFORE UPDATE OF reader_advice, rating_overall, rating_difficulty, reader_level ON public.user_books FOR EACH ROW EXECUTE FUNCTION require_reading_reflection_access_for_user_books()"
+      }
+    ],
+    "bookmark_function": []
+  }
+}

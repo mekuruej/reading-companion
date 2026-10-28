@@ -13,6 +13,7 @@ import { getEnglishNativeTrackerBookMode } from "@/lib/books/englishNativeTracke
 import { supabase } from "@/lib/supabaseClient";
 import ReadingJournalPanel from "../components/ReadingJournalPanel";
 import SimpleTimedSessionPage from "../_shared/timed-session/SimpleTimedSessionPage";
+import ResumeBookmarkSummary from "@/components/books/ResumeBookmarkSummary";
 import { CuriosityReadingExperience } from "../curiosity-reading/WordTimerExperience";
 
 type ListeningViewMode = "listening" | "workspace";
@@ -271,6 +272,7 @@ export default function ListeningPage() {
           <p className="mt-1 text-sm text-stone-600">
             Log listening time and keep heard words with their listening session.
           </p>
+          <ResumeBookmarkSummary userBookId={userBookId} />
 
           {canUseReadingJournal ? (
             <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3">

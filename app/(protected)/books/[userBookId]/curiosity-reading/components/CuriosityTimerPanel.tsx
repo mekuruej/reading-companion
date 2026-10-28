@@ -12,6 +12,8 @@ type CuriosityTimerPanelProps = {
   sessionEndPage: string;
   timerSaveMessage: string;
   endingPhraseField: ReactNode;
+  resumeBookmarkSection?: ReactNode;
+  resumeBookmarkFeedback?: ReactNode;
   latestEndingPhrase: ReactNode;
   formatTimer: (seconds: number) => string;
   onStart: () => void;
@@ -42,6 +44,8 @@ export default function CuriosityTimerPanel({
   sessionEndPage,
   timerSaveMessage,
   endingPhraseField,
+  resumeBookmarkSection = null,
+  resumeBookmarkFeedback = null,
   latestEndingPhrase,
   formatTimer,
   onStart,
@@ -72,6 +76,7 @@ export default function CuriosityTimerPanel({
           {description}
         </div>
 
+        {resumeBookmarkFeedback}
         <div className="flex flex-wrap items-center justify-center gap-2">
           {!isRunning && !isPaused && (!listeningProgressOnly || !showTimedSessionForm) ? (
             <button
@@ -182,6 +187,7 @@ export default function CuriosityTimerPanel({
             </div>
           )}
 
+          {resumeBookmarkSection}
           {endingPhraseField}
           <div className="mt-3 text-sm text-stone-500">
             Time: {formatTimer(elapsed)}

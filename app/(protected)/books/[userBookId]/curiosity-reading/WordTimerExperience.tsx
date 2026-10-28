@@ -5,11 +5,14 @@ import { useListeningCapture } from "@/lib/listening/useListeningCapture";
 import { ListeningSessionWords } from "@/components/listening/ListeningSessionWords";
 import VocabularyProgressPrompt from "@/components/books/VocabularyProgressPrompt";
 import BookProgressSummaryBar from "@/components/books/BookProgressSummaryBar";
+import ResumeBookmarkSection, { ResumeBookmarkFeedback } from "@/components/books/ResumeBookmarkSection";
+import ResumeBookmarkSummary from "@/components/books/ResumeBookmarkSummary";
 import { useSessionEndingPhrase, SessionEndingPhraseField, LatestEndingPhrase } from "@/components/books/SessionEndingPhrase";
 import WordContextFields from "@/components/vocabulary/WordContextFields";
 import { wordContextPayload, type WordContext } from "@/lib/vocabulary/wordContext";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
-import { nextProgressStart, matchingTotal, progressLabels, parseProgressRange, sessionEnd } from "@/lib/books/readingProgress";
+import { nextProgressStart, matchingTotal, progressLabels, parseProgressRange, parseProgressPosition, sessionEnd } from "@/lib/books/readingProgress";
+import { useResumeBookmark } from "@/lib/books/useResumeBookmark";
 
 
 import { isReadyForFlashcards } from "@/lib/wordSupportEligibility";
@@ -518,6 +521,10 @@ function CuriosityReadingContent({
   const [hasFinishedTimer, setHasFinishedTimer] = useState(false);
   const [sessionStartPage, setSessionStartPage] = useState("");
   const [sessionEndPage, setSessionEndPage] = useState("");
+  const resumeBookmark = useResumeBookmark(userBookId, tracking.method === "page" && tracking.canChoose);
+  const bookmarkEndingPage = tracking.method === "page"
+    ? parseProgressPosition(sessionEndPage, "page", progressTotal).value
+    : null;
   const [sessionDate, setSessionDate] = useState("");
   const [timerPersistenceReady, setTimerPersistenceReady] = useState(false);
   const skippedInitialPersistenceWriteRef = useRef(false);
@@ -2030,10 +2037,14 @@ function CuriosityReadingContent({
       }
     }
 
+    const bookmarkSave = tracking.method === "page"
+      ? await resumeBookmark.save(sessionEndPage)
+      : { saved: false, skipped: true as const };
+
     setTimerSaveMessage(
-      isListeningMode
+      `${isListeningMode
         ? "Your listening session has been saved in Reading History."
-        : "Your curiosity session has been saved in Reading History."
+        : "Your curiosity session has been saved in Reading History."}${bookmarkSave.error ? " The session was saved, but the resume bookmark could not be updated." : ""}`
     );
     window.setTimeout(() => setTimerSaveMessage(""), 4000);
 
@@ -2139,8 +2150,20 @@ function CuriosityReadingContent({
       showTimedSessionForm={showTimedSessionForm}
       sessionStartPage={sessionStartPage}
       sessionEndPage={sessionEndPage}
-      endingPhraseField={<SessionEndingPhraseField value={sessionEndingPhrase} onChange={setSessionEndingPhrase} listening={isListeningMode} />}
-      latestEndingPhrase={isListeningMode ? null : wordCaptureOnly ? <LatestEndingPhrase phrase={latestEndingPhrase} /> : null}
+      endingPhraseField={!(resumeBookmark.available && resumeBookmark.eligible) ? <SessionEndingPhraseField value={sessionEndingPhrase} onChange={setSessionEndingPhrase} listening={isListeningMode} /> : null}
+      resumeBookmarkFeedback={<ResumeBookmarkFeedback bookmark={resumeBookmark} />}
+      resumeBookmarkSection={tracking.method === "page" && tracking.canChoose ? (
+        <ResumeBookmarkSection
+          available={resumeBookmark.available && resumeBookmark.eligible}
+          endingPage={bookmarkEndingPage}
+          kind={resumeBookmark.choice}
+          phrase={resumeBookmark.phrase}
+          onKindChange={resumeBookmark.setChoice}
+          onPhraseChange={resumeBookmark.setPhrase}
+          onSkip={resumeBookmark.skip}
+        />
+      ) : null}
+      latestEndingPhrase={isListeningMode || resumeBookmark.bookmark ? null : wordCaptureOnly ? <LatestEndingPhrase phrase={latestEndingPhrase} /> : null}
       timerSaveMessage={timerSaveMessage}
       formatTimer={formatTimer}
       compact={workspaceCompact || useCompactSessionBar}
@@ -2148,6 +2171,7 @@ function CuriosityReadingContent({
         if (isListeningMode && (showTimedSessionForm || (capture.identity && !capture.completed))) return;
         if (!tracking.timersEnabled) return;
         if (!tracking.requireMethod()) return;
+        resumeBookmark.skip();
         const startedAt = Date.now();
         if (isListeningMode) {
           const identity = capture.start(identity => writePersistedTimedSession({version:1, sessionMode:"listening", userBookId, captureSessionId:identity.id, captureOwnerId:identity.owner, captureStartedAt:identity.startedAt, startedAt, accumulatedElapsedMs:0, isPaused:false, sessionDate:todayYmdAppTimeZone(), sessionStartPage:"", sessionEndPage:"", showTimedSessionForm:false, savedAt:startedAt, trackingUnit:tracking.method}));
@@ -2203,9 +2227,11 @@ function CuriosityReadingContent({
       onSaveSession={() => void saveReadingSession()}
       onCancelSession={() => {
         if (isListeningMode) {
+          resumeBookmark.skip();
           setShowTimedSessionForm(false); setHasFinishedTimer(false); setIsPaused(true);
           return;
         }
+        resumeBookmark.skip();
         setSessionEndingPhrase("");
         setShowTimedSessionForm(false);
         setElapsed(0);
@@ -2224,6 +2250,7 @@ function CuriosityReadingContent({
 
   const sessionBar = (
     <>
+      {!embedded && tracking.method === "page" && tracking.canChoose ? <ResumeBookmarkSummary userBookId={userBookId} /> : null}
       {bookTitle && (!workspaceCompact || wordCaptureOnly) ? (
         <Link
           href={`/books/${encodeURIComponent(userBookId)}`}

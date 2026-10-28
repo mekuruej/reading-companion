@@ -11,7 +11,10 @@ import type { CapturePosition } from "@/lib/books/vocabularyProgress";
 import WordPositionField from "@/components/vocabulary/WordPositionField";
 import { wordPosition, wordPositionText, wordPositionPayload, wordPositionInput, parseWordPosition, type WordPositionRecord } from "@/lib/vocabulary/wordPosition";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
-import { matchingTotal, parseProgressRange, sessionEnd } from "@/lib/books/readingProgress";
+import ResumeBookmarkSection, { ResumeBookmarkFeedback } from "@/components/books/ResumeBookmarkSection";
+import ResumeBookmarkSummary from "@/components/books/ResumeBookmarkSummary";
+import { matchingTotal, parseProgressRange, parseProgressPosition, sessionEnd } from "@/lib/books/readingProgress";
+import { useResumeBookmark } from "@/lib/books/useResumeBookmark";
 
 
 import { isReadyForFlashcards } from "@/lib/wordSupportEligibility";
@@ -420,6 +423,10 @@ function ReadAlongContent() {
     const [sessionDate, setSessionDate] = useState("");
     const [sessionStartPage, setSessionStartPage] = useState("");
     const [sessionEndPage, setSessionEndPage] = useState("");
+    const resumeBookmark = useResumeBookmark(userBookId, tracking.method === "page" && ownsBook);
+    const bookmarkEndingPage = tracking.method === "page"
+        ? parseProgressPosition(sessionEndPage, "page", matchingTotal("page", tracking.totals)).value
+        : null;
     const [sessionMinutesRead, setSessionMinutesRead] = useState("");
 
     const [startTime, setStartTime] = useState<number | null>(null);
@@ -1036,6 +1043,10 @@ function ReadAlongContent() {
             return;
         }
 
+        const bookmarkSave = tracking.method === "page"
+            ? await resumeBookmark.save(sessionEndPage)
+            : { saved: false, skipped: true as const };
+
         setShowTimedSessionForm(false);
         setElapsed(0);
         setStartTime(null);
@@ -1043,7 +1054,9 @@ function ReadAlongContent() {
         setIsPaused(false);
         setSessionMinutesRead("");
         clearPersistedTimedSession(READ_ALONG_TIMED_SESSION_MODE, userBookId);
-        setTimerSaveMessage("Your fluid reading session has been saved in Reading History.");
+        setTimerSaveMessage(bookmarkSave.error
+            ? "Your fluid reading session has been saved in Reading History. The resume bookmark could not be updated."
+            : "Your fluid reading session has been saved in Reading History.");
 
         setTimeout(() => {
             setTimerSaveMessage("");
@@ -1386,8 +1399,9 @@ function ReadAlongContent() {
     }
 
     function handleStartTimer() {
-    if (!tracking.timersEnabled) return;
+        if (!tracking.timersEnabled) return;
         if (!tracking.requireMethod()) return;
+        resumeBookmark.skip();
         const today = todayYmdAppTimeZone();
 
         setSessionDate(today);
@@ -1442,6 +1456,7 @@ function ReadAlongContent() {
     }
 
     function handleCancelTimedSession() {
+        resumeBookmark.skip();
         setShowTimedSessionForm(false);
         setElapsed(0);
         setStartTime(null);
@@ -2467,6 +2482,8 @@ function ReadAlongContent() {
                 ) : null}
 
                 {bookTitle ? (
+                    <>
+                    {tracking.method === "page" && ownsBook ? <ResumeBookmarkSummary userBookId={userBookId} /> : null}
                     <ReadAlongBookContextCard
                         bookTitle={bookTitle}
                         bookCover={bookCover}
@@ -2480,6 +2497,18 @@ function ReadAlongContent() {
                                 showTimedSessionForm={showTimedSessionForm}
                                 sessionStartPage={sessionStartPage}
                                 sessionEndPage={sessionEndPage}
+                                resumeBookmarkFeedback={<ResumeBookmarkFeedback bookmark={resumeBookmark} />}
+                                resumeBookmarkSection={tracking.method === "page" && ownsBook ? (
+                                    <ResumeBookmarkSection
+                                        available={resumeBookmark.available && resumeBookmark.eligible}
+                                        endingPage={bookmarkEndingPage}
+                                        kind={resumeBookmark.choice}
+                                        phrase={resumeBookmark.phrase}
+                                        onKindChange={resumeBookmark.setChoice}
+                                        onPhraseChange={resumeBookmark.setPhrase}
+                                        onSkip={resumeBookmark.skip}
+                                    />
+                                ) : null}
                                 timerSaveMessage={timerSaveMessage}
                                 compact
                                 onStartTimer={handleStartTimer}
@@ -2494,6 +2523,7 @@ function ReadAlongContent() {
                             /> : null
                         }
                     />
+                    </>
                 ) : null}
 
                 {chapterOptions.length > 0 ? (

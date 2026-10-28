@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import AudioTimeInput from "@/components/books/AudioTimeInput";
 import { useBookProgress } from "@/components/books/BookProgressProvider";
 import { progressLabels } from "@/lib/books/readingProgress";
@@ -8,6 +9,8 @@ type ReadAlongTimerPanelProps = {
   showTimedSessionForm: boolean;
   sessionStartPage: string;
   sessionEndPage: string;
+  resumeBookmarkSection?: ReactNode;
+  resumeBookmarkFeedback?: ReactNode;
   timerSaveMessage: string;
   compact?: boolean;
 
@@ -32,6 +35,8 @@ export default function ReadAlongTimerPanel({
   showTimedSessionForm,
   sessionStartPage,
   sessionEndPage,
+  resumeBookmarkSection = null,
+  resumeBookmarkFeedback = null,
   timerSaveMessage,
   compact = false,
   onStartTimer,
@@ -54,6 +59,7 @@ export default function ReadAlongTimerPanel({
         </div>
       ) : null}
 
+      {resumeBookmarkFeedback}
       <div className="flex flex-wrap items-center justify-center gap-2">
         {!isRunning && !isPaused ? (
           <button
@@ -146,6 +152,7 @@ export default function ReadAlongTimerPanel({
             </div>
           </div>
 
+          {resumeBookmarkSection}
           <div className="mt-3 text-sm text-stone-500">
             Time: {elapsedLabel}
           </div>
