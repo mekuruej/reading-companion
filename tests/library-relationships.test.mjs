@@ -309,7 +309,8 @@ test('daily invitation waits for Library render, coalesces refreshes and uses ve
   assert.match(reminder, /stale = true/);
   const readiness = fs.readFileSync('lib/study/dailyReminderReadiness.ts', 'utf8');
   assert.match(readiness, /loadAllPagedRows/);
-  assert.match(readiness, /keys.slice\(i, i \+ 75\)/);
+  assert.match(readiness, /keys.slice\(batchIndex \* 75, \(batchIndex \+ 1\) \* 75\)/);
+  assert.match(readiness, /Math.min\(4, progressBatches.length\)/);
   assert.match(readiness, /eligibleIdentityCount >= 100 && dueCardCount >= 10/);
   assert.match(reminder, /\/library-study\/check\?start=1/);
 });

@@ -46,7 +46,12 @@ test('actual Check completion function includes final pending seen card, rejects
  assert.equal(await runIntegration(),true);assert.equal(await runIntegration({endedEarly:true}),false);assert.equal(await runIntegration({authOwner:'other'}),false);assert.equal(await runIntegration({mode:'practice'}),false);assert.equal(await runIntegration({seenIds:ids.slice(0,9)}),false);assert.equal(await runIntegration({reachedEnd:false}),false);
 });
 test('scheduler, builders, readiness identities and exploration return validation remain byte-identical',()=>{
- for(const file of ['lib/study/abilityCheckScheduler.ts','lib/study/abilityCheckCards.ts','lib/study/dailyReminderReadiness.ts','lib/studySenseIdentity.ts','lib/wordSkyExploration.ts'])assert.equal(fs.readFileSync(file,'utf8'),execFileSync('git',['show','d44dc9f:'+file],{encoding:'utf8'}));
+ for(const file of ['lib/study/abilityCheckScheduler.ts','lib/study/abilityCheckCards.ts','lib/studySenseIdentity.ts','lib/wordSkyExploration.ts'])assert.equal(fs.readFileSync(file,'utf8'),execFileSync('git',['show','d44dc9f:'+file],{encoding:'utf8'}));
+ for(const name of ['recommendationIdentity','calculateDailyReminderReadiness']){
+  const file='lib/study/dailyReminderReadiness.ts';
+  const extract=text=>{const source=ts.createSourceFile(file,text,ts.ScriptTarget.Latest,true);return source.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name?.text===name).getText(source)};
+  assert.equal(extract(fs.readFileSync(file,'utf8')),extract(execFileSync('git',['show','d44dc9f:'+file],{encoding:'utf8'})));
+ }
  const wordSky='app/(protected)/library-study/word-sky/page.tsx',current=fs.readFileSync(wordSky,'utf8'),old=execFileSync('git',['show','d44dc9f:'+wordSky],{encoding:'utf8'});
  // Every learning-status color branch is unchanged; only the ordinary unclaimed bubble is themed.
  for(const color of ['red','orange','yellow','grey','green','blue','purple']){

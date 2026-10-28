@@ -218,14 +218,30 @@ export async function loadDailyReminderReadiness(
     });
     const keys = [...new Set([...words.map(w => w.study_identity_key || studyIdentityKey(w.surface, w.reading)),
       ...claims.map(c => c.study_identity_key)].filter(Boolean))];
-    const progressRows: LibraryWordProgressRow[] = [];
-    for (let i = 0; i < keys.length; i += 75) {
-      const batch = completeActivityRows<LibraryWordProgressRow & { id: string }>(await
-        client.from('user_library_word_progress').select('id, user_id, study_identity_key, surface, reading, definition_key, reading_gate_status, meaning_gate_status, held_before_reading_gate, held_before_meaning_gate, mastered, reading_gate_attempts, meaning_gate_attempts, reading_gate_passed_at, reading_gate_failed_at, meaning_gate_passed_at, meaning_gate_failed_at, mastered_at, last_studied_at', { count: 'exact' }).eq('user_id', ownerId)
-          .in('study_identity_key', keys.slice(i, i + 75)).order('id'), 'ability_check_progress_cap');
-      if (batch.some(p => p.user_id !== ownerId)) return unavailable('unknown', 'owner_mismatch');
-      progressRows.push(...batch);
+    // Independent 75-key reads need not accumulate one round trip per batch.
+    // Four workers bound database load; keep batch order independent of arrival
+    // order, and drain in-flight reads before returning any failure as unknown.
+    const progressBatches: LibraryWordProgressRow[][] = new Array(Math.ceil(keys.length / 75));
+    let nextBatch = 0;
+    let failed = false;
+    let failure: unknown;
+    async function loadProgressBatches() {
+      while (!failed && nextBatch < progressBatches.length) {
+        const batchIndex = nextBatch++;
+        try {
+          const batch = completeActivityRows<LibraryWordProgressRow & { id: string }>(await
+            client.from('user_library_word_progress').select('id, user_id, study_identity_key, surface, reading, definition_key, reading_gate_status, meaning_gate_status, held_before_reading_gate, held_before_meaning_gate, mastered, reading_gate_attempts, meaning_gate_attempts, reading_gate_passed_at, reading_gate_failed_at, meaning_gate_passed_at, meaning_gate_failed_at, mastered_at, last_studied_at', { count: 'exact' }).eq('user_id', ownerId)
+              .in('study_identity_key', keys.slice(batchIndex * 75, (batchIndex + 1) * 75)).order('id'), 'ability_check_progress_cap');
+          if (batch.some(p => p.user_id !== ownerId)) throw new IncompleteActivitySource('owner_mismatch');
+          progressBatches[batchIndex] = batch;
+        } catch (error) {
+          if (!failed) { failed = true; failure = error; }
+        }
+      }
     }
+    await Promise.all(Array.from({ length: Math.min(4, progressBatches.length) }, () => loadProgressBatches()));
+    if (failed) throw failure;
+    const progressRows = progressBatches.flat();
     const finalAuth = await client.auth.getUser();
     if (finalAuth.error || finalAuth.data.user?.id !== ownerId) return unavailable('unknown', 'session_changed');
     return calculateDailyReminderReadiness({
