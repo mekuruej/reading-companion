@@ -1,9 +1,10 @@
-import {test} from 'node:test';
+import {test,mock} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 import {createRequire} from 'node:module';
+mock.timers.enable({apis:['Date'],now:Date.parse('2026-10-27T03:00:00Z')});
 const require=createRequire(import.meta.url),cache=new Map();
 function load(file){
  file=path.resolve(file);if(cache.has(file))return cache.get(file);

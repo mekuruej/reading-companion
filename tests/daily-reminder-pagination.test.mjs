@@ -1,10 +1,11 @@
-import {test} from 'node:test';
+import {test,mock} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 import {createRequire} from 'node:module';
 import {execFileSync} from 'node:child_process';
+mock.timers.enable({apis:['Date'],now:Date.parse('2026-10-27T03:00:00Z')});
 const require=createRequire(import.meta.url);
 const changed=['lib/vocabulary/loadAllPagedRows.ts','lib/study/dailyReminderReadiness.ts','lib/study/dailyLibraryReminder.ts'];
 const beforeSources=new Map(changed.map(f=>[path.resolve(f),execFileSync('git',['show','77c362b:'+f],{encoding:'utf8'})]));
@@ -95,8 +96,8 @@ test('shared hidden data is owner-bound, failures remain unknown, and separate l
  let called=false;const shared={ownerId:'other',load:async()=>{called=true;return new Set();}};await assert.rejects(readiness.ownerHiddenIdentities(f.client,'u',shared));assert.equal(called,false);
  const hidden=fixture({words:0,claims:1,hiddenKeys:['コーヒー||こーひー']});const result=await current.loadDailyLibraryReminder(hidden.client,'u',store());assert.equal(result.readiness.eligibleIdentityCount,0);
 });
-test('selection, identity calculations, cards, scheduler, exploration and component stale guards unchanged',()=>{
+test('identity calculations, dismissal, cards, scheduler, exploration and component stale guards unchanged',()=>{
  const functions=(source,names)=>{const ast=ts.createSourceFile('file.ts',source,ts.ScriptTarget.Latest,true);return ast.statements.filter(n=>ts.isFunctionDeclaration(n)&&names.includes(n.name?.text)).map(n=>n.getText(ast));};
- for(const [file,names] of [['lib/study/dailyLibraryReminder.ts',['selectDailyLibraryReminder','reminderHidden','dismissDailyReminder','reminderStudyContext','wordSkyReminderHref']],['lib/study/dailyReminderReadiness.ts',['recommendationIdentity','calculateDailyReminderReadiness']]])assert.deepEqual(functions(fs.readFileSync(file,'utf8'),names),functions(beforeSources.get(path.resolve(file)),names));
+ for(const [file,names] of [['lib/study/dailyLibraryReminder.ts',['reminderHidden','dismissDailyReminder','reminderStudyContext','wordSkyReminderHref']],['lib/study/dailyReminderReadiness.ts',['recommendationIdentity','calculateDailyReminderReadiness']]])assert.deepEqual(functions(fs.readFileSync(file,'utf8'),names),functions(beforeSources.get(path.resolve(file)),names));
  for(const file of ['lib/study/abilityCheckCards.ts','lib/study/abilityCheckScheduler.ts','lib/wordSkyExploration.ts','app/(protected)/users/[username]/books/components/DailyLibraryReminder.tsx'])assert.equal(fs.readFileSync(file,'utf8'),execFileSync('git',['show','77c362b:'+file],{encoding:'utf8'}));
 });

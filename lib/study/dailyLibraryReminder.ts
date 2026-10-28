@@ -10,21 +10,33 @@ import { loadAllPagedRows } from '@/lib/vocabulary/loadAllPagedRows';
 import { computeLibraryStudyColorStatus, type LibraryStudyColorSettings } from '@/lib/libraryStudyColor';
 
 export type DailyLibraryActivity = 'word_sky' | 'ability_check';
+export type ReminderReadiness = DailyReminderReadiness | {
+  status: 'not_evaluated'; reason: 'scheduled_word_sky';
+  eligibleIdentityCount: null; dueCardCount: null; recommendAbilityCheck: false;
+};
+export type WordSkyAvailability = 'available' | 'unavailable' | 'unknown';
+
+function isWordSkyReminderDay(date: Date) {
+  const weekday = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tokyo', weekday: 'short' }).format(date);
+  return ['Mon', 'Wed', 'Fri'].includes(weekday);
+}
 export type ReminderStorage = Pick<Storage, 'getItem' | 'setItem'>;
 const DISMISS_PREFIX = 'mekuru-library-reminder-hidden:';
 
 export function selectDailyLibraryReminder(input: {
   date: Date; ownLibrary: boolean; enabled: boolean; hidden: boolean;
   canUseWordSky: boolean; wordSkyAvailable: boolean;
-  canUseAbilityCheck: boolean; readiness: DailyReminderReadiness; abilityCheckCompleted?: boolean;
+  canUseAbilityCheck: boolean; readiness: ReminderReadiness; abilityCheckCompleted?: boolean;
 }): DailyLibraryActivity | null {
   if (!input.ownLibrary || !input.enabled || input.hidden) return null;
+  const skyDay = isWordSkyReminderDay(input.date);
+  const sky = input.canUseWordSky && input.wordSkyAvailable;
+  // Only a verified scheduled Word Sky path can omit readiness. It is not low readiness.
+  if (input.readiness.status === 'not_evaluated') return skyDay && sky ? 'word_sky' : null;
   // Unknown is not evidence of beginner status. Wait for reliable information.
   if (input.readiness.status === 'unknown' || input.readiness.status === 'loading') return null;
   const check = input.canUseAbilityCheck && input.readiness.status === 'ready' && input.readiness.recommendAbilityCheck;
-  const sky = input.canUseWordSky && input.wordSkyAvailable;
-  const weekday = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Tokyo', weekday: 'short' }).format(input.date);
-  const skyDay = ['Mon', 'Wed', 'Fri'].includes(weekday);
+
   if (input.abilityCheckCompleted && !skyDay) return null;
   if (check && (!skyDay || !sky)) return input.abilityCheckCompleted ? null : 'ability_check';
   return sky ? 'word_sky' : check ? 'ability_check' : null;
@@ -66,16 +78,18 @@ export function wordSkyReminderHref(path: string, state: {
   return '/library-study/word-sky?' + new URLSearchParams({ explore: '1', returnTo });
 }
 
-export type LoadedDailyReminder = { ownerId: string; day: string; libraryPath: string; canUseWordSky: boolean; wordSkyAvailable: boolean; canUseAbilityCheck: boolean; readiness: DailyReminderReadiness; abilityCheckCompleted?: boolean };
+export type LoadedDailyReminder = { ownerId: string; day: string; libraryPath: string; canUseWordSky: boolean; wordSkyAvailable: boolean; canUseAbilityCheck: boolean; readiness: ReminderReadiness; abilityCheckCompleted?: boolean };
 
 /** Read-only invitation data. Fail closed on auth/preferences, and use the exact
  * activity access gates. The reference RPC supplies availability only, never cards.
  */
 export async function loadDailyLibraryReminder(client: SupabaseClient, ownerId: string, storage: ReminderStorage | null, libraryPath = '/books'): Promise<LoadedDailyReminder | null> {
   try {
-    const day = ymdInTimeZone();
+    const startedAt = new Date();
+    const day = ymdInTimeZone(startedAt);
     const auth = await client.auth.getUser();
     if (auth.error || auth.data.user?.id !== ownerId) return null;
+    if (storage && reminderHidden(storage, ownerId, startedAt)) return null;
     const [profile, settings] = await Promise.all([
       client.from('profiles').select('id, username, role, is_super_teacher, app_access_type, app_access_expires_at').eq('id', ownerId).maybeSingle(),
       client.from('user_learning_settings').select('show_ability_check_reminder, red_stages, orange_stages, yellow_stages').eq('user_id', ownerId).maybeSingle(),
@@ -96,12 +110,26 @@ export async function loadDailyLibraryReminder(client: SupabaseClient, ownerId: 
       ownerId,
       load: () => hiddenPromise ??= loadPersonallyHiddenIdentities(client),
     };
-    const [readiness, wordSkyAvailable] = await Promise.all([
-      loadDailyReminderReadiness(client, storage ? reminderStudyContext(storage, ownerId) : null, sharedHidden),
-      canUseWordSky ? loadWordSkyReminderAvailability(client, ownerId, settings.data ?? {}, sharedHidden) : Promise.resolve(false),
-    ]);
+    const loadReadiness = () => loadDailyReminderReadiness(client, storage ? reminderStudyContext(storage, ownerId) : null, sharedHidden);
+    const loadAvailability = () => canUseWordSky
+      ? loadWordSkyReminderAvailability(client, ownerId, settings.data ?? {}, sharedHidden)
+      : Promise.resolve<WordSkyAvailability>('unavailable');
+    let readiness: ReminderReadiness;
+    let availability: WordSkyAvailability;
+    if (isWordSkyReminderDay(startedAt)) {
+      availability = await loadAvailability();
+      // A failed/incomplete availability query is not evidence of an empty sky.
+      if (availability === 'unknown') return null;
+      readiness = availability === 'available'
+        ? { status: 'not_evaluated', reason: 'scheduled_word_sky', eligibleIdentityCount: null, dueCardCount: null, recommendAbilityCheck: false }
+        : await loadReadiness();
+    } else {
+      // Check days retain full readiness and the existing below-threshold fallback.
+      [readiness, availability] = await Promise.all([loadReadiness(), loadAvailability()]);
+    }
+    const wordSkyAvailable = availability === 'available';
     const finalAuth = await client.auth.getUser();
-    if (finalAuth.error || finalAuth.data.user?.id !== ownerId || ymdInTimeZone() !== day) return null;
+    if (finalAuth.error || finalAuth.data.user?.id !== ownerId || ymdInTimeZone() !== day || (storage && reminderHidden(storage, ownerId))) return null;
     return { ownerId, day, libraryPath, canUseWordSky, wordSkyAvailable, canUseAbilityCheck, readiness, abilityCheckCompleted: storage ? abilityCheckReminderCompleted(storage, ownerId) : false };
   } catch { return null; }
 }
@@ -110,14 +138,17 @@ export async function loadDailyLibraryReminder(client: SupabaseClient, ownerId: 
  * Only the reference RPC supplies content. Personal data merely excludes entries.
  * Failed/incomplete visibility reads cannot establish available Word Sky words.
  */
-export async function loadWordSkyReminderAvailability(client: SupabaseClient, ownerId: string, settings: LibraryStudyColorSettings, sharedHidden?: OwnerBoundHiddenIdentities): Promise<boolean> {
+export async function loadWordSkyReminderAvailability(client: SupabaseClient, ownerId: string, settings: LibraryStudyColorSettings, sharedHidden?: OwnerBoundHiddenIdentities): Promise<WordSkyAvailability> {
   try {
     const pool = await client.rpc('get_word_sky_pool', { p_limit: 180 });
-    if (pool.error || !Array.isArray(pool.data)) return false;
-    const keys: string[] = [...new Set<string>(pool.data.filter((row: {study_identity_key?: string; surface?: string; reading?: string; meaning?: string}) =>
-      [row.study_identity_key, row.surface, row.reading, row.meaning].every(value => typeof value === 'string' && value.trim())
-    ).map((row: {study_identity_key: string}) => row.study_identity_key))];
-    if (!keys.length) return false;
+    if (pool.error || !Array.isArray(pool.data)) return 'unknown';
+    // The RPC contract is a deduplicated sample of at most 180 usable reference rows.
+    // Malformed output cannot establish either availability or genuine absence.
+    if (pool.data.length > 180 || pool.data.some(row => !row ||
+      ![row.study_identity_key, row.surface, row.reading, row.meaning].every(value => typeof value === 'string' && value.trim()))) return 'unknown';
+    const keys: string[] = pool.data.map(row => row.study_identity_key);
+    if (new Set(keys).size !== keys.length) return 'unknown';
+    if (!keys.length) return 'unavailable';
     const [hidden, summaries, progress] = await Promise.all([
       ownerHiddenIdentities(client, ownerId, sharedHidden),
       loadAllPagedRows<{ id: string; study_identity_key: string; total_encounter_count: number }>((from, to) =>
@@ -138,6 +169,6 @@ export async function loadWordSkyReminderAvailability(client: SupabaseClient, ow
       // Conservative across definitions: never invite on an ambiguously excluded identity.
       if (color === 'green' || color === 'blue' || color === 'purple') excludedColors.add(row.study_identity_key);
     }
-    return keys.some(key => !hiddenKeys.has(key) && !excludedColors.has(key));
-  } catch { return false; }
+    return keys.some(key => !hiddenKeys.has(key) && !excludedColors.has(key)) ? 'available' : 'unavailable';
+  } catch { return 'unknown'; }
 }

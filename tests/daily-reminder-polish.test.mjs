@@ -1,10 +1,11 @@
-import {test} from 'node:test';
+import {test,mock} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 import {createRequire} from 'node:module';
 import {execFileSync} from 'node:child_process';
+mock.timers.enable({apis:['Date'],now:Date.parse('2026-10-27T03:00:00Z')});
 const require=createRequire(import.meta.url),cache=new Map();
 function load(file){file=path.resolve(file);if(cache.has(file))return cache.get(file);const module={exports:{}};cache.set(file,module.exports);new Function('require','module','exports',ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX}}).outputText)(name=>name.startsWith('@/')?load(name.slice(2)+'.ts'):name.startsWith('.')?load(path.resolve(path.dirname(file),name)+'.ts'):require(name),module,module.exports);return module.exports;}
 const {dismissCompletedAbilityCheckReminder:complete,abilityCheckReminderCompleted:completed}=load('lib/study/abilityCheckReminderCompletion.ts');
