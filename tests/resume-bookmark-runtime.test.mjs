@@ -12,9 +12,9 @@ const progress=load('lib/books/readingProgress.ts');
 const Section=load('components/books/ResumeBookmarkSection.tsx').default;
 
 test('actual bookmark control renders optional, accessible, distinct top/end/phrase choices',()=>{
- for(const kind of ['top','end','phrase']){
-  const html=renderToStaticMarkup(React.createElement(Section,{available:true,endingPage:44,kind,phrase:'家族',onKindChange(){},onPhraseChange(){},onSkip(){}}));
-  assert.match(html,/Optional/);assert.equal((html.match(/type="radio"/g)||[]).length,3);assert.match(html,new RegExp(`checked="" value="${kind}"`));
+ for(const kind of ['page','top','end','phrase']){
+  const html=renderToStaticMarkup(React.createElement(Section,{available:true,endingPage:44,kind,phrase:'家族',onKindChange(){},onPhraseChange(){}}));
+  assert.match(html,/optional/);assert.doesNotMatch(html,/Skip bookmark/);assert.equal((html.match(/type="radio"/g)||[]).length,4);assert.match(html,new RegExp(`checked="" value="${kind}"`));
   assert.equal(html.includes('placeholder="A Japanese or English word or phrase"'),kind==='phrase');
   assert.match(html,/var\(--appearance-surface/);
  }
@@ -51,13 +51,13 @@ async function harness(){
 test('actual hook saves/reloads top, end and phrase without altering session starting progress',async()=>{
  const h=await harness();try{
   assert.equal(h.value.bookmark,null);assert.equal(h.value.available,true);
-  for(const kind of ['top','end','phrase']){
+  for(const kind of ['page','top','end','phrase']){
    h.value.setChoice(kind);h.value.setPhrase(' 家族 ');await h.flush();
    assert.equal((await h.value.save('44')).saved,true);await h.flush();await h.reload();
    assert.deepEqual(h.value.bookmark,bookmark.resolveResumeBookmark(kind,44,45,' 家族 '));
   }
   assert.ok(h.requests.every(r=>r.url.endsWith('/resume-bookmark')));
-  const before=h.requests.length;h.value.skip();await h.flush();assert.equal((await h.value.save('45')).skipped,true);assert.equal(h.requests.length,before);
+  const before=h.requests.length;h.value.skip();await h.flush();assert.equal(h.value.choice,'page');assert.equal((await h.value.save('45')).saved,true);await h.flush();assert.equal(h.requests.length,before+1);assert.deepEqual(h.value.bookmark,{kind:'page',page:45,phrase:null});
  }finally{h.close()}
 });
 
@@ -65,7 +65,7 @@ test('failed bookmark writes retain selection/phrase and retry only the bookmark
  const h=await harness();try{
   h.value.setChoice('phrase');h.value.setPhrase('Unsaved phrase');await h.flush();h.fail(true);
   const result=await h.value.save('44');await h.flush();assert.match(result.error,/Synthetic/);assert.equal(h.value.choice,'phrase');assert.equal(h.value.phrase,'Unsaved phrase');assert.equal(h.value.canRetry,true);await h.reload();assert.equal(h.value.canRetry,true);assert.equal(h.value.phrase,'Unsaved phrase');
-  h.value.setPhrase('Corrected retained phrase');await h.flush();h.fail(false);assert.equal((await h.value.retry()).saved,true);await h.flush();assert.equal(h.value.bookmark.phrase,'Corrected retained phrase');assert.equal(h.value.choice,null);
+  h.value.setPhrase('Corrected retained phrase');await h.flush();h.fail(false);assert.equal((await h.value.retry()).saved,true);await h.flush();assert.equal(h.value.bookmark.phrase,'Corrected retained phrase');assert.equal(h.value.choice,'page');
   assert.equal(h.requests.filter(r=>r.method==='PUT').length,2);
  }finally{h.close()}
 });
@@ -108,10 +108,10 @@ test('actual API uses a per-request user JWT client and private relation without
  const req=(owner='owner-a',payload)=>new Request('http://synthetic.invalid/book',{method:payload?'PUT':'GET',headers:owner?{authorization:'Bearer '+owner,'content-type':'application/json'}:{},...(payload?{body:JSON.stringify(payload)}:{})});
  assert.equal((await route.GET(req(''),context)).status,401);assert.equal((await route.GET(req('owner-b'),context)).status,404);
  assert.equal((await route.GET(req(),context)).body.bookmark,null);
- for(const kind of ['top','end','phrase']){const payload={kind,endingPage:44,phrase:'家族',user_id:'attacker-supplied-id'};assert.equal((await route.PUT(req('owner-a',payload),context)).status,200);assert.deepEqual((await route.GET(req(),context)).body.bookmark,bookmark.resolveResumeBookmark(kind,44,45,'家族'))}
+ for(const kind of ['page','top','end','phrase']){const payload={kind,endingPage:44,phrase:'家族',user_id:'attacker-supplied-id'};assert.equal((await route.PUT(req('owner-a',payload),context)).status,200);assert.deepEqual((await route.GET(req(),context)).body.bookmark,bookmark.resolveResumeBookmark(kind,44,45,'家族'))}
  assert.equal((await route.PUT(req('owner-a',{kind:'phrase',endingPage:44,phrase:' '}),context)).status,400);
  row.progress_tracking_method='percent';assert.equal((await route.PUT(req('owner-a',{kind:'top',endingPage:44}),context)).status,400);
- row.progress_tracking_method='page';missing=true;assert.equal((await route.GET(req(),context)).body.available,false);assert.equal((await route.PUT(req('owner-a',{kind:'top',endingPage:44}),context)).status,409);assert.equal(writes,3);
+ row.progress_tracking_method='page';missing=true;assert.equal((await route.GET(req(),context)).body.available,false);assert.equal((await route.PUT(req('owner-a',{kind:'top',endingPage:44}),context)).status,409);assert.equal(writes,4);
  missing=false;denied=true;const originalError=console.error;console.error=()=>{};try{assert.equal((await route.GET(req(),context)).status,500);assert.equal((await route.PUT(req('owner-a',{kind:'top',endingPage:44}),context)).status,500);denied=false;missingLibrary=true;assert.equal((await route.GET(req(),context)).status,500)}finally{console.error=originalError}
  assert.ok(clients.includes('owner-b'));assert.ok(clients.filter(x=>x==='owner-a').length>1);
  const source=fs.readFileSync('app/api/books/[userBookId]/resume-bookmark/route.ts','utf8');assert.doesNotMatch(source,/SUPABASE_SERVICE_ROLE_KEY|supabaseAdmin/);
@@ -123,6 +123,36 @@ test('late write failures are ignored even after switching away from and back to
  const h=await harness();try{
   h.value.setChoice('phrase');h.value.setPhrase('Old draft');await h.flush();h.hold(true);h.fail(true);
   const old=h.value.save('20');await h.flush();await h.book('book-b');await h.book('book-a');
-  h.hold(false);h.release();await old;await h.flush();assert.equal(h.value.error,null);assert.equal(h.value.choice,null);assert.equal(h.value.canRetry,false);
+  h.hold(false);h.release();await old;await h.flush();assert.equal(h.value.error,null);assert.equal(h.value.choice,'page');assert.equal(h.value.canRetry,false);
+ }finally{h.close()}
+});
+
+
+test('default page-only draft does not write on opening; saving replaces older precise cue', async () => {
+ const h=await harness();try{
+  assert.equal(h.value.choice,'page');assert.equal(h.requests.filter(r=>r.method==='PUT').length,0);
+  h.value.setChoice('phrase');h.value.setPhrase('Old precise location');await h.flush();await h.value.save('10');await h.flush();await h.reload();
+  assert.equal(h.value.bookmark.phrase,'Old precise location');assert.equal(h.value.choice,'page');
+  await h.value.save('14');await h.flush();await h.reload();
+  assert.deepEqual(h.value.bookmark,{kind:'page',page:14,phrase:null});
+ }finally{h.close()}
+});
+test('default page-only control is selected in actual rendered form', () => {
+ const html=renderToStaticMarkup(React.createElement(Section,{available:true,endingPage:14,kind:'page',phrase:'',onKindChange(){},onPhraseChange(){}}));
+ assert.match(html,/checked="" value="page"/);assert.match(html,/No specific location/);assert.doesNotMatch(html,/Skip bookmark|placeholder=/);
+});
+test('failed page-only write retains prior stored cue and retries the new page independently', async () => {
+ const h=await harness();try{
+  h.value.setChoice('phrase');h.value.setPhrase('Existing cue');await h.flush();await h.value.save('10');await h.flush();
+  h.fail(true);assert.equal((await h.value.save('14')).saved,false);await h.flush();assert.equal(h.value.canRetry,true);assert.equal(h.value.choice,'page');assert.equal(h.value.bookmark.phrase,'Existing cue');
+  h.fail(false);assert.equal((await h.value.retry()).saved,true);await h.flush();await h.reload();assert.deepEqual(h.value.bookmark,{kind:'page',page:14,phrase:null});
+ }finally{h.close()}
+});
+
+
+test('empty optional session page does not write a bookmark or invent a page', async () => {
+ const h=await harness();try{
+  assert.equal((await h.value.save('')).skipped,true);await h.flush();
+  assert.equal(h.requests.filter(r=>r.method==='PUT').length,0);assert.equal(h.value.canRetry,false);
  }finally{h.close()}
 });

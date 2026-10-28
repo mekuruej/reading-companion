@@ -7,7 +7,7 @@ const require = createRequire(import.meta.url);
 const bookmark = await import('../lib/books/resumeBookmark.mjs');
 function load(file, deps = {}) {
   const exports = {};
-  new Function('require', 'exports', ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText)(name => deps[name] ?? require(name), exports);
+  new Function('require', 'exports', ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText)(name => deps[name] ?? (name === './ResumeBookmarkSummary' ? { default: () => null } : require(name)), exports);
   return exports;
 }
 const progress = load('lib/books/readingProgress.ts');

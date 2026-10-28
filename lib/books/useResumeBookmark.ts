@@ -7,7 +7,7 @@ import { parseProgressPosition } from "@/lib/books/readingProgress";
 
 type BookmarkResponse = { available?: boolean; eligible?: boolean; pageCount?: number | null; bookmark?: ResumeBookmark | null; error?: string };
 type Draft = { kind: ResumeBookmarkKind | null; phrase: string; endingPage?: string; error?: string };
-const emptyDraft: Draft = { kind: null, phrase: "" };
+const emptyDraft: Draft = { kind: "page", phrase: "" };
 const emptyState = { available: false, eligible: false, pageCount: null as number | null, bookmark: null as ResumeBookmark | null };
 
 // Each request rechecks the authenticated owner. Never reuse a previous owner's token.
@@ -88,6 +88,7 @@ export function useResumeBookmark(userBookId: string, enabled: boolean) {
 
   const save = useCallback(async (endingPageText: string) => {
     if (!draft.kind || !current.available || !current.eligible || !owner) return { saved: false, skipped: true };
+    if (draft.kind === "page" && !endingPageText.trim()) return { saved: false, skipped: true };
     if (saving.current) return { saved: false, skipped: false, error: "A bookmark save is already in progress." };
     const page = parseProgressPosition(endingPageText, "page", current.pageCount);
     const validation = page.error || (page.value == null ? "Enter a valid ending page." : null);

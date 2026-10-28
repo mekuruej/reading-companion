@@ -931,7 +931,6 @@ export default function SimpleTimedSessionPage({
                     phrase={resumeBookmark.phrase}
                     onKindChange={resumeBookmark.setChoice}
                     onPhraseChange={resumeBookmark.setPhrase}
-                    onSkip={resumeBookmark.skip}
                 />
             ) : null}
             {!(resumeBookmark.available && resumeBookmark.eligible) ? <SessionEndingPhraseField value={sessionEndingPhrase} onChange={setSessionEndingPhrase} listening={activeSessionMode === "listening"} /> : null}

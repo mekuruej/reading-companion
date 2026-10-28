@@ -2160,7 +2160,6 @@ function CuriosityReadingContent({
           phrase={resumeBookmark.phrase}
           onKindChange={resumeBookmark.setChoice}
           onPhraseChange={resumeBookmark.setPhrase}
-          onSkip={resumeBookmark.skip}
         />
       ) : null}
       latestEndingPhrase={isListeningMode || resumeBookmark.bookmark ? null : wordCaptureOnly ? <LatestEndingPhrase phrase={latestEndingPhrase} /> : null}

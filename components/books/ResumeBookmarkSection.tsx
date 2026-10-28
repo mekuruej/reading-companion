@@ -10,22 +10,22 @@ type Props = {
   phrase: string;
   onKindChange: (kind: ResumeBookmarkKind | null) => void;
   onPhraseChange: (phrase: string) => void;
-  onSkip: () => void;
 };
 
 const choices: { value: ResumeBookmarkKind; label: string }[] = [
+  { value: "page", label: "No specific location" },
   { value: "top", label: "Top of page" },
   { value: "end", label: "End of page" },
-  { value: "phrase", label: "Specific phrase" },
+  { value: "phrase", label: "Specific word or phrase" },
 ];
 
-export default function ResumeBookmarkSection({ available, endingPage, kind, phrase, onKindChange, onPhraseChange, onSkip }: Props) {
+export default function ResumeBookmarkSection({ available, endingPage, kind, phrase, onKindChange, onPhraseChange }: Props) {
   const group = useId();
   if (!available) return null;
   return (
     <fieldset className="mt-4 rounded-xl border border-[var(--appearance-border)] bg-[var(--appearance-surface-muted)] text-[var(--appearance-text)] p-3">
       <legend className="px-1 text-sm font-semibold text-[var(--appearance-text)]">Where Did I Leave Off?</legend>
-      <p className="mb-2 text-xs text-[var(--appearance-muted-text)]">Optional. Skip this to keep your current bookmark unchanged.</p>
+      <p className="mb-2 text-xs text-[var(--appearance-muted-text)]">The page number is your resume bookmark. Adding a specific location within the page is optional.</p>
       <div className="flex flex-wrap gap-x-4 gap-y-2">
         {choices.map((choice) => (
           <label key={choice.value} className={`inline-flex items-center gap-2 text-sm ${endingPage == null ? "text-[var(--appearance-muted-text)] opacity-60" : "text-[var(--appearance-text)]"}`}>
@@ -56,7 +56,6 @@ export default function ResumeBookmarkSection({ available, endingPage, kind, phr
           />
         </label>
       ) : null}
-      {kind ? <button type="button" onClick={onSkip} className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--appearance-accent)] mt-2 text-xs font-semibold text-[var(--appearance-text)] underline underline-offset-2">Skip bookmark</button> : null}
     </fieldset>
   );
 }
@@ -66,8 +65,8 @@ export function ResumeBookmarkFeedback({ bookmark }: { bookmark: { canRetry: boo
   if (!bookmark.canRetry) return null;
   return <div role="alert" className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
     <p>The session was saved, but its bookmark was not. {bookmark.error}</p>
-    <p className="break-words">Unsaved bookmark: {bookmark.choice}{bookmark.choice === "phrase" ? ` — ${bookmark.phrase}` : ""}</p>
-    <ResumeBookmarkSection available endingPage={bookmark.retryEndingPage} kind={bookmark.choice} phrase={bookmark.phrase} onKindChange={bookmark.setChoice} onPhraseChange={bookmark.setPhrase} onSkip={bookmark.skip} />
+    <p className="break-words">Unsaved bookmark: {choices.find(choice => choice.value === bookmark.choice)?.label}{bookmark.choice === "phrase" ? ` — ${bookmark.phrase}` : ""}</p>
+    <ResumeBookmarkSection available endingPage={bookmark.retryEndingPage} kind={bookmark.choice} phrase={bookmark.phrase} onKindChange={bookmark.setChoice} onPhraseChange={bookmark.setPhrase} />
     <div className="mt-2 flex flex-wrap gap-3">
       <button type="button" className="underline focus-visible:outline-2 focus-visible:outline-offset-2" onClick={() => void bookmark.retry()}>Retry bookmark only</button>
     </div>

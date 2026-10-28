@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import ResumeBookmarkSummary from "./ResumeBookmarkSummary";
 import { useEffect } from "react";
 import { useBookProgress } from "./BookProgressProvider";
 import { summarizeBookProgress } from "@/lib/books/bookProgressSummary";
 import { formatAudioTime, sessionEnd, sessionProgressUnit } from "@/lib/books/readingProgress";
 import BookHubProgressSummary from "@/app/(protected)/books/[userBookId]/components/BookHubProgressSummary";
 
-export default function BookProgressSummaryBar({ userBookId, showVocabulary = true, listening = false, showBackLink = false }: { userBookId: string; showVocabulary?: boolean; listening?: boolean; showBackLink?: boolean }) {
+export default function BookProgressSummaryBar({ userBookId, showVocabulary = true, listening = false, showBackLink = false, bookmarkAware = false }: { userBookId: string; showVocabulary?: boolean; listening?: boolean; showBackLink?: boolean; bookmarkAware?: boolean }) {
   const tracking = useBookProgress();
   const { refreshSummary } = tracking;
   const matchesBook = tracking.userBookId === userBookId;
@@ -39,10 +40,7 @@ export default function BookProgressSummaryBar({ userBookId, showVocabulary = tr
         ? `Resume from ${tracking.summaryData.currentLocation.trim()}`
         : "No saved listening position yet.";
 
-    return <div>
-      {showBackLink ? <Link href={`/books/${encodeURIComponent(userBookId)}`} className="mb-3 inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900">
-        ← Back to Book Hub
-      </Link> : null}
+    const fallback = (
       <div className="mb-3 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-700 shadow-sm" role="status">
         <span className="font-semibold text-stone-900">Where did I leave off?</span>{" "}
         {tracking.summaryData && tracking.loaded ? resumeLabel : "Loading listening position…"}
@@ -50,6 +48,12 @@ export default function BookProgressSummaryBar({ userBookId, showVocabulary = tr
           <p className="mt-1 whitespace-pre-wrap break-words text-stone-600">{latestListeningSession.ending_phrase.trim()}</p>
         ) : null}
       </div>
+    );
+    return <div>
+      {showBackLink ? <Link href={`/books/${encodeURIComponent(userBookId)}`} className="mb-3 inline-flex text-sm font-semibold text-slate-500 hover:text-slate-900">
+        ← Back to Book Hub
+      </Link> : null}
+      {bookmarkAware ? <ResumeBookmarkSummary userBookId={userBookId} fallback={fallback} /> : fallback}
       {tracking.summaryError ? <p role="alert" className="mb-3 text-xs text-amber-800">{tracking.summaryError} <button type="button" className="underline" onClick={() => void refreshSummary()}>Retry</button></p> : null}
     </div>;
   }

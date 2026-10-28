@@ -59,7 +59,6 @@ import { resolveBookHubMode } from "@/lib/books/bookHubMode";
 import RemoveFromLibraryDialog from "./components/RemoveFromLibraryDialog";
 import BookHubProgressSummary from "./components/BookHubProgressSummary";
 import { latestSessionPhrase } from "@/lib/books/resumeBookmark.mjs";
-import ResumeBookmarkSummary from "@/components/books/ResumeBookmarkSummary";
 import BookHubNotices from "./components/BookHubNotices";
 import BookHubHero from "./components/BookHubHero";
 import BookHubStatusPanel from "./components/BookHubStatusPanel";
@@ -5910,8 +5909,6 @@ export default function BookHubPage() {
                 summaryStats={bookHubSummaryStats}
                 learningStats={canSeeVocabularySummary && isJapaneseLearningBook(book.language_code ?? null) ? bookHubLearningStats : undefined}
               />
-
-              {isOwnBookHub && tracking.method === "page" ? <ResumeBookmarkSummary userBookId={row.id} /> : null}
 
               <AudiobookProgressControl
                 userBookId={row.id}

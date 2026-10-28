@@ -56,13 +56,13 @@ test("finish forms show optional choices only for owner page tracking and do not
     assert.match(source, /tracking\.method === "page"/);
     assert.match(source, /resumeBookmark\.save\(/);
   }
-  assert.match(section, /Skip this to keep your current bookmark unchanged/);
-  assert.match(section, /Skip bookmark/);
+  assert.match(section, /specific location within the page is optional/);
+  assert.doesNotMatch(section, /Skip bookmark/);
   assert.match(hook, /!draft.kind/);
   assert.match(hook, /result\.available === false/);
-  assert.match(hub, /ResumeBookmarkSummary/);
+  assert.doesNotMatch(hub, /ResumeBookmarkSummary/);
   assert.match(read, /ResumeBookmarkSummary/);
-  assert.match(listen, /ResumeBookmarkSummary/);
+  assert.match(listen, /BookProgressSummaryBar/);
   assert.doesNotMatch(history, /resumeBookmark|resume_bookmark/);
   assert.doesNotMatch(sessionsApi, /resume_bookmark/);
   assert.match(simple, /session_mode: activeSessionMode/);
@@ -104,4 +104,12 @@ test("legacy phrase loader includes blank latest sessions and legacy untyped rea
   assert.doesNotMatch(source, /\.not\("ending_phrase"/);
   assert.match(source, /session_mode\.neq\.listening,session_mode\.is\.null/);
   assert.match(source, /setLatestEndingPhrase\(sessionEndingPhrase\.trim\(\)\)/);
+});
+
+
+test("page-only bookmarks save the current page and discard any older precise location", () => {
+  const bookmark = resolveResumeBookmark("page", 44, 45, "old phrase");
+  assert.deepEqual(bookmark, { kind: "page", page: 44, phrase: null });
+  assert.equal(resumeBookmarkLabel(bookmark, 45), "Resume from page 44");
+  assert.deepEqual(resolveResumeBookmark("page", 45, 45), { kind: "page", page: 45, phrase: null });
 });

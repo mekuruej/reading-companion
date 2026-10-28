@@ -4,7 +4,7 @@ import { effectiveProgressMethod, matchingTotal } from "@/lib/books/readingProgr
 import { resolveResumeBookmark } from "@/lib/books/resumeBookmark.mjs";
 
 const bookmarkColumns = "kind, page, phrase";
-type ResumeBookmarkKind = "top" | "end" | "phrase";
+type ResumeBookmarkKind = "page" | "top" | "end" | "phrase";
 
 function bookmarkResponse(body: unknown, options?: { status?: number }) {
   return NextResponse.json(body, { ...options, headers: { "Cache-Control": "private, no-store" } });
@@ -75,7 +75,7 @@ export async function PUT(req: Request, context: { params: Promise<{ userBookId:
     }
     const body = await req.json().catch(() => ({}));
     const kind = body?.kind as ResumeBookmarkKind;
-    if (kind !== "top" && kind !== "end" && kind !== "phrase") {
+    if (kind !== "page" && kind !== "top" && kind !== "end" && kind !== "phrase") {
       return bookmarkResponse({ error: "Choose a valid resume position." }, { status: 400 });
     }
     const bookmark = resolveResumeBookmark(kind, body?.endingPage, matchingTotal("page", owner.bookDetails ?? {}), body?.phrase);

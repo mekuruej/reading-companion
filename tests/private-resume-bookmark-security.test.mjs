@@ -162,3 +162,55 @@ test('legacy user_books bookmark storage requires a separate reviewed transition
   assert.equal((await db.query('SELECT resume_bookmark_phrase FROM public.user_books LIMIT 1')).rows[0].resume_bookmark_phrase,'Synthetic legacy cue');
  }finally{await db.close()}
 });
+
+test('page-only extension preserves installed private security, old data and repeatability', async () => {
+ const db=await setup();
+ const extension=await fs.readFile(new URL('../sql/20261029_resume_bookmark_page_only.sql',import.meta.url),'utf8');
+ const metadata=async()=>({
+  policies:(await db.query("SELECT tablename,policyname,roles,cmd,qual,with_check FROM pg_policies ORDER BY tablename,policyname")).rows,
+  relations:(await db.query("SELECT relname,relowner,relacl,relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid IN ('public.user_books'::regclass,'public.user_book_resume_bookmarks'::regclass)")).rows,
+  triggers:(await db.query("SELECT tgname,pg_get_triggerdef(oid) FROM pg_trigger WHERE tgrelid='public.user_books'::regclass")).rows,
+ });
+ try {
+  await db.exec(migration);
+  await asUser(db,'authenticated',owner,upsert(owner,book));
+  const before=await metadata();const saved=(await db.query('SELECT * FROM public.user_book_resume_bookmarks')).rows;
+  await assert.rejects(asUser(db,'authenticated',owner,upsert(owner,book,'page',44,null)),e=>e.code==='23514');
+  await db.exec(extension);
+  assert.deepEqual(await metadata(),before);
+  assert.deepEqual((await db.query('SELECT * FROM public.user_book_resume_bookmarks')).rows,saved);
+  for(const kind of ['top','end','phrase','page']){
+   await asUser(db,'authenticated',owner,upsert(owner,book,kind,44,kind==='phrase'?'New phrase':null));
+   assert.equal((await asUser(db,'authenticated',owner,'SELECT kind FROM public.user_book_resume_bookmarks')).rows[0].kind,kind);
+  }
+  assert.deepEqual((await asUser(db,'authenticated',owner,'SELECT kind,page,phrase FROM public.user_book_resume_bookmarks')).rows,[{kind:'page',page:44,phrase:null}]);
+  for(const id of [teacher,superTeacher,other]){
+   assert.equal((await asUser(db,'authenticated',id,'SELECT * FROM public.user_book_resume_bookmarks')).rows.length,0);
+   await assert.rejects(asUser(db,'authenticated',id,upsert(owner,book,'page',12,null)),e=>e.code==='42501');
+   await assert.rejects(asUser(db,'authenticated',id,upsert(id,book,'page',12,null)),e=>e.code==='42501');
+   assert.equal((await asUser(db,'authenticated',id,"UPDATE public.user_book_resume_bookmarks SET page=1 RETURNING *")).rows.length,0);
+   assert.equal((await asUser(db,'authenticated',id,"DELETE FROM public.user_book_resume_bookmarks RETURNING *")).rows.length,0);
+  }
+  for(const role of ['anon','service_role'])await assert.rejects(asUser(db,role,null,'SELECT * FROM public.user_book_resume_bookmarks'),e=>e.code==='42501');
+  for(const patch of ["kind='page',phrase='old marker'","kind='page',page=-1","kind='unknown'","kind='phrase',phrase=' '"]){
+   await assert.rejects(asUser(db,'authenticated',owner,`UPDATE public.user_book_resume_bookmarks SET ${patch}`),e=>e.code==='23514');
+  }
+  await db.exec(extension);assert.deepEqual(await metadata(),before);
+  assert.deepEqual((await asUser(db,'authenticated',owner,'SELECT kind,page,phrase FROM public.user_book_resume_bookmarks')).rows,[{kind:'page',page:44,phrase:null}]);
+  // Older deployed helper has a page-only fallback label; no old app deployment is required to read it.
+  assert.equal((await asUser(db,'authenticated',teacher,`SELECT id FROM public.user_books WHERE id='${book}'`)).rows.length,1);
+  await asUser(db,'authenticated',teacher,`UPDATE public.user_books SET current_location='Page 45' WHERE id='${book}'`);
+  await asUser(db,'authenticated',owner,`DELETE FROM public.user_book_resume_bookmarks WHERE user_book_id='${book}'`);
+  assert.equal((await db.query('SELECT * FROM public.user_book_resume_bookmarks')).rows.length,0);
+ }finally{await db.close()}
+});
+
+test('page-only extension fails transactionally on unexpected CHECK drift', async()=>{
+ const db=await setup();try{
+  await db.exec(migration);
+  await db.exec('ALTER TABLE public.user_book_resume_bookmarks DROP CONSTRAINT user_book_resume_bookmarks_valid; ALTER TABLE public.user_book_resume_bookmarks ADD CONSTRAINT user_book_resume_bookmarks_valid CHECK(page>=0)');
+  const extension=await fs.readFile(new URL('../sql/20261029_resume_bookmark_page_only.sql',import.meta.url),'utf8');
+  await assert.rejects(db.exec(extension),/Unexpected private bookmark CHECK/);await db.exec('ROLLBACK');
+  assert.equal((await db.query("SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid='public.user_book_resume_bookmarks'::regclass AND conname='user_book_resume_bookmarks_valid'")).rows[0].definition,'CHECK ((page >= 0))');
+ }finally{await db.close()}
+});

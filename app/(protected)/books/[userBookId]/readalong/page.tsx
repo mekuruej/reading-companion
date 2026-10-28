@@ -2506,7 +2506,6 @@ function ReadAlongContent() {
                                         phrase={resumeBookmark.phrase}
                                         onKindChange={resumeBookmark.setChoice}
                                         onPhraseChange={resumeBookmark.setPhrase}
-                                        onSkip={resumeBookmark.skip}
                                     />
                                 ) : null}
                                 timerSaveMessage={timerSaveMessage}
