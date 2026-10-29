@@ -15,6 +15,7 @@ import {
   JAPANESE_FLASHCARD_TYPING_MODES,
   normalizeJapaneseFlashcardMode,
 } from "@/lib/study/japaneseFlashcardModes";
+import { loadAllPagedRows } from "@/lib/vocabulary/loadAllPagedRows";
 import { canLoadJapaneseFlashcard, canStudyWord } from "@/lib/wordSupportEligibility";
 import { saveStudentWord } from "@/lib/teacher/saveStudentWord";
 import StudentToolBoundary from "@/components/teacher/StudentToolBoundary";
@@ -200,6 +201,19 @@ function chapterInfoFromRow(r: WordRow): { label: string; display: string } {
     return { label: `name::${name}`, display: name };
   }
   return { label: "(none)", display: "(none)" };
+}
+
+// Location belongs to each eligible encounter, not only the first card in a sense group.
+function cardEncounters(card: Flashcard): Flashcard[] {
+  return card.visibilityEntries?.length ? card.visibilityEntries : [card];
+}
+
+function matchesCardLocation(card: Flashcard, chapter: string, page: string) {
+  const position = /^\d+$/.test(page) ? `Page ${page}` : page;
+  return cardEncounters(card).some(encounter =>
+    (chapter === "all" || encounter.chapterLabel === chapter) &&
+    (page === "all" || wordPositionText(encounter) === position)
+  );
 }
 
 function kataToHira(s: string) {
@@ -756,7 +770,7 @@ function BookFlashcardsPageContent() {
           setLibraryColorByWordKey({});
 
           const today = new Date().toISOString().slice(0, 10);
-          const { data: englishWords, error: englishWordsErr } = await supabase
+          const englishWords = await loadAllPagedRows<WordRow>((from, to) => supabase
             .from("study_visible_user_book_words")
             .select(
               `
@@ -785,7 +799,8 @@ function BookFlashcardsPageContent() {
               reviewed_by_user_id,
               reviewed_at,
               kanji_meta
-            `
+            `,
+              { count: "exact" }
             )
             .eq("user_book_id", userBookId)
             .eq("target_language_code", "en")
@@ -793,9 +808,11 @@ function BookFlashcardsPageContent() {
             .eq("excluded_from_flashcards", false)
             .or(`skipped_on.is.null,skipped_on.neq.${today}`)
             .order("page_number", { ascending: true })
-            .order("created_at", { ascending: true });
-
-          if (englishWordsErr) throw englishWordsErr;
+            .order("created_at", { ascending: true })
+            .order("id", { ascending: true })
+            .range(from, to)
+            .returns<WordRow[]>()
+          );
 
           const repeatCounts = new Map<string, number>();
           for (const w of (englishWords ?? []) as WordRow[]) {
@@ -852,17 +869,18 @@ function BookFlashcardsPageContent() {
         }
 
         if (ownerUserId) {
-          const { data: ownedBooks, error: ownedBooksErr } = await supabase
+          const ownedBooks = await loadAllPagedRows<{ id: string }>((from, to) => supabase
             .from("user_books")
-            .select("id")
-            .eq("user_id", ownerUserId);
-
-          if (ownedBooksErr) throw ownedBooksErr;
+            .select("id", { count: "exact" })
+            .eq("user_id", ownerUserId)
+            .order("id", { ascending: true })
+            .range(from, to)
+          );
 
           const ownedBookIds = (ownedBooks ?? []).map((b: any) => b.id).filter(Boolean);
 
           if (ownedBookIds.length > 0) {
-            const { data: libraryWords, error: libraryWordsErr } = await supabase
+            const libraryWords = await loadAllPagedRows<WordRow>((from, to) => supabase
               .from("personal_user_book_words")
               .select(
                 `
@@ -890,15 +908,18 @@ function BookFlashcardsPageContent() {
                 reviewed_by_user_id,
                 reviewed_at,
                 kanji_meta
-              `
+              `,
+                { count: "exact" }
               )
               .in("user_book_id", ownedBookIds)
               .or("target_language_code.is.null,target_language_code.eq.ja")
               .eq("hidden", false)
               .order("page_number", { ascending: true })
-              .order("created_at", { ascending: true });
-
-            if (libraryWordsErr) throw libraryWordsErr;
+              .order("created_at", { ascending: true })
+              .order("id", { ascending: true })
+              .range(from, to)
+              .returns<WordRow[]>()
+            );
 
             for (const w of libraryWords ?? []) {
               const key = normalizeRepeatKey((w as any).surface ?? "");
@@ -967,7 +988,7 @@ function BookFlashcardsPageContent() {
 
         const today = new Date().toISOString().slice(0, 10);
 
-        const { data: words, error: wordsErr } = await supabase
+        const words = await loadAllPagedRows<WordRow>((from, to) => supabase
           .from("study_visible_user_book_words")
           .select(
             `
@@ -995,7 +1016,8 @@ function BookFlashcardsPageContent() {
             reviewed_by_user_id,
             reviewed_at,
             kanji_meta
-          `
+          `,
+            { count: "exact" }
           )
           .eq("user_book_id", userBookId)
           .or("target_language_code.is.null,target_language_code.eq.ja")
@@ -1003,9 +1025,11 @@ function BookFlashcardsPageContent() {
 
           .or(`skipped_on.is.null,skipped_on.neq.${today}`)
           .order("page_number", { ascending: true })
-          .order("created_at", { ascending: true });
-
-        if (wordsErr) throw wordsErr;
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to)
+          .returns<WordRow[]>()
+        );
 
         const repeatCounts = new Map<string, number>();
         for (const w of (words ?? []) as WordRow[]) {
@@ -1098,7 +1122,7 @@ function BookFlashcardsPageContent() {
         setFilteredCards(deduped);
 
         const map = new Map<string, string>();
-        for (const c of deduped) {
+        for (const c of deduped.flatMap(cardEncounters)) {
           if (!map.has(c.chapterLabel)) map.set(c.chapterLabel, c.chapterDisplay);
         }
 
@@ -1118,6 +1142,7 @@ function BookFlashcardsPageContent() {
           Array.from(
             new Set(
               deduped
+                .flatMap(cardEncounters)
                 .map((card) => wordPositionText(card))
                 .filter(Boolean)
             )
@@ -1174,14 +1199,7 @@ function BookFlashcardsPageContent() {
       );
     }
 
-    if (chapterFilter !== "all") {
-      result = result.filter((c) => c.chapterLabel === chapterFilter);
-    }
-
-    if (pageFilter !== "all") {
-      const position = /^\d+$/.test(pageFilter) ? `Page ${pageFilter}` : pageFilter;
-      result = result.filter(c => wordPositionText(c) === position);
-    }
+    result = result.filter(card => matchesCardLocation(card, chapterFilter, pageFilter));
 
     if (repeatsOnly) {
       result = result.filter((c) => (c.repeatCount ?? 1) >= 2);
