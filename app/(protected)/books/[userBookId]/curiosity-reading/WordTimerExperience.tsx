@@ -13,6 +13,7 @@ import { wordContextPayload, type WordContext } from "@/lib/vocabulary/wordConte
 import { useBookProgress } from "@/components/books/BookProgressProvider";
 import { nextProgressStart, matchingTotal, progressLabels, parseProgressRange, parseProgressPosition, sessionEnd } from "@/lib/books/readingProgress";
 import { useResumeBookmark } from "@/lib/books/useResumeBookmark";
+import { nextSessionStartPage } from "@/lib/books/resumeBookmark.mjs";
 
 
 import { isReadyForFlashcards } from "@/lib/wordSupportEligibility";
@@ -356,6 +357,7 @@ function CuriosityReadingContent({
   onCloseWorkspaceAside,
   modeSwitchSlot,
   showProgressSummaryBar = true,
+  timerReminder,
   onActiveTimerChange,
   onReadingJournalContextChange,
 }: {
@@ -370,6 +372,7 @@ function CuriosityReadingContent({
   onCloseWorkspaceAside?: () => void;
   modeSwitchSlot?: ReactNode;
   showProgressSummaryBar?: boolean;
+  timerReminder?: ReactNode;
   onActiveTimerChange?: (active: boolean) => void;
   onReadingJournalContextChange?: (context: CuriosityReadingJournalContext) => void;
 }) {
@@ -1920,9 +1923,19 @@ function CuriosityReadingContent({
   }
 
   async function openTimedSessionFormWithDefaults() {
+    if (showTimedSessionForm) return; // Preserve edits if the existing form is reopened.
     if (!userBookId) {
       setShowTimedSessionForm(true);
       return;
+    }
+
+    const bookmarkStart = tracking.method === "page" && resumeBookmark.available && resumeBookmark.eligible
+        ? nextSessionStartPage(resumeBookmark.bookmark, progressTotal) : null;
+    if (!isListeningMode && bookmarkStart !== null) {
+        setSessionStartPage(bookmarkStart);
+        setSessionEndPage("");
+        setShowTimedSessionForm(true);
+        return;
     }
 
     const { data, error } = await supabase
@@ -2136,6 +2149,7 @@ function CuriosityReadingContent({
 
   const timerPanel = tracking.timersEnabled ? (
     <CuriosityTimerPanel
+      timerReminder={timerReminder}
       title={timerTitle}
       description={timerDescription}
       saveTitle={saveSessionTitle}

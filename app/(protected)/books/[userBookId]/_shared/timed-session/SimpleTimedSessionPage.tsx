@@ -9,10 +9,11 @@ import { useBookProgress } from "@/components/books/BookProgressProvider";
 import ResumeBookmarkSection, { ResumeBookmarkFeedback } from "@/components/books/ResumeBookmarkSection";
 import ResumeBookmarkSummary from "@/components/books/ResumeBookmarkSummary";
 import { useResumeBookmark } from "@/lib/books/useResumeBookmark";
+import { nextSessionStartPage } from "@/lib/books/resumeBookmark.mjs";
 import { nextProgressStart, matchingTotal, progressLabels, parseProgressRange, parseProgressPosition, progressPayload, sessionEnd } from "@/lib/books/readingProgress";
 
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { displayBookTitle } from "@/lib/books/bookIdentity";
@@ -46,6 +47,7 @@ type SimpleTimedSessionPageProps = {
     workspaceCompact?: boolean;
     showFluidReadingExplanation?: boolean;
     showProgressSummaryBar?: boolean;
+    timerReminder?: ReactNode;
     onActiveTimerChange?: (active: boolean) => void;
 };
 
@@ -78,6 +80,7 @@ export default function SimpleTimedSessionPage({
     workspaceCompact = false,
     showFluidReadingExplanation = false,
     showProgressSummaryBar = true,
+    timerReminder = null,
     onActiveTimerChange,
 }: SimpleTimedSessionPageProps) {
     const tracking = useBookProgress();
@@ -452,9 +455,19 @@ export default function SimpleTimedSessionPage({
     ]);
 
     async function openTimedSessionFormWithDefaults() {
+        if (showTimedSessionForm) return; // Preserve edits if the existing form is reopened.
         if (!canAccessBook) return;
 
         if (!userBookId) {
+            setShowTimedSessionForm(true);
+            return;
+        }
+
+        const bookmarkStart = tracking.method === "page" && resumeBookmark.available && resumeBookmark.eligible
+            ? nextSessionStartPage(resumeBookmark.bookmark, progressTotal) : null;
+        if (activeSessionMode !== "listening" && bookmarkStart !== null) {
+            setSessionStartPage(bookmarkStart);
+            setSessionEndPage("");
             setShowTimedSessionForm(true);
             return;
         }
@@ -798,6 +811,8 @@ export default function SimpleTimedSessionPage({
     }
 
     const timerPanel = (
+        <>
+            {timerReminder ? <div className="mb-3 text-left">{timerReminder}</div> : null}
         <div className={workspaceCompact ? "rounded-2xl border border-stone-200 bg-stone-50 p-4 text-center" : "mt-6 rounded-3xl border border-stone-200 bg-stone-50 p-5 text-center"}>
             <div className="text-sm font-medium text-stone-500">Timer</div>
             <div className={workspaceCompact ? "mt-2 text-4xl font-black tracking-tight text-stone-900" : "mt-2 text-6xl font-black tracking-tight text-stone-900"}>
@@ -868,6 +883,7 @@ export default function SimpleTimedSessionPage({
                 <p className="mt-3 text-xs text-emerald-600">{timerSaveMessage}</p>
             ) : null}
         </div>
+        </>
     );
 
     const saveSessionForm = showTimedSessionForm && !isRunning ? (

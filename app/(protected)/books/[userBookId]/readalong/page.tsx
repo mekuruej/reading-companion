@@ -15,6 +15,7 @@ import ResumeBookmarkSection, { ResumeBookmarkFeedback } from "@/components/book
 import ResumeBookmarkSummary from "@/components/books/ResumeBookmarkSummary";
 import { matchingTotal, parseProgressRange, parseProgressPosition, sessionEnd } from "@/lib/books/readingProgress";
 import { useResumeBookmark } from "@/lib/books/useResumeBookmark";
+import { nextSessionStartPage } from "@/lib/books/resumeBookmark.mjs";
 
 
 import { isReadyForFlashcards } from "@/lib/wordSupportEligibility";
@@ -979,9 +980,19 @@ function ReadAlongContent() {
     }
 
     async function openTimedSessionFormWithDefaults() {
+        if (showTimedSessionForm) return; // Preserve edits if the existing form is reopened.
         if (!canAccessBook) return;
 
         if (!userBookId) {
+            setShowTimedSessionForm(true);
+            return;
+        }
+
+        const bookmarkStart = tracking.method === "page" && resumeBookmark.available && resumeBookmark.eligible
+            ? nextSessionStartPage(resumeBookmark.bookmark, matchingTotal(tracking.method, tracking.totals)) : null;
+        if (bookmarkStart !== null) {
+            setSessionStartPage(bookmarkStart);
+            setSessionEndPage(tracking.method === currentPage?.positionUnit && currentPageNumber != null ? String(currentPageNumber) : "");
             setShowTimedSessionForm(true);
             return;
         }

@@ -156,3 +156,15 @@ test('empty optional session page does not write a bookmark or invent a page', a
   assert.equal(h.requests.filter(r=>r.method==='PUT').length,0);assert.equal(h.value.canRetry,false);
  }finally{h.close()}
 });
+
+test('actual bookmark hook save/reload supplies each next-session default without rewriting the saved page',async()=>{
+ const h=await harness();try{
+  for(const [kind,expected] of [['top','16'],['end','17'],['phrase','16'],['page','17']]){
+   h.value.setChoice(kind);h.value.setPhrase('Phrase on this page');await h.flush();await h.value.save('16');await h.flush();await h.reload();
+   const stored=structuredClone(h.value.bookmark);assert.equal(bookmark.nextSessionStartPage(stored,45),expected);assert.deepEqual(h.value.bookmark,stored);
+  }
+  h.value.setChoice('top');await h.flush();h.fail(true);await h.value.save('20');await h.flush();
+  assert.equal(bookmark.nextSessionStartPage(h.value.bookmark,45),'17');assert.equal(h.value.canRetry,true);
+  h.fail(false);await h.value.retry();await h.flush();await h.reload();assert.equal(bookmark.nextSessionStartPage(h.value.bookmark,45),'20');
+ }finally{h.close()}
+});

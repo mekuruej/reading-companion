@@ -210,12 +210,14 @@ export default function ListeningPage() {
   }
 
   const showReadingWorkspace = viewMode === "workspace" && canUseReadingJournal && journalOwnerUserId;
+  const listeningReminder = <BookProgressSummaryBar userBookId={userBookId} listening={!isNativeListeningWorkspace || nativeSessionMode === "listening"} bookmarkAware showBackLink={Boolean(showReadingWorkspace)} />;
   const listeningExperience = canSaveWordsWhileListening ? (
     <CuriosityReadingExperience
       experienceMode="listening"
       nativeListeningPosition={isNativeListeningWorkspace}
       embedded
       showProgressSummaryBar={false}
+      timerReminder={listeningReminder}
       workspaceCompact={Boolean(showReadingWorkspace)}
     />
   ) : isNativeListeningWorkspace ? (
@@ -234,6 +236,7 @@ export default function ListeningPage() {
       listeningLocationNote="Optional. Add an audiobook position like Chapter 8, 37%, or 3:12:45. Listening time stays separate from reading pace."
       embedded
       showProgressSummaryBar={false}
+      timerReminder={listeningReminder}
       workspaceCompact={Boolean(showReadingWorkspace)}
     />
   ) : (
@@ -249,6 +252,7 @@ export default function ListeningPage() {
       sessionLocationNote="Progress is optional. If you leave it blank, only listening time will be saved."
       embedded
       showProgressSummaryBar={false}
+      timerReminder={listeningReminder}
       workspaceCompact={Boolean(showReadingWorkspace)}
     />
   );
@@ -275,7 +279,6 @@ export default function ListeningPage() {
           <p className="mt-1 text-sm text-stone-600">
             Log listening time and keep heard words with their listening session.
           </p>
-          <BookProgressSummaryBar userBookId={userBookId} listening={!isNativeListeningWorkspace || nativeSessionMode === "listening"} bookmarkAware showBackLink={Boolean(showReadingWorkspace)} />
 
           {canUseReadingJournal ? (
             <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3">
