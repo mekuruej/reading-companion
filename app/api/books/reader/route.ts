@@ -56,6 +56,7 @@ export async function POST(request: Request) {
     if (!bookId) {
       const metadata = body.metadata ?? {};
       const { data, error } = await client.from("books").insert({
+        reader_created: true,
         title, language_code: language, edition_format: format, isbn13, asin,
         author: text(metadata.author).slice(0, 1000) || null,
         publisher: text(metadata.publisher).slice(0, 1000) || null,

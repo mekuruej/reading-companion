@@ -106,3 +106,9 @@ test('minimal metadata retains existing reading/study gates and progress behavio
  assert.equal(progress.completionPercent(16,'page',book),null);
  assert.equal(progress.effectiveProgressMethod(null,{edition_format:'audiobook'}),'audiobook_time');
 });
+
+test('reader provenance is atomic only on new catalog INSERT, including complete metadata and failed attachment',async()=>{
+ for(const opts of [{},{failLibrary:true}]) {const h=harness(opts);await h.post({...minimal,metadata:{author:'Author',publisher:'Publisher',coverUrl:'https://example.invalid/cover',pageCount:20,publishedDate:'2026'}});assert.equal(h.books[0].reader_created,true);assert.equal(h.writes.filter(w=>w.table==='books').length,1);assert.equal(h.books[0].catalog_reviewed_at,undefined);}
+ const existing={id:'existing',isbn13:'9780306406157',edition_format:'paperback',reader_created:false};const h=harness({books:[existing]});await h.post({...minimal,isbn13:existing.isbn13});assert.equal(h.writes.filter(w=>w.table==='books').length,0);assert.equal(existing.reader_created,false);
+ const race=harness({race:true});await race.post({...minimal,isbn13:'9780306406157'});assert.equal(race.books.length,1);assert.equal(race.books[0].reader_created,undefined);
+});

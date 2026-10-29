@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import CatalogReviewQueue from "@/components/books/CatalogReviewQueue";
 import { useEffect, useState } from "react";
 import AccessDeniedMessage from "@/components/AccessDeniedMessage";
 import { getFeatureAccess } from "@/lib/access/featureAccess";
@@ -68,6 +69,7 @@ export default function AdminHubPage() {
         if (!tools.length) return null;
         return <section key={section.title} className="mt-8">
           <h2 className="mb-3 text-2xl font-black text-stone-950">{section.title}</h2>
+          {section.title === "Catalog & Books" && <CatalogReviewQueue countOnly />}
           <TeacherHubCardGrid cards={tools.map(tool => ({ title: tool.title, href: `${tool.route}?from=admin-hub`, description: tool.description, eyebrow: section.title }))} />
         </section>;
       })}

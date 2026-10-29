@@ -11,6 +11,6 @@ export function canEnterTeacherRoute(profile: Profile, pathname: string | null) 
       !!profile?.is_super_teacher) return true;
   return profile?.role === "admin" && [
     "/teacher/admin", "/teacher/books", "/teacher/books/missing-info",
-    "/teacher/books/add", "/teacher/needs-attention",
+    "/teacher/books/new-review", "/teacher/books/add", "/teacher/needs-attention",
   ].includes(pathname ?? "");
 }
