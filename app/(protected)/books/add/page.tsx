@@ -2,6 +2,8 @@
 // 
 "use client";
 
+import ReaderAddBook from "./components/ReaderAddBook";
+import { isSimpleReaderAddBook } from "@/lib/books/readerAddBook";
 import EditionCoreFields from "@/components/books/EditionCoreFields";
 import { missingCoreBookFields } from "@/lib/books/bookMetadata";
 import { useEffect, useMemo, useState } from "react";
@@ -168,6 +170,7 @@ export default function AddBookPage() {
     const [manualPossibleMatches, setManualPossibleMatches] = useState<BookSearchResult[]>([]);
     const [book, setBook] = useState<LookupBook | null>(null);
     const [currentUserId, setCurrentUserId] = useState("");
+    const [currentProfileLoaded, setCurrentProfileLoaded] = useState(false);
     const [currentUsername, setCurrentUsername] = useState<string | null>(null);
     const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
     const [currentUserIsSuperTeacher, setCurrentUserIsSuperTeacher] = useState(false);
@@ -236,7 +239,8 @@ export default function AddBookPage() {
                 data: { user },
             } = await supabase.auth.getUser();
 
-            if (!alive || !user) return;
+            if (!alive) return;
+            if (!user) { setCurrentProfileLoaded(true); return; }
 
             setCurrentUserId(user.id);
 
@@ -250,6 +254,7 @@ export default function AddBookPage() {
 
             setCurrentUsername((profile as any)?.username ?? null);
             setCurrentUserRole((profile as any)?.role ?? null);
+            setCurrentProfileLoaded(true);
             setCurrentUserIsSuperTeacher(
                 (profile as any)?.is_super_teacher === true ||
                 (profile as any)?.is_super_teacher === "true"
@@ -1438,6 +1443,11 @@ export default function AddBookPage() {
         : "manual";
     const isbnButtonState = addButtonState(isbnActionKey);
     const manualButtonState = addButtonState(manualActionKey);
+    if (!currentProfileLoaded) return <main className="mx-auto max-w-4xl px-4 py-8"><p role="status">Loading Add Book…</p></main>;
+    if (!currentUserId) return <main className="mx-auto max-w-4xl px-4 py-8"><Link href="/login">Sign in to add a book</Link></main>;
+    if (isSimpleReaderAddBook({ role: currentUserRole, isSuperTeacher: currentUserIsSuperTeacher, destination, context: addBookContext, targetUserId: targetUserIdParam, ownerId: currentUserId })) {
+        return <ReaderAddBook key={currentUserId} ownerId={currentUserId} />;
+    }
     return (
         <main className="mx-auto max-w-4xl px-4 py-8">
             <Link

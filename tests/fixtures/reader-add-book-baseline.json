@@ -1,0 +1,81 @@
+{
+  "core_function": {
+    "name": "validate_book_core_metadata",
+    "owner": "postgres",
+    "signature": "",
+    "definition": "CREATE OR REPLACE FUNCTION public.validate_book_core_metadata()\n RETURNS trigger\n LANGUAGE plpgsql\n SET search_path TO 'public'\nAS $function$\nbegin\n  if (TG_OP = 'INSERT' or NEW.title is distinct from OLD.title)\n     and nullif(btrim(NEW.title), '') is null then\n    raise exception 'Title is required.' using errcode = '23514';\n  end if;\n  if (TG_OP = 'INSERT' or NEW.author is distinct from OLD.author)\n     and nullif(btrim(NEW.author), '') is null then\n    raise exception 'Author is required.' using errcode = '23514';\n  end if;\n  -- Application entry points normalize language aliases to two-letter codes.\n  if (TG_OP = 'INSERT' or NEW.language_code is distinct from OLD.language_code)\n     and (NEW.language_code is null or NEW.language_code !~ '^[a-z]{2}$') then\n    raise exception 'Language is required (two-letter language code).' using errcode = '23514';\n  end if;\n  if (TG_OP = 'INSERT' or NEW.edition_format is distinct from OLD.edition_format)\n     and (NEW.edition_format is null or NEW.edition_format not in\n       ('bunko', 'tankobon_hardcover', 'tankobon_softcover', 'paperback',\n        'hardcover', 'ebook', 'audiobook', 'other')) then\n    raise exception 'Format is required.' using errcode = '23514';\n  end if;\n  return NEW;\nend $function$\n",
+    "security_definer": false
+  },
+  "books_policies": [
+    {
+      "cmd": "INSERT",
+      "qual": null,
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "books",
+      "policyname": "books_insert_authenticated",
+      "with_check": "true"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "true",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "books",
+      "policyname": "books_select_authenticated",
+      "with_check": null
+    },
+    {
+      "cmd": "UPDATE",
+      "qual": "true",
+      "roles": [
+        "authenticated"
+      ],
+      "tablename": "books",
+      "policyname": "books_update_authenticated",
+      "with_check": "true"
+    },
+    {
+      "cmd": "DELETE",
+      "qual": "is_super_teacher(auth.uid())",
+      "roles": [
+        "public"
+      ],
+      "tablename": "books",
+      "policyname": "super teachers delete books",
+      "with_check": null
+    },
+    {
+      "cmd": "INSERT",
+      "qual": null,
+      "roles": [
+        "public"
+      ],
+      "tablename": "books",
+      "policyname": "super teachers insert books",
+      "with_check": "is_super_teacher(auth.uid())"
+    },
+    {
+      "cmd": "SELECT",
+      "qual": "is_super_teacher(auth.uid())",
+      "roles": [
+        "public"
+      ],
+      "tablename": "books",
+      "policyname": "super teachers select books",
+      "with_check": null
+    },
+    {
+      "cmd": "UPDATE",
+      "qual": "is_super_teacher(auth.uid())",
+      "roles": [
+        "public"
+      ],
+      "tablename": "books",
+      "policyname": "super teachers update books",
+      "with_check": "is_super_teacher(auth.uid())"
+    }
+  ]
+}
