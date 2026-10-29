@@ -1,4 +1,5 @@
 import { missingCoreBookFields } from "@/lib/books/bookMetadata";
+import { canReviewBookInfo } from "@/lib/teacher/bookInfoAccess";
 import { supabase } from "@/lib/supabaseClient";
 
 export type GlobalBookRow = {
@@ -27,7 +28,15 @@ export function missingGlobalBookFields(book: GlobalBookRow) {
     return missingCoreBookFields(book);
 }
 
+export async function requireBookInfoReviewer() {
+  return checkReviewer(true);
+}
+
 export async function requireSuperTeacher() {
+  return checkReviewer(false);
+}
+
+async function checkReviewer(allowAdmin: boolean) {
   const { data: auth, error: authError } = await supabase.auth.getUser();
   const user = auth?.user;
 
@@ -44,10 +53,11 @@ export async function requireSuperTeacher() {
   if (profileError) return { user: null, error: profileError.message };
 
   const canAccess =
+    (allowAdmin && canReviewBookInfo(profile)) ||
     profile?.role === "super_teacher" || isSuperTeacherFlag(profile?.is_super_teacher);
 
   if (!canAccess) {
-    return { user: null, error: "Super teacher access is required for book attention flags." };
+    return { user: null, error: allowAdmin ? "Admin or super teacher access is required for missing book information." : "Super teacher access is required for book attention flags." };
   }
 
   return { user, error: null };

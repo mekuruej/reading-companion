@@ -3,6 +3,7 @@
 
 "use client";
 
+import TeacherMissingBookInfoPage from "../books/missing-info/page";
 import { missingCoreBookFields } from "@/lib/books/bookMetadata";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
@@ -137,6 +138,7 @@ function missingGlobalBookFields(book: GlobalBookRow) {
 }
 
 export default function TeacherNeedsAttentionPage() {
+  const [adminOnly, setAdminOnly] = useState(false);
   const [accessChecked, setAccessChecked] = useState(false);
   const [canAccess, setCanAccess] = useState(false);
   const [message, setMessage] = useState("");
@@ -199,11 +201,13 @@ export default function TeacherNeedsAttentionPage() {
       const isSuperTeacher =
         profile?.role === "super_teacher" || isSuperTeacherFlag(profile?.is_super_teacher);
 
-      setCanAccess(isTeacher);
+      const catalogAdmin = profile?.role === "admin" && !isSuperTeacher;
+      setAdminOnly(catalogAdmin);
+      setCanAccess(isTeacher || catalogAdmin);
       setMessage(isTeacher ? "" : "Teacher access is required.");
       setAccessChecked(true);
 
-      if (!isTeacher) {
+      if (catalogAdmin || !isTeacher) {
         setCountsLoading(false);
         return;
       }
@@ -377,6 +381,8 @@ export default function TeacherNeedsAttentionPage() {
   if (!canAccess) {
     return <NeedsAttentionAccessPanel message={message} />;
   }
+
+  if (adminOnly) return <TeacherMissingBookInfoPage />;
 
   return (
     <main className="min-h-screen bg-slate-100 px-3 py-4 sm:px-6 sm:py-8">

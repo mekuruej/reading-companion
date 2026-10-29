@@ -10,7 +10,7 @@ import { getTeacherBackLink } from "../../components/teacherBackLink";
 import {
   type GlobalBookRow,
   missingGlobalBookFields,
-  requireSuperTeacher,
+  requireBookInfoReviewer,
 } from "../_shared/bookAttentionHelpers";
 
 type MissingBookInfoItem = {
@@ -36,7 +36,7 @@ export default function TeacherMissingBookInfoPage() {
     setMessage("");
 
     try {
-      const access = await requireSuperTeacher();
+      const access = await requireBookInfoReviewer();
       if (access.error || !access.user) {
         setMessage(access.error ?? "Super teacher access is required.");
         setItems([]);
@@ -76,7 +76,7 @@ export default function TeacherMissingBookInfoPage() {
     setMessage("");
 
     try {
-      const access = await requireSuperTeacher();
+      const access = await requireBookInfoReviewer();
       if (access.error || !access.user) {
         setMessage(access.error ?? "Please sign in again.");
         return;

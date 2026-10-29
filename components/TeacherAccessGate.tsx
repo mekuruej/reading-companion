@@ -4,8 +4,9 @@
 "use client";
 
 import Link from "next/link";
+import { canEnterTeacherRoute } from "@/lib/teacher/bookInfoAccess";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
 type Props = {
@@ -14,6 +15,8 @@ type Props = {
 
 export default function TeacherAccessGate({ children }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
+  const [checkedPath, setCheckedPath] = useState<string | null>(null);
 
   const [checking, setChecking] = useState(true);
   const [allowed, setAllowed] = useState(false);
@@ -58,11 +61,10 @@ export default function TeacherAccessGate({ children }: Props) {
         }
 
         const canAccess =
-          profile?.role === "teacher" ||
-          profile?.role === "super_teacher" ||
-          !!profile?.is_super_teacher;
+          canEnterTeacherRoute(profile, pathname);
 
         if (!cancelled) {
+          setCheckedPath(pathname);
           setAllowed(canAccess);
           setMessage(canAccess ? "" : "This page is only available to teachers.");
           setChecking(false);
@@ -83,9 +85,9 @@ export default function TeacherAccessGate({ children }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, pathname]);
 
-  if (checking) {
+  if (checking || (allowed && checkedPath !== pathname)) {
     return <div className="p-6 text-sm text-stone-600">Checking teacher access...</div>;
   }
 

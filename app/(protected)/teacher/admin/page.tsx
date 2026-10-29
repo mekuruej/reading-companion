@@ -16,7 +16,7 @@ const sections: { title: string; tools: Tool[] }[] = [
     { title: "Books & Catalog", route: "/teacher/books", description: "Review shared catalog issues and book requests." },
     { title: "Book Requests", route: "/teacher/books/requests", description: "Review requested books.", superOnly: true },
     { title: "Book Flags", route: "/teacher/books/flags", description: "Review reported book issues.", superOnly: true },
-    { title: "Missing Book Information", route: "/teacher/books/missing-info", description: "Complete missing catalog details.", superOnly: true },
+    { title: "Missing Book Information", route: "/teacher/books/missing-info", description: "Complete missing catalog details." },
     { title: "Catalog Editor", route: "/teacher/books/add", description: "Edit shared edition metadata." },
   ] },
   { title: "Shared Language Content", tools: [
@@ -28,7 +28,7 @@ const sections: { title: string; tools: Tool[] }[] = [
     { title: "Grammar DB", route: "/teacher/needs-attention/grammar", description: "Maintain shared grammar content.", superOnly: true },
   ] },
   { title: "Diagnostics & Maintenance", tools: [
-    { title: "Needs Attention", route: "/teacher/needs-attention", description: "Open global review and cleanup queues.", superOnly: true },
+    { title: "Needs Attention", route: "/teacher/needs-attention", description: "Open available review and cleanup queues." },
     { title: "Site Upkeep", route: "/teacher/general-upkeep", description: "Open existing maintenance tools." },
     { title: "Testing Tools", route: "/teacher/testing", description: "Check feature access and Ability Check behavior." },
   ] },
