@@ -108,6 +108,7 @@ type Book = {
   illustrator_english_name: string | null;
   publisher_id?: string | null;
   cover_url: string | null;
+  needs_review?: boolean | null;
   genre: string | null;
   book_type: string | null;
   language_code: string | null;
@@ -3863,6 +3864,7 @@ export default function BookHubPage() {
           illustrator,
           illustrator_english_name,
           cover_url,
+          needs_review,
           genre,
           book_type,
           language_code,
@@ -5825,6 +5827,7 @@ export default function BookHubPage() {
               <BookHubHero
                 book={book}
                 displayedCoverUrl={book.cover_url}
+                isPendingReview={book.needs_review === true}
                 bookHubContextLabel={bookHubContextLabel}
                 isViewingStudentBookHub={isViewingStudentBookHub}
               />

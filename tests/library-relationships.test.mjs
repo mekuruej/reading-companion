@@ -15,7 +15,12 @@ function load(file) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
   new Function('require', 'module', 'exports', code)(name => {
-    if (name.startsWith('@/')) return load(name.slice(2) + '.ts');
+    if (name.startsWith('@/')) {
+      const aliasPath = name.slice(2);
+      for (const extension of ['.tsx', '.ts']) {
+        if (fs.existsSync(aliasPath + extension)) return load(aliasPath + extension);
+      }
+    }
     if (name.startsWith('./')) {
       const siblingPath = path.join(path.dirname(file), name);
       for (const extension of ['.tsx', '.ts']) {

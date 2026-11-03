@@ -44,6 +44,7 @@ type Book = {
   publisher: string | null;
   isbn13: string | null;
   cover_url: string | null;
+  needs_review?: boolean | null;
   page_count: number | null;
   kindle_location_count?: number | null;
   audiobook_duration_minutes?: number | null;
@@ -464,6 +465,7 @@ export default function BooksPage() {
           language_code,
           author,
           cover_url,
+          needs_review,
           page_count,
           kindle_location_count,
           audiobook_duration_minutes,

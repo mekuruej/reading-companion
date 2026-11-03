@@ -1,3 +1,4 @@
+import PendingBookCover from "@/components/books/PendingBookCover";
 import { displayBookTitle } from "@/lib/books/bookIdentity";
 import type { LibraryRelationshipBadge } from "../libraryRelationship";
 
@@ -5,6 +6,7 @@ type LibraryBookCardBook = {
   title: string;
   language_code?: string | null;
   cover_url: string | null;
+  needs_review?: boolean | null;
 };
 
 type LibraryBookCardRow = {
@@ -56,6 +58,8 @@ export default function LibraryBookCard({
             alt={`${displayTitle} cover`}
             className="h-48 w-32 rounded-md object-cover shadow-md"
           />
+        ) : book.needs_review ? (
+          <PendingBookCover className="h-48 w-32" />
         ) : (
           <div className="flex h-48 w-32 items-center justify-center rounded-md bg-gray-200 text-sm text-gray-400">
             No cover

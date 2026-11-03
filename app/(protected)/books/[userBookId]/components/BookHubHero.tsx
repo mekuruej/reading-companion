@@ -1,3 +1,4 @@
+import PendingBookCover from "@/components/books/PendingBookCover";
 import BookEditionLine from "@/components/books/BookEditionLine";
 import type { EditionDisplayFields } from "@/lib/books/editionDisplay";
 import { getBookIdentity } from "@/lib/books/bookIdentity";
@@ -15,6 +16,7 @@ type BookHubHeroBook = EditionDisplayFields & {
 type BookHubHeroProps = {
   book: BookHubHeroBook;
   displayedCoverUrl: string | null;
+  isPendingReview: boolean;
   bookHubContextLabel: string;
   isViewingStudentBookHub: boolean;
 };
@@ -22,6 +24,7 @@ type BookHubHeroProps = {
 export default function BookHubHero({
   book,
   displayedCoverUrl,
+  isPendingReview,
   bookHubContextLabel,
   isViewingStudentBookHub,
 }: BookHubHeroProps) {
@@ -36,6 +39,8 @@ export default function BookHubHero({
             alt={`${bookIdentity.title} cover`}
             className="w-full rounded-2xl border border-stone-200 object-cover shadow-sm"
           />
+        ) : isPendingReview ? (
+          <PendingBookCover className="rounded-2xl" />
         ) : (
           <div className="flex aspect-[2/3] w-full items-center justify-center rounded-2xl border border-stone-200 bg-stone-100 text-sm text-stone-400">
             No cover
