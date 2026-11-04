@@ -6,7 +6,8 @@ type LibraryBookCardBook = {
   title: string;
   language_code?: string | null;
   cover_url: string | null;
-  needs_review?: boolean | null;
+  reader_created?: boolean;
+  catalog_reviewed_at?: string | null;
 };
 
 type LibraryBookCardRow = {
@@ -58,7 +59,7 @@ export default function LibraryBookCard({
             alt={`${displayTitle} cover`}
             className="h-48 w-32 rounded-md object-cover shadow-md"
           />
-        ) : book.needs_review ? (
+        ) : book.reader_created === true && book.catalog_reviewed_at === null ? (
           <PendingBookCover className="h-48 w-32" />
         ) : (
           <div className="flex h-48 w-32 items-center justify-center rounded-md bg-gray-200 text-sm text-gray-400">
