@@ -37,6 +37,7 @@ const Context = createContext<ContextValue>({
 export const useBookProgress = () => useContext(Context);
 
 function suggestedMethod(totals: ProgressTotals) {
+  if (totals.edition_format === "audiobook") return "audiobook_time";
   const pages = matchingTotal("page", totals);
   const locations = matchingTotal("kindle_location", totals);
   return locations && !pages ? "kindle_location" : pages && !locations ? "page" : null;
@@ -165,13 +166,19 @@ export function BookProgressProvider({ userBookId, children, readOnly = false }:
 
 function ProgressTrackingEditor({ allowDismiss = false }: { allowDismiss?: boolean }) {
   const tracking = useBookProgress();
+  const isAudiobook = tracking.totals.edition_format === "audiobook";
+  const description = isAudiobook
+    ? "Choose elapsed audiobook time or percentage. Your Listening timer records actual minutes separately."
+    : tracking.method === "kindle_location"
+      ? "Kindle Locations are the position numbers shown by Kindle, separate from printed pages."
+      : "Choose the position format used by this copy.";
   return <div className="min-w-0 space-y-3">
     <h3 id="progress-method-title" className="text-sm font-semibold leading-5 text-stone-900">How will you track your progress in this copy?</h3>
-    <p className="text-xs leading-5 text-stone-600">{tracking.method === "audiobook_time" ? "Use the published audio timeline. Minutes listened are recorded separately." : "Kindle Locations are the position numbers shown by Kindle, separate from printed pages."}</p>
+    <p className="text-xs leading-5 text-stone-600">{description}</p>
     {tracking.method ? <p className="text-xs leading-5 text-amber-800">Earlier entries keep their original units. Record your next position in the new unit when you log your reading.</p> : null}
     <fieldset disabled={tracking.saving} className="space-y-2">
       <legend className="sr-only">Progress tracking method</legend>
-      {(tracking.totals.edition_format === "audiobook" ? ["audiobook_time"] as const : ["page", "kindle_location", "percent"] as const).map((value) => <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 ${tracking.choice === value ? "border-violet-400 bg-violet-50" : "border-violet-100 bg-white"}`}>
+      {(isAudiobook ? ["audiobook_time", "percent"] as const : ["page", "kindle_location", "percent"] as const).map((value) => <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 ${tracking.choice === value ? "border-violet-400 bg-violet-50" : "border-violet-100 bg-white"}`}>
         <input type="radio" name="progress-method" checked={tracking.choice === value} onChange={() => tracking.choose(value)} className="shrink-0 accent-violet-700" />
         <span className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-2 text-sm text-stone-800">
           <span>{progressLabels(value).name}</span>

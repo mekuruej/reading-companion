@@ -1982,7 +1982,7 @@ function CuriosityReadingContent({
       if (error) { setMessage(`❌ Could not save reading session: ${error.message}`); return; }
     }
 
-    if (isListeningMode && nativeListeningPosition && tracking.method !== "audiobook_time") {
+    if (isListeningMode && nativeListeningPosition && tracking.method !== "audiobook_time" && tracking.method !== "percent") {
       const { data: currentBookStatus, error: currentBookStatusError } = await supabase
         .from("user_books")
         .select("started_at")

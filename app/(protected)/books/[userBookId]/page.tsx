@@ -1283,7 +1283,7 @@ export default function BookHubPage() {
   }, [visualReadingSessions]);
 
   const bookHubProgressSummaryLabel = (
-    tracking.method === "audiobook_time"
+    book?.edition_format === "audiobook"
       ? [trackedProgress.total ? `Audiobook length: ${formatAudioTime(trackedProgress.total)}` : "Audiobook length unknown. Add it through the catalog editor or Flag a problem to request it."]
       : isNativeAudiobook
       ? [row?.current_location?.trim() ? `Listening progress ${row.current_location.trim()}` : null]

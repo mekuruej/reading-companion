@@ -507,7 +507,7 @@ export default function SimpleTimedSessionPage({
         if (!tracking.requireMethod() || !tracking.method) return;
         const trimmedEndPage = sessionEndPage.trim();
         const parsed = parseProgressRange(activeSessionMode === "listening" ? "" : sessionStartPage, trimmedEndPage, tracking.method, progressTotal);
-        if (parsed.error && (tracking.method === "audiobook_time" || !isNativeListeningMode || (!/^\d+:\d{2}(?::\d{2})?$/.test(trimmedEndPage) && /^[\d.+-]|^(?:p(?:age)?|loc(?:ation)?)\.?\s*\d/i.test(trimmedEndPage)))) { alert(parsed.error); return; }
+        if (parsed.error && (tracking.method === "audiobook_time" || tracking.method === "percent" || !isNativeListeningMode || (!/^\d+:\d{2}(?::\d{2})?$/.test(trimmedEndPage) && /^[\d.+-]|^(?:p(?:age)?|loc(?:ation)?)\.?\s*\d/i.test(trimmedEndPage)))) { alert(parsed.error); return; }
         const positionPayload = parsed.error ? progressPayload(tracking.method, null, null, progressTotal) : parsed.payload;
 
         const minutesNum = Number(sessionMinutesRead || Math.max(1, Math.round(elapsed / 60)));
@@ -561,7 +561,7 @@ export default function SimpleTimedSessionPage({
             bookPatch.started_at = readOn;
         }
 
-        if (isNativeListeningMode && tracking.method !== "audiobook_time") {
+        if (isNativeListeningMode && tracking.method !== "audiobook_time" && tracking.method !== "percent") {
             bookPatch.current_location = trimmedEndPage || null;
         }
 
@@ -677,7 +677,7 @@ export default function SimpleTimedSessionPage({
 
         if (!tracking.requireMethod() || !tracking.method) return;
         const parsed = parseProgressRange("", trimmedLocation, tracking.method, progressTotal);
-        if (parsed.error && (tracking.method === "audiobook_time" || !isNativeListeningMode || (!/^\d+:\d{2}(?::\d{2})?$/.test(trimmedLocation) && /^[\d.+-]|^(?:p(?:age)?|loc(?:ation)?)\.?\s*\d/i.test(trimmedLocation)))) { setProgressUpdateMessage(parsed.error); return; }
+        if (parsed.error && (tracking.method === "audiobook_time" || tracking.method === "percent" || !isNativeListeningMode || (!/^\d+:\d{2}(?::\d{2})?$/.test(trimmedLocation) && /^[\d.+-]|^(?:p(?:age)?|loc(?:ation)?)\.?\s*\d/i.test(trimmedLocation)))) { setProgressUpdateMessage(parsed.error); return; }
         const positionPayload = parsed.error ? progressPayload(tracking.method, null, null, progressTotal) : parsed.payload;
 
         setSavingProgressUpdate(true);
@@ -713,7 +713,7 @@ export default function SimpleTimedSessionPage({
             bookPatch.started_at = readOn;
         }
 
-        if (activeSessionMode === "listening" && tracking.method !== "audiobook_time") {
+        if (activeSessionMode === "listening" && tracking.method !== "audiobook_time" && tracking.method !== "percent") {
             bookPatch.current_location = trimmedLocation;
         }
 
@@ -898,15 +898,20 @@ export default function SimpleTimedSessionPage({
                         {isNativeListeningMode ? "Listening position" : labels.current}
                     </div>
                     {tracking.method === "audiobook_time" ? <AudioTimeInput label="Current audiobook position (optional)" value={sessionEndPage} onChange={setSessionEndPage} /> : (<input
-                        type="text"
-                        inputMode="decimal"
+                        type={tracking.method === "percent" ? "number" : "text"}
+                        inputMode={tracking.method === "percent" ? "decimal" : "text"}
+                        min={tracking.method === "percent" ? 0 : undefined}
+                        max={tracking.method === "percent" ? 100 : undefined}
+                        step={tracking.method === "percent" ? "any" : undefined}
                         value={sessionEndPage}
                         onChange={(e) => setSessionEndPage(e.target.value)}
-                        placeholder={isNativeListeningMode ? "e.g. Chapter 8, 37%, or 3:12:45" : `Enter ${labels.unit.toLowerCase()}`}
+                        placeholder={tracking.method === "percent" ? "e.g. 37.5" : isNativeListeningMode ? "e.g. Chapter 8 or a location" : `Enter ${labels.unit.toLowerCase()}`}
                         className="w-full rounded-xl border px-3 py-2 text-sm"
                     />)}
                     <div className="mt-1 text-xs text-stone-500">
-                        {isNativeListeningMode
+                        {tracking.method === "percent"
+                            ? "Enter a position from 0 to 100%. Listening minutes are recorded separately."
+                            : isNativeListeningMode
                             ? "Optional. This updates your audiobook position without adding page data."
                             : "Optional. Use the saved progress tracking method for this copy."}
                     </div>
@@ -953,7 +958,7 @@ export default function SimpleTimedSessionPage({
             <div className="mt-3 space-y-1 text-sm text-stone-500">
                 <div>Time: {formatTimer(elapsed)}</div>
                 <div className="text-xs">
-                    {tracking.method === "audiobook_time" ? "Position follows the audio timeline; session minutes record your actual listening time." : isNativeListeningMode ? listeningLocationNote : `Positions are optional. Entries are saved in ${labels.plural}.`}
+                    {tracking.method === "audiobook_time" ? "Position follows the audio timeline; session minutes record your actual listening time." : tracking.method === "percent" ? "Position uses 0–100%; Listening minutes are recorded separately." : isNativeListeningMode ? listeningLocationNote : `Positions are optional. Entries are saved in ${labels.plural}.`}
                 </div>
             </div>
 
@@ -1020,11 +1025,14 @@ export default function SimpleTimedSessionPage({
                             {activeSessionMode === "listening" ? "Listening position" : labels.current}
                         </span>
                         {tracking.method === "audiobook_time" ? <AudioTimeInput label="Current audiobook position (optional)" value={progressUpdateLocation} onChange={setProgressUpdateLocation} /> : (<input
-                            type="text"
-                            inputMode={activeSessionMode === "listening" ? "text" : "numeric"}
+                            type={tracking.method === "percent" ? "number" : "text"}
+                            inputMode={tracking.method === "percent" ? "decimal" : activeSessionMode === "listening" ? "text" : "numeric"}
+                            min={tracking.method === "percent" ? 0 : undefined}
+                            max={tracking.method === "percent" ? 100 : undefined}
+                            step={tracking.method === "percent" ? "any" : undefined}
                             value={progressUpdateLocation}
                             onChange={(event) => setProgressUpdateLocation(event.target.value)}
-                            placeholder={activeSessionMode === "listening" ? "e.g. Chapter 8, 37%, or 3:12:45" : "e.g. 84"}
+                            placeholder={tracking.method === "percent" ? "e.g. 37.5" : activeSessionMode === "listening" ? "e.g. Chapter 8 or a location" : "e.g. 84"}
                             className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-stone-300"
                         />)}
                     </div>

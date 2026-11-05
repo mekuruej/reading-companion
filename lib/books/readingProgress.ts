@@ -127,5 +127,10 @@ export function formatProgressPosition(position: number, method: ProgressTrackin
   return method === "audiobook_time" ? formatAudioTime(position) : `${progressLabels(method).unit} ${position}${method === "percent" ? "%" : ""}`;
 }
 export function effectiveProgressMethod(method: unknown, book: ProgressTotals): ProgressTrackingMethod | null {
-  return book.edition_format === "audiobook" ? "audiobook_time" : progressMethod(method);
+  if (book.edition_format === "audiobook") {
+    // Existing audiobook copies default to elapsed time, while readers may
+    // choose percentage as their persistent position format.
+    return progressMethod(method) === "percent" ? "percent" : "audiobook_time";
+  }
+  return progressMethod(method);
 }

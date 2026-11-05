@@ -17,6 +17,10 @@ const {normalizeSessionPayload}=load('lib/books/readingSessionPayload.ts');
 const book={edition_format:'audiobook',audiobook_duration_minutes:555,page_count:300,kindle_location_count:6000};
 test('audio uses published timeline total and human readable hours/minutes',()=>{
   assert.equal(p.effectiveProgressMethod('page',book),'audiobook_time');
+  assert.equal(p.effectiveProgressMethod(null,book),'audiobook_time');
+  assert.equal(p.effectiveProgressMethod('audiobook_time',book),'audiobook_time');
+  assert.equal(p.effectiveProgressMethod('percent',book),'percent');
+  assert.equal(p.effectiveProgressMethod('page',{edition_format:'audiobook'}),'audiobook_time');
   assert.equal(p.effectiveProgressMethod('page',{edition_format:'paperback'}),'page');
   assert.equal(p.completionPercent(222,'audiobook_time',book),40);
   assert.equal(p.formatProgressPosition(222,'audiobook_time'),'3 hr 42 min');
@@ -43,6 +47,48 @@ test('listening duration and position are independent; unknown total and untimed
   assert.equal(normalizeSessionPayload({minutes_read:30,session_mode:'listening'},{books:book}).end_position,null);
   assert.equal(normalizeSessionPayload({end_position:222},{books:book}).minutes_read,null);
   assert.equal(normalizeSessionPayload({end_position:12},{books:book},{tracking_unit:'page',progress_total:300}).tracking_unit,'page');
+});
+test('audiobook percentage position uses the saved per-copy method and preserves listening duration separately',()=>{
+  const result=normalizeSessionPayload({session_mode:'listening',minutes_read:25,end_position:42.5},
+    {progress_tracking_method:'percent',books:book});
+  assert.equal(result.tracking_unit,'percent');
+  assert.equal(result.end_position,42.5);
+  assert.equal(result.progress_total,100);
+  assert.equal(result.minutes_read,25);
+  assert.equal(result.session_mode,'listening');
+  const existingAudio=normalizeSessionPayload({session_mode:'listening',minutes_read:20,end_position:222},
+    {progress_tracking_method:'audiobook_time',books:book});
+  assert.equal(existingAudio.tracking_unit,'audiobook_time');
+  assert.equal(existingAudio.progress_total,555);
+});
+test('English and Japanese audiobooks support either method, and switching methods preserves historical units',()=>{
+  for(const language_code of ['en','ja']){
+    const edition={...book,language_code};
+    assert.equal(p.effectiveProgressMethod('audiobook_time',edition),'audiobook_time');
+    assert.equal(p.effectiveProgressMethod('percent',edition),'percent');
+    const copy={books:edition,progress_tracking_method:'audiobook_time'};
+    const oldTime=normalizeSessionPayload({session_mode:'listening',minutes_read:30,end_position:149},copy);
+    copy.progress_tracking_method='percent';
+    const newPercent=normalizeSessionPayload({session_mode:'listening',minutes_read:20,end_position:37.5},copy);
+    assert.equal(oldTime.tracking_unit,'audiobook_time');
+    assert.equal(oldTime.progress_total,555);
+    assert.equal(newPercent.tracking_unit,'percent');
+    assert.equal(newPercent.progress_total,100);
+    const history=[oldTime,newPercent];
+    assert.equal(p.progressSummary(history,'audiobook_time',edition).position,149);
+    assert.equal(p.progressSummary(history,'percent',edition).position,37.5);
+    assert.equal(history[0].tracking_unit,'audiobook_time');
+  }
+});
+test('audiobook settings and Book Hub position control offer both persisted position formats',()=>{
+  const provider=fs.readFileSync(path.join(root,'components/books/BookProgressProvider.tsx'),'utf8');
+  const control=fs.readFileSync(path.join(root,'components/books/AudiobookProgressControl.tsx'),'utf8');
+  const hub=fs.readFileSync(path.join(root,'app/(protected)/books/[userBookId]/page.tsx'),'utf8');
+  assert.match(provider,/if \(totals\.edition_format === "audiobook"\) return "audiobook_time"/);
+  assert.match(provider,/\["audiobook_time", "percent"\]/);
+  assert.match(control,/method !== "audiobook_time" && method !== "percent"/);
+  assert.match(control,/Current audiobook position \(%\)/);
+  assert.match(hub,/book\?\.edition_format === "audiobook"\s*\? \[trackedProgress\.total \? `Audiobook length:/);
 });
 test('audio positions reject invalid values and never accept page/location prefixes',()=>{
   for(const raw of ['-1','1.5','NaN','Infinity','556','loc 20','20%','3:42']) assert.ok(p.parseProgressPosition(raw,'audiobook_time',555).error,raw);
@@ -76,6 +122,9 @@ test('SQL migration is rerunnable, preserves history and validates audio snapsho
     await db.exec("insert into user_book_reading_sessions(user_book_id,tracking_unit,end_position,minutes_read) values(1,'audiobook_time',222,25)");
     const audio=(await db.query('select * from user_book_reading_sessions where id=2')).rows[0];
     assert.equal(Number(audio.progress_total),555);assert.equal(Number(audio.end_position),222);assert.equal(Number(audio.minutes_read),25);assert.equal(audio.end_page,null);
+    await db.exec("update user_books set progress_tracking_method='percent'; insert into user_book_reading_sessions(user_book_id,tracking_unit,end_position,minutes_read) values(1,'percent',42.5,25)");
+    const percent=(await db.query('select * from user_book_reading_sessions where id=3')).rows[0];
+    assert.equal(Number(percent.progress_total),100);assert.equal(Number(percent.end_position),42.5);assert.equal(percent.tracking_unit,'percent');
     await assert.rejects(db.exec("insert into user_book_reading_sessions(user_book_id,tracking_unit,end_position) values(1,'audiobook_time',556)"),/exceeds/);
     await assert.rejects(db.exec("insert into user_book_reading_sessions(user_book_id,tracking_unit,end_position) values(1,'audiobook_time',1.5)"),/whole/);
     await assert.rejects(db.exec("update user_book_reading_sessions set tracking_unit='audiobook_time' where id=1"),/original tracking unit/);
