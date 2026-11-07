@@ -1118,10 +1118,7 @@ function CuriosityReadingContent({
       const next = await fetchLibraryStudyColorInfoByWord(
         supabase,
         user.id,
-        wordsToCheck,
-        {
-          includeMissingAsFirstEncounter: true,
-        }
+        wordsToCheck
       );
 
       if (!cancelled) {
